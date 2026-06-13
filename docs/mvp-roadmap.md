@@ -23,15 +23,15 @@ Goal: resolve the minimum unknowns before scaffolding heavy code.
 
 Tasks:
 
-- Research ephemeris libraries for Kotlin/JVM and Java backend use.
-- Validate one library against known Moonrise/Moon altitude/azimuth examples.
+- Research ephemeris libraries for Kotlin/JVM and Java backend use. Initial recommendation is documented in `docs/ephemeris-research.md`.
+- Validate Astronomy Engine against known Moonrise/Moon altitude/azimuth examples before scaffolding app/backend code.
 - Research weather providers, including terms, forecast horizon, rate limits, cost, and API key requirements.
 - Decide whether provider requirements force a backend for the MVP.
 - Draft the `POST /forecast-opportunities` request/response shape if a backend is selected.
 
 Exit criteria:
 
-- Ephemeris library candidate selected.
+- Ephemeris library candidate selected and validation plan documented.
 - Weather provider candidate selected.
 - MVP architecture choice documented in `docs/architecture.md`.
 
@@ -108,6 +108,6 @@ Exit criteria:
 
 ## Smallest Next Implementation Step
 
-Before scaffolding code, do one research spike:
+Before scaffolding app/backend code, finish the ephemeris validation spike:
 
-Select one ephemeris library candidate and document a tiny validation plan with two or three known reference cases. This keeps the next step small while attacking the riskiest domain dependency.
+Use the cases in `docs/ephemeris-research.md` to compare Astronomy Engine against JPL Horizons, then record the observed differences and decide whether the library is accepted for the prototype.

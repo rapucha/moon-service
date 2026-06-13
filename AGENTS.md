@@ -35,6 +35,7 @@ The main unresolved choice is whether the first MVP should be fully backendless 
 - `docs/product-notes.md`: product stance, users, MVP scope, privacy posture.
 - `docs/architecture.md`: architecture options, recommended hybrid shape, unresolved decisions.
 - `docs/scoring-model.md`: first scoring model for Moon opportunities.
+- `docs/ephemeris-research.md`: ephemeris library recommendation and validation plan.
 - `docs/mvp-roadmap.md`: milestone plan and implementation order.
 
 ## Engineering Guidelines

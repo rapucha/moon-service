@@ -1,0 +1,171 @@
+# Ephemeris Research
+
+## Decision
+
+Use Astronomy Engine as the first ephemeris candidate for Moon Service.
+
+Repository and docs: <https://github.com/cosinekitty/astronomy>
+
+Rationale:
+
+- It has Kotlin/JVM support with Java examples, so it can run in Android Kotlin and a future JVM backend.
+- It calculates apparent horizon-based positions for an observer on Earth, including altitude and azimuth.
+- It supports rise and set searches for the Moon, Sun, and planets.
+- It exposes Moon phase and illumination data needed by the scoring model.
+- It is MIT licensed, which is simple for a private or later public app.
+- It is designed to be small and dependency-light.
+- The project documents validation against NOVAS, JPL Horizons, and other ephemeris sources, with a target accuracy suitable for amateur astronomy use.
+
+Initial caveat:
+
+- The Kotlin/JVM package is distributed through JitPack in the upstream README, not Maven Central. Before committing to it permanently, verify that this is acceptable for Android and backend builds, or vendor/fork only if there is a strong reason.
+
+## Candidate Comparison
+
+### Astronomy Engine
+
+Status: recommended first candidate.
+
+Source: <https://github.com/cosinekitty/astronomy>
+
+Relevant capabilities:
+
+- `Observer` for latitude, longitude, and elevation.
+- `horizon(...)` for topocentric altitude and azimuth.
+- `searchRiseSet(...)` for rise/set times.
+- `illumination(...)` and Moon phase functions.
+- Kotlin/JVM and Java-facing API.
+
+Tradeoffs:
+
+- JitPack dependency source needs build-policy review.
+- API is astronomy-oriented rather than photography-oriented, so Moon Service still needs its own candidate-window and scoring layer.
+
+### Time4J / Time4A
+
+Status: secondary candidate or cross-check source.
+
+Source: <https://github.com/MenoData/Time4J>
+
+Relevant capabilities:
+
+- Java time library with sun/moon astronomy support.
+- Android users are directed to the sister project Time4A.
+
+Tradeoffs:
+
+- LGPL-2.1 license is workable in some cases, but it adds more distribution and compliance considerations than MIT.
+- It is a broad date/time/calendar library, so adopting it only for Moon calculations may be heavier than needed.
+
+### Swiss Ephemeris
+
+Status: do not use for MVP.
+
+Source: <https://www.astro.com/swisseph/swephinfo_e.htm>
+
+Relevant capabilities:
+
+- Very high precision ephemeris based on JPL data.
+- Long historical/future time coverage.
+
+Tradeoffs:
+
+- Dual licensed under AGPL or a paid professional license.
+- The AGPL path is not a good fit for this project unless the whole distribution and service model intentionally adopts AGPL.
+- The precision and data footprint are unnecessary for alert-level Moon photography planning.
+
+## Recommended Abstraction
+
+When implementation starts, keep project code independent of the library API:
+
+```text
+EphemerisService
+  input:
+    - UTC instant
+    - latitude
+    - longitude
+    - elevation meters
+
+  output:
+    - Moon altitude degrees
+    - Moon azimuth degrees
+    - Moon illumination fraction
+    - Moon phase angle or named phase
+    - next moonrise time
+    - next moonset time
+    - Sun altitude degrees
+```
+
+This boundary allows replacing the ephemeris library later without changing scoring or UI code.
+
+## Validation Source
+
+Use NASA/JPL Horizons as the primary reference for validation.
+
+API docs: <https://ssd-api.jpl.nasa.gov/doc/horizons.html>
+
+Useful Horizons behavior:
+
+- `EPHEM_TYPE=OBSERVER` provides observer ephemerides.
+- `CENTER='coord'` plus `SITE_COORD` can represent an arbitrary latitude/longitude/elevation.
+- `QUANTITIES` can request observer quantities such as apparent coordinates and azimuth/elevation.
+- `STEP_SIZE` supports fixed time steps and rise/transit/set event output modes for topocentric observers.
+
+Use a second source, such as Time4J/Time4A or a reputable public astronomy calculator, only to sanity-check that the JPL query was configured correctly.
+
+## Validation Cases
+
+Use UTC internally. Local time is listed only to make manual review easier.
+
+### Case 1: Prague Near Full Moon
+
+Purpose: validate normal mid-latitude Moon altitude, azimuth, illumination, and rise/set behavior near the main target use case.
+
+- Location: Prague, Czech Republic.
+- Coordinates: 50.0755 N, 14.4378 E.
+- Elevation: 250 m.
+- Time window: 2026-06-29 18:00 UTC to 2026-06-30 04:00 UTC.
+- Local time: Europe/Prague.
+- Expected reference: JPL Horizons observer table for Moon with azimuth/elevation and rise/set markers.
+
+### Case 2: Low Moon Window In Western Europe
+
+Purpose: validate low-altitude filtering around a practical horizon opportunity.
+
+- Location: Amsterdam, Netherlands.
+- Coordinates: 52.3676 N, 4.9041 E.
+- Elevation: 0 m.
+- Time window: 2026-07-29 18:00 UTC to 2026-07-30 04:00 UTC.
+- Local time: Europe/Amsterdam.
+- Expected reference: JPL Horizons observer table for Moon sampled every 10 minutes, plus interpolated crossing through 0 to 12 degrees altitude.
+
+### Case 3: Southern Hemisphere Regression Case
+
+Purpose: prevent north-hemisphere assumptions in azimuth, rise/set, and scoring.
+
+- Location: Wellington, New Zealand.
+- Coordinates: 41.2924 S, 174.7787 E.
+- Elevation: 0 m.
+- Time window: 2026-08-28 05:00 UTC to 2026-08-28 17:00 UTC.
+- Local time: Pacific/Auckland.
+- Expected reference: JPL Horizons observer table for Moon with azimuth/elevation and rise/set markers.
+
+## Acceptance Tolerances
+
+For the first implementation spike:
+
+- Moon altitude should be within 0.25 degrees of the reference for sampled instants.
+- Moon azimuth should be within 0.25 degrees of the reference for sampled instants.
+- Moonrise and moonset should be within 2 minutes of the reference.
+- Moon illumination fraction should be within 0.02 of the reference or equivalent trusted source.
+
+These tolerances are tighter than the product needs, but loose enough to avoid wasting time on harmless differences in refraction settings, elevation, and timescale handling.
+
+## Implementation Notes For Later
+
+- Normalize all calculations to UTC instants.
+- Store latitude and longitude as decimal degrees.
+- Include elevation when known, but allow `0 m` as a default.
+- Decide whether altitude means apparent refracted altitude or geometric altitude, and keep that choice consistent.
+- For alert scoring, apparent refracted altitude is likely more user-relevant near the horizon.
+- Never mix local civil time into core calculations except for display.

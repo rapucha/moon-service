@@ -138,7 +138,7 @@ These are acceptable limitations for an alert-first MVP, but the UI should avoid
 
 ## Research Needed
 
-- Pick an ephemeris library and validate Moon altitude/azimuth against a trusted reference.
+- Validate the recommended ephemeris candidate in `docs/ephemeris-research.md` against JPL Horizons before using it in product scoring.
 - Pick a weather provider and map its fields into the model.
 - Collect real sample days for known good and bad Moon photography conditions.
 - Tune thresholds from examples rather than preference alone.
