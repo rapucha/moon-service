@@ -2,9 +2,9 @@
 
 ## Project Purpose
 
-Moon Service is an Android-first alert tool for photographers. It should identify upcoming Moon photography opportunities near user-selected locations, with emphasis on low Moon altitude, useful ambient light, and promising weather.
+Moon Service is a lightweight discovery and alert tool for photographers. It should identify upcoming Moon photography opportunities near user-selected locations, with emphasis on low Moon altitude, useful ambient light, and promising weather.
 
-The near-term product is not a full Photographer's Ephemeris clone. It is an alert-first MVP that helps users decide when to go outside with a camera.
+The near-term product is not a full Photographer's Ephemeris clone. It is a web-first discovery MVP that helps users decide when to go outside with a camera, with recurring alerts added only after the basic value is proven.
 
 ## Current Phase
 
@@ -15,27 +15,34 @@ Do not scaffold backend, Android, database, or deployment code until the MVP arc
 ## Product Direction
 
 - Prefer no mandatory account for the MVP.
-- Store user locations and alert preferences locally on Android by default.
-- Treat email as optional for backup, email alerts, or calendar features.
+- Start with a zero-install web flow: enter a city/location and see the next good Moon opportunity.
+- Keep the first public product anonymous: web lookup, shareable result page, RSS/Atom, and `.ics` export.
+- Treat email alerts as later because they require storing personal data and handling consent, unsubscribe, deletion, retention, and provider processing.
+- Treat Reddit as a community experiment only; do not depend on automated posting.
+- Do not plan Mastodon or Bluesky integration for now.
 - Keep privacy boundaries explicit if a backend receives locations or preferences.
-- Favor an Android-first or hybrid architecture with a small backend control plane only where it creates clear value.
+- Favor a small backend because geocoding, weather lookup, caching, scoring, and provider migration are server-side concerns.
 
 ## Architecture Bias
 
 The current likely direction is:
 
-- Android app: UI, saved locations, local preferences, local notifications, and possibly local preview calculations.
-- Small backend: weather integration, scoring rules, candidate Moon opportunity generation, remote config, and later push/email/calendar support.
+- Web MVP: city/location entry, next opportunity display, shareable result page, RSS/Atom feeds, and `.ics` export.
+- Small backend: geocoding, weather integration, scoring rules, weather cache, candidate Moon opportunity generation, and provider abstraction.
+- Android later: saved locations, local preferences, local notifications, and possibly local preview calculations.
 
-The main unresolved choice is whether the first MVP should be fully backendless Android or Android plus a minimal scoring API.
+The main unresolved choice is now the exact first web/API contract for city lookup, opportunity results, RSS/Atom feeds, and `.ics` export.
 
 ## Documentation Map
 
 - `docs/moon-service-handover.md`: historical planning handover from the previous session.
 - `docs/product-notes.md`: product stance, users, MVP scope, privacy posture.
 - `docs/architecture.md`: architecture options, recommended hybrid shape, unresolved decisions.
+- `docs/api-shape.md`: first web/API contract, statuses, result kinds, localStorage, RSS/Atom, and `.ics` rules.
 - `docs/scoring-model.md`: first scoring model for Moon opportunities.
 - `docs/ephemeris-research.md`: ephemeris library recommendation and validation plan.
+- `docs/weather-provider-research.md`: weather provider recommendation, caching, and privacy notes.
+- `docs/geocoding-research.md`: geocoding provider recommendation and city/location lookup privacy notes.
 - `docs/mvp-roadmap.md`: milestone plan and implementation order.
 
 ## Engineering Guidelines
@@ -43,7 +50,7 @@ The main unresolved choice is whether the first MVP should be fully backendless 
 - Keep early changes narrow and documentation-led.
 - Prefer explicit tradeoffs over premature abstractions.
 - Do not introduce mandatory accounts without documenting user value and recovery behavior.
-- Do not permanently store user locations server-side unless the feature requires it and the privacy model is updated.
+- Do not permanently store user locations server-side unless saved alerts require it and the privacy model is updated.
 - Design device identity recovery before relying on anonymous device-bound accounts.
 - Treat Android Auto Backup and Firebase Cloud Messaging as conveniences with platform assumptions, not universal guarantees.
 

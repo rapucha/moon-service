@@ -25,6 +25,7 @@ Moon geometry:
 - Azimuth.
 - Illumination or phase.
 - Rise/set timing.
+- Observer elevation when available.
 
 Sun and light:
 
@@ -35,7 +36,9 @@ Sun and light:
 Weather:
 
 - Cloud cover.
+- Low, mid, and high cloud cover when available.
 - Precipitation probability.
+- Precipitation amount.
 - Visibility.
 - Forecast confidence if available.
 - Optional condition summary, such as clear, partly cloudy, fog, rain, snow, or overcast.
@@ -65,6 +68,33 @@ Suggested starting thresholds:
 - Cloud cover: reject very high cloud cover, but do not reject partial clouds automatically.
 
 These numbers are placeholders. Validate them against real examples before treating them as product behavior.
+
+## Observer Elevation And Horizon Obstruction
+
+Distinguish two concepts:
+
+- Observer elevation: the location's height above sea level. Ephemeris calculations can use this for small parallax/refraction corrections.
+- Horizon obstruction: terrain, hills, buildings, or trees that raise the effective horizon in a specific azimuth direction.
+
+Observer elevation is safe to include in V0 when the geocoder provides it. It does not solve hilly terrain visibility.
+
+Terrain horizon should be deferred until the product supports exact shooting positions. City-level lookup is too vague for terrain obstruction because "Prague" can mean very different viewpoints. Once exact positions exist, a later terrain model can estimate:
+
+```text
+observer location + azimuth -> terrain horizon altitude
+```
+
+Then visibility can be checked with:
+
+```text
+moon_visible = moon_altitude > terrain_horizon_altitude + margin
+```
+
+V0 should phrase low-horizon opportunities cautiously:
+
+```text
+Local hills, buildings, or trees may affect exact visibility near the horizon.
+```
 
 ## V0 Score Components
 
@@ -127,7 +157,7 @@ Include the raw facts needed for a photographer to make a decision:
 
 V0 ignores:
 
-- Terrain and true horizon elevation.
+- Terrain horizon elevation and local obstruction.
 - Buildings, trees, skylines, and local obstructions.
 - Exact subject alignment.
 - Shooting position versus subject position.
@@ -139,6 +169,6 @@ These are acceptable limitations for an alert-first MVP, but the UI should avoid
 ## Research Needed
 
 - Validate the recommended ephemeris candidate in `docs/ephemeris-research.md` against JPL Horizons before using it in product scoring.
-- Pick a weather provider and map its fields into the model.
+- Validate the recommended weather provider in `docs/weather-provider-research.md` against local forecast examples and map its fields into the model.
 - Collect real sample days for known good and bad Moon photography conditions.
 - Tune thresholds from examples rather than preference alone.

@@ -2,27 +2,55 @@
 
 ## Current Product Shape
 
-The leading architecture is Android-first with a small backend control plane. The Android app owns the user experience and local data; the backend owns fast-changing integrations and scoring logic.
+The leading architecture is now backend-backed with a web-first discovery surface. The first useful product can be a simple webpage where a user enters a city/location and sees the next promising Moon opportunity. Android remains important later for saved locations and reliable recurring alerts, but it no longer has to be the first surface.
 
 ```text
-Android app
+Web MVP
+  - city/location entry
+  - next opportunity display
+  - shareable result page
+  - RSS/Atom feeds
+  - `.ics` export
+
+Small backend
+  - geocoding
+  - weather provider integration
+  - Moon opportunity candidate generation
+  - scoring rules
+  - weather cache
+  - provider quota counters and private admin status page
+  - later terrain horizon support for exact shooting positions
+  - later saved alerts and email delivery
+
+Android app later
   - saved locations
   - preferences
   - opportunity list UI
   - local notifications
   - optional local ephemeris preview
-
-Small backend
-  - weather provider integration
-  - Moon opportunity candidate generation
-  - scoring rules
-  - remote config
-  - later push/email/calendar support
 ```
 
-The backend should not require accounts for the first scoring endpoint.
+The backend should not require accounts for the first lookup endpoint.
 
-## Option 1: Backendless Android App
+## Option 1: Web-First Backend MVP
+
+A small web app and backend let users enter a city/location and see upcoming Moon opportunities without installing an app.
+
+Benefits:
+
+- Lowest trial friction.
+- Easy to share with photographers.
+- Scoring quality can be validated before mobile work.
+- Backend is already justified for weather, geocoding, caching, and scoring.
+- RSS/Atom and `.ics` follow-up do not require accounts or personal-data subscriptions.
+
+Costs:
+
+- Web notifications are less reliable than Android local notifications.
+- Requires hosting from the beginning.
+- If email or recurring personal alerts are added, identity, consent, unsubscribe, deletion, and data-retention choices return.
+
+## Option 2: Backendless Android App
 
 The Android app calculates ephemeris, fetches weather, scores opportunities, stores locations locally, and schedules local notifications.
 
@@ -40,7 +68,7 @@ Costs:
 - Android background work may be delayed by battery restrictions.
 - Sync, push, email, calendar, and web access are harder later.
 
-## Option 2: Android Plus Small Backend
+## Option 3: Android Plus Small Backend
 
 The app remains local-first, but sends locations and preferences to a backend scoring API. The backend returns ranked Moon opportunities.
 
@@ -67,15 +95,21 @@ Costs:
 
 ## Recommended MVP Direction
 
-Use a hybrid architecture unless provider research shows that a backendless prototype is clearly simpler and acceptable.
+Use a web-first backend MVP. Weather provider research in `docs/weather-provider-research.md` makes a small backend useful earlier than originally assumed because it can protect paid API keys, cache forecast data, round coordinates before provider calls, and keep scoring/provider changes server-side. A web surface then gives the fastest way to test whether the score is useful.
 
 Recommended boundary:
 
-- Android stores user-owned data locally.
+- Web UI accepts a city/location and displays ranked opportunities.
+- Backend geocodes raw Unicode location queries.
+- Browser locale is used only as a display/ranking hint.
+- Backend fetches and caches weather by rounded coordinate/time bucket.
 - Backend computes ranked opportunities from request payloads.
+- Backend rate-limits public lookup requests and protects upstream provider quotas.
+- Backend records provider call counters and cache hit/miss counts for operational visibility.
 - Backend avoids permanent location storage in the first version.
-- Local notifications can be scheduled from opportunities returned by the backend.
-- Push notifications remain a later milestone.
+- RSS/Atom feeds and `.ics` export are the first low-friction follow-up options.
+- Email alerts remain later because they require storing email plus location preferences.
+- Android local notifications remain a later milestone for recurring personal alerts.
 
 ## Hosting Direction
 
@@ -93,6 +127,38 @@ Feasible early hosts:
 - Existing Intel NUC for alpha/beta if resource usage is monitored.
 - Raspberry Pi 4/5 with SSD, or preferably an x86 mini PC for Java/Spring ergonomics.
 
+## Admin/Ops Surface
+
+The backend should include a small private web admin/status surface before public alpha. This is not a full admin product or dashboard; it is an operator view for quota and health.
+
+Recommended first route:
+
+```text
+GET /admin/status
+```
+
+Protect it with simple admin authentication suitable for the deployment environment, such as basic auth behind Cloudflare Access or a single admin login. Do not expose it publicly.
+
+Minimum fields:
+
+- App version/build.
+- Active feature flags, including LLM fictional fallback.
+- Provider call counters by provider and endpoint.
+- Hourly, daily, and monthly usage estimates where plan limits are known.
+- Warning thresholds, such as 50 percent, 80 percent, and 95 percent of known limits.
+- Cache hit/miss counts for geocoding, weather, and scoring.
+- Recent provider errors and timeouts.
+- Current public API rate-limit settings.
+
+Provider quota tracking may need local counters because providers may not expose real-time quota usage. Count outbound calls from the backend and compare them with configured plan limits.
+
+Possible automatic responses:
+
+- Warn admin at 50 percent usage.
+- Treat 80 percent usage as operational risk.
+- Disable nonessential work near 95 percent, such as LLM Easter eggs or aggressive feed refresh.
+- Keep core lookup available as long as cached data is useful.
+
 ## Expected Future Stack
 
 Backend:
@@ -101,7 +167,7 @@ Backend:
 - Spring Boot REST API.
 - Postgres.
 - Flyway or Liquibase.
-- Scheduled jobs once push/email exists.
+- Scheduled jobs once feed generation or email exists.
 - Weather provider client.
 - Ephemeris and scoring engine.
 
@@ -117,11 +183,16 @@ Android:
 
 ## Key Unresolved Architecture Choices
 
-- First MVP boundary: backendless Android prototype or Android plus stateless scoring API.
+- First MVP boundary: web-first backend lookup is now favored; first API shape is documented in `docs/api-shape.md`.
+- Geocoding provider: Open-Meteo Geocoding is the first candidate for city/town lookup; exact-address autocomplete remains out of scope.
+- Internationalized search: raw Unicode input must work even when browser locale is generic or English.
 - Ephemeris implementation: Kotlin/JVM library shared with Android, Java backend library, or separate implementations.
-- Weather provider: API quality, cost, forecast horizon, rate limits, terms, and key protection requirements.
-- Identity timing: no identity at first, anonymous device identity from first release, or defer until push/sync.
-- Notification timing: local notifications only for MVP, or early backend-driven push.
-- Recovery model: recovery code from day one, optional email later, and Android Auto Backup as convenience only.
+- Weather provider: Open-Meteo is the first candidate; still validate forecast quality and whether alpha use is strictly non-commercial.
+- Weather cache: whether to use Postgres immediately or begin with a simpler cache during the first scoring prototype.
+- Admin/ops storage: where provider call counters, cache metrics, and recent errors live before a full database exists.
+- Identity timing: no identity for one-off lookup; add optional email or anonymous identity only when saved alerts require it.
+- Notification timing: RSS/Atom and `.ics` first; email later; Android local notifications later.
+- Distribution/community: Reddit is manual/community validation only; Mastodon and Bluesky are not planned.
 - Data retention: whether backend request logs may contain coordinates, and how to scrub or minimize them.
+- Terrain horizon modeling: deferred until users can provide exact shooting positions; city-level lookup cannot reliably account for hills, buildings, or trees.
 - Hosting target for alpha: dev laptop, NUC, Raspberry Pi, x86 mini PC, or hosted VPS.

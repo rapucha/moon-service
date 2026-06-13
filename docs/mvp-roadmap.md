@@ -25,30 +25,34 @@ Tasks:
 
 - Research ephemeris libraries for Kotlin/JVM and Java backend use. Initial recommendation is documented in `docs/ephemeris-research.md`.
 - Validate Astronomy Engine against known Moonrise/Moon altitude/azimuth examples before scaffolding app/backend code.
-- Research weather providers, including terms, forecast horizon, rate limits, cost, and API key requirements.
-- Decide whether provider requirements force a backend for the MVP.
-- Draft the `POST /forecast-opportunities` request/response shape if a backend is selected.
+- Research weather providers, including terms, forecast horizon, rate limits, cost, and API key requirements. Initial recommendation is documented in `docs/weather-provider-research.md`.
+- Decide whether provider requirements force a backend for the MVP. Current answer: yes for real MVP/alpha, though direct Android calls are acceptable for a throwaway prototype.
+- Research geocoding options for city/location input. Initial recommendation is documented in `docs/geocoding-research.md`.
+- Draft the first web/API lookup shape for city/location input and opportunity output. Initial shape is documented in `docs/api-shape.md`.
 
 Exit criteria:
 
 - Ephemeris library candidate selected and validation plan documented.
-- Weather provider candidate selected.
+- Weather provider candidate selected and weather cache/privacy plan documented.
+- Geocoding provider candidate selected and city/location lookup privacy plan documented.
+- First web/API preview contract documented.
 - MVP architecture choice documented in `docs/architecture.md`.
 
 ## Phase 2: Thin Scoring Prototype
 
-Goal: prove the scoring model without committing to full app/backend structure.
+Goal: prove the scoring model behind a minimal backend contract without committing to the full app stack.
 
-Possible backend-first path:
+Recommended web-first path:
 
-- Create a minimal JVM scoring module or Spring Boot endpoint.
-- Accept one location and a time range.
+- Create a minimal backend endpoint or script-level prototype.
+- Accept one city/location or coordinate and a time range.
 - Return candidate windows with score explanations.
 - Use fixture weather data before integrating a live provider if useful.
+- Add a tiny web page only after the endpoint shape is clear.
 
-Possible Android-first path:
+Possible Android path:
 
-- Create a minimal Android prototype with one saved location.
+- Create a minimal Android prototype later with one saved location.
 - Compute or request candidate windows.
 - Display ranked opportunities.
 - Skip account, push, and sync.
@@ -61,19 +65,22 @@ Exit criteria:
 
 ## Phase 3: MVP App Loop
 
-Goal: make the simplest useful user loop work.
+Goal: make the simplest useful public loop work.
 
 Tasks:
 
-- Save locations locally.
-- Fetch or compute ranked opportunities.
+- Enter a city or location on the webpage.
+- Fetch ranked opportunities.
 - Display details for each opportunity.
-- Schedule local notifications for selected alert thresholds.
-- Add clear privacy copy for local storage and any backend requests.
+- Provide a shareable result URL.
+- Add clear privacy copy for geocoding, weather lookup, coordinate rounding, and backend logs.
+- Provide RSS/Atom feed output for public opportunities.
+- Provide `.ics` export for individual opportunities.
 
 Exit criteria:
 
-- A user can save a location and receive a useful local notification.
+- A user can enter a location and get a useful next-opportunity result.
+- A user can follow a public feed or export an event without creating an account.
 - No mandatory account exists.
 - Backend, if present, does not permanently store location data by default.
 
@@ -97,10 +104,13 @@ Exit criteria:
 ## Deferred Features
 
 - Mandatory accounts.
+- Native Android app.
 - Cross-device sync.
 - Push notifications.
 - Email alerts.
 - Calendar integration.
+- Automated Reddit posting.
+- Mastodon/Bluesky integration.
 - Map planning.
 - Terrain/horizon modeling.
 - Landmark alignment and saved compositions.
@@ -108,6 +118,9 @@ Exit criteria:
 
 ## Smallest Next Implementation Step
 
-Before scaffolding app/backend code, finish the ephemeris validation spike:
+Before scaffolding app/backend code, finish two validation spikes:
 
-Use the cases in `docs/ephemeris-research.md` to compare Astronomy Engine against JPL Horizons, then record the observed differences and decide whether the library is accepted for the prototype.
+- Use the cases in `docs/ephemeris-research.md` to compare Astronomy Engine against JPL Horizons, then record the observed differences and decide whether the library is accepted for the prototype.
+- Build a no-code or script-level Open-Meteo query for one saved location and confirm the fields needed by `docs/scoring-model.md` are present for the target forecast horizon.
+- Build a no-code or script-level Open-Meteo geocoding query for several ambiguous cities and confirm the result fields needed by `docs/geocoding-research.md`.
+- Review `docs/api-shape.md` once against the validation spikes, then start the smallest backend prototype only if the contract still holds.

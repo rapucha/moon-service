@@ -4,24 +4,24 @@
 
 Moon Service helps photographers catch photogenic Moon opportunities near locations they care about. The core value is a timely alert that says, in effect: the Moon will be low, visible, and the weather may be worth trying.
 
-The MVP should be alert-first and Android-friendly. It should not attempt to clone full planning tools such as The Photographer's Ephemeris. Advanced composition planning can come later.
+The MVP should be lightweight and easy to try. The favored first surface is now a web discovery flow: enter a city or location, see the next good Moon opportunity, and optionally use RSS/Atom or `.ics` export. It should not attempt to clone full planning tools such as The Photographer's Ephemeris. Advanced composition planning can come later.
 
 ## Target User
 
-The first user is a photographer who wants practical prompts for local Moon shots:
+The first user is a photographer who wants a quick answer for local Moon shots:
 
 - Moon near the horizon.
 - Ambient light still useful for foreground detail.
 - Forecast suggests clear sky, partial cloud, or visually interesting conditions.
-- Alert arrives early enough to travel or set up.
+- Result or alert arrives early enough to travel or set up.
 
-The product should support saved locations before saved compositions. Exact landmark alignment is a later feature.
+The product should support one-off location lookup before saved compositions. Exact landmark alignment is a later feature.
 
 ## MVP User Promise
 
-No account required. Locations and alert settings live on the device by default. Add email only if backup, email alerts, or calendar integration becomes useful.
+No account required. Enter a city or location and see the next promising Moon opportunity. Use RSS/Atom feeds or `.ics` export for low-friction follow-up. Add email or Android later only if recurring personal alerts become useful.
 
-The first useful alert can include:
+The first useful result can include:
 
 - Location name.
 - Date and time window.
@@ -35,33 +35,119 @@ The first useful alert can include:
 
 In scope:
 
-- Save one or more locations.
-- Find upcoming Moon windows for those locations.
+- Enter a city or location.
+- Support raw Unicode city/location input.
+- Disambiguate city/location search results when needed.
+- Remember recent searches in browser `localStorage` only.
+- Find upcoming Moon windows for that location.
 - Score opportunities using Moon geometry, Sun state, and weather.
 - Present ranked opportunities.
-- Trigger local Android notifications or manual refresh during early prototype.
+- Provide a shareable result page.
+- Provide RSS/Atom feeds for public city/region or best-upcoming opportunities.
+- Provide `.ics` export for individual events.
 
 Out of scope for the first MVP:
 
 - Mandatory accounts.
+- Cookies for remembering users.
+- Native Android app as the required first surface.
+- Exact address autocomplete.
 - Full map planning.
 - Exact house/church/landmark alignment.
 - Terrain and obstruction modeling.
 - Cross-device sync.
 - Calendar OAuth.
+- Email alerts.
 - Paid subscriptions.
 
 ## Privacy Stance
 
 The product should avoid collecting permanent location data by default.
 
-If the backend is used for scoring, the first API can be stateless: the app sends locations and preferences, and the backend returns ranked opportunities without storing the request beyond operational logs. If push subscriptions or cloud sync are introduced, document exactly what is stored and why.
+The first web/API flow should avoid permanent user-location storage. The backend can geocode, score, and cache selected city/location records plus weather by rounded coordinate/time bucket without storing a user profile. The UI should steer users toward city/town search, not exact home addresses. If saved alerts, push subscriptions, email, or cloud sync are introduced, document exactly what is stored and why.
+
+Location search should accept local-language and non-Latin names. Browser locale is only a display/ranking hint; it must not prevent a raw query such as `Praha`, `München`, `東京`, or `京都` from resolving.
+
+The web UI may store a small ordered list of recent searches in browser `localStorage`. Store display names and slugs/canonical IDs only, not timestamps, exact addresses, cookies, or server-side user identifiers. Provide a clear recent-searches control.
+
+Email plus saved location preferences is personal data. Do not add email alerts until the product has a privacy notice, consent/unsubscribe/delete flows, retention rules, and an email provider/data-processing plan.
+
+Reddit can be used for manual community validation or a project-owned subreddit later. Do not auto-post to existing subreddits without moderator approval. Mastodon and Bluesky are not planned for now.
+
+## Terrain Caveat
+
+The MVP can use observer elevation from geocoding when available, but it should not claim to account for local horizon obstruction. In hilly cities or near mountains, the Moon or Sun may appear later or disappear earlier than the geometric horizon suggests. Terrain horizon modeling should wait until users can choose an exact shooting position.
+
+## Fictional Location Easter Eggs
+
+The web UI can include fictional, mythic, literary, and videogame locations as Easter eggs. These should produce clearly fictional reports, not invented real-world coordinates.
+
+Rules:
+
+- Clearly label the result as fictional.
+- Do not mix fictional reports into real weather, ephemeris, RSS/Atom, `.ics`, or notification outputs.
+- Do not present fictional reports as real photography guidance.
+- Keep the tone playful but concise.
+- Prefer public-domain, mythic, or generic examples when possible.
+- For modern franchises, avoid copying protected text and keep references brief.
+
+If a query matches both real and fictional meanings, show both as distinct choices:
+
+```text
+Prague, Czech Republic
+Prague, Oklahoma, United States
+Prague, Fallout universe (fictional)
+```
+
+Fictional reports can include fictional conditions such as radstorms, impossible moon phases, dream weather, or fantasy-light conditions, as long as the UI is unmistakably marked as fiction.
+
+Fallback behavior:
+
+- Try real geocoding first.
+- Check curated fictional locations second.
+- If neither matches, a later LLM-assisted fallback may classify whether the query belongs to recognizable lore and generate a clearly fictional report.
+- If the LLM is uncertain, return the normal not-found response.
+
+LLM-generated Easter eggs need guardrails:
+
+- Never produce real coordinates.
+- Never claim the place exists.
+- Never imitate copyrighted prose or character voices.
+- Keep franchise references short and factual.
+- Cache approved fictional mappings so repeated queries do not require repeated LLM calls.
+- Prefer a reviewable allowlist for popular fictional universes before enabling public generation.
+
+Useful examples:
+
+- Xanadu.
+- Atlantis.
+- Camelot.
+- El Dorado.
+- Shangri-La.
+- Utopia.
+- Lilliput.
+- Brobdingnag.
+- Laputa.
+- Narnia.
+- Minas Tirith.
+- Rivendell.
+- Hogwarts.
+- Neverland.
+- R'lyeh.
+- The Shire.
+- Fallout-universe locations.
+
+Possible not-found copy when there is no real or fictional match:
+
+```text
+We could not find that place on Earth or in the usual imaginary maps. Try a city or town, such as Prague, Kyoto, or Tromso.
+```
 
 ## Identity Direction
 
 Avoid mandatory accounts initially.
 
-Preferred future identity model:
+Preferred future identity model, if Android or recurring personal alerts are added:
 
 - Anonymous device identity created at install.
 - Local credential storage on Android.
@@ -73,6 +159,7 @@ Device-only identity must not become a trap. Recovery should be designed early, 
 
 ## Later Product Ideas
 
+- Android app with saved locations and reliable local notifications.
 - Map view with Moon azimuth corridor.
 - Shooting-position to subject-position planning.
 - Focal length and composition hints.
@@ -81,3 +168,5 @@ Device-only identity must not become a trap. Recovery should be designed early, 
 - Saved compositions.
 - `.ics` export and later calendar OAuth.
 - Email alerts for users who opt in.
+- Telegram-style broadcast channels for popular cities or regions.
+- Reddit community posts or a project-owned subreddit.
