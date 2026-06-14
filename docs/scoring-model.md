@@ -6,6 +6,8 @@ The scoring model should rank upcoming Moon photography opportunities for a save
 
 The first model should be explainable. Users should see why an alert fired.
 
+The core photographic problem is exposure balance. The Moon is much brighter than most foreground subjects and can blow out if the scene is exposed like a normal landscape. Moon Service should therefore favor windows where the Moon is visible but the sky and foreground still have enough Sun-driven ambient light that a photographer can preserve Moon detail and still keep useful scene detail.
+
 ## Candidate Window
 
 Generate candidate windows around Moon visibility events:
@@ -13,7 +15,7 @@ Generate candidate windows around Moon visibility events:
 - Moonrise.
 - Moonset.
 - Low-altitude passes near the horizon.
-- Full or near-full Moon windows for the first mode.
+- Full, gibbous, quarter, and crescent Moon windows when the Moon is low enough and the light/weather context is useful.
 
 Initial search horizon should match the selected weather provider's reliable forecast range. If the provider only gives useful confidence for a few days, do not pretend to predict beyond that.
 
@@ -32,6 +34,7 @@ Sun and light:
 - Sun altitude.
 - Daylight, golden hour, civil twilight, nautical twilight, or night bucket.
 - Relative timing between Sun state and Moon position.
+- Exposure-balance context: whether ambient light is likely sufficient for foreground detail while keeping Moon highlights under control.
 
 Weather:
 
@@ -47,7 +50,7 @@ User preferences:
 
 - Location.
 - Alert lead time.
-- Preferred window type, initially full or near-full Moon.
+- Optional preferred window type, such as low full Moon, crescent, twilight, or daylight Moon.
 - Optional minimum score threshold.
 
 ## V0 Hard Filters
@@ -117,14 +120,21 @@ Moon altitude fit:
 Sun/light fit:
 
 - Favor golden hour and civil twilight.
-- Allow daylight when Moon contrast is plausible.
-- Penalize full night for the MVP's dynamic-range goal, while keeping it available for later night-photo modes.
+- Allow daylight when Moon contrast is plausible and the Moon is visible enough to photograph.
+- Penalize full night for the MVP's exposure-balance goal, while keeping it available for later night-photo modes.
+- Treat nautical twilight and night cautiously: they may still work, but foreground detail is harder to retain without blending, artificial light, silhouette intent, or high dynamic range technique.
 
 Moon illumination fit:
 
 - Favor full or near-full Moon when all else is equal.
 - Do not reject crescent Moon opportunities solely because illumination is low.
 - Low crescent windows can still be useful when the Moon is close to the horizon, the sky is clear enough, and ambient light supports the intended photograph.
+
+Exposure-balance explanation:
+
+- Surface Sun altitude and Moon illumination together. A thin crescent in golden hour may be easy to balance; a bright full Moon in deep night may require exposing for the Moon and losing foreground detail.
+- Avoid implying that the system knows the user's exact exposure settings. Camera dynamic range, lens, focal length, haze, atmospheric extinction, and post-processing choices matter.
+- Prefer wording such as "ambient light should help preserve foreground detail" over exact exposure promises.
 
 Weather fit:
 
@@ -153,6 +163,7 @@ Include the raw facts needed for a photographer to make a decision:
 - Sun state.
 - Weather summary.
 - Score or confidence label.
+- Exposure-balance hint, especially when the Moon is very bright, very thin, or the Sun is below civil twilight.
 
 ## Known Limitations
 

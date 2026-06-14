@@ -77,6 +77,7 @@ Tasks:
 - Provide a shareable result URL.
 - Add clear privacy copy for geocoding, weather lookup, coordinate rounding, and backend logs.
 - Provide RSS/Atom feed output for public opportunities.
+- Provide dynamic public `.ics` calendar feeds for canonical real locations.
 - Provide `.ics` export for individual opportunities.
 
 Exit criteria:

@@ -18,6 +18,7 @@ Recommended first routes:
 /search?q=Praha
 /l/prague-cz
 /feeds/prague-cz.atom
+/calendars/prague-cz.ics
 /o/prague-cz-2026-06-29T1920Z.ics
 ```
 
@@ -564,8 +565,10 @@ RSS/Atom:
 
 `.ics`:
 
+- Dynamic public calendar feeds may be generated on demand for canonical real locations, such as `/calendars/prague-cz.ics`.
+- Calendar feeds should contain a rolling window of upcoming public opportunities for that location and use caching rather than manual feed creation per requested city.
 - Only for real individual opportunities.
-- Should include title, time window, location display name, summary, and caveat about local horizon obstruction.
+- Individual event exports, such as `/o/prague-cz-2026-06-29T1920Z.ics`, should include title, time window, location display name, summary, and caveat about local horizon obstruction.
 - Do not generate `.ics` for fictional reports.
 
 ## Privacy And Storage Rules

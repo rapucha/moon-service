@@ -11,7 +11,7 @@ The MVP should be lightweight and easy to try. The favored first surface is now 
 The first user is a photographer who wants a quick answer for local Moon shots:
 
 - Moon near the horizon.
-- Ambient light still useful for foreground detail.
+- Ambient light still useful for foreground detail while preserving visible detail in the Moon.
 - Forecast suggests clear sky, partial cloud, or visually interesting conditions.
 - Result or alert arrives early enough to travel or set up.
 
@@ -31,6 +31,8 @@ The first useful result can include:
 - Weather summary and confidence.
 - A short reason the opportunity scored well.
 
+The product should think like a photographer, not only like an astronomy calculator. The Moon is bright and often needs a relatively short exposure to avoid blown highlights. A useful opportunity is often when the sky and foreground still have enough Sun-driven ambient light that the photographer can expose for Moon detail without losing the landscape, skyline, tree, building, or hill into darkness. This favors daylight edges, golden hour, and twilight, but should still report darker or crescent situations when the facts are promising and clearly explained.
+
 ## MVP Scope
 
 In scope:
@@ -44,6 +46,7 @@ In scope:
 - Present ranked opportunities.
 - Provide a shareable result page.
 - Provide RSS/Atom feeds for public city/region or best-upcoming opportunities.
+- Provide dynamic public `.ics` calendar feeds for canonical real locations, generated on demand and cached.
 - Provide `.ics` export for individual events.
 
 Out of scope for the first MVP:
