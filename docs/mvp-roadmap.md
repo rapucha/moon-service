@@ -24,10 +24,12 @@ Goal: resolve the minimum unknowns before scaffolding heavy code.
 Tasks:
 
 - Research ephemeris libraries for Kotlin/JVM and Java backend use. Initial recommendation is documented in `docs/ephemeris-research.md`.
-- Validate Astronomy Engine against known Moonrise/Moon altitude/azimuth examples before scaffolding app/backend code.
+- Validate Astronomy Engine against known Moonrise/Moon altitude/azimuth examples before scaffolding app/backend code. Completed for the thin scoring prototype; results are recorded in `docs/ephemeris-research.md`.
 - Research weather providers, including terms, forecast horizon, rate limits, cost, and API key requirements. Initial recommendation is documented in `docs/weather-provider-research.md`.
+- Validate Open-Meteo weather field coverage for the scoring model. Completed for the thin scoring prototype; results are recorded in `docs/weather-provider-research.md`.
 - Decide whether provider requirements force a backend for the MVP. Current answer: yes for real MVP/alpha, though direct Android calls are acceptable for a throwaway prototype.
 - Research geocoding options for city/location input. Initial recommendation is documented in `docs/geocoding-research.md`.
+- Validate Open-Meteo geocoding against ambiguous and internationalized city queries. Initial validation is recorded in `docs/geocoding-research.md`; some native-script city queries need a curated alias/transliteration fallback before a secondary provider or narrowed v0 promise.
 - Draft the first web/API lookup shape for city/location input and opportunity output. Initial shape is documented in `docs/api-shape.md`.
 
 Exit criteria:
@@ -118,9 +120,10 @@ Exit criteria:
 
 ## Smallest Next Implementation Step
 
-Before scaffolding app/backend code, finish two validation spikes:
+Before scaffolding app/backend code, resolve the geocoding/API contract mismatch found during provider validation:
 
-- Use the cases in `docs/ephemeris-research.md` to compare Astronomy Engine against JPL Horizons, then record the observed differences and decide whether the library is accepted for the prototype.
-- Build a no-code or script-level Open-Meteo query for one saved location and confirm the fields needed by `docs/scoring-model.md` are present for the target forecast horizon.
-- Build a no-code or script-level Open-Meteo geocoding query for several ambiguous cities and confirm the result fields needed by `docs/geocoding-research.md`.
-- Review `docs/api-shape.md` once against the validation spikes, then start the smallest backend prototype only if the contract still holds.
+- Define the v0 curated alias/transliteration fallback for known Open-Meteo misses such as `東京`, `京都`, `大阪`, `とうきょう`, and `서울`.
+- Include input validation, abuse protection, and one-character place-name handling in the lookup contract.
+- Decide whether that fallback is enough for the raw Unicode promise, or whether a secondary geocoder or narrower v0 promise is still needed.
+- Review `docs/api-shape.md` against that decision.
+- Start the smallest backend or script-level scoring prototype only after the lookup contract still holds.

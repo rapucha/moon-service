@@ -2,7 +2,7 @@
 
 ## Decision
 
-Use Astronomy Engine as the first ephemeris candidate for Moon Service.
+Use Astronomy Engine as the first ephemeris candidate for Moon Service. It has passed the first validation spike for the thin scoring prototype.
 
 Repository and docs: <https://github.com/cosinekitty/astronomy>
 
@@ -16,7 +16,7 @@ Rationale:
 - It is designed to be small and dependency-light.
 - The project documents validation against NOVAS, JPL Horizons, and other ephemeris sources, with a target accuracy suitable for amateur astronomy use.
 
-Initial caveat:
+Remaining caveat:
 
 - The Kotlin/JVM package is distributed through JitPack in the upstream README, not Maven Central. Before committing to it permanently, verify that this is acceptable for Android and backend builds, or vendor/fork only if there is a strong reason.
 
@@ -110,6 +110,8 @@ Useful Horizons behavior:
 - `CENTER='coord'` plus `SITE_COORD` can represent an arbitrary latitude/longitude/elevation.
 - `QUANTITIES` can request observer quantities such as apparent coordinates and azimuth/elevation.
 - `STEP_SIZE` supports fixed time steps and rise/transit/set event output modes for topocentric observers.
+- Horizons URL parameters that contain spaces or comma-separated values must keep the single-quoted value syntax shown in the official API examples, such as `QUANTITIES='4,10'`, `SITE_COORD='14.4378,50.0755,0.250'`, and `START_TIME='2026-Jun-29 18:00'`.
+- For city-level Moon Service validation, compare Astronomy Engine `SearchRiseSet` against Horizons `STEP_SIZE='1m GEO'`, not `TVH`. `TVH` includes true visual horizon dip from site altitude; city elevation is observer elevation above sea level, not height above a local flat horizon.
 
 Use a second source, such as Time4J/Time4A or a reputable public astronomy calculator, only to sanity-check that the JPL query was configured correctly.
 
@@ -160,6 +162,50 @@ For the first implementation spike:
 - Moon illumination fraction should be within 0.02 of the reference or equivalent trusted source.
 
 These tolerances are tighter than the product needs, but loose enough to avoid wasting time on harmless differences in refraction settings, elevation, and timescale handling.
+
+## Validation Spike Results
+
+Date run: 2026-06-13 UTC.
+
+Method:
+
+- Used Astronomy Engine's Python implementation as a temporary local proxy for the same library family.
+- Used JPL Horizons `EPHEM_TYPE='OBSERVER'`, Moon target `COMMAND='301'`, `APPARENT='REFRACTED'`, `ANG_FORMAT='DEG'`, `QUANTITIES='4,10'`, and 10-minute samples for altitude, azimuth, and illuminated fraction.
+- Used Astronomy Engine equator-of-date topocentric coordinates with aberration enabled, then `Horizon(..., Refraction.JplHorizons)` for sampled altitude/azimuth comparison.
+- Used Horizons `STEP_SIZE='1m GEO'` plus `R_T_S_ONLY='YES'` for rise/set comparison against Astronomy Engine `SearchRiseSet`.
+
+Observed maximum differences:
+
+```text
+Prague, 61 samples
+  max altitude delta: 0.000486 degrees
+  max azimuth delta:  0.000718 degrees
+  max illum delta:    0.060654 percentage points
+  rise delta:         0.568 minutes
+  set delta:          0.788 minutes
+
+Amsterdam, 61 samples
+  max altitude delta: 0.000705 degrees
+  max azimuth delta:  0.000975 degrees
+  max illum delta:    0.044290 percentage points
+  rise delta:         0.261 minutes
+  set delta:          no set event inside the validation window
+
+Wellington, 73 samples
+  max altitude delta: 0.001107 degrees
+  max azimuth delta:  0.001607 degrees
+  max illum delta:    0.033735 percentage points
+  rise delta:         0.667 minutes
+  set delta:          no set event inside the validation window
+```
+
+Conclusion:
+
+- Astronomy Engine is accurate enough for the first thin scoring prototype.
+- The sampled altitude and azimuth differences are far below the 0.25 degree tolerance.
+- Rise/set differences are below the 2 minute tolerance when Horizons `GEO` mode is used.
+- Illumination differences are far below the 0.02 fraction tolerance. The table above reports percentage points; the worst case is about `0.000607` as a 0 to 1 fraction.
+- Do not use Horizons `TVH` mode for city-level validation unless intentionally modeling height above a visible local horizon. In Prague, `TVH` shifted rise/set by roughly 4 to 5 minutes compared with Astronomy Engine's default city-level rise/set behavior.
 
 ## Implementation Notes For Later
 

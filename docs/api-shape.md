@@ -36,7 +36,8 @@ GET /api/preview?q=Praha&lang=cs
 - Required for query-based lookup.
 - Raw Unicode city/location query.
 - Do not ASCII-normalize before geocoding.
-- Reject empty, too-short, or unreasonably long queries with `invalid_request`.
+- Reject empty or unreasonably long queries with `invalid_request`.
+- One visible-character queries are allowed because real one-symbol place names exist, such as `Å` and `Y`, but they should use stricter handling because they are highly ambiguous.
 
 `lang`:
 
@@ -85,6 +86,26 @@ HTTP status codes can stay conventional:
 - `429` for `rate_limited`.
 - `503` for `temporarily_unavailable`.
 
+## Message Codes
+
+Responses may include `messages` for non-fatal context:
+
+```text
+local_horizon_not_modelled
+fictional_result
+query_alias_used
+input_normalized
+one_character_query
+```
+
+Meanings:
+
+- `local_horizon_not_modelled`: terrain, buildings, trees, and exact local horizon are not included.
+- `fictional_result`: the response is an Easter egg and not real-world guidance.
+- `query_alias_used`: raw geocoding returned no candidates, so a curated alias or transliteration was used.
+- `input_normalized`: lookup/cache input was normalized, such as whitespace collapsing, while preserving the original query in the response.
+- `one_character_query`: the query is a single visible character and was handled with stricter lookup rules.
+
 ## Rate Limits And Upstream Quotas
 
 The backend must protect both Moon Service and upstream providers.
@@ -114,6 +135,36 @@ Example rate-limited response:
   "retryAfterSeconds": 60
 }
 ```
+
+## Input Validation And Abuse Protection
+
+Treat lookup input as hostile even when it looks like a city name.
+
+Validation rules:
+
+- Require `q` after Unicode trim.
+- Reject empty input.
+- Use a maximum length for city/location search, initially around 100 visible characters.
+- Allow one visible Unicode letter or number because real one-symbol place names exist.
+- Reject or strip ASCII control characters and Unicode bidirectional control characters.
+- Normalize whitespace runs to a single space for lookup/cache keys while preserving the original query for display/debug context.
+- Do not call aliases, secondary geocoders, or future LLM fallback for invalid input.
+
+One-character query rules:
+
+- Permit one visible-character queries such as `Å` or `Y`.
+- Require exact geocoding or exact curated alias match.
+- Do not invoke broad fuzzy fallback, dynamic translation/transliteration, secondary geocoding, or LLM fallback by default.
+- Return `ambiguous_location` if multiple plausible places match.
+- Rate-limit one-character lookups conservatively because they are cheap to abuse and likely to be ambiguous.
+
+Safety rules:
+
+- Escape `q`, provider display names, and aliases before rendering them in HTML.
+- Do not put raw `q` in structured application logs by default.
+- Do not build provider URLs by string concatenation; use encoded query parameters.
+- Cache negative lookups briefly, but cap negative-cache size and TTL to avoid cache pollution.
+- Keep provider call counters and rate limits visible in `/admin/status`.
 
 ## Admin Status Endpoint
 
@@ -286,6 +337,72 @@ fictional_location
 }
 ```
 
+### Alias Fallback
+
+```json
+{
+  "status": "ok",
+  "query": "東京",
+  "locale": "ja",
+  "location": {
+    "kind": "real_location",
+    "id": "openmeteo:tokyo-jp",
+    "displayName": "東京都, Japan",
+    "latitude": 35.6895,
+    "longitude": 139.69171,
+    "elevationMeters": 44,
+    "timezone": "Asia/Tokyo",
+    "countryCode": "JP"
+  },
+  "lookup": {
+    "originalQuery": "東京",
+    "searchedQuery": "Tokyo",
+    "aliasApplied": true,
+    "aliasSource": "curated"
+  },
+  "opportunities": [],
+  "messages": [
+    {
+      "level": "info",
+      "code": "query_alias_used",
+      "text": "We searched for Tokyo after the original place name did not resolve."
+    }
+  ]
+}
+```
+
+### One-Character Query
+
+```json
+{
+  "status": "ambiguous_location",
+  "query": "Å",
+  "candidates": [
+    {
+      "kind": "real_location",
+      "id": "openmeteo:aa-nordland-no",
+      "displayName": "Å, Nordland, Norway",
+      "countryCode": "NO",
+      "timezone": "Europe/Oslo"
+    },
+    {
+      "kind": "real_location",
+      "id": "openmeteo:aa-vasternorrland-se",
+      "displayName": "Å, Västernorrland, Sweden",
+      "countryCode": "SE",
+      "timezone": "Europe/Stockholm"
+    }
+  ],
+  "messages": [
+    {
+      "level": "info",
+      "code": "one_character_query",
+      "text": "One-character place names are allowed, but may be ambiguous."
+    }
+  ]
+}
+```
+
 ### Fictional Report
 
 ```json
@@ -333,6 +450,51 @@ fictional_location
 }
 ```
 
+### Invalid Request
+
+```json
+{
+  "status": "invalid_request",
+  "query": "",
+  "message": "Enter a city or town.",
+  "errors": [
+    {
+      "field": "q",
+      "code": "empty_query",
+      "text": "The location query is required."
+    }
+  ]
+}
+```
+
+```json
+{
+  "status": "invalid_request",
+  "message": "That location query is too long.",
+  "errors": [
+    {
+      "field": "q",
+      "code": "query_too_long",
+      "text": "Use a city, town, or short location name."
+    }
+  ]
+}
+```
+
+```json
+{
+  "status": "invalid_request",
+  "message": "That location query contains unsupported characters.",
+  "errors": [
+    {
+      "field": "q",
+      "code": "unsupported_control_characters",
+      "text": "Remove control or bidirectional formatting characters."
+    }
+  ]
+}
+```
+
 ### Empty Opportunities
 
 ```json
@@ -362,6 +524,7 @@ fictional_location
 - Return the resolved location timezone.
 - Display event times in the location timezone.
 - Keep first MVP UI copy English-only unless translation work is explicitly added.
+- Provider validation found that Open-Meteo Geocoding resolves many raw Unicode city queries, but misses some native-script cases such as Japanese `東京`, `京都`, and `大阪`, and Korean `서울`. Keeping a broad raw Unicode promise requires a curated alias/transliteration fallback before considering a secondary geocoder or narrower v0 search promise.
 
 ## Local Recent Searches
 

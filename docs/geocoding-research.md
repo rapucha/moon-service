@@ -2,7 +2,7 @@
 
 ## Decision
 
-Use Open-Meteo Geocoding API as the first geocoding provider for the web MVP.
+Use Open-Meteo Geocoding API as the first geocoding provider candidate for the web MVP, but not as the only option until the native-script query gaps are resolved.
 
 Docs: <https://open-meteo.com/en/docs/geocoding-api>
 
@@ -15,11 +15,12 @@ Rationale:
 - Commercial use can move to Open-Meteo customer API resources with an API key.
 - It is based on GeoNames, which is appropriate for city/town lookup.
 
-Initial caveat:
+Remaining caveats:
 
 - It is not an exact-address geocoder and should not be positioned as one.
 - It is not a full place-search product for landmarks, businesses, or shooting subjects.
 - For the first MVP, use explicit search/submit rather than per-keystroke autocomplete.
+- Initial validation found that Open-Meteo Geocoding handles many raw Unicode city names, including diacritics, Cyrillic, Chinese, Hindi, Thai, Arabic, and Hebrew examples. It did not resolve tested Japanese-script or Korean-script queries such as `東京`, `京都`, `大阪`, `とうきょう`, or `서울`. If broad native-script city search remains part of the v0 promise, add a curated alias/transliteration layer before considering a secondary provider.
 
 ## Internationalization
 
@@ -33,6 +34,7 @@ Rules:
 - Preserve non-ASCII display names returned by the provider.
 - Store UTC internally, but display event times in the resolved location timezone.
 - Keep UI copy English-only for the first MVP unless translation work is explicitly added.
+- Allow one visible-character place-name queries because real examples exist, such as `Å` and `Y`; handle them with exact-match and stricter abuse controls rather than a blanket minimum-length rejection.
 
 Recommended fallback lookup sequence:
 
@@ -41,6 +43,8 @@ Recommended fallback lookup sequence:
 2. raw query + provider default language behavior
 3. raw query + English display language
 4. raw query + optional country hint, if provided
+5. curated aliases or transliterations for high-priority native-script city names that the primary provider misses
+6. optional secondary geocoder only if aliases/transliteration are not enough
 ```
 
 The same canonical location may be found through different query/display-language combinations. Cache display-oriented geocoding results separately from canonical locations:
@@ -56,6 +60,37 @@ For example, a user with `en-US` browser settings who searches `Praha` should st
 ```text
 Prague / Praha, Czech Republic
 ```
+
+## Alias And Transliteration Fallback
+
+For v0, prefer a deterministic alias layer over an LLM or translation API.
+
+Use it only after raw geocoding fails. The goal is not general translation; it is converting known missed place-name spellings into provider-supported aliases while preserving the user's original query.
+
+Initial curated examples:
+
+```text
+東京 -> Tokyo
+京都 -> Kyoto
+大阪 -> Osaka
+とうきょう -> Tokyo
+서울 -> Seoul
+```
+
+Fallback rules:
+
+- Try raw provider geocoding first.
+- Apply aliases only after the raw query returns no real candidates.
+- Apply aliases by exact match only, especially for one-character queries.
+- Preserve the original query in the API response.
+- Mark which alias or transliteration was used internally for debugging/admin visibility.
+- Cache accepted alias mappings separately from provider results.
+- Keep the alias table reviewable and small at first.
+- Do not send failed raw queries to an LLM by default.
+- If a dynamic transliteration or translation service is added later, use it only for scripts/provider gaps with a clear need, require high confidence, and cache accepted mappings.
+- If an alias produces multiple plausible cities, return `ambiguous_location` rather than silently picking one.
+- If an alias maps a fictional or ambiguous term, keep fictional lookup separate from real geocoding.
+- For one-character queries, do not invoke broad fuzzy fallback, dynamic transliteration, secondary geocoding, or LLM fallback by default.
 
 ## Recommended MVP Boundary
 
@@ -135,7 +170,7 @@ LLM fallback rules:
 
 ### Open-Meteo Geocoding
 
-Status: recommended first provider.
+Status: useful first provider candidate, but not sufficient alone for the current internationalized search promise.
 
 Source: <https://open-meteo.com/en/docs/geocoding-api>
 
@@ -166,6 +201,124 @@ Limitations:
 
 - Not a full address/POI autocomplete service.
 - Less suitable for landmark-specific planning.
+- Did not resolve tested Japanese-script city queries `東京`, `京都`, `大阪`, or `とうきょう`, or Korean-script `서울`. Romanized `Tokyo` and `Kyoto` did resolve and returned Japanese display names when `language=ja` was requested, supporting a small curated alias/transliteration fallback.
+
+## Validation Spike Results
+
+Date run: 2026-06-14 Europe/Prague local time.
+
+Request shape tested:
+
+```text
+GET https://geocoding-api.open-meteo.com/v1/search
+  name=<raw or URL-encoded query>
+  count=10
+  language=<display language>
+  format=json
+```
+
+Observed results:
+
+```text
+Prague, language=en
+  8 results
+  first result: Prague, CZ, Europe/Prague, elevation 202 m, population 1165581
+  ambiguity: also returned Prague, Oklahoma and Prague, Nebraska
+
+Praha, language=cs
+  10 results
+  first result: Praha, CZ, Europe/Prague, elevation 202 m, population 1165581
+  ambiguity: also returned smaller Praha matches in SK and US
+
+München, language=de
+  10 results
+  first result: München, DE, Europe/Berlin, elevation 524 m, population 1260391
+
+東京, language=ja
+  0 results
+
+東京, language=ja, countryCode=JP
+  0 results
+
+Tokyo, language=ja
+  10 results
+  first result: 東京都, JP, Asia/Tokyo, elevation 44 m, population 9733276
+
+京都, language=ja
+  0 results
+
+Kyoto, language=ja
+  5 results
+  first result: 京都市, JP, Asia/Tokyo, elevation 50 m, population 1463723
+
+Montréal, language=fr
+  5 results
+  first result: Montréal, CA, America/Toronto, elevation 216 m, population 1762949
+
+Québec, language=fr
+  5 results
+  first result: Québec, CA, America/Toronto, elevation 54 m, population 531902
+
+Saint-Étienne, language=fr
+  5 results
+  first result: Saint-Étienne, FR, Europe/Paris, elevation 529 m, population 176280
+
+Kraków, language=pl
+  5 results
+  first result: Kraków, PL, Europe/Warsaw, elevation 219 m, population 804237
+
+Łódź, language=pl
+  5 results
+  first result: Łódź, PL, Europe/Warsaw, elevation 214 m, population 645693
+
+Москва, language=ru
+  4 results
+  first result: Москва, RU, Europe/Moscow, elevation 155 m, population 10381222
+
+Київ, language=uk
+  5 results
+  first result: Київ, UA, Europe/Kyiv, elevation 179 m, population 2952301
+
+北京, language=zh
+  3 results
+  first result: 北京, CN, Asia/Shanghai, elevation 49 m, population 18960744
+
+上海, language=zh
+  5 results
+  first result: 上海, CN, Asia/Shanghai, elevation 12 m, population 24874500
+
+दिल्ली, language=hi
+  1 result
+  first result: दिल्ली, IN, Asia/Kolkata, elevation 227 m, population 11034555
+
+กรุงเทพมหานคร, language=th
+  1 result
+  first result: กรุงเทพมหานคร, TH, Asia/Bangkok, elevation 12 m, population 5104476
+
+القاهرة, language=ar
+  5 results
+  first result: القاهرة, EG, Africa/Cairo, elevation 23 m, population 9606916
+
+ירושלים, language=he
+  1 result
+  first result: ירושלים, IL, Asia/Jerusalem, elevation 786 m, population 971800
+
+서울, language=ko
+  0 results
+
+大阪, language=ja
+  0 results
+
+とうきょう, language=ja
+  0 results
+```
+
+Conclusion:
+
+- Open-Meteo Geocoding returns the fields needed by the MVP data contract for successful city matches: id, display name, latitude, longitude, elevation, timezone, country, admin area, population, and feature code.
+- It handles European local-language Unicode examples and several non-Latin scripts well enough for the first prototype.
+- It supports ambiguity handling for Prague/Praha-style cases.
+- It does not satisfy a broad raw native-script search requirement by itself. The product/API contract should add a curated alias/transliteration fallback for high-priority missed place names before narrowing the v0 search promise or adopting a secondary provider.
 
 ### OpenStreetMap Nominatim Public API
 

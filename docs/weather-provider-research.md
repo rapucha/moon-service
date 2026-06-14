@@ -2,7 +2,7 @@
 
 ## Decision
 
-Use Open-Meteo as the first weather provider candidate for the MVP.
+Use Open-Meteo as the first weather provider candidate for the MVP. It has passed the first field-coverage validation spike for the thin scoring prototype.
 
 Docs: <https://open-meteo.com/en/docs>
 
@@ -15,7 +15,7 @@ Rationale:
 - The API can request multiple coordinates in one call, which helps backend batching.
 - Pricing path is straightforward if the product becomes commercial: paid endpoint, API key, higher reliability, and commercial use license.
 
-Initial caveat:
+Remaining caveats:
 
 - The free API is non-commercial, rate-limited, has no uptime guarantee, and requires attribution through the underlying CC BY 4.0 weather data license.
 - Open-Meteo may log IP addresses and request URLs, which can include coordinates, for troubleshooting. Their terms state these logs are deleted after 90 days.
@@ -53,7 +53,7 @@ Direct Android calls remain acceptable for a throwaway prototype if there is no 
 
 ### Open-Meteo
 
-Status: recommended first provider.
+Status: recommended first provider for the thin scoring prototype.
 
 Source: <https://open-meteo.com/en/docs>
 
@@ -326,6 +326,36 @@ Privacy:
 Fit:
 
 - Not global, so not a primary provider for Moon Service.
+
+## Validation Spike Results
+
+Date run: 2026-06-14 Europe/Prague local time.
+
+Request shape tested:
+
+```text
+GET https://api.open-meteo.com/v1/forecast
+  latitude=50.0755
+  longitude=14.4378
+  elevation=250
+  hourly=cloud_cover,cloud_cover_low,cloud_cover_mid,cloud_cover_high,precipitation_probability,precipitation,weather_code,visibility
+  forecast_days=7 or 16
+  timezone=UTC
+```
+
+Observed result for Prague:
+
+- `forecast_days=7` returned 168 hourly points.
+- `forecast_days=16` returned 384 hourly points.
+- All requested hourly arrays were present with matching lengths.
+- Units were explicit: cloud cover and precipitation probability in percent, precipitation in millimeters, visibility in meters, and weather code as WMO code.
+- Timestamps were UTC-style hourly strings when `timezone=UTC` was requested.
+
+Conclusion:
+
+- Open-Meteo has the fields needed by the v0 scoring model.
+- Use 7 days as the conservative default forecast horizon for the MVP unless scoring tests show useful value beyond that.
+- A 16-day request is technically available, but model horizons vary by provider and region, so later scoring should reduce confidence for distant forecast hours rather than treating all 16 days equally.
 
 ## Weather Data Contract For MVP
 

@@ -44,6 +44,7 @@ The main unresolved choice is now the exact first web/API contract for city look
 - `docs/weather-provider-research.md`: weather provider recommendation, caching, and privacy notes.
 - `docs/geocoding-research.md`: geocoding provider recommendation and city/location lookup privacy notes.
 - `docs/mvp-roadmap.md`: milestone plan and implementation order.
+- `docs/next-session-prompt.md`: copyable prompt for continuing from the current planning state.
 
 ## Engineering Guidelines
 
@@ -53,6 +54,7 @@ The main unresolved choice is now the exact first web/API contract for city look
 - Do not permanently store user locations server-side unless saved alerts require it and the privacy model is updated.
 - Design device identity recovery before relying on anonymous device-bound accounts.
 - Treat Android Auto Backup and Firebase Cloud Messaging as conveniences with platform assumptions, not universal guarantees.
+- Do not repeat a failing command, API request, or tool call unchanged unless the failure is plausibly transient, such as a timeout, network interruption, rate-limit retry hint, lock contention, or service restart. For deterministic errors, change the request based on a concrete hypothesis, reduce it to a minimal reproduction, inspect docs/help/output, or stop and explain the blocker. For plausibly transient errors, retry with exponential backoff and a small retry budget; once the next backoff delay would reach roughly 30 to 60 seconds, stop retrying and report the failure.
 
 ## Suggested Tooling Direction
 
