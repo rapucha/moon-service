@@ -77,7 +77,7 @@ Run with a different minimum score:
 python3 -B scripts/scoring_contract_spike.py --min-score 80
 ```
 
-This script does not calculate real ephemeris or fetch live weather. It uses fixed Moon, Sun, and weather samples to exercise hard filters, score components, ranking, explanation text, and API-shaped output.
+This script does not calculate real ephemeris or fetch live weather. It uses fixed Moon, Sun, and weather samples to exercise hard filters, score components, exposure-balance hints, ranking, explanation text, and API-shaped output.
 
 ## Real-Data Scoring Spike
 

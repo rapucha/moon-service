@@ -284,6 +284,10 @@ fictional_location
         "visibilityMeters": 18000,
         "summary": "partly cloudy"
       },
+      "exposureBalance": {
+        "label": "balanced",
+        "text": "Twilight may still provide enough scene light while keeping the Moon readable."
+      },
       "reason": "Moon is low in the southeast during civil twilight with low precipitation risk.",
       "links": {
         "ics": "/o/prague-cz-2026-06-29T1920Z.ics"

@@ -135,6 +135,7 @@ Exposure-balance explanation:
 - Surface Sun altitude and Moon illumination together. A thin crescent in golden hour may be easy to balance; a bright full Moon in deep night may require exposing for the Moon and losing foreground detail.
 - Avoid implying that the system knows the user's exact exposure settings. Camera dynamic range, lens, focal length, haze, atmospheric extinction, and post-processing choices matter.
 - Prefer wording such as "ambient light should help preserve foreground detail" over exact exposure promises.
+- Return a simple exposure-balance label and explanation with each opportunity so the user can understand whether the scene is likely balanced, Moon-bright with foreground risk, a subtle crescent, or likely dark foreground.
 
 Weather fit:
 

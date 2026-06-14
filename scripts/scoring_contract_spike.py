@@ -331,6 +331,51 @@ def weather_summary(weather: dict[str, Any]) -> str:
     return "mixed conditions"
 
 
+def exposure_balance(moon: dict[str, Any], bucket: str) -> dict[str, str]:
+    illumination = moon["illuminationPercent"]
+    if bucket in {"daylight", "golden_hour"}:
+        if illumination >= 70:
+            return {
+                "label": "moon_detail_easy_foreground_supported",
+                "text": "Ambient light should support foreground detail; expose carefully for the bright Moon.",
+            }
+        if illumination < 5:
+            return {
+                "label": "thin_crescent_visible_but_subtle",
+                "text": "Ambient light should help the scene, but the thin crescent may be subtle.",
+            }
+        return {
+            "label": "balanced",
+            "text": "Ambient light and Moon brightness look reasonably balanced for a natural exposure.",
+        }
+
+    if bucket == "civil_twilight":
+        if illumination >= 85:
+            return {
+                "label": "moon_bright_foreground_risk",
+                "text": "The Moon is bright while foreground light is fading; foreground detail may need careful exposure.",
+            }
+        if illumination < 5:
+            return {
+                "label": "thin_crescent_visible_but_subtle",
+                "text": "The crescent is very thin; clear sky and foreground contrast will matter.",
+            }
+        return {
+            "label": "balanced",
+            "text": "Twilight may still provide enough scene light while keeping the Moon readable.",
+        }
+
+    if illumination >= 70:
+        return {
+            "label": "moon_bright_foreground_risk",
+            "text": "The Moon may be easy to expose, but the foreground is likely much darker.",
+        }
+    return {
+        "label": "foreground_likely_dark",
+        "text": "Foreground detail is likely limited without silhouette intent, artificial light, or blending.",
+    }
+
+
 def format_opportunity(
     window: dict[str, Any],
     location: dict[str, Any],
@@ -341,6 +386,7 @@ def format_opportunity(
     sun = window["sun"]
     weather = window["weather"]
     bucket = light_bucket(sun["altitudeDegrees"])
+    exposure = exposure_balance(moon, bucket)
     return {
         "id": window["id"],
         "startsAt": window["startsAt"],
@@ -368,7 +414,8 @@ def format_opportunity(
             "visibilityMeters": weather["visibilityMeters"],
             "summary": weather_summary(weather),
         },
-        "reason": reason_text(moon, sun, weather, bucket),
+        "exposureBalance": exposure,
+        "reason": reason_text(moon, sun, weather, bucket, exposure),
         "links": {
             "ics": f"/o/{window['id']}.ics",
         },
@@ -380,13 +427,15 @@ def reason_text(
     sun: dict[str, Any],
     weather: dict[str, Any],
     bucket: str,
+    exposure: dict[str, str],
 ) -> str:
     return (
         f"Moon is {moon['altitudeDegrees']:.1f} degrees above the horizon "
         f"at azimuth {moon['azimuthDegrees']:.0f} degrees, "
         f"{moon['illuminationPercent']:.1f} percent illuminated, during "
         f"{bucket.replace('_', ' ')} with {weather_summary(weather)} "
-        f"and {weather['precipitationProbabilityPercent']} percent precipitation risk."
+        f"and {weather['precipitationProbabilityPercent']} percent precipitation risk. "
+        f"{exposure['text']}"
     )
 
 
