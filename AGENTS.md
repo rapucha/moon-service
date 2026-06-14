@@ -44,7 +44,6 @@ The main unresolved choice is now the exact first web/API contract for city look
 - `docs/weather-provider-research.md`: weather provider recommendation, caching, and privacy notes.
 - `docs/geocoding-research.md`: geocoding provider recommendation and city/location lookup privacy notes.
 - `docs/mvp-roadmap.md`: milestone plan and implementation order.
-- `docs/next-session-prompt.md`: copyable prompt for continuing from the current planning state.
 
 ## Engineering Guidelines
 

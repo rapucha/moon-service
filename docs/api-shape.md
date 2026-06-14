@@ -73,7 +73,7 @@ Meanings:
 - `ok`: resolved one location and completed the lookup. For real locations, `opportunities` may contain results or be empty.
 - `ambiguous_location`: multiple plausible real or fictional candidates; user must choose.
 - `location_not_found`: no real geocoding result and no fictional match.
-- `invalid_request`: missing, too short, too long, malformed, or unsupported input.
+- `invalid_request`: missing, empty after trimming, too long, malformed, or unsupported input.
 - `temporarily_unavailable`: geocoding, weather, ephemeris, scoring, or cache dependency failed or timed out.
 - `rate_limited`: request was valid, but the client or service exceeded an application-level rate limit.
 

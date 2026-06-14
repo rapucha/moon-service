@@ -29,7 +29,7 @@ Tasks:
 - Validate Open-Meteo weather field coverage for the scoring model. Completed for the thin scoring prototype; results are recorded in `docs/weather-provider-research.md`.
 - Decide whether provider requirements force a backend for the MVP. Current answer: yes for real MVP/alpha, though direct Android calls are acceptable for a throwaway prototype.
 - Research geocoding options for city/location input. Initial recommendation is documented in `docs/geocoding-research.md`.
-- Validate Open-Meteo geocoding against ambiguous and internationalized city queries. Initial validation is recorded in `docs/geocoding-research.md`; some native-script city queries need a curated alias/transliteration fallback before a secondary provider or narrowed v0 promise.
+- Validate Open-Meteo geocoding against ambiguous and internationalized city queries. Initial validation is recorded in `docs/geocoding-research.md`; the v0 response to known native-script misses is a curated alias/transliteration fallback before a secondary provider or narrowed v0 promise.
 - Draft the first web/API lookup shape for city/location input and opportunity output. Initial shape is documented in `docs/api-shape.md`.
 
 Exit criteria:
@@ -120,10 +120,18 @@ Exit criteria:
 
 ## Smallest Next Implementation Step
 
-Before scaffolding app/backend code, resolve the geocoding/API contract mismatch found during provider validation:
+The geocoding/API contract mismatch found during provider validation is now resolved in documentation:
 
-- Define the v0 curated alias/transliteration fallback for known Open-Meteo misses such as `東京`, `京都`, `大阪`, `とうきょう`, and `서울`.
-- Include input validation, abuse protection, and one-character place-name handling in the lookup contract.
-- Decide whether that fallback is enough for the raw Unicode promise, or whether a secondary geocoder or narrower v0 promise is still needed.
-- Review `docs/api-shape.md` against that decision.
-- Start the smallest backend or script-level scoring prototype only after the lookup contract still holds.
+- `docs/geocoding-research.md` defines raw Open-Meteo lookup first, then a small curated alias/transliteration fallback for known misses such as `東京`, `京都`, `大阪`, `とうきょう`, and `서울`.
+- `docs/api-shape.md` includes input validation, abuse protection, alias messaging, and one-character place-name handling.
+- The current v0 decision is to keep the broad raw Unicode input promise with curated fallback for known provider gaps, without adding a secondary geocoder or LLM/translation API by default.
+
+The retained script-level spike is `scripts/geocoding_contract_spike.py`. It should stay small and independent from app/backend scaffolding while the lookup contract is still being proven.
+
+Use it to verify:
+
+- Raw hits, ambiguous results, alias hits, one-character handling, invalid input, not-found behavior, and fictional-location separation.
+- Normalized candidate/output examples matching `docs/api-shape.md`.
+- Provider drift with optional live Open-Meteo calls when network access is available.
+
+Next, either capture any live-provider adjustments found by the spike, or move on to the thin scoring prototype if the contract still holds.
