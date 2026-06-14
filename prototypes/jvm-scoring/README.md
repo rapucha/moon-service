@@ -29,7 +29,7 @@ mvn test
 
 ```bash
 mvn -q org.codehaus.mojo:exec-maven-plugin:3.3.0:java \
-  -Dexec.mainClass=dev.moonservice.prototype.MoonScoringPrototype \
+  -Dexec.mainClass=dev.moonservice.scoringprototype.MoonScoringPrototype \
   -Dexec.args="--request fixtures/prague-preview-request.json"
 ```
 
@@ -37,7 +37,7 @@ The equivalent explicit-flag form is:
 
 ```bash
 mvn -q org.codehaus.mojo:exec-maven-plugin:3.3.0:java \
-  -Dexec.mainClass=dev.moonservice.prototype.MoonScoringPrototype \
+  -Dexec.mainClass=dev.moonservice.scoringprototype.MoonScoringPrototype \
   -Dexec.args="--location prague-cz --start 2026-06-29 --days 7 --step-minutes 30 --min-score 50 --limit 5"
 ```
 
@@ -58,6 +58,10 @@ The request fixture is intentionally small:
   "limit": 5
 }
 ```
+
+The public integration surface for sibling prototypes is
+`dev.moonservice.scoringprototype.PreviewEvaluator`. Other classes stay
+package-private unless tests need direct access inside this module.
 
 ## Current Boundary
 

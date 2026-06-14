@@ -78,7 +78,7 @@ def main() -> int:
         "mvn",
         "-q",
         "org.codehaus.mojo:exec-maven-plugin:3.3.0:java",
-        "-Dexec.mainClass=dev.moonservice.prototype.MoonScoringPrototype",
+        "-Dexec.mainClass=dev.moonservice.scoringprototype.MoonScoringPrototype",
         "-Dexec.args=--request fixtures/prague-preview-request.json",
     ], cwd=ROOT / "prototypes/jvm-scoring")
 

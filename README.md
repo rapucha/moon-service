@@ -130,7 +130,7 @@ Run the Maven prototype CLI:
 ```bash
 cd prototypes/jvm-scoring
 mvn -q org.codehaus.mojo:exec-maven-plugin:3.3.0:java \
-  -Dexec.mainClass=dev.moonservice.prototype.MoonScoringPrototype \
+  -Dexec.mainClass=dev.moonservice.scoringprototype.MoonScoringPrototype \
   -Dexec.args="--request fixtures/prague-preview-request.json"
 ```
 
@@ -139,7 +139,7 @@ The equivalent explicit-flag form is:
 ```bash
 cd prototypes/jvm-scoring
 mvn -q org.codehaus.mojo:exec-maven-plugin:3.3.0:java \
-  -Dexec.mainClass=dev.moonservice.prototype.MoonScoringPrototype \
+  -Dexec.mainClass=dev.moonservice.scoringprototype.MoonScoringPrototype \
   -Dexec.args="--location prague-cz --start 2026-06-29 --days 7 --step-minutes 30 --min-score 50 --limit 5"
 ```
 
@@ -179,23 +179,23 @@ apart from `generatedAt` and the prototype identifier.
 Run the Spring HTTP contract harness tests:
 
 ```bash
-cd prototypes/spring-preview
-mvn test
+(cd prototypes/jvm-scoring && mvn install)
+(cd prototypes/spring-preview && mvn test)
 ```
 
 Run the local prototype endpoint:
 
 ```bash
-cd prototypes/spring-preview
-mvn spring-boot:run
+(cd prototypes/jvm-scoring && mvn install)
+(cd prototypes/spring-preview && mvn spring-boot:run)
 ```
 
 The only endpoint is `POST /api/preview`, using the same request shape as
 `prototypes/jvm-scoring/fixtures/prague-preview-request.json`. This remains a
 prototype: no geocoding, live weather, persistence, accounts, feeds, calendar
-generation, Docker, or deployment config. The endpoint returns typed response
-objects through Spring/Jackson; the Maven CLI keeps the hand-formatted JSON
-path for parity with the older source-file prototype.
+generation, Docker, or deployment config. The Spring harness depends on the
+`jvm-scoring-prototype` Maven artifact and calls its public
+`PreviewEvaluator` facade.
 
 ## Verification
 
@@ -216,7 +216,8 @@ python3 -B scripts/real_data_scoring_spike.py --forecast-days 2 --limit 3
 python3 -B -m py_compile scripts/real_data_scoring_spike.py
 java -cp /tmp/astronomy-2.1.19.jar:/tmp/kotlin-stdlib-jdk8-1.6.10.jar:/tmp/kotlin-stdlib-jdk7-1.6.10.jar:/tmp/kotlin-stdlib-1.6.10.jar:/tmp/kotlin-stdlib-common-1.6.10.jar prototypes/jvm-ephemeris/MoonWindowPrototype.java --location prague-cz --start 2026-06-29 --days 7 --step-minutes 30 --min-score 50 --limit 5
 (cd prototypes/jvm-scoring && mvn test)
-(cd prototypes/jvm-scoring && mvn -q org.codehaus.mojo:exec-maven-plugin:3.3.0:java -Dexec.mainClass=dev.moonservice.prototype.MoonScoringPrototype -Dexec.args="--request fixtures/prague-preview-request.json")
+(cd prototypes/jvm-scoring && mvn -q org.codehaus.mojo:exec-maven-plugin:3.3.0:java -Dexec.mainClass=dev.moonservice.scoringprototype.MoonScoringPrototype -Dexec.args="--request fixtures/prague-preview-request.json")
 python3 -B scripts/prototype_contract_parity.py
+(cd prototypes/jvm-scoring && mvn install)
 (cd prototypes/spring-preview && mvn test)
 ```

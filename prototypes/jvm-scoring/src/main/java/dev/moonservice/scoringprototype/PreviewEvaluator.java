@@ -1,0 +1,11 @@
+package dev.moonservice.scoringprototype;
+
+import com.fasterxml.jackson.databind.JsonNode;
+
+public final class PreviewEvaluator {
+    public String evaluateJson(JsonNode request) {
+        PrototypeConfig config = RequestConfigReader.fromJson(request);
+        PrototypeResult result = new OpportunityService().evaluate(config);
+        return new ResponseFormatter().format(result);
+    }
+}

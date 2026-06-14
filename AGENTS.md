@@ -94,7 +94,8 @@ For the Maven-based JVM scoring prototype, verify with:
 
 ```bash
 (cd prototypes/jvm-scoring && mvn test)
-(cd prototypes/jvm-scoring && mvn -q org.codehaus.mojo:exec-maven-plugin:3.3.0:java -Dexec.mainClass=dev.moonservice.prototype.MoonScoringPrototype -Dexec.args="--request fixtures/prague-preview-request.json")
+(cd prototypes/jvm-scoring && mvn -q org.codehaus.mojo:exec-maven-plugin:3.3.0:java -Dexec.mainClass=dev.moonservice.scoringprototype.MoonScoringPrototype -Dexec.args="--request fixtures/prague-preview-request.json")
 python3 -B scripts/prototype_contract_parity.py
+(cd prototypes/jvm-scoring && mvn install)
 (cd prototypes/spring-preview && mvn test)
 ```

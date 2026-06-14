@@ -156,12 +156,14 @@ The Maven prototype also accepts a request-shaped JSON fixture at `prototypes/jv
 
 The first HTTP contract harness now exists as `prototypes/spring-preview/`. It
 uses Spring Boot only to exercise `POST /api/preview` with the same fixture
-request shape, reusing the Maven scoring prototype sources. It is not
+request shape, reusing the Maven scoring prototype through the
+`jvm-scoring-prototype` Maven dependency and its public `PreviewEvaluator`
+facade. It is not
 production backend scaffolding: no persistence, geocoding integration, live
 weather calls, accounts, feeds, calendar generation, Docker, deployment, or
-admin surface are included. The Spring harness now returns typed response
-objects through Jackson instead of round-tripping the Maven CLI JSON string,
-while the CLI formatter remains for source-file parity.
+admin surface are included. The Spring harness serves the same JSON formatter
+as the Maven CLI, keeping one response path for the HTTP preview and command
+line prototype.
 
 The Spring preview harness now locks down the first invalid-request behavior:
 malformed JSON, non-object JSON, unsupported fixture locations, invalid start

@@ -35,8 +35,8 @@ Request body:
 ```
 
 Only the Prague fixture is supported. Weather is still fixed fixture weather.
-The endpoint returns typed response objects through Spring/Jackson while the
-Maven CLI prototype keeps its existing hand-formatted JSON output.
+The endpoint calls `dev.moonservice.scoringprototype.PreviewEvaluator` from
+the `jvm-scoring-prototype` Maven dependency and returns that JSON over HTTP.
 
 Invalid request bodies return HTTP `400` with `status: "invalid_request"`.
 The prototype currently covers malformed JSON, non-object JSON, unsupported
@@ -45,12 +45,14 @@ fixture locations, invalid start dates, and out-of-range numeric controls.
 ## Verify
 
 ```bash
+(cd ../jvm-scoring && mvn install)
 mvn test
 ```
 
 ## Run Locally
 
 ```bash
+(cd ../jvm-scoring && mvn install)
 mvn spring-boot:run
 ```
 
