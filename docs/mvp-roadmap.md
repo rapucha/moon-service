@@ -143,4 +143,27 @@ The first replacement step now exists as `prototypes/jvm-ephemeris/MoonWindowPro
 
 The JVM prototype now mirrors the retained Python scoring contract for the core top-level, location, opportunity, rejected, and message fields. It still includes prototype-only diagnostics such as sample counts and search interval metadata.
 
-Next, decide whether to keep iterating in the source-file prototype or create a minimal Maven project before adding fixture tests.
+The next narrow step now exists as `prototypes/jvm-scoring/`. It keeps the same prototype boundary, uses Astronomy Engine through Maven/JitPack, ports scoring and candidate generation into small testable Java classes, and adds fixture tests for scoring plus one contract-shaped Prague response.
+
+Contract parity as of this step:
+
+- `scripts/scoring_contract_spike.py` remains the fixed-fixture scoring contract reference for field shape, scoring vocabulary, hard filters, rejection reasons, and exposure-balance labels.
+- `prototypes/jvm-ephemeris/MoonWindowPrototype.java` and `prototypes/jvm-scoring/` now match for the Prague real-ephemeris fixture, except for `generatedAt` and the prototype identifier.
+- Exact top opportunity timing and score differ between the Python spike and JVM prototypes by design because the Python spike uses synthetic Moon/Sun windows while the JVM prototypes sample Astronomy Engine.
+- `scripts/prototype_contract_parity.py` verifies the shared contract shape and vocabulary across all three, and verifies exact source-file JVM vs Maven JVM parity after normalizing volatile prototype metadata.
+
+The Maven prototype also accepts a request-shaped JSON fixture at `prototypes/jvm-scoring/fixtures/prague-preview-request.json`. This proves the future web/API input boundary without adding HTTP routes, geocoding integration, live weather, feeds, calendar generation, or backend scaffolding.
+
+The first HTTP contract harness now exists as `prototypes/spring-preview/`. It
+uses Spring Boot only to exercise `POST /api/preview` with the same fixture
+request shape, reusing the Maven scoring prototype sources. It is not
+production backend scaffolding: no persistence, geocoding integration, live
+weather calls, accounts, feeds, calendar generation, Docker, deployment, or
+admin surface are included. The Spring harness now returns typed response
+objects through Jackson instead of round-tripping the Maven CLI JSON string,
+while the CLI formatter remains for source-file parity.
+
+The Spring preview harness now locks down the first invalid-request behavior:
+malformed JSON, non-object JSON, unsupported fixture locations, invalid start
+dates, and out-of-range numeric controls return HTTP `400` with
+`status: "invalid_request"`.

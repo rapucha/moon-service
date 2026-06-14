@@ -8,9 +8,13 @@ The near-term product is not a full Photographer's Ephemeris clone. It is a web-
 
 ## Current Phase
 
-This repo is in planning and documentation mode.
+This repo is in planning and documentation mode with narrow prototypes under
+`prototypes/`.
 
-Do not scaffold backend, Android, database, or deployment code until the MVP architecture, scoring model, ephemeris library, and weather provider choices are documented.
+Do not scaffold production backend, Android, database, or deployment code until
+the MVP architecture, scoring model, ephemeris library, and weather provider
+choices are documented. A thin Spring Boot HTTP contract harness is allowed
+under `prototypes/` when it stays fixture-only and avoids production concerns.
 
 ## Product Direction
 
@@ -44,6 +48,8 @@ The main unresolved choice is now the exact first web/API contract for city look
 - `docs/weather-provider-research.md`: weather provider recommendation, caching, and privacy notes.
 - `docs/geocoding-research.md`: geocoding provider recommendation and city/location lookup privacy notes.
 - `docs/mvp-roadmap.md`: milestone plan and implementation order.
+- `prototypes/jvm-scoring/`: minimal Maven JVM scoring/ephemeris prototype with fixture tests.
+- `prototypes/spring-preview/`: thin Spring Boot HTTP contract harness for the preview request/response shape.
 
 ## Engineering Guidelines
 
@@ -82,4 +88,13 @@ jars into `/tmp`, verify with:
 
 ```bash
 java -cp /tmp/astronomy-2.1.19.jar:/tmp/kotlin-stdlib-jdk8-1.6.10.jar:/tmp/kotlin-stdlib-jdk7-1.6.10.jar:/tmp/kotlin-stdlib-1.6.10.jar:/tmp/kotlin-stdlib-common-1.6.10.jar prototypes/jvm-ephemeris/MoonWindowPrototype.java --location prague-cz --start 2026-06-29 --days 7 --step-minutes 30 --min-score 50 --limit 5
+```
+
+For the Maven-based JVM scoring prototype, verify with:
+
+```bash
+(cd prototypes/jvm-scoring && mvn test)
+(cd prototypes/jvm-scoring && mvn -q org.codehaus.mojo:exec-maven-plugin:3.3.0:java -Dexec.mainClass=dev.moonservice.prototype.MoonScoringPrototype -Dexec.args="--request fixtures/prague-preview-request.json")
+python3 -B scripts/prototype_contract_parity.py
+(cd prototypes/spring-preview && mvn test)
 ```
