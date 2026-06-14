@@ -40,6 +40,7 @@ Email alerts, native Android, saved personal preferences, terrain horizon modeli
 - `scripts/geocoding_contract_spike.py`: retained Python spike for checking the v0 geocoding contract.
 - `scripts/scoring_contract_spike.py`: retained Python spike for checking the v0 scoring contract with fixture data.
 - `scripts/real_data_scoring_spike.py`: retained Python spike that combines live JPL Horizons ephemeris samples with live Open-Meteo weather.
+- `prototypes/jvm-ephemeris/`: source-file JVM prototype using Astronomy Engine for Moon/Sun samples and low-Moon candidate windows.
 
 ## Geocoding Contract Spike
 
@@ -95,6 +96,21 @@ python3 -B scripts/real_data_scoring_spike.py --forecast-days 2 --limit 3
 
 This script calls NASA/JPL Horizons for Moon/Sun observer samples and Open-Meteo for hourly forecast data, then reuses the scoring functions from `scripts/scoring_contract_spike.py`. It is a prototype harness, not the final ephemeris or backend integration.
 
+## JVM Ephemeris Prototype
+
+Run the Astronomy Engine source-file prototype after fetching its jars into `/tmp`
+as documented in `prototypes/jvm-ephemeris/README.md`:
+
+```bash
+java -cp /tmp/astronomy-2.1.19.jar:/tmp/kotlin-stdlib-jdk8-1.6.10.jar:/tmp/kotlin-stdlib-jdk7-1.6.10.jar:/tmp/kotlin-stdlib-1.6.10.jar:/tmp/kotlin-stdlib-common-1.6.10.jar \
+  prototypes/jvm-ephemeris/MoonWindowPrototype.java \
+  --location prague-cz --start 2026-06-29 --days 7 --step-minutes 30 --limit 5
+```
+
+This prototype is the intended bridge away from the JPL-based Python validation
+spike. It does not include Spring Boot, persistence, weather calls, feeds, or
+calendar generation.
+
 ## Verification
 
 For documentation-only changes:
@@ -112,4 +128,5 @@ python3 -B scripts/scoring_contract_spike.py
 python3 -B -m py_compile scripts/scoring_contract_spike.py
 python3 -B scripts/real_data_scoring_spike.py --forecast-days 2 --limit 3
 python3 -B -m py_compile scripts/real_data_scoring_spike.py
+java -cp /tmp/astronomy-2.1.19.jar:/tmp/kotlin-stdlib-jdk8-1.6.10.jar:/tmp/kotlin-stdlib-jdk7-1.6.10.jar:/tmp/kotlin-stdlib-1.6.10.jar:/tmp/kotlin-stdlib-common-1.6.10.jar prototypes/jvm-ephemeris/MoonWindowPrototype.java --location prague-cz --start 2026-06-29 --days 7 --step-minutes 30 --limit 5
 ```

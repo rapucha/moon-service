@@ -139,4 +139,6 @@ The retained script-level scoring spike is `scripts/scoring_contract_spike.py`. 
 
 The retained thin real-data scoring spike is `scripts/real_data_scoring_spike.py`. It wires one resolved Prague fixture to live JPL Horizons Moon/Sun samples and live Open-Meteo hourly weather, then reuses the scoring functions. Moon illumination contributes to scoring, but crescent Moon windows are allowed when altitude, light, and weather are otherwise promising.
 
-Next, either capture any live-provider adjustments found by the spikes, or move on to replacing the JPL Horizons script dependency with the selected implementation library before backend scaffolding.
+The first replacement step now exists as `prototypes/jvm-ephemeris/MoonWindowPrototype.java`. It uses Astronomy Engine on the JVM to sample Moon/Sun positions and emit low-Moon candidate windows for the Prague validation fixture, without Spring Boot, persistence, weather calls, feeds, or calendar generation.
+
+Next, compare its windows against the retained JPL-based spike, then port the fixture scoring rules into JVM code while keeping weather as fixtures until the scoring contract is stable.
