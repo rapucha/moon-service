@@ -102,7 +102,7 @@ Meanings:
 
 - `local_horizon_not_modelled`: terrain, buildings, trees, and exact local horizon are not included.
 - `fictional_result`: the response is an Easter egg and not real-world guidance.
-- `query_alias_used`: raw geocoding returned no candidates, so a curated alias or transliteration was used.
+- `query_alias_used`: raw geocoding returned no candidates, so a curated alias, transliteration, or exact curated one-character place record was used.
 - `input_normalized`: lookup/cache input was normalized, such as whitespace collapsing, while preserving the original query in the response.
 - `one_character_query`: the query is a single visible character and was handled with stricter lookup rules.
 

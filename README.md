@@ -38,6 +38,7 @@ Email alerts, native Android, saved personal preferences, terrain horizon modeli
 - `docs/geocoding-research.md`: geocoding provider decision and validation notes.
 - `docs/mvp-roadmap.md`: milestone plan and next steps.
 - `scripts/geocoding_contract_spike.py`: retained Python spike for checking the v0 geocoding contract.
+- `scripts/scoring_contract_spike.py`: retained Python spike for checking the v0 scoring contract with fixture data.
 
 ## Geocoding Contract Spike
 
@@ -61,6 +62,22 @@ python3 -B scripts/geocoding_contract_spike.py --live --lang ja 東京 京都 �
 
 The default fixture mode is intended for stable local checks. Live mode is for detecting provider behavior changes.
 
+## Scoring Contract Spike
+
+Run the fixture-based scoring check:
+
+```bash
+python3 -B scripts/scoring_contract_spike.py
+```
+
+Run with a different minimum score:
+
+```bash
+python3 -B scripts/scoring_contract_spike.py --min-score 80
+```
+
+This script does not calculate real ephemeris or fetch live weather. It uses fixed Moon, Sun, and weather samples to exercise hard filters, score components, ranking, explanation text, and API-shaped output.
+
 ## Verification
 
 For documentation-only changes:
@@ -74,4 +91,6 @@ For the current Python spike:
 ```bash
 python3 -B scripts/geocoding_contract_spike.py
 python3 -B -m py_compile scripts/geocoding_contract_spike.py
+python3 -B scripts/scoring_contract_spike.py
+python3 -B -m py_compile scripts/scoring_contract_spike.py
 ```

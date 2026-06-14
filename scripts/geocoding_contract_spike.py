@@ -64,6 +64,47 @@ FICTIONAL_LOCATIONS = {
 }
 
 
+CURATED_REAL_LOCATIONS = {
+    "Å": [
+        {
+            "id": "curated:aa-nordland-no",
+            "name": "Å",
+            "country_code": "NO",
+            "country": "Norway",
+            "admin1": "Nordland",
+            "latitude": 67.87926,
+            "longitude": 12.98108,
+            "elevation": 8,
+            "timezone": "Europe/Oslo",
+        },
+        {
+            "id": "curated:aa-vasternorrland-se",
+            "name": "Å",
+            "country_code": "SE",
+            "country": "Sweden",
+            "admin1": "Västernorrland",
+            "latitude": 63.25,
+            "longitude": 17.25,
+            "elevation": 52,
+            "timezone": "Europe/Stockholm",
+        },
+    ],
+    "Y": [
+        {
+            "id": "curated:y-somme-fr",
+            "name": "Y",
+            "country_code": "FR",
+            "country": "France",
+            "admin1": "Hauts-de-France",
+            "latitude": 49.803,
+            "longitude": 2.995,
+            "elevation": 82,
+            "timezone": "Europe/Paris",
+        }
+    ],
+}
+
+
 FIXTURE_RESULTS = {
     "Prague": [
         {
@@ -344,7 +385,15 @@ def preview(
                 }
                 messages.append({"level": "info", "code": "query_alias_used"})
 
-    real_candidates = [normalize_candidate(row) for row in rows]
+    curated_rows = []
+    if not rows:
+        curated_rows = CURATED_REAL_LOCATIONS.get(valid.normalized, [])
+        if country:
+            curated_rows = [row for row in curated_rows if row.get("country_code") == country.upper()]
+        if curated_rows:
+            messages.append({"level": "info", "code": "query_alias_used"})
+
+    real_candidates = [normalize_candidate(row) for row in rows + curated_rows]
     fictional_candidate = FICTIONAL_LOCATIONS.get(valid.normalized.casefold())
 
     if len(real_candidates) == 1 and not fictional_candidate:
@@ -430,16 +479,24 @@ def normalize_candidate(row: dict[str, Any]) -> dict[str, Any]:
     slug_name = slugify(row.get("name") or "location")
     slug_country = slugify(country_code)
     provider_id = row.get("id")
+    provider = "curated" if str(provider_id).startswith("curated:") else "openmeteo"
+    public_id = (
+        provider_id
+        if provider == "curated"
+        else f"openmeteo:{slug_name}-{slug_country}"
+        if slug_country
+        else f"openmeteo:{provider_id}"
+    )
     return {
         "kind": "real_location",
-        "id": f"openmeteo:{slug_name}-{slug_country}" if slug_country else f"openmeteo:{provider_id}",
+        "id": public_id,
         "displayName": display_name(row),
         "latitude": row.get("latitude"),
         "longitude": row.get("longitude"),
         "elevationMeters": row.get("elevation"),
         "timezone": row.get("timezone"),
         "countryCode": country_code,
-        "provider": "openmeteo",
+        "provider": provider,
         "providerPlaceId": provider_id,
     }
 

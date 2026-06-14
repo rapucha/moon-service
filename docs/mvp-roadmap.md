@@ -126,7 +126,7 @@ The geocoding/API contract mismatch found during provider validation is now reso
 - `docs/api-shape.md` includes input validation, abuse protection, alias messaging, and one-character place-name handling.
 - The current v0 decision is to keep the broad raw Unicode input promise with curated fallback for known provider gaps, without adding a secondary geocoder or LLM/translation API by default.
 
-The retained script-level spike is `scripts/geocoding_contract_spike.py`. It should stay small and independent from app/backend scaffolding while the lookup contract is still being proven.
+The retained script-level geocoding spike is `scripts/geocoding_contract_spike.py`. It should stay small and independent from app/backend scaffolding while the lookup contract is still being proven.
 
 Use it to verify:
 
@@ -134,4 +134,6 @@ Use it to verify:
 - Normalized candidate/output examples matching `docs/api-shape.md`.
 - Provider drift with optional live Open-Meteo calls when network access is available.
 
-Next, either capture any live-provider adjustments found by the spike, or move on to the thin scoring prototype if the contract still holds.
+The retained script-level scoring spike is `scripts/scoring_contract_spike.py`. It uses fixture Moon, Sun, and weather samples to prove hard filters, score components, ranking, explanation text, and API-shaped output before real ephemeris/weather integration.
+
+Next, either capture any live-provider adjustments found by the spikes, or move on to a thin real-data scoring prototype that wires one resolved location to ephemeris and weather provider calls without scaffolding the full backend.

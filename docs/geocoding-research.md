@@ -82,6 +82,7 @@ Fallback rules:
 - Try raw provider geocoding first.
 - Apply aliases only after the raw query returns no real candidates.
 - Apply aliases by exact match only, especially for one-character queries.
+- For one-character place names that the provider cannot search directly, use exact curated real-location records only after raw lookup returns no candidates.
 - Preserve the original query in the API response.
 - Mark which alias or transliteration was used internally for debugging/admin visibility.
 - Cache accepted alias mappings separately from provider results.
@@ -319,6 +320,19 @@ Conclusion:
 - It handles European local-language Unicode examples and several non-Latin scripts well enough for the first prototype.
 - It supports ambiguity handling for Prague/Praha-style cases.
 - It does not satisfy a broad raw native-script search requirement by itself. The product/API contract should add a curated alias/transliteration fallback for high-priority missed place names before narrowing the v0 search promise or adopting a secondary provider.
+
+## Contract Spike Notes
+
+The retained script `scripts/geocoding_contract_spike.py` exercises the documented lookup flow with fixtures by default and can optionally query live Open-Meteo Geocoding with `--live`.
+
+Live recheck:
+
+- Date run: 2026-06-14 Europe/Prague local time.
+- Command shape: `python3 -B scripts/geocoding_contract_spike.py --live ...`
+- `Prague` and `Praha` returned multiple real candidates, so `ambiguous_location` remains the correct response unless the UI supplies an explicit selection or country hint.
+- Alias fallbacks for `東京`, `京都`, `大阪`, `とうきょう`, and `서울` successfully produced real candidates, but live provider results were ambiguous because the romanized alias matched multiple places. The contract already handles this by returning `ambiguous_location` rather than silently selecting the first result.
+- `Xanadu` returned both a real place and a curated fictional candidate, confirming that real and fictional candidates need to stay distinct in ambiguous responses.
+- One-character live queries `Å` and `Y` did not return exact Open-Meteo candidates through this flow. The retained spike now uses exact curated real-location records for those examples after raw lookup returns no candidates. Keep broad fuzzy, dynamic transliteration, secondary geocoding, and LLM fallback disabled for one-character queries by default.
 
 ### OpenStreetMap Nominatim Public API
 
