@@ -148,6 +148,44 @@ Forecast confidence:
 - Use confidence to reduce alert urgency.
 - If confidence is not available, expose a neutral confidence state rather than fabricating precision.
 
+## Future Scoring Profiles
+
+V0 should start with one default `photographer_balanced` scoring profile. The
+anonymous web lookup should stay simple until real usage shows which controls
+matter.
+
+Later, scoring should support user-selectable profiles or preferences without
+changing candidate generation. Candidate windows can remain broad, while the
+score changes based on the photographer's goal.
+
+Possible profile presets:
+
+- `photographer_balanced`: default mix of low Moon, useful ambient light, and reasonable weather.
+- `crescent_twilight`: favors thin or modest crescents near golden hour or civil twilight.
+- `full_moon_horizon`: favors high illumination when the Moon is low, especially near rise/set.
+- `daylight_moon`: allows and favors visible daylight Moon opportunities with enough contrast.
+- `night_silhouette`: accepts darker foreground conditions when silhouette or night-landscape intent is explicit.
+
+Possible preference controls:
+
+- Light preference: daylight, golden hour, civil twilight, nautical twilight, night, or any.
+- Moon type: crescent, quarter, gibbous, full, or any.
+- Foreground goal: balanced exposure, silhouette, or night landscape.
+- Moon altitude range: very low, low, moderate, or any within the low-Moon limit.
+- Weather tolerance: clear only, partial clouds welcome, or dramatic clouds allowed.
+- Minimum score threshold.
+- Travel or setup lead time.
+
+Preferences should adjust weights and explanations, not hide the raw facts. For
+example, a daylight profile may score daylight higher than the v0 default, while
+the default profile continues to favor golden hour and civil twilight. The UI
+should still show Sun altitude, Moon illumination, weather, and exposure-balance
+text so users can override the recommendation with their own judgment.
+
+Do not add server-side user profiles in v0 just to support scoring preferences.
+If profile selection is added before accounts, keep it request-scoped or stored
+only in browser `localStorage`.
+
 ## Alert Explanation
 
 Each scored opportunity should include a short explanation:

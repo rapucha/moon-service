@@ -16,8 +16,10 @@ import java.time.ZoneOffset;
 import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 
 public class MoonWindowPrototype {
     private static final Location PRAGUE = new Location(
@@ -31,7 +33,19 @@ public class MoonWindowPrototype {
 
     private static final int DEFAULT_DAYS = 7;
     private static final int DEFAULT_STEP_MINUTES = 30;
+    private static final int DEFAULT_MIN_SCORE = 50;
     private static final double DEFAULT_MAX_MOON_ALTITUDE = 12.0;
+    private static final WeatherFixture FIXTURE_WEATHER = new WeatherFixture(
+            35,
+            10,
+            25,
+            40,
+            5,
+            0.0,
+            20000,
+            2,
+            1.0
+    );
 
     public static void main(String[] args) {
         try {
@@ -46,16 +60,35 @@ public class MoonWindowPrototype {
     private static String run(Config config) {
         List<MoonSample> samples = sample(config);
         List<MoonWindow> windows = findWindows(samples, config);
-        windows.sort(Comparator.comparingDouble(MoonWindow::scoreSortKey).reversed()
-                .thenComparing(window -> window.peak.instant));
-        if (windows.size() > config.limit) {
-            windows = windows.subList(0, config.limit);
+        List<ScoredWindow> scored = new ArrayList<>();
+        Map<String, Integer> rejectedCounts = new LinkedHashMap<>();
+
+        for (MoonWindow window : windows) {
+            List<String> rejectionReasons = hardFilterReasons(window, FIXTURE_WEATHER, config);
+            if (!rejectionReasons.isEmpty()) {
+                countRejections(rejectedCounts, rejectionReasons);
+                continue;
+            }
+
+            ComponentScores components = scoreWindow(window, FIXTURE_WEATHER);
+            if (components.total() < config.minScore) {
+                countRejections(rejectedCounts, List.of("below_minimum_score"));
+                continue;
+            }
+
+            scored.add(new ScoredWindow(window, FIXTURE_WEATHER, components));
+        }
+
+        scored.sort(Comparator.comparingInt((ScoredWindow item) -> item.components.total()).reversed()
+                .thenComparing(item -> item.window.peak.instant));
+        if (scored.size() > config.limit) {
+            scored = scored.subList(0, config.limit);
         }
 
         Json out = new Json();
         out.line("{");
         out.field("status", "ok", true);
-        out.field("prototype", "jvm_ephemeris_astronomy_engine", true);
+        out.field("prototype", "jvm_ephemeris_scoring_fixture", true);
         out.field("ephemerisSource", "Astronomy Engine 2.1.19 via JitPack", true);
         out.field("generatedAt", Instant.now().toString(), true);
         out.line("\"location\": {");
@@ -71,14 +104,19 @@ public class MoonWindowPrototype {
         out.field("sampleStepMinutes", config.stepMinutes, true);
         out.field("samplesEvaluated", samples.size(), true);
         out.field("maxMoonAltitudeDegrees", config.maxMoonAltitudeDegrees, true);
+        out.field("minScore", config.minScore, true);
         out.line("\"opportunities\": [");
-        for (int i = 0; i < windows.size(); i++) {
-            windows.get(i).writeJson(out, i < windows.size() - 1);
+        for (int i = 0; i < scored.size(); i++) {
+            scored.get(i).writeJson(out, i < scored.size() - 1);
         }
         out.line("],");
         out.line("\"diagnostics\": {");
-        out.field("note", "Prototype only: no weather, scoring persistence, HTTP API, database, or backend framework.", true);
-        out.field("selectionRule", "Contiguous samples where the apparent refracted Moon altitude is between 0 degrees and the configured maximum.", false);
+        out.field("note", "Prototype only: fixture weather, no persistence, HTTP API, database, or backend framework.", true);
+        out.field("selectionRule", "Contiguous samples where the apparent refracted Moon altitude is between 0 degrees and the configured maximum.", true);
+        out.field("weatherSource", "fixed_fixture", true);
+        out.line("\"rejectedCounts\": {");
+        writeCounts(out, rejectedCounts);
+        out.line("}");
         out.line("}");
         out.line("}");
         return out.toString();
@@ -149,13 +187,146 @@ public class MoonWindowPrototype {
             return;
         }
         MoonSample peak = samples.stream()
-                .max(Comparator.comparingDouble(MoonSample::candidateFit))
+                .max(Comparator.comparingInt(MoonWindowPrototype::candidateFit))
                 .orElseThrow();
         Duration halfStep = Duration.ofMinutes(config.stepMinutes / 2L);
         Instant startsAt = max(config.start, samples.get(0).instant.minus(halfStep));
         Instant endsAt = min(config.end(), samples.get(samples.size() - 1).instant.plus(halfStep));
         windows.add(new MoonWindow(config.location.id, startsAt, peak, endsAt, samples.size()));
         samples.clear();
+    }
+
+    private static List<String> hardFilterReasons(MoonWindow window, WeatherFixture weather, Config config) {
+        List<String> reasons = new ArrayList<>();
+        if (window.peak.moonAltitudeDegrees < 0.0) {
+            reasons.add("moon_below_horizon");
+        }
+        if (window.peak.moonAltitudeDegrees > config.maxMoonAltitudeDegrees) {
+            reasons.add("moon_too_high_for_low_moon_mode");
+        }
+        if (weather.cloudCoverPercent >= 90) {
+            reasons.add("overcast");
+        }
+        if (weather.precipitationProbabilityPercent >= 30) {
+            reasons.add("high_precipitation_probability");
+        }
+        if (weather.visibilityMeters < 10000) {
+            reasons.add("low_visibility");
+        }
+        return reasons;
+    }
+
+    private static int candidateFit(MoonSample sample) {
+        return scoreMoonAltitude(sample.moonAltitudeDegrees) + scoreSunLight(sample.sunAltitudeDegrees);
+    }
+
+    private static ComponentScores scoreWindow(MoonWindow window, WeatherFixture weather) {
+        return new ComponentScores(
+                scoreMoonAltitude(window.peak.moonAltitudeDegrees),
+                scoreSunLight(window.peak.sunAltitudeDegrees),
+                scoreIllumination(window.peak.moonIlluminationPercent),
+                scoreWeather(weather),
+                scoreConfidence(weather.forecastAgeHours)
+        );
+    }
+
+    private static int scoreMoonAltitude(double altitude) {
+        if (altitude < 0.0 || altitude > 12.0) {
+            return 0;
+        }
+        if (altitude >= 1.0 && altitude <= 6.0) {
+            return 30;
+        }
+        if (altitude < 1.0) {
+            return Math.toIntExact(Math.round(18.0 + altitude * 6.0));
+        }
+        return Math.toIntExact(Math.round(30.0 - ((altitude - 6.0) / 6.0) * 12.0));
+    }
+
+    private static int scoreSunLight(double sunAltitude) {
+        return switch (lightBucket(sunAltitude)) {
+            case "golden_hour" -> 25;
+            case "civil_twilight" -> 24;
+            case "daylight" -> 16;
+            case "nautical_twilight" -> 14;
+            default -> 7;
+        };
+    }
+
+    private static int scoreIllumination(double percent) {
+        if (percent >= 95.0) {
+            return 15;
+        }
+        if (percent >= 85.0) {
+            return 12;
+        }
+        if (percent >= 70.0) {
+            return 10;
+        }
+        if (percent >= 30.0) {
+            return 8;
+        }
+        if (percent >= 5.0) {
+            return 6;
+        }
+        return 4;
+    }
+
+    private static int scoreWeather(WeatherFixture weather) {
+        int cloudScore = Math.max(0, 13 - Math.toIntExact(Math.round(Math.abs(weather.cloudCoverPercent - 35) / 5.0)));
+        int precipScore = Math.max(0, 7 - Math.toIntExact(Math.round(weather.precipitationProbabilityPercent / 5.0)));
+        int visibilityScore = weather.visibilityMeters >= 20000 ? 5 : weather.visibilityMeters >= 15000 ? 4 : 2;
+        return Math.min(25, cloudScore + precipScore + visibilityScore);
+    }
+
+    private static int scoreConfidence(double forecastAgeHours) {
+        if (forecastAgeHours <= 3.0) {
+            return 5;
+        }
+        if (forecastAgeHours <= 12.0) {
+            return 4;
+        }
+        if (forecastAgeHours <= 24.0) {
+            return 3;
+        }
+        return 2;
+    }
+
+    private static String confidenceLabel(int score) {
+        if (score >= 85) {
+            return "high";
+        }
+        if (score >= 65) {
+            return "medium";
+        }
+        return "low";
+    }
+
+    private static String weatherSummary(WeatherFixture weather) {
+        if (weather.weatherCode == 0 || weather.weatherCode == 1) {
+            return "clear to mostly clear";
+        }
+        if (weather.weatherCode == 2 || weather.weatherCode == 3) {
+            return "partly cloudy";
+        }
+        if (weather.weatherCode >= 50) {
+            return "rain likely";
+        }
+        return "mixed conditions";
+    }
+
+    private static void countRejections(Map<String, Integer> rejectedCounts, List<String> reasons) {
+        for (String reason : reasons) {
+            rejectedCounts.put(reason, rejectedCounts.getOrDefault(reason, 0) + 1);
+        }
+    }
+
+    private static void writeCounts(Json out, Map<String, Integer> counts) {
+        int index = 0;
+        for (Map.Entry<String, Integer> entry : counts.entrySet()) {
+            out.field(entry.getKey(), entry.getValue(), index < counts.size() - 1);
+            index++;
+        }
     }
 
     private static Instant max(Instant a, Instant b) {
@@ -220,6 +391,7 @@ public class MoonWindowPrototype {
                 "  --days N                    Days to sample. Default: 7.",
                 "  --step-minutes N            Sampling step. Default: 30.",
                 "  --max-altitude DEG          Low-Moon ceiling. Default: 12.",
+                "  --min-score N               Minimum returned score. Default: 50.",
                 "  --limit N                   Maximum returned windows. Default: 10."
         );
     }
@@ -240,6 +412,7 @@ public class MoonWindowPrototype {
             int days,
             int stepMinutes,
             double maxMoonAltitudeDegrees,
+            int minScore,
             int limit
     ) {
         Instant end() {
@@ -252,6 +425,7 @@ public class MoonWindowPrototype {
             int days = DEFAULT_DAYS;
             int stepMinutes = DEFAULT_STEP_MINUTES;
             double maxMoonAltitudeDegrees = DEFAULT_MAX_MOON_ALTITUDE;
+            int minScore = DEFAULT_MIN_SCORE;
             int limit = 10;
 
             for (int i = 0; i < args.length; i++) {
@@ -263,6 +437,7 @@ public class MoonWindowPrototype {
                     case "--days" -> days = parseInt(arg, value, 1, 30);
                     case "--step-minutes" -> stepMinutes = parseInt(arg, value, 1, 180);
                     case "--max-altitude" -> maxMoonAltitudeDegrees = parseDouble(arg, value, 0.0, 45.0);
+                    case "--min-score" -> minScore = parseInt(arg, value, 0, 100);
                     case "--limit" -> limit = parseInt(arg, value, 1, 100);
                     default -> throw new UsageException("Unknown option: " + arg);
                 }
@@ -271,7 +446,7 @@ public class MoonWindowPrototype {
             if (!locationId.equals(PRAGUE.id)) {
                 throw new UsageException("Unsupported location for this prototype: " + locationId);
             }
-            return new Config(PRAGUE, start, days, stepMinutes, maxMoonAltitudeDegrees, limit);
+            return new Config(PRAGUE, start, days, stepMinutes, maxMoonAltitudeDegrees, minScore, limit);
         }
 
         private static String requireValue(String[] args, int index, String option) {
@@ -324,19 +499,6 @@ public class MoonWindowPrototype {
             double moonIlluminationPercent,
             double sunAltitudeDegrees
     ) {
-        double candidateFit() {
-            double altitudeFit = moonAltitudeDegrees >= 1.0 && moonAltitudeDegrees <= 6.0
-                    ? 30.0
-                    : Math.max(0.0, 30.0 - Math.abs(moonAltitudeDegrees - 4.0) * 3.0);
-            double lightFit = switch (lightBucket(sunAltitudeDegrees)) {
-                case "golden_hour" -> 25.0;
-                case "civil_twilight" -> 24.0;
-                case "daylight" -> 16.0;
-                case "nautical_twilight" -> 14.0;
-                default -> 7.0;
-            };
-            return altitudeFit + lightFit;
-        }
     }
 
     private record MoonWindow(
@@ -346,35 +508,101 @@ public class MoonWindowPrototype {
             Instant endsAt,
             int sampleCount
     ) {
-        double scoreSortKey() {
-            return peak.candidateFit();
-        }
+    }
 
+    private record WeatherFixture(
+            int cloudCoverPercent,
+            int lowCloudCoverPercent,
+            int midCloudCoverPercent,
+            int highCloudCoverPercent,
+            int precipitationProbabilityPercent,
+            double precipitationMm,
+            int visibilityMeters,
+            int weatherCode,
+            double forecastAgeHours
+    ) {
+    }
+
+    private record ComponentScores(
+            int moonAltitudeFit,
+            int sunLightFit,
+            int moonIlluminationFit,
+            int weatherFit,
+            int forecastConfidence
+    ) {
+        int total() {
+            return moonAltitudeFit + sunLightFit + moonIlluminationFit + weatherFit + forecastConfidence;
+        }
+    }
+
+    private record ScoredWindow(
+            MoonWindow window,
+            WeatherFixture weather,
+            ComponentScores components
+    ) {
         void writeJson(Json out, boolean comma) {
-            String id = locationId + "-" + peak.instant.toString()
+            String id = window.locationId + "-" + window.peak.instant.toString()
                     .replace(":", "")
                     .replace("-", "")
                     .replace(".000", "");
             out.line("{");
             out.field("id", id, true);
-            out.field("startsAt", startsAt.toString(), true);
-            out.field("peaksAt", peak.instant.toString(), true);
-            out.field("endsAt", endsAt.toString(), true);
-            out.field("sampleCount", sampleCount, true);
+            out.field("startsAt", window.startsAt.toString(), true);
+            out.field("peaksAt", window.peak.instant.toString(), true);
+            out.field("endsAt", window.endsAt.toString(), true);
+            out.field("score", components.total(), true);
+            out.field("confidence", confidenceLabel(components.total()), true);
+            out.line("\"components\": {");
+            out.field("moonAltitudeFit", components.moonAltitudeFit, true);
+            out.field("sunLightFit", components.sunLightFit, true);
+            out.field("moonIlluminationFit", components.moonIlluminationFit, true);
+            out.field("weatherFit", components.weatherFit, true);
+            out.field("forecastConfidence", components.forecastConfidence, false);
+            out.line("},");
+            out.field("sampleCount", window.sampleCount, true);
             out.line("\"moon\": {");
-            out.field("altitudeDegrees", round3(peak.moonAltitudeDegrees), true);
-            out.field("azimuthDegrees", round3(peak.moonAzimuthDegrees), true);
-            out.field("illuminationPercent", round3(peak.moonIlluminationPercent), false);
+            out.field("altitudeDegrees", round3(window.peak.moonAltitudeDegrees), true);
+            out.field("azimuthDegrees", round3(window.peak.moonAzimuthDegrees), true);
+            out.field("illuminationPercent", round3(window.peak.moonIlluminationPercent), false);
             out.line("},");
             out.line("\"sun\": {");
-            out.field("altitudeDegrees", round3(peak.sunAltitudeDegrees), true);
-            out.field("lightBucket", lightBucket(peak.sunAltitudeDegrees), false);
+            out.field("altitudeDegrees", round3(window.peak.sunAltitudeDegrees), true);
+            out.field("lightBucket", lightBucket(window.peak.sunAltitudeDegrees), false);
+            out.line("},");
+            out.line("\"weather\": {");
+            out.field("cloudCoverPercent", weather.cloudCoverPercent, true);
+            out.field("lowCloudCoverPercent", weather.lowCloudCoverPercent, true);
+            out.field("midCloudCoverPercent", weather.midCloudCoverPercent, true);
+            out.field("highCloudCoverPercent", weather.highCloudCoverPercent, true);
+            out.field("precipitationProbabilityPercent", weather.precipitationProbabilityPercent, true);
+            out.field("precipitationMm", weather.precipitationMm, true);
+            out.field("visibilityMeters", weather.visibilityMeters, true);
+            out.field("weatherCode", weather.weatherCode, true);
+            out.field("summary", weatherSummary(weather), false);
             out.line("},");
             out.line("\"exposureBalance\": {");
-            out.field("label", exposureBalance(peak), true);
-            out.field("text", exposureText(peak), false);
+            out.field("label", exposureBalance(window.peak), true);
+            out.field("text", exposureText(window.peak), false);
+            out.line("},");
+            out.field("reason", reasonText(), true);
+            out.line("\"links\": {");
+            out.field("ics", "/o/" + id + ".ics", false);
             out.line("}");
             out.line(comma ? "}," : "}");
+        }
+
+        private String reasonText() {
+            return String.format(
+                    Locale.ROOT,
+                    "Moon is %.1f degrees above the horizon at azimuth %.0f degrees, %.1f percent illuminated, during %s with %s and %d percent precipitation risk. %s",
+                    window.peak.moonAltitudeDegrees,
+                    window.peak.moonAzimuthDegrees,
+                    window.peak.moonIlluminationPercent,
+                    lightBucket(window.peak.sunAltitudeDegrees).replace("_", " "),
+                    weatherSummary(weather),
+                    weather.precipitationProbabilityPercent,
+                    exposureText(window.peak)
+            );
         }
 
         private static String exposureText(MoonSample sample) {
