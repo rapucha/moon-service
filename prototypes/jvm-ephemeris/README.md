@@ -69,7 +69,23 @@ This prototype intentionally does not include:
 - Feed or calendar generation.
 - Production package structure.
 
-The next narrow step is to compare this output shape with
-`scripts/scoring_contract_spike.py`, then decide whether to keep iterating in
-this source-file prototype or create a minimal Maven project before adding
-fixture tests.
+After this contract-shape pass, the next narrow step is to decide whether to
+keep iterating in this source-file prototype or create a minimal Maven project
+before adding fixture tests.
+
+## Contract Shape
+
+The JVM prototype intentionally mirrors the retained Python scoring contract for
+the core response fields:
+
+- Top-level `status`, `location`, `forecastHorizonDays`, `opportunities`,
+  `rejected`, and `messages`.
+- Opportunity `id`, time window, `localTimeZone`, `score`, `confidence`,
+  `components`, `moon`, `sun`, `weather`, `exposureBalance`, `reason`, and
+  `links`.
+- Location `kind`, `id`, `displayName`, coordinates, elevation, timezone, and
+  country code.
+
+The JVM output also includes prototype-only diagnostics such as sample counts,
+source notes, and the generated search interval. These are useful while the
+prototype is still a local harness and do not have to become public API fields.

@@ -141,4 +141,6 @@ The retained thin real-data scoring spike is `scripts/real_data_scoring_spike.py
 
 The first replacement step now exists as `prototypes/jvm-ephemeris/MoonWindowPrototype.java`. It uses Astronomy Engine on the JVM to sample Moon/Sun positions, emit low-Moon candidate windows, and apply fixture-weather scoring for the Prague validation fixture, without Spring Boot, persistence, live weather calls, feeds, or calendar generation.
 
-Next, compare its output shape against `scripts/scoring_contract_spike.py`, then decide whether to keep iterating in the source-file prototype or create a minimal Maven project before adding fixture tests.
+The JVM prototype now mirrors the retained Python scoring contract for the core top-level, location, opportunity, rejected, and message fields. It still includes prototype-only diagnostics such as sample counts and search interval metadata.
+
+Next, decide whether to keep iterating in the source-file prototype or create a minimal Maven project before adding fixture tests.

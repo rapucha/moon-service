@@ -24,11 +24,14 @@ import java.util.Map;
 public class MoonWindowPrototype {
     private static final Location PRAGUE = new Location(
             "prague-cz",
+            "real_location",
+            "openmeteo:prague-cz",
             "Prague / Praha, Czech Republic",
             50.08804,
             14.42076,
             202.0,
-            "Europe/Prague"
+            "Europe/Prague",
+            "CZ"
     );
 
     private static final int DEFAULT_DAYS = 7;
@@ -61,18 +64,21 @@ public class MoonWindowPrototype {
         List<MoonSample> samples = sample(config);
         List<MoonWindow> windows = findWindows(samples, config);
         List<ScoredWindow> scored = new ArrayList<>();
+        List<RejectedWindow> rejected = new ArrayList<>();
         Map<String, Integer> rejectedCounts = new LinkedHashMap<>();
 
         for (MoonWindow window : windows) {
             List<String> rejectionReasons = hardFilterReasons(window, FIXTURE_WEATHER, config);
             if (!rejectionReasons.isEmpty()) {
                 countRejections(rejectedCounts, rejectionReasons);
+                rejected.add(new RejectedWindow(window.id(), null, rejectionReasons));
                 continue;
             }
 
             ComponentScores components = scoreWindow(window, FIXTURE_WEATHER);
             if (components.total() < config.minScore) {
                 countRejections(rejectedCounts, List.of("below_minimum_score"));
+                rejected.add(new RejectedWindow(window.id(), components.total(), List.of("below_minimum_score")));
                 continue;
             }
 
@@ -93,12 +99,15 @@ public class MoonWindowPrototype {
         out.field("generatedAt", Instant.now().toString(), true);
         out.line("\"location\": {");
         out.field("id", config.location.id, true);
+        out.field("kind", config.location.kind, true);
         out.field("displayName", config.location.displayName, true);
         out.field("latitude", config.location.latitude, 5, true);
         out.field("longitude", config.location.longitude, 5, true);
         out.field("elevationMeters", config.location.elevationMeters, 1, true);
-        out.field("timezone", config.location.timezone, false);
+        out.field("timezone", config.location.timezone, true);
+        out.field("countryCode", config.location.countryCode, false);
         out.line("},");
+        out.field("forecastHorizonDays", config.days, true);
         out.field("startsAt", config.start.toString(), true);
         out.field("endsAt", config.end().toString(), true);
         out.field("sampleStepMinutes", config.stepMinutes, true);
@@ -109,6 +118,14 @@ public class MoonWindowPrototype {
         for (int i = 0; i < scored.size(); i++) {
             scored.get(i).writeJson(out, i < scored.size() - 1);
         }
+        out.line("],");
+        out.line("\"rejected\": [");
+        for (int i = 0; i < rejected.size(); i++) {
+            rejected.get(i).writeJson(out, i < rejected.size() - 1);
+        }
+        out.line("],");
+        out.line("\"messages\": [");
+        writeMessages(out);
         out.line("],");
         out.line("\"diagnostics\": {");
         out.field("note", "Prototype only: fixture weather, no persistence, HTTP API, database, or backend framework.", true);
@@ -192,7 +209,7 @@ public class MoonWindowPrototype {
         Duration halfStep = Duration.ofMinutes(config.stepMinutes / 2L);
         Instant startsAt = max(config.start, samples.get(0).instant.minus(halfStep));
         Instant endsAt = min(config.end(), samples.get(samples.size() - 1).instant.plus(halfStep));
-        windows.add(new MoonWindow(config.location.id, startsAt, peak, endsAt, samples.size()));
+        windows.add(new MoonWindow(config.location.slug, startsAt, peak, endsAt, samples.size()));
         samples.clear();
     }
 
@@ -329,6 +346,19 @@ public class MoonWindowPrototype {
         }
     }
 
+    private static void writeMessages(Json out) {
+        out.line("{");
+        out.field("level", "info", true);
+        out.field("code", "local_horizon_not_modelled", true);
+        out.field("text", "Local hills, buildings, or trees may affect exact visibility near the horizon.", false);
+        out.line("},");
+        out.line("{");
+        out.field("level", "info", true);
+        out.field("code", "fixture_weather", true);
+        out.field("text", "This JVM prototype uses fixed weather while exercising real Astronomy Engine Moon and Sun samples.", false);
+        out.line("}");
+    }
+
     private static Instant max(Instant a, Instant b) {
         return a.compareTo(b) >= 0 ? a : b;
     }
@@ -397,12 +427,15 @@ public class MoonWindowPrototype {
     }
 
     private record Location(
+            String slug,
+            String kind,
             String id,
             String displayName,
             double latitude,
             double longitude,
             double elevationMeters,
-            String timezone
+            String timezone,
+            String countryCode
     ) {
     }
 
@@ -443,7 +476,7 @@ public class MoonWindowPrototype {
                 }
             }
 
-            if (!locationId.equals(PRAGUE.id)) {
+            if (!locationId.equals(PRAGUE.slug)) {
                 throw new UsageException("Unsupported location for this prototype: " + locationId);
             }
             return new Config(PRAGUE, start, days, stepMinutes, maxMoonAltitudeDegrees, minScore, limit);
@@ -502,12 +535,21 @@ public class MoonWindowPrototype {
     }
 
     private record MoonWindow(
-            String locationId,
+            String locationSlug,
             Instant startsAt,
             MoonSample peak,
             Instant endsAt,
             int sampleCount
     ) {
+        String id() {
+            return formatOpportunityId(locationSlug, peak.instant);
+        }
+    }
+
+    private static String formatOpportunityId(String locationSlug, Instant peak) {
+        return locationSlug + "-" + peak.toString()
+                .replace(":00Z", "Z")
+                .replace(":", "");
     }
 
     private record WeatherFixture(
@@ -535,21 +577,41 @@ public class MoonWindowPrototype {
         }
     }
 
+    private record RejectedWindow(
+            String id,
+            Integer score,
+            List<String> reasons
+    ) {
+        void writeJson(Json out, boolean comma) {
+            out.line("{");
+            out.field("id", id, score != null || !reasons.isEmpty());
+            if (score != null) {
+                out.field("score", score, !reasons.isEmpty());
+            }
+            if (!reasons.isEmpty()) {
+                out.line("\"reasons\": [");
+                for (int i = 0; i < reasons.size(); i++) {
+                    out.stringValue(reasons.get(i), i < reasons.size() - 1);
+                }
+                out.line("]");
+            }
+            out.line(comma ? "}," : "}");
+        }
+    }
+
     private record ScoredWindow(
             MoonWindow window,
             WeatherFixture weather,
             ComponentScores components
     ) {
         void writeJson(Json out, boolean comma) {
-            String id = window.locationId + "-" + window.peak.instant.toString()
-                    .replace(":", "")
-                    .replace("-", "")
-                    .replace(".000", "");
+            String id = window.id();
             out.line("{");
             out.field("id", id, true);
             out.field("startsAt", window.startsAt.toString(), true);
             out.field("peaksAt", window.peak.instant.toString(), true);
             out.field("endsAt", window.endsAt.toString(), true);
+            out.field("localTimeZone", PRAGUE.timezone, true);
             out.field("score", components.total(), true);
             out.field("confidence", confidenceLabel(components.total()), true);
             out.line("\"components\": {");
@@ -659,6 +721,10 @@ public class MoonWindowPrototype {
 
         void field(String name, int value, boolean comma) {
             line("\"" + name + "\": " + value + (comma ? "," : ""));
+        }
+
+        void stringValue(String value, boolean comma) {
+            line("\"" + escape(value) + "\"" + (comma ? "," : ""));
         }
 
         private static String escape(String value) {
