@@ -39,6 +39,7 @@ Email alerts, native Android, saved personal preferences, terrain horizon modeli
 - `docs/mvp-roadmap.md`: milestone plan and next steps.
 - `scripts/geocoding_contract_spike.py`: retained Python spike for checking the v0 geocoding contract.
 - `scripts/scoring_contract_spike.py`: retained Python spike for checking the v0 scoring contract with fixture data.
+- `scripts/real_data_scoring_spike.py`: retained Python spike that combines live JPL Horizons ephemeris samples with live Open-Meteo weather.
 
 ## Geocoding Contract Spike
 
@@ -78,6 +79,22 @@ python3 -B scripts/scoring_contract_spike.py --min-score 80
 
 This script does not calculate real ephemeris or fetch live weather. It uses fixed Moon, Sun, and weather samples to exercise hard filters, score components, ranking, explanation text, and API-shaped output.
 
+## Real-Data Scoring Spike
+
+Run the live-provider scoring check:
+
+```bash
+python3 -B scripts/real_data_scoring_spike.py
+```
+
+Useful shorter run while iterating:
+
+```bash
+python3 -B scripts/real_data_scoring_spike.py --forecast-days 2 --limit 3
+```
+
+This script calls NASA/JPL Horizons for Moon/Sun observer samples and Open-Meteo for hourly forecast data, then reuses the scoring functions from `scripts/scoring_contract_spike.py`. It is a prototype harness, not the final ephemeris or backend integration.
+
 ## Verification
 
 For documentation-only changes:
@@ -93,4 +110,6 @@ python3 -B scripts/geocoding_contract_spike.py
 python3 -B -m py_compile scripts/geocoding_contract_spike.py
 python3 -B scripts/scoring_contract_spike.py
 python3 -B -m py_compile scripts/scoring_contract_spike.py
+python3 -B scripts/real_data_scoring_spike.py --forecast-days 2 --limit 3
+python3 -B -m py_compile scripts/real_data_scoring_spike.py
 ```

@@ -271,7 +271,11 @@ def score_illumination(percent: float) -> int:
     if percent >= 85:
         return 12
     if percent >= 70:
+        return 10
+    if percent >= 30:
         return 8
+    if percent >= 5:
+        return 6
     return 4
 
 
@@ -379,7 +383,8 @@ def reason_text(
 ) -> str:
     return (
         f"Moon is {moon['altitudeDegrees']:.1f} degrees above the horizon "
-        f"at azimuth {moon['azimuthDegrees']:.0f} degrees during "
+        f"at azimuth {moon['azimuthDegrees']:.0f} degrees, "
+        f"{moon['illuminationPercent']:.1f} percent illuminated, during "
         f"{bucket.replace('_', ' ')} with {weather_summary(weather)} "
         f"and {weather['precipitationProbabilityPercent']} percent precipitation risk."
     )

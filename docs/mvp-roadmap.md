@@ -136,4 +136,6 @@ Use it to verify:
 
 The retained script-level scoring spike is `scripts/scoring_contract_spike.py`. It uses fixture Moon, Sun, and weather samples to prove hard filters, score components, ranking, explanation text, and API-shaped output before real ephemeris/weather integration.
 
-Next, either capture any live-provider adjustments found by the spikes, or move on to a thin real-data scoring prototype that wires one resolved location to ephemeris and weather provider calls without scaffolding the full backend.
+The retained thin real-data scoring spike is `scripts/real_data_scoring_spike.py`. It wires one resolved Prague fixture to live JPL Horizons Moon/Sun samples and live Open-Meteo hourly weather, then reuses the scoring functions. Moon illumination contributes to scoring, but crescent Moon windows are allowed when altitude, light, and weather are otherwise promising.
+
+Next, either capture any live-provider adjustments found by the spikes, or move on to replacing the JPL Horizons script dependency with the selected implementation library before backend scaffolding.

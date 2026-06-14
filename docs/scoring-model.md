@@ -122,8 +122,9 @@ Sun/light fit:
 
 Moon illumination fit:
 
-- First mode favors full or near-full Moon.
-- Crescent-specific modes can be added later rather than weakening the first model.
+- Favor full or near-full Moon when all else is equal.
+- Do not reject crescent Moon opportunities solely because illumination is low.
+- Low crescent windows can still be useful when the Moon is close to the horizon, the sky is clear enough, and ambient light supports the intended photograph.
 
 Weather fit:
 
