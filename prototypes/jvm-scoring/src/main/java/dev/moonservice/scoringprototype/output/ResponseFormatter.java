@@ -1,6 +1,8 @@
 package dev.moonservice.scoringprototype.output;
 
-import dev.moonservice.scoringprototype.Json;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ArrayNode;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import dev.moonservice.scoringprototype.ephemeris.MoonSample;
 import dev.moonservice.scoringprototype.fixture.Location;
 import dev.moonservice.scoringprototype.fixture.WeatherFixture;
@@ -16,102 +18,100 @@ import java.util.List;
 import java.util.Locale;
 
 public final class ResponseFormatter {
+    private static final ObjectMapper MAPPER = new ObjectMapper();
+
     public String format(PrototypeResult result) {
         PrototypeConfig config = result.config();
-        Json out = new Json();
-        out.line("{");
-        out.field("status", "ok", true);
-        out.field("prototype", "jvm_maven_ephemeris_scoring_fixture", true);
-        out.field("ephemerisSource", "Astronomy Engine 2.1.19 via JitPack", true);
-        out.field("generatedAt", Instant.now().toString(), true);
-        writeLocation(out, config.location());
-        out.field("forecastHorizonDays", config.days(), true);
-        out.field("startsAt", config.start().toString(), true);
-        out.field("endsAt", config.end().toString(), true);
-        out.field("candidateWindowsEvaluated", result.candidateWindowsEvaluated(), true);
-        out.field("maxMoonAltitudeDegrees", config.maxMoonAltitudeDegrees(), true);
-        writeOpportunities(out, result.opportunities());
-        writeRejected(out);
-        writeMessages(out);
-        writeDiagnostics(out);
-        out.line("}");
-        return out.toString();
+        ObjectNode root = MAPPER.createObjectNode();
+        root.put("status", "ok");
+        root.put("prototype", "jvm_maven_ephemeris_scoring_fixture");
+        root.put("ephemerisSource", "Astronomy Engine 2.1.19 via JitPack");
+        root.put("generatedAt", Instant.now().toString());
+        writeLocation(root, config.location());
+        root.put("forecastHorizonDays", config.days());
+        root.put("startsAt", config.start().toString());
+        root.put("endsAt", config.end().toString());
+        root.put("candidateWindowsEvaluated", result.candidateWindowsEvaluated());
+        root.put("maxMoonAltitudeDegrees", config.maxMoonAltitudeDegrees());
+        writeOpportunities(root, result.opportunities());
+        writeRejected(root);
+        writeMessages(root);
+        writeDiagnostics(root);
+        return root.toPrettyString();
     }
 
-    private static void writeLocation(Json out, Location location) {
-        out.line("\"location\": {");
-        out.field("id", location.id(), true);
-        out.field("kind", location.kind(), true);
-        out.field("displayName", location.displayName(), true);
-        out.field("latitude", location.latitude(), 5, true);
-        out.field("longitude", location.longitude(), 5, true);
-        out.field("elevationMeters", location.elevationMeters(), 1, true);
-        out.field("timezone", location.timezone(), true);
-        out.field("countryCode", location.countryCode(), false);
-        out.line("},");
+    private static void writeLocation(ObjectNode parent, Location location) {
+        var locationNode = parent.putObject("location");
+        locationNode.put("id", location.id());
+        locationNode.put("kind", location.kind());
+        locationNode.put("displayName", location.displayName());
+        locationNode.put("latitude", location.latitude());
+        locationNode.put("longitude", location.longitude());
+        locationNode.put("elevationMeters", location.elevationMeters());
+        locationNode.put("timezone", location.timezone());
+        locationNode.put("countryCode", location.countryCode());
     }
 
-    private static void writeOpportunities(Json out, List<ScoredWindow> scored) {
-        out.line("\"opportunities\": [");
-        for (int i = 0; i < scored.size(); i++) {
-            writeOpportunity(out, scored.get(i), i < scored.size() - 1);
+    private static void writeOpportunities(ObjectNode parent, List<ScoredWindow> scored) {
+        ArrayNode opportunities = parent.putArray("opportunities");
+        for (ScoredWindow scoredWindow : scored) {
+            writeOpportunity(opportunities.addObject(), scoredWindow);
         }
-        out.line("],");
     }
 
-    private static void writeOpportunity(Json out, ScoredWindow scored, boolean comma) {
+    private static void writeOpportunity(ObjectNode opportunity, ScoredWindow scored) {
         MoonWindow window = scored.window();
         WeatherFixture weather = scored.weather();
         ComponentScores components = scored.components();
         String id = window.id();
-        out.line("{");
-        out.field("id", id, true);
-        out.field("windowKind", window.kind(), true);
-        out.field("startsAt", window.startsAt().toString(), true);
-        out.field("suggestedAt", window.suggested().instant().toString(), true);
-        out.field("endsAt", window.endsAt().toString(), true);
-        out.field("localTimeZone", window.location().timezone(), true);
-        out.field("score", components.total(), true);
-        out.field("confidence", ScoringModel.confidenceLabel(components.total()), true);
-        out.line("\"components\": {");
-        out.field("moonAltitudeFit", components.moonAltitudeFit(), true);
-        out.field("sunLightFit", components.sunLightFit(), true);
-        out.field("moonIlluminationFit", components.moonIlluminationFit(), true);
-        out.field("weatherFit", components.weatherFit(), true);
-        out.field("forecastConfidence", components.forecastConfidence(), false);
-        out.line("},");
-        out.line("\"moon\": {");
-        out.field("altitudeDegrees", round3(window.suggested().moonAltitudeDegrees()), true);
-        out.field("azimuthDegrees", round3(window.suggested().moonAzimuthDegrees()), true);
-        out.field("illuminationPercent", round3(window.suggested().moonIlluminationPercent()), false);
-        out.line("},");
-        out.line("\"sun\": {");
-        out.field("altitudeDegrees", round3(window.suggested().sunAltitudeDegrees()), true);
-        out.field("lightBucket", ScoringModel.lightBucket(window.suggested().sunAltitudeDegrees()), false);
-        out.line("},");
-        out.line("\"weather\": {");
-        out.field("sourceResolution", "hourly", true);
-        out.field("segmentKind", weatherSegmentKind(weather), true);
-        out.field("cloudCoverMeanPercent", weather.cloudCoverPercent(), true);
-        out.field("cloudCoverMaxPercent", weather.cloudCoverPercent(), true);
-        out.field("lowCloudCoverMaxPercent", weather.lowCloudCoverPercent(), true);
-        out.field("midCloudCoverMaxPercent", weather.midCloudCoverPercent(), true);
-        out.field("highCloudCoverMaxPercent", weather.highCloudCoverPercent(), true);
-        out.field("precipitationProbabilityMaxPercent", weather.precipitationProbabilityPercent(), true);
-        out.field("precipitationMm", weather.precipitationMm(), true);
-        out.field("visibilityMinMeters", weather.visibilityMeters(), true);
-        out.field("weatherCode", weather.weatherCode(), true);
-        out.field("summary", ScoringModel.weatherSummary(weather), false);
-        out.line("},");
-        out.line("\"exposureBalance\": {");
-        out.field("label", ScoringModel.exposureBalance(window.suggested()), true);
-        out.field("text", ScoringModel.exposureText(window.suggested()), false);
-        out.line("},");
-        out.field("reason", reasonText(window.suggested(), weather), true);
-        out.line("\"links\": {");
-        out.field("ics", "/o/" + id + ".ics", false);
-        out.line("}");
-        out.line(comma ? "}," : "}");
+
+        opportunity.put("id", id);
+        opportunity.put("windowKind", window.kind());
+        opportunity.put("startsAt", window.startsAt().toString());
+        opportunity.put("suggestedAt", window.suggested().instant().toString());
+        opportunity.put("endsAt", window.endsAt().toString());
+        opportunity.put("localTimeZone", window.location().timezone());
+        opportunity.put("score", components.total());
+        opportunity.put("confidence", ScoringModel.confidenceLabel(components.total()));
+
+        ObjectNode componentsNode = opportunity.putObject("components");
+        componentsNode.put("moonAltitudeFit", components.moonAltitudeFit());
+        componentsNode.put("sunLightFit", components.sunLightFit());
+        componentsNode.put("moonIlluminationFit", components.moonIlluminationFit());
+        componentsNode.put("weatherFit", components.weatherFit());
+        componentsNode.put("forecastConfidence", components.forecastConfidence());
+
+        ObjectNode moon = opportunity.putObject("moon");
+        moon.put("altitudeDegrees", round3(window.suggested().moonAltitudeDegrees()));
+        moon.put("azimuthDegrees", round3(window.suggested().moonAzimuthDegrees()));
+        moon.put("illuminationPercent", round3(window.suggested().moonIlluminationPercent()));
+
+        ObjectNode sun = opportunity.putObject("sun");
+        sun.put("altitudeDegrees", round3(window.suggested().sunAltitudeDegrees()));
+        sun.put("lightBucket", ScoringModel.lightBucket(window.suggested().sunAltitudeDegrees()));
+
+        ObjectNode weatherNode = opportunity.putObject("weather");
+        weatherNode.put("sourceResolution", "hourly");
+        weatherNode.put("segmentKind", weatherSegmentKind(weather));
+        weatherNode.put("cloudCoverMeanPercent", weather.cloudCoverPercent());
+        weatherNode.put("cloudCoverMaxPercent", weather.cloudCoverPercent());
+        weatherNode.put("lowCloudCoverMaxPercent", weather.lowCloudCoverPercent());
+        weatherNode.put("midCloudCoverMaxPercent", weather.midCloudCoverPercent());
+        weatherNode.put("highCloudCoverMaxPercent", weather.highCloudCoverPercent());
+        weatherNode.put("precipitationProbabilityMaxPercent", weather.precipitationProbabilityPercent());
+        weatherNode.put("precipitationMm", weather.precipitationMm());
+        weatherNode.put("visibilityMinMeters", weather.visibilityMeters());
+        weatherNode.put("weatherCode", weather.weatherCode());
+        weatherNode.put("summary", ScoringModel.weatherSummary(weather));
+
+        ObjectNode exposureBalance = opportunity.putObject("exposureBalance");
+        exposureBalance.put("label", ScoringModel.exposureBalance(window.suggested()));
+        exposureBalance.put("text", ScoringModel.exposureText(window.suggested()));
+
+        opportunity.put("reason", reasonText(window.suggested(), weather));
+
+        ObjectNode links = opportunity.putObject("links");
+        links.put("ics", "/o/" + id + ".ics");
     }
 
     private static String reasonText(MoonSample sample, WeatherFixture weather) {
@@ -141,32 +141,30 @@ public final class ResponseFormatter {
         return "mixed";
     }
 
-    private static void writeRejected(Json out) {
-        out.line("\"rejected\": [],");
+    private static void writeRejected(ObjectNode parent) {
+        parent.putArray("rejected");
     }
 
-    private static void writeMessages(Json out) {
-        out.line("\"messages\": [");
-        out.line("{");
-        out.field("level", "info", true);
-        out.field("code", "local_horizon_not_modelled", true);
-        out.field("text", "Local hills, buildings, or trees may affect exact visibility near the horizon.", false);
-        out.line("},");
-        out.line("{");
-        out.field("level", "info", true);
-        out.field("code", "fixture_weather", true);
-        out.field("text", "This JVM prototype uses fixed weather while exercising real Astronomy Engine Moon and Sun samples.", false);
-        out.line("}");
-        out.line("],");
+    private static void writeMessages(ObjectNode parent) {
+        ArrayNode messages = parent.putArray("messages");
+
+        ObjectNode horizonMessage = messages.addObject();
+        horizonMessage.put("level", "info");
+        horizonMessage.put("code", "local_horizon_not_modelled");
+        horizonMessage.put("text", "Local hills, buildings, or trees may affect exact visibility near the horizon.");
+
+        ObjectNode weatherMessage = messages.addObject();
+        weatherMessage.put("level", "info");
+        weatherMessage.put("code", "fixture_weather");
+        weatherMessage.put("text", "This JVM prototype uses fixed weather while exercising real Astronomy Engine Moon and Sun samples.");
     }
 
-    private static void writeDiagnostics(Json out) {
-        out.line("\"diagnostics\": {");
-        out.field("note", "Prototype only: fixture weather, no persistence, HTTP API, database, or backend framework.", true);
-        out.field("selectionRule", "Natural low-Moon windows bounded by Moon altitude crossings and local day boundaries.", true);
-        out.field("weatherSource", "fixed_fixture", true);
-        out.field("weatherResolution", "hourly_fixture", false);
-        out.line("}");
+    private static void writeDiagnostics(ObjectNode parent) {
+        ObjectNode diagnostics = parent.putObject("diagnostics");
+        diagnostics.put("note", "Prototype only: fixture weather, no persistence, HTTP API, database, or backend framework.");
+        diagnostics.put("selectionRule", "Natural low-Moon windows bounded by Moon altitude crossings and local day boundaries.");
+        diagnostics.put("weatherSource", "fixed_fixture");
+        diagnostics.put("weatherResolution", "hourly_fixture");
     }
 
     private static double round3(double value) {
