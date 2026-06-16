@@ -1,6 +1,6 @@
-package dev.moonservice.scoringprototype;
+package dev.moonservice.scoringprototype.fixture;
 
-record WeatherFixture(
+public record WeatherFixture(
         int cloudCoverPercent,
         int lowCloudCoverPercent,
         int midCloudCoverPercent,
@@ -11,7 +11,7 @@ record WeatherFixture(
         int weatherCode,
         double forecastAgeHours
 ) {
-    static final WeatherFixture PRAGUE_PARTLY_CLOUDY = new WeatherFixture(
+    public static final WeatherFixture PRAGUE_PARTLY_CLOUDY = new WeatherFixture(
             35,
             10,
             25,

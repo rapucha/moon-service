@@ -11,7 +11,7 @@ v0 scoring contract using fixture weather:
 - Moon illumination percentage.
 - Sun apparent altitude and light bucket.
 - Contiguous low-Moon candidate windows.
-- Hard filters and component scores.
+- Component scores and `minScore` rejection.
 - Exposure-balance labels that match the scoring spike vocabulary.
 - API-shaped opportunity output.
 
@@ -50,7 +50,7 @@ java -cp /tmp/astronomy-2.1.19.jar:/tmp/kotlin-stdlib-jdk8-1.6.10.jar:/tmp/kotli
   --location prague-cz \
   --start 2026-06-29 \
   --days 7 \
-  --step-minutes 30 \
+  --step-minutes 5 \
   --min-score 50 \
   --limit 5
 ```

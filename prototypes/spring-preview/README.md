@@ -27,9 +27,7 @@ Request body:
   "locationId": "prague-cz",
   "start": "2026-06-29",
   "forecastHorizonDays": 7,
-  "stepMinutes": 30,
   "maxMoonAltitudeDegrees": 12,
-  "minScore": 50,
   "limit": 5
 }
 ```

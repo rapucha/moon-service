@@ -12,9 +12,9 @@ generation.
 ## What It Exercises
 
 - Astronomy Engine Moon/Sun sampling through JitPack.
-- Low-Moon candidate window generation.
+- Natural low-Moon candidate window generation.
 - Fixture weather scoring.
-- Hard filters and component scores from the retained scoring contract.
+- Component scoring and `limit`-based top-result selection.
 - Exposure-balance labels and explanation text.
 - API-shaped JSON output with `status`, `location`, `forecastHorizonDays`,
   `opportunities`, `rejected`, `messages`, and prototype diagnostics.
@@ -29,7 +29,7 @@ mvn test
 
 ```bash
 mvn -q org.codehaus.mojo:exec-maven-plugin:3.3.0:java \
-  -Dexec.mainClass=dev.moonservice.scoringprototype.MoonScoringPrototype \
+  -Dexec.mainClass=dev.moonservice.scoringprototype.cli.MoonScoringPrototype \
   -Dexec.args="--request fixtures/prague-preview-request.json"
 ```
 
@@ -37,13 +37,14 @@ The equivalent explicit-flag form is:
 
 ```bash
 mvn -q org.codehaus.mojo:exec-maven-plugin:3.3.0:java \
-  -Dexec.mainClass=dev.moonservice.scoringprototype.MoonScoringPrototype \
-  -Dexec.args="--location prague-cz --start 2026-06-29 --days 7 --step-minutes 30 --min-score 50 --limit 5"
+  -Dexec.mainClass=dev.moonservice.scoringprototype.cli.MoonScoringPrototype \
+  -Dexec.args="--location prague-cz --start 2026-06-29 --days 7 --max-altitude 12 --limit 5"
 ```
 
 Default behavior uses the Prague fixture and fixed partly-cloudy fixture
-weather. Maven resolves `io.github.cosinekitty:astronomy:2.1.19` from JitPack;
-do not vendor dependency jars into this repo.
+weather. The `start` date is interpreted as a local date in the fixture
+location's timezone. Maven resolves `io.github.cosinekitty:astronomy:2.1.19`
+from JitPack; do not vendor dependency jars into this repo.
 
 The request fixture is intentionally small:
 
@@ -52,9 +53,7 @@ The request fixture is intentionally small:
   "locationId": "prague-cz",
   "start": "2026-06-29",
   "forecastHorizonDays": 7,
-  "stepMinutes": 30,
   "maxMoonAltitudeDegrees": 12,
-  "minScore": 50,
   "limit": 5
 }
 ```

@@ -1,12 +1,22 @@
-package dev.moonservice.scoringprototype;
+package dev.moonservice.scoringprototype.output;
+
+import dev.moonservice.scoringprototype.Json;
+import dev.moonservice.scoringprototype.ephemeris.MoonSample;
+import dev.moonservice.scoringprototype.fixture.Location;
+import dev.moonservice.scoringprototype.fixture.WeatherFixture;
+import dev.moonservice.scoringprototype.input.PrototypeConfig;
+import dev.moonservice.scoringprototype.scoring.ComponentScores;
+import dev.moonservice.scoringprototype.scoring.ScoredWindow;
+import dev.moonservice.scoringprototype.scoring.ScoringModel;
+import dev.moonservice.scoringprototype.service.PrototypeResult;
+import dev.moonservice.scoringprototype.window.MoonWindow;
 
 import java.time.Instant;
 import java.util.List;
 import java.util.Locale;
-import java.util.Map;
 
-final class ResponseFormatter {
-    String format(PrototypeResult result) {
+public final class ResponseFormatter {
+    public String format(PrototypeResult result) {
         PrototypeConfig config = result.config();
         Json out = new Json();
         out.line("{");
@@ -18,14 +28,12 @@ final class ResponseFormatter {
         out.field("forecastHorizonDays", config.days(), true);
         out.field("startsAt", config.start().toString(), true);
         out.field("endsAt", config.end().toString(), true);
-        out.field("sampleStepMinutes", config.stepMinutes(), true);
-        out.field("samplesEvaluated", result.samples().size(), true);
+        out.field("candidateWindowsEvaluated", result.candidateWindowsEvaluated(), true);
         out.field("maxMoonAltitudeDegrees", config.maxMoonAltitudeDegrees(), true);
-        out.field("minScore", config.minScore(), true);
         writeOpportunities(out, result.opportunities());
-        writeRejected(out, result.rejected());
+        writeRejected(out);
         writeMessages(out);
-        writeDiagnostics(out, result.rejectedCounts());
+        writeDiagnostics(out);
         out.line("}");
         return out.toString();
     }
@@ -58,8 +66,9 @@ final class ResponseFormatter {
         String id = window.id();
         out.line("{");
         out.field("id", id, true);
+        out.field("windowKind", window.kind(), true);
         out.field("startsAt", window.startsAt().toString(), true);
-        out.field("peaksAt", window.peak().instant().toString(), true);
+        out.field("suggestedAt", window.suggested().instant().toString(), true);
         out.field("endsAt", window.endsAt().toString(), true);
         out.field("localTimeZone", window.location().timezone(), true);
         out.field("score", components.total(), true);
@@ -71,32 +80,34 @@ final class ResponseFormatter {
         out.field("weatherFit", components.weatherFit(), true);
         out.field("forecastConfidence", components.forecastConfidence(), false);
         out.line("},");
-        out.field("sampleCount", window.sampleCount(), true);
         out.line("\"moon\": {");
-        out.field("altitudeDegrees", round3(window.peak().moonAltitudeDegrees()), true);
-        out.field("azimuthDegrees", round3(window.peak().moonAzimuthDegrees()), true);
-        out.field("illuminationPercent", round3(window.peak().moonIlluminationPercent()), false);
+        out.field("altitudeDegrees", round3(window.suggested().moonAltitudeDegrees()), true);
+        out.field("azimuthDegrees", round3(window.suggested().moonAzimuthDegrees()), true);
+        out.field("illuminationPercent", round3(window.suggested().moonIlluminationPercent()), false);
         out.line("},");
         out.line("\"sun\": {");
-        out.field("altitudeDegrees", round3(window.peak().sunAltitudeDegrees()), true);
-        out.field("lightBucket", ScoringModel.lightBucket(window.peak().sunAltitudeDegrees()), false);
+        out.field("altitudeDegrees", round3(window.suggested().sunAltitudeDegrees()), true);
+        out.field("lightBucket", ScoringModel.lightBucket(window.suggested().sunAltitudeDegrees()), false);
         out.line("},");
         out.line("\"weather\": {");
-        out.field("cloudCoverPercent", weather.cloudCoverPercent(), true);
-        out.field("lowCloudCoverPercent", weather.lowCloudCoverPercent(), true);
-        out.field("midCloudCoverPercent", weather.midCloudCoverPercent(), true);
-        out.field("highCloudCoverPercent", weather.highCloudCoverPercent(), true);
-        out.field("precipitationProbabilityPercent", weather.precipitationProbabilityPercent(), true);
+        out.field("sourceResolution", "hourly", true);
+        out.field("segmentKind", weatherSegmentKind(weather), true);
+        out.field("cloudCoverMeanPercent", weather.cloudCoverPercent(), true);
+        out.field("cloudCoverMaxPercent", weather.cloudCoverPercent(), true);
+        out.field("lowCloudCoverMaxPercent", weather.lowCloudCoverPercent(), true);
+        out.field("midCloudCoverMaxPercent", weather.midCloudCoverPercent(), true);
+        out.field("highCloudCoverMaxPercent", weather.highCloudCoverPercent(), true);
+        out.field("precipitationProbabilityMaxPercent", weather.precipitationProbabilityPercent(), true);
         out.field("precipitationMm", weather.precipitationMm(), true);
-        out.field("visibilityMeters", weather.visibilityMeters(), true);
+        out.field("visibilityMinMeters", weather.visibilityMeters(), true);
         out.field("weatherCode", weather.weatherCode(), true);
         out.field("summary", ScoringModel.weatherSummary(weather), false);
         out.line("},");
         out.line("\"exposureBalance\": {");
-        out.field("label", ScoringModel.exposureBalance(window.peak()), true);
-        out.field("text", ScoringModel.exposureText(window.peak()), false);
+        out.field("label", ScoringModel.exposureBalance(window.suggested()), true);
+        out.field("text", ScoringModel.exposureText(window.suggested()), false);
         out.line("},");
-        out.field("reason", reasonText(window.peak(), weather), true);
+        out.field("reason", reasonText(window.suggested(), weather), true);
         out.line("\"links\": {");
         out.field("ics", "/o/" + id + ".ics", false);
         out.line("}");
@@ -117,28 +128,21 @@ final class ResponseFormatter {
         );
     }
 
-    private static void writeRejected(Json out, List<RejectedWindow> rejected) {
-        out.line("\"rejected\": [");
-        for (int i = 0; i < rejected.size(); i++) {
-            writeRejectedWindow(out, rejected.get(i), i < rejected.size() - 1);
+    private static String weatherSegmentKind(WeatherFixture weather) {
+        if (weather.weatherCode() == 0 || weather.weatherCode() == 1) {
+            return "clear";
         }
-        out.line("],");
+        if (weather.weatherCode() == 2 || weather.weatherCode() == 3) {
+            return "partly_cloudy";
+        }
+        if (weather.weatherCode() >= 50) {
+            return "precipitation_risk";
+        }
+        return "mixed";
     }
 
-    private static void writeRejectedWindow(Json out, RejectedWindow rejected, boolean comma) {
-        out.line("{");
-        out.field("id", rejected.id(), rejected.score() != null || !rejected.reasons().isEmpty());
-        if (rejected.score() != null) {
-            out.field("score", rejected.score(), !rejected.reasons().isEmpty());
-        }
-        if (!rejected.reasons().isEmpty()) {
-            out.line("\"reasons\": [");
-            for (int i = 0; i < rejected.reasons().size(); i++) {
-                out.stringValue(rejected.reasons().get(i), i < rejected.reasons().size() - 1);
-            }
-            out.line("]");
-        }
-        out.line(comma ? "}," : "}");
+    private static void writeRejected(Json out) {
+        out.line("\"rejected\": [],");
     }
 
     private static void writeMessages(Json out) {
@@ -156,23 +160,13 @@ final class ResponseFormatter {
         out.line("],");
     }
 
-    private static void writeDiagnostics(Json out, Map<String, Integer> rejectedCounts) {
+    private static void writeDiagnostics(Json out) {
         out.line("\"diagnostics\": {");
         out.field("note", "Prototype only: fixture weather, no persistence, HTTP API, database, or backend framework.", true);
-        out.field("selectionRule", "Contiguous samples where the apparent refracted Moon altitude is between 0 degrees and the configured maximum.", true);
+        out.field("selectionRule", "Natural low-Moon windows bounded by Moon altitude crossings and local day boundaries.", true);
         out.field("weatherSource", "fixed_fixture", true);
-        out.line("\"rejectedCounts\": {");
-        writeCounts(out, rejectedCounts);
+        out.field("weatherResolution", "hourly_fixture", false);
         out.line("}");
-        out.line("}");
-    }
-
-    private static void writeCounts(Json out, Map<String, Integer> counts) {
-        int index = 0;
-        for (Map.Entry<String, Integer> entry : counts.entrySet()) {
-            out.field(entry.getKey(), entry.getValue(), index < counts.size() - 1);
-            index++;
-        }
     }
 
     private static double round3(double value) {

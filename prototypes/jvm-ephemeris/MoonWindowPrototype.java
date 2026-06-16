@@ -35,7 +35,7 @@ public class MoonWindowPrototype {
     );
 
     private static final int DEFAULT_DAYS = 7;
-    private static final int DEFAULT_STEP_MINUTES = 30;
+    private static final int DEFAULT_STEP_MINUTES = 5;
     private static final int DEFAULT_MIN_SCORE = 50;
     private static final double DEFAULT_MAX_MOON_ALTITUDE = 12.0;
     private static final WeatherFixture FIXTURE_WEATHER = new WeatherFixture(
@@ -68,13 +68,6 @@ public class MoonWindowPrototype {
         Map<String, Integer> rejectedCounts = new LinkedHashMap<>();
 
         for (MoonWindow window : windows) {
-            List<String> rejectionReasons = hardFilterReasons(window, FIXTURE_WEATHER, config);
-            if (!rejectionReasons.isEmpty()) {
-                countRejections(rejectedCounts, rejectionReasons);
-                rejected.add(new RejectedWindow(window.id(), null, rejectionReasons));
-                continue;
-            }
-
             ComponentScores components = scoreWindow(window, FIXTURE_WEATHER);
             if (components.total() < config.minScore) {
                 countRejections(rejectedCounts, List.of("below_minimum_score"));
@@ -206,31 +199,11 @@ public class MoonWindowPrototype {
         MoonSample peak = samples.stream()
                 .max(Comparator.comparingInt(MoonWindowPrototype::candidateFit))
                 .orElseThrow();
-        Duration halfStep = Duration.ofMinutes(config.stepMinutes / 2L);
+        Duration halfStep = Duration.ofSeconds(config.stepMinutes * 30L);
         Instant startsAt = max(config.start, samples.get(0).instant.minus(halfStep));
         Instant endsAt = min(config.end(), samples.get(samples.size() - 1).instant.plus(halfStep));
         windows.add(new MoonWindow(config.location.slug, startsAt, peak, endsAt, samples.size()));
         samples.clear();
-    }
-
-    private static List<String> hardFilterReasons(MoonWindow window, WeatherFixture weather, Config config) {
-        List<String> reasons = new ArrayList<>();
-        if (window.peak.moonAltitudeDegrees < 0.0) {
-            reasons.add("moon_below_horizon");
-        }
-        if (window.peak.moonAltitudeDegrees > config.maxMoonAltitudeDegrees) {
-            reasons.add("moon_too_high_for_low_moon_mode");
-        }
-        if (weather.cloudCoverPercent >= 90) {
-            reasons.add("overcast");
-        }
-        if (weather.precipitationProbabilityPercent >= 30) {
-            reasons.add("high_precipitation_probability");
-        }
-        if (weather.visibilityMeters < 10000) {
-            reasons.add("low_visibility");
-        }
-        return reasons;
     }
 
     private static int candidateFit(MoonSample sample) {
@@ -419,7 +392,7 @@ public class MoonWindowPrototype {
                 "  --location prague-cz         Fixture location; only prague-cz exists in this prototype.",
                 "  --start YYYY-MM-DD|INSTANT  UTC start date or instant. Default: 2026-06-29.",
                 "  --days N                    Days to sample. Default: 7.",
-                "  --step-minutes N            Sampling step. Default: 30.",
+                "  --step-minutes N            Sampling step. Default: 5.",
                 "  --max-altitude DEG          Low-Moon ceiling. Default: 12.",
                 "  --min-score N               Minimum returned score. Default: 50.",
                 "  --limit N                   Maximum returned windows. Default: 10."

@@ -238,6 +238,34 @@ fictional_location
 - Must not produce RSS/Atom feed entries, `.ics` exports, real weather, or real ephemeris results.
 - Can produce a clearly labeled fictional report.
 
+## Opportunity Window Contract
+
+Real opportunities should represent natural low-Moon windows, not artificial
+slices produced by ephemeris sampling.
+
+For each local day, the backend should find intervals where the apparent
+refracted Moon altitude is within the configured low-Moon range, initially
+0 to 12 degrees. These intervals are bounded by Moonrise, Moonset, crossings
+through the low-Moon ceiling, and local day boundaries.
+
+Response rules:
+
+- `startsAt` and `endsAt` define the useful opportunity window.
+- `suggestedAt` is optional and only identifies a representative time inside
+  the window for sorting, links, or display.
+- Do not expose ephemeris sampling cadence such as `stepMinutes` in the public
+  API.
+- Weather fields on an opportunity are aggregates over the merged weather
+  interval. V0 uses hourly weather fields because cloud cover is the primary
+  scoring input and Open-Meteo exposes cloud-cover layers hourly.
+- Split natural low-Moon windows at provider forecast change boundaries when
+  those changes affect the recommendation.
+- Merge adjacent intervals when the derived weather class and
+  decision-relevant facts are equivalent.
+- A single opportunity may cover a broad interval when the Moon stays low and
+  the forecast state is stable.
+- Avoid wording that implies minute-level weather certainty.
+
 ## Preview Response Examples
 
 ### Real Opportunities
@@ -262,9 +290,10 @@ fictional_location
   "opportunities": [
     {
       "id": "prague-cz-2026-06-29T1920Z",
-      "startsAt": "2026-06-29T19:00:00Z",
-      "peaksAt": "2026-06-29T19:20:00Z",
-      "endsAt": "2026-06-29T19:50:00Z",
+      "windowKind": "moonrise_low",
+      "startsAt": "2026-06-29T18:48:00Z",
+      "suggestedAt": "2026-06-29T19:20:00Z",
+      "endsAt": "2026-06-29T20:04:00Z",
       "localTimeZone": "Europe/Prague",
       "score": 82,
       "confidence": "medium",
@@ -278,17 +307,20 @@ fictional_location
         "lightBucket": "civil_twilight"
       },
       "weather": {
-        "cloudCoverPercent": 38,
-        "lowCloudCoverPercent": 20,
-        "precipitationProbabilityPercent": 5,
-        "visibilityMeters": 18000,
+        "sourceResolution": "hourly",
+        "segmentKind": "partly_cloudy",
+        "cloudCoverMeanPercent": 38,
+        "cloudCoverMaxPercent": 52,
+        "lowCloudCoverMaxPercent": 20,
+        "precipitationProbabilityMaxPercent": 5,
+        "visibilityMinMeters": 18000,
         "summary": "partly cloudy"
       },
       "exposureBalance": {
         "label": "balanced",
         "text": "Twilight may still provide enough scene light while keeping the Moon readable."
       },
-      "reason": "Moon is low in the southeast during civil twilight with low precipitation risk.",
+      "reason": "Moon is low in the southeast during a twilight window with low precipitation risk.",
       "links": {
         "ics": "/o/prague-cz-2026-06-29T1920Z.ics"
       }
@@ -514,8 +546,8 @@ fictional_location
   "forecastHorizonDays": 7,
   "opportunities": [],
   "emptyReason": {
-    "code": "no_opportunities_above_threshold",
-    "text": "No Moon opportunity exceeded the current score threshold in the forecast window."
+    "code": "no_useful_low_moon_windows",
+    "text": "No useful low-Moon window was found in the forecast period."
   }
 }
 ```

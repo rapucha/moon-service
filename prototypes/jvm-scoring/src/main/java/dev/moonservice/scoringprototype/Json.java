@@ -2,11 +2,11 @@ package dev.moonservice.scoringprototype;
 
 import java.util.Locale;
 
-final class Json {
+public final class Json {
     private final StringBuilder builder = new StringBuilder();
     private int indent = 0;
 
-    void line(String value) {
+    public void line(String value) {
         if (value.equals("}") || value.equals("},") || value.equals("]") || value.equals("],")) {
             indent--;
         }
@@ -16,23 +16,23 @@ final class Json {
         }
     }
 
-    void field(String name, String value, boolean comma) {
+    public void field(String name, String value, boolean comma) {
         line("\"" + name + "\": \"" + escape(value) + "\"" + (comma ? "," : ""));
     }
 
-    void field(String name, double value, boolean comma) {
+    public void field(String name, double value, boolean comma) {
         line("\"" + name + "\": " + String.format(Locale.ROOT, "%.3f", value) + (comma ? "," : ""));
     }
 
-    void field(String name, double value, int decimals, boolean comma) {
+    public void field(String name, double value, int decimals, boolean comma) {
         line("\"" + name + "\": " + String.format(Locale.ROOT, "%." + decimals + "f", value) + (comma ? "," : ""));
     }
 
-    void field(String name, int value, boolean comma) {
+    public void field(String name, int value, boolean comma) {
         line("\"" + name + "\": " + value + (comma ? "," : ""));
     }
 
-    void stringValue(String value, boolean comma) {
+    public void stringValue(String value, boolean comma) {
         line("\"" + escape(value) + "\"" + (comma ? "," : ""));
     }
 

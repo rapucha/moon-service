@@ -30,9 +30,7 @@ class PreviewControllerTest {
                                   "locationId": "prague-cz",
                                   "start": "2026-06-29",
                                   "forecastHorizonDays": 7,
-                                  "stepMinutes": 30,
                                   "maxMoonAltitudeDegrees": 12,
-                                  "minScore": 50,
                                   "limit": 5
                                 }
                                 """))
@@ -41,8 +39,9 @@ class PreviewControllerTest {
                 .andExpect(jsonPath("$.status").value("ok"))
                 .andExpect(jsonPath("$.location.id").value("openmeteo:prague-cz"))
                 .andExpect(jsonPath("$.forecastHorizonDays").value(7))
-                .andExpect(jsonPath("$.opportunities[0].id").value("prague-cz-2026-07-01T0300Z"))
-                .andExpect(jsonPath("$.opportunities[0].score").value(99))
+                .andExpect(jsonPath("$.candidateWindowsEvaluated").isNumber())
+                .andExpect(jsonPath("$.opportunities[0].suggestedAt").exists())
+                .andExpect(jsonPath("$.opportunities[0].weather.sourceResolution").value("hourly"))
                 .andExpect(jsonPath("$.opportunities[0].links.ics", startsWith("/o/prague-cz-")));
     }
 
@@ -68,9 +67,7 @@ class PreviewControllerTest {
             {"locationId": ""} | locationId must be a non-empty string in the request fixture.
             {"start": "not-a-date"} | Invalid --start value: not-a-date
             {"forecastHorizonDays": 0} | forecastHorizonDays must be between 1 and 30.
-            {"stepMinutes": 0} | stepMinutes must be between 1 and 180.
             {"limit": 0} | limit must be between 1 and 100.
-            {"minScore": 101} | minScore must be between 0 and 100.
             {"maxMoonAltitudeDegrees": 46} | maxMoonAltitudeDegrees must be between 0.0 and 45.0.
             """)
     void mapsInvalidRequestBodiesToInvalidRequest(String body, String message) throws Exception {

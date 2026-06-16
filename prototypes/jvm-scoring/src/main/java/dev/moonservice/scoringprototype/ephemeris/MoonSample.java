@@ -1,8 +1,8 @@
-package dev.moonservice.scoringprototype;
+package dev.moonservice.scoringprototype.ephemeris;
 
 import java.time.Instant;
 
-record MoonSample(
+public record MoonSample(
         Instant instant,
         double moonAltitudeDegrees,
         double moonAzimuthDegrees,

@@ -1,9 +1,11 @@
 package dev.moonservice.scoringprototype;
 
+import dev.moonservice.scoringprototype.ephemeris.MoonSample;
+import dev.moonservice.scoringprototype.fixture.WeatherFixture;
+import dev.moonservice.scoringprototype.scoring.ScoringModel;
 import org.junit.jupiter.api.Test;
 
 import java.time.Instant;
-import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
@@ -58,23 +60,6 @@ class ScoringModelTest {
         assertEquals(
                 "foreground_likely_dark",
                 ScoringModel.exposureBalance(sample(4.0, 30.0, -13.0))
-        );
-    }
-
-    @Test
-    void returnsHardFilterReasons() {
-        MoonWindow window = new MoonWindow(
-                Locations.PRAGUE,
-                Instant.parse("2026-06-29T00:00:00Z"),
-                sample(4.0, 90.0, -2.0),
-                Instant.parse("2026-06-29T00:30:00Z"),
-                1
-        );
-        WeatherFixture poorWeather = new WeatherFixture(95, 80, 80, 80, 35, 1.5, 5000, 61, 2.0);
-
-        assertEquals(
-                List.of("overcast", "high_precipitation_probability", "low_visibility"),
-                ScoringModel.hardFilterReasons(window, poorWeather, PrototypeConfig.defaults())
         );
     }
 

@@ -1,8 +1,8 @@
-package dev.moonservice.scoringprototype;
+package dev.moonservice.scoringprototype.scoring;
 
 import java.util.List;
 
-record RejectedWindow(
+public record RejectedWindow(
         String id,
         Integer score,
         List<String> reasons

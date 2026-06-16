@@ -1,19 +1,21 @@
-package dev.moonservice.scoringprototype;
+package dev.moonservice.scoringprototype.input;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import dev.moonservice.scoringprototype.fixture.Locations;
+import dev.moonservice.scoringprototype.UsageException;
 
 import java.io.IOException;
 import java.nio.file.Path;
-import java.time.Instant;
+import java.time.LocalDate;
 
-final class RequestConfigReader {
+public final class RequestConfigReader {
     private static final ObjectMapper MAPPER = new ObjectMapper();
 
     private RequestConfigReader() {
     }
 
-    static PrototypeConfig read(Path path) {
+    public static PrototypeConfig read(Path path) {
         try {
             return fromJson(MAPPER.readTree(path.toFile()));
         } catch (IOException ex) {
@@ -21,14 +23,13 @@ final class RequestConfigReader {
         }
     }
 
-    static PrototypeConfig fromJson(JsonNode root) {
+    public static PrototypeConfig fromJson(JsonNode root) {
         if (!root.isObject()) {
             throw new UsageException("Request fixture must be a JSON object.");
         }
         String locationId = text(root, "locationId", Locations.PRAGUE.slug());
-        Instant start = PrototypeConfig.parseStart(text(root, "start", "2026-06-29"));
+        LocalDate startDate = PrototypeConfig.parseStartDate(text(root, "start", "2026-06-29"));
         int days = intValue(root, "forecastHorizonDays", PrototypeConfig.DEFAULT_DAYS, 1, 30);
-        int stepMinutes = intValue(root, "stepMinutes", PrototypeConfig.DEFAULT_STEP_MINUTES, 1, 180);
         double maxMoonAltitudeDegrees = doubleValue(
                 root,
                 "maxMoonAltitudeDegrees",
@@ -36,16 +37,13 @@ final class RequestConfigReader {
                 0.0,
                 45.0
         );
-        int minScore = intValue(root, "minScore", PrototypeConfig.DEFAULT_MIN_SCORE, 0, 100);
         int limit = intValue(root, "limit", 10, 1, 100);
 
         return new PrototypeConfig(
                 Locations.requireFixture(locationId),
-                start,
+                startDate,
                 days,
-                stepMinutes,
                 maxMoonAltitudeDegrees,
-                minScore,
                 limit
         );
     }

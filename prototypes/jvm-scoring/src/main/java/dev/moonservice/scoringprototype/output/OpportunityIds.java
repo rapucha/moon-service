@@ -1,12 +1,12 @@
-package dev.moonservice.scoringprototype;
+package dev.moonservice.scoringprototype.output;
 
 import java.time.Instant;
 
-final class OpportunityIds {
+public final class OpportunityIds {
     private OpportunityIds() {
     }
 
-    static String format(String locationSlug, Instant peak) {
+    public static String format(String locationSlug, Instant peak) {
         return locationSlug + "-" + peak.toString()
                 .replace(":00Z", "Z")
                 .replace(":", "");

@@ -48,14 +48,14 @@ Recommended web-first path:
 
 - Create a minimal backend endpoint or script-level prototype.
 - Accept one city/location or coordinate and a time range.
-- Return candidate windows with score explanations.
+- Return natural low-Moon windows with window-level weather and light explanations.
 - Use fixture weather data before integrating a live provider if useful.
 - Add a tiny web page only after the endpoint shape is clear.
 
 Possible Android path:
 
 - Create a minimal Android prototype later with one saved location.
-- Compute or request candidate windows.
+- Compute or request natural low-Moon windows.
 - Display ranked opportunities.
 - Skip account, push, and sync.
 
@@ -135,11 +135,11 @@ Use it to verify:
 - Normalized candidate/output examples matching `docs/api-shape.md`.
 - Provider drift with optional live Open-Meteo calls when network access is available.
 
-The retained script-level scoring spike is `scripts/scoring_contract_spike.py`. It uses fixture Moon, Sun, and weather samples to prove hard filters, score components, ranking, explanation text, and API-shaped output before real ephemeris/weather integration.
+The retained script-level scoring spike is `scripts/scoring_contract_spike.py`. It uses fixture Moon, Sun, and weather samples to prove hard filters, score components, ranking, explanation text, and API-shaped output before real ephemeris/weather integration. It is now a historical contract spike; the next scoring model should replace sampled opportunity slices with natural low-Moon windows.
 
-The retained thin real-data scoring spike is `scripts/real_data_scoring_spike.py`. It wires one resolved Prague fixture to live JPL Horizons Moon/Sun samples and live Open-Meteo hourly weather, then reuses the scoring functions. Moon illumination contributes to scoring, but crescent Moon windows are allowed when altitude, light, and weather are otherwise promising.
+The retained thin real-data scoring spike is `scripts/real_data_scoring_spike.py`. It wires one resolved Prague fixture to live JPL Horizons Moon/Sun samples and live Open-Meteo hourly weather, then reuses the scoring functions. Moon illumination contributes to scoring, but crescent Moon windows are allowed when altitude, light, and weather are otherwise promising. Its weather-provider result remains relevant because Open-Meteo's useful cloud-cover fields are hourly.
 
-The first replacement step now exists as `prototypes/jvm-ephemeris/MoonWindowPrototype.java`. It uses Astronomy Engine on the JVM to sample Moon/Sun positions, emit low-Moon candidate windows, and apply fixture-weather scoring for the Prague validation fixture, without Spring Boot, persistence, live weather calls, feeds, or calendar generation.
+The first replacement step now exists as `prototypes/jvm-ephemeris/MoonWindowPrototype.java`. It uses Astronomy Engine on the JVM to sample Moon/Sun positions, emit low-Moon candidate windows, and apply fixture-weather scoring for the Prague validation fixture, without Spring Boot, persistence, live weather calls, feeds, or calendar generation. Its sampling-based window generation should now be treated as prototype scaffolding, not the desired product model.
 
 The JVM prototype now mirrors the retained Python scoring contract for the core top-level, location, opportunity, rejected, and message fields. It still includes prototype-only diagnostics such as sample counts and search interval metadata.
 
@@ -169,3 +169,18 @@ The Spring preview harness now locks down the first invalid-request behavior:
 malformed JSON, non-object JSON, unsupported fixture locations, invalid start
 dates, and out-of-range numeric controls return HTTP `400` with
 `status: "invalid_request"`.
+
+Natural-window scoring refactor now implemented in `prototypes/jvm-scoring/` and
+the Spring preview harness:
+
+- Generate natural low-Moon windows per local day from Moonrise, Moonset,
+  crossings through the low-Moon altitude ceiling, and local day boundaries.
+- Use sampling only as a numerical aid if needed to bracket event crossings.
+- Removed public and fixture dependence on `stepMinutes` as an
+  opportunity-shaping control.
+- Use hourly Open-Meteo weather fields for V0 because cloud cover is the key
+  scoring input and cloud-cover layers are hourly.
+- The fixed weather fixture is represented as one stable hourly weather state;
+  real hourly forecast-change splitting remains a later live-weather step.
+- Returned windows are selected by top `limit`; request-level `minScore` was
+  removed from the Maven and Spring prototype contract.

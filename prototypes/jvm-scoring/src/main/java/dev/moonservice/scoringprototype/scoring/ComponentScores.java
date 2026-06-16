@@ -1,13 +1,13 @@
-package dev.moonservice.scoringprototype;
+package dev.moonservice.scoringprototype.scoring;
 
-record ComponentScores(
+public record ComponentScores(
         int moonAltitudeFit,
         int sunLightFit,
         int moonIlluminationFit,
         int weatherFit,
         int forecastConfidence
 ) {
-    int total() {
+    public int total() {
         return moonAltitudeFit + sunLightFit + moonIlluminationFit + weatherFit + forecastConfidence;
     }
 }

@@ -1,47 +1,28 @@
-package dev.moonservice.scoringprototype;
+package dev.moonservice.scoringprototype.scoring;
 
-import java.util.ArrayList;
-import java.util.List;
+import dev.moonservice.scoringprototype.ephemeris.MoonSample;
+import dev.moonservice.scoringprototype.fixture.WeatherFixture;
+import dev.moonservice.scoringprototype.window.MoonWindow;
 
-final class ScoringModel {
+public final class ScoringModel {
     private ScoringModel() {
     }
 
-    static List<String> hardFilterReasons(MoonWindow window, WeatherFixture weather, PrototypeConfig config) {
-        List<String> reasons = new ArrayList<>();
-        if (window.peak().moonAltitudeDegrees() < 0.0) {
-            reasons.add("moon_below_horizon");
-        }
-        if (window.peak().moonAltitudeDegrees() > config.maxMoonAltitudeDegrees()) {
-            reasons.add("moon_too_high_for_low_moon_mode");
-        }
-        if (weather.cloudCoverPercent() >= 90) {
-            reasons.add("overcast");
-        }
-        if (weather.precipitationProbabilityPercent() >= 30) {
-            reasons.add("high_precipitation_probability");
-        }
-        if (weather.visibilityMeters() < 10000) {
-            reasons.add("low_visibility");
-        }
-        return reasons;
-    }
-
-    static int candidateFit(MoonSample sample) {
+    public static int candidateFit(MoonSample sample) {
         return scoreMoonAltitude(sample.moonAltitudeDegrees()) + scoreSunLight(sample.sunAltitudeDegrees());
     }
 
-    static ComponentScores scoreWindow(MoonWindow window, WeatherFixture weather) {
+    public static ComponentScores scoreWindow(MoonWindow window, WeatherFixture weather) {
         return new ComponentScores(
-                scoreMoonAltitude(window.peak().moonAltitudeDegrees()),
-                scoreSunLight(window.peak().sunAltitudeDegrees()),
-                scoreIllumination(window.peak().moonIlluminationPercent()),
+                scoreMoonAltitude(window.suggested().moonAltitudeDegrees()),
+                scoreSunLight(window.suggested().sunAltitudeDegrees()),
+                scoreIllumination(window.suggested().moonIlluminationPercent()),
                 scoreWeather(weather),
                 scoreConfidence(weather.forecastAgeHours())
         );
     }
 
-    static int scoreMoonAltitude(double altitude) {
+    public static int scoreMoonAltitude(double altitude) {
         if (altitude < 0.0 || altitude > 12.0) {
             return 0;
         }
@@ -54,7 +35,7 @@ final class ScoringModel {
         return Math.toIntExact(Math.round(30.0 - ((altitude - 6.0) / 6.0) * 12.0));
     }
 
-    static int scoreSunLight(double sunAltitude) {
+    public static int scoreSunLight(double sunAltitude) {
         return switch (lightBucket(sunAltitude)) {
             case "golden_hour" -> 25;
             case "civil_twilight" -> 24;
@@ -83,14 +64,14 @@ final class ScoringModel {
         return 4;
     }
 
-    static int scoreWeather(WeatherFixture weather) {
+    public static int scoreWeather(WeatherFixture weather) {
         int cloudScore = Math.max(0, 13 - Math.toIntExact(Math.round(Math.abs(weather.cloudCoverPercent() - 35) / 5.0)));
         int precipScore = Math.max(0, 7 - Math.toIntExact(Math.round(weather.precipitationProbabilityPercent() / 5.0)));
         int visibilityScore = weather.visibilityMeters() >= 20000 ? 5 : weather.visibilityMeters() >= 15000 ? 4 : 2;
         return Math.min(25, cloudScore + precipScore + visibilityScore);
     }
 
-    static int scoreConfidence(double forecastAgeHours) {
+    public static int scoreConfidence(double forecastAgeHours) {
         if (forecastAgeHours <= 3.0) {
             return 5;
         }
@@ -103,7 +84,7 @@ final class ScoringModel {
         return 2;
     }
 
-    static String confidenceLabel(int score) {
+    public static String confidenceLabel(int score) {
         if (score >= 85) {
             return "high";
         }
@@ -113,7 +94,7 @@ final class ScoringModel {
         return "low";
     }
 
-    static String weatherSummary(WeatherFixture weather) {
+    public static String weatherSummary(WeatherFixture weather) {
         if (weather.weatherCode() == 0 || weather.weatherCode() == 1) {
             return "clear to mostly clear";
         }
@@ -126,7 +107,7 @@ final class ScoringModel {
         return "mixed conditions";
     }
 
-    static String lightBucket(double sunAltitude) {
+    public static String lightBucket(double sunAltitude) {
         if (sunAltitude >= 6.0) {
             return "daylight";
         }
@@ -142,7 +123,7 @@ final class ScoringModel {
         return "night";
     }
 
-    static String exposureBalance(MoonSample sample) {
+    public static String exposureBalance(MoonSample sample) {
         String bucket = lightBucket(sample.sunAltitudeDegrees());
         if (bucket.equals("daylight") || bucket.equals("golden_hour")) {
             if (sample.moonIlluminationPercent() >= 70.0) {
@@ -168,7 +149,7 @@ final class ScoringModel {
         return "foreground_likely_dark";
     }
 
-    static String exposureText(MoonSample sample) {
+    public static String exposureText(MoonSample sample) {
         return switch (exposureBalance(sample)) {
             case "moon_detail_easy_foreground_supported" ->
                     "Ambient light should support foreground detail; expose carefully for the bright Moon.";

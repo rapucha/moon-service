@@ -7,10 +7,10 @@ This is a local verification harness, not backend scaffolding. It compares:
 - the source-file JVM ephemeris/scoring prototype,
 - the Maven JVM scoring prototype.
 
-The Python spike uses fixed Moon/Sun fixture windows, so it is expected to
-match field shape and vocabulary rather than exact opportunity timing. The two
-JVM prototypes should match exactly except for prototype identity and
-generatedAt.
+The Python spike and source-file JVM prototype are historical references, so
+they are expected to match field shape and vocabulary rather than exact
+opportunity timing. The Maven JVM prototype is the active contract target for
+natural low-Moon windows.
 """
 
 from __future__ import annotations
@@ -35,7 +35,6 @@ REQUIRED_TOP_LEVEL = {
 REQUIRED_OPPORTUNITY = {
     "id",
     "startsAt",
-    "peaksAt",
     "endsAt",
     "localTimeZone",
     "score",
@@ -78,7 +77,7 @@ def main() -> int:
         "mvn",
         "-q",
         "org.codehaus.mojo:exec-maven-plugin:3.3.0:java",
-        "-Dexec.mainClass=dev.moonservice.scoringprototype.MoonScoringPrototype",
+        "-Dexec.mainClass=dev.moonservice.scoringprototype.cli.MoonScoringPrototype",
         "-Dexec.args=--request fixtures/prague-preview-request.json",
     ], cwd=ROOT / "prototypes/jvm-scoring")
 
@@ -89,7 +88,7 @@ def main() -> int:
     }.items():
         assert_contract_shape(name, response)
 
-    assert_jvm_equivalent(source_response, maven_response)
+    assert_maven_refactor_contract(maven_response)
     print("prototype contract parity ok")
     print("python top opportunity:", python_response["opportunities"][0]["id"])
     print("jvm top opportunity:", maven_response["opportunities"][0]["id"])
@@ -120,10 +119,6 @@ def source_file_command() -> list[str]:
         "2026-06-29",
         "--days",
         "7",
-        "--step-minutes",
-        "30",
-        "--min-score",
-        "50",
         "--limit",
         "5",
     ]
@@ -170,6 +165,8 @@ def assert_contract_shape(name: str, response: dict[str, Any]) -> None:
         missing_opportunity = REQUIRED_OPPORTUNITY - opportunity.keys()
         if missing_opportunity:
             raise AssertionError(f"{name}: missing opportunity fields {sorted(missing_opportunity)}")
+        if "suggestedAt" not in opportunity and "peaksAt" not in opportunity:
+            raise AssertionError(f"{name}: opportunity must include suggestedAt or historical peaksAt")
         label = opportunity["exposureBalance"]["label"]
         if label not in EXPOSURE_LABELS:
             raise AssertionError(f"{name}: unknown exposure label {label!r}")
@@ -184,18 +181,20 @@ def assert_contract_shape(name: str, response: dict[str, Any]) -> None:
         raise AssertionError(f"{name}: missing local horizon message")
 
 
-def assert_jvm_equivalent(source_response: dict[str, Any], maven_response: dict[str, Any]) -> None:
-    source_normalized = normalize_jvm_response(source_response)
-    maven_normalized = normalize_jvm_response(maven_response)
-    if source_normalized != maven_normalized:
-        raise AssertionError("source-file JVM and Maven JVM responses differ beyond generatedAt/prototype")
-
-
-def normalize_jvm_response(response: dict[str, Any]) -> dict[str, Any]:
-    normalized = dict(response)
-    normalized.pop("generatedAt", None)
-    normalized.pop("prototype", None)
-    return normalized
+def assert_maven_refactor_contract(response: dict[str, Any]) -> None:
+    forbidden_top_level = {"sampleStepMinutes", "samplesEvaluated", "minScore"}
+    present_forbidden = forbidden_top_level & response.keys()
+    if present_forbidden:
+        raise AssertionError(f"maven-jvm: obsolete top-level fields present {sorted(present_forbidden)}")
+    if response.get("candidateWindowsEvaluated", 0) <= 0:
+        raise AssertionError("maven-jvm: expected candidateWindowsEvaluated to be positive")
+    for opportunity in response["opportunities"]:
+        if "suggestedAt" not in opportunity:
+            raise AssertionError("maven-jvm: expected suggestedAt in each opportunity")
+        if "peaksAt" in opportunity:
+            raise AssertionError("maven-jvm: obsolete peaksAt field present")
+        if opportunity["weather"].get("sourceResolution") != "hourly":
+            raise AssertionError("maven-jvm: expected hourly weather sourceResolution")
 
 
 if __name__ == "__main__":

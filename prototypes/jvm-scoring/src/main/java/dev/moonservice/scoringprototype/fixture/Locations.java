@@ -1,7 +1,9 @@
-package dev.moonservice.scoringprototype;
+package dev.moonservice.scoringprototype.fixture;
 
-final class Locations {
-    static final Location PRAGUE = new Location(
+import dev.moonservice.scoringprototype.UsageException;
+
+public final class Locations {
+    public static final Location PRAGUE = new Location(
             "prague-cz",
             "real_location",
             "openmeteo:prague-cz",
@@ -16,7 +18,7 @@ final class Locations {
     private Locations() {
     }
 
-    static Location requireFixture(String slug) {
+    public static Location requireFixture(String slug) {
         if (!PRAGUE.slug().equals(slug)) {
             throw new UsageException("Unsupported location for this prototype: " + slug);
         }

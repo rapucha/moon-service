@@ -1,6 +1,8 @@
-package dev.moonservice.scoringprototype;
+package dev.moonservice.scoringprototype.fixture;
 
-record Location(
+import java.time.ZoneId;
+
+public record Location(
         String slug,
         String kind,
         String id,
@@ -11,4 +13,7 @@ record Location(
         String timezone,
         String countryCode
 ) {
+    public ZoneId zoneId() {
+        return ZoneId.of(timezone);
+    }
 }

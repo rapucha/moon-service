@@ -1,5 +1,6 @@
-package dev.moonservice.scoringprototype;
+package dev.moonservice.scoringprototype.ephemeris;
 
+import dev.moonservice.scoringprototype.fixture.Location;
 import io.github.cosinekitty.astronomy.Aberration;
 import io.github.cosinekitty.astronomy.Astronomy;
 import io.github.cosinekitty.astronomy.Body;
@@ -11,24 +12,10 @@ import io.github.cosinekitty.astronomy.Refraction;
 import io.github.cosinekitty.astronomy.Time;
 import io.github.cosinekitty.astronomy.Topocentric;
 
-import java.time.Duration;
 import java.time.Instant;
-import java.util.ArrayList;
-import java.util.List;
 
-final class EphemerisSampler {
-    List<MoonSample> sample(PrototypeConfig config) {
-        List<MoonSample> samples = new ArrayList<>();
-        Instant cursor = config.start();
-        Instant end = config.end();
-        while (!cursor.isAfter(end)) {
-            samples.add(sampleAt(config.location(), cursor));
-            cursor = cursor.plus(Duration.ofMinutes(config.stepMinutes()));
-        }
-        return samples;
-    }
-
-    MoonSample sampleAt(Location location, Instant instant) {
+public final class EphemerisSampler {
+    public MoonSample sampleAt(Location location, Instant instant) {
         Observer observer = new Observer(location.latitude(), location.longitude(), location.elevationMeters());
         Time time = Time.fromMillisecondsSince1970(instant.toEpochMilli());
 
