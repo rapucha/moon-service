@@ -2,7 +2,10 @@
 
 Moon Service is an early-stage discovery and alert tool for photographers. The goal is to identify upcoming Moon photography opportunities near a selected city or location, with emphasis on a low Moon, useful ambient light, and promising weather.
 
-The project is currently documentation-led. Backend, Android, database, and deployment scaffolding should wait until the MVP contracts and prototype boundaries are proven.
+The project is currently documentation-led with narrow prototypes under
+`prototypes/`. Production backend, Android, database, and deployment
+scaffolding should wait until the MVP contracts and prototype boundaries are
+proven.
 
 ## MVP Direction
 
@@ -41,6 +44,8 @@ Email alerts, native Android, saved personal preferences, terrain horizon modeli
 - `scripts/scoring_contract_spike.py`: retained Python spike for checking the v0 scoring contract with fixture data.
 - `scripts/real_data_scoring_spike.py`: retained Python spike that combines live JPL Horizons ephemeris samples with live Open-Meteo weather.
 - `prototypes/jvm-ephemeris/`: source-file JVM prototype using Astronomy Engine for Moon/Sun samples, low-Moon candidate windows, and fixture-weather scoring.
+- `prototypes/jvm-scoring/`: minimal Maven JVM prototype with natural low-Moon windows, fixture weather scoring, and fixture tests.
+- `prototypes/spring-preview/`: thin Spring Boot HTTP contract harness around the Maven scoring prototype.
 
 ## Geocoding Contract Spike
 
@@ -111,6 +116,86 @@ This prototype is the intended bridge away from the JPL-based Python validation
 spike. It includes fixture-weather scoring, but does not include Spring Boot,
 persistence, live weather calls, feeds, or calendar generation.
 
+## Maven JVM Scoring Prototype
+
+Run the Maven-based prototype tests:
+
+```bash
+cd prototypes/jvm-scoring
+mvn test
+```
+
+Run the Maven prototype CLI:
+
+```bash
+cd prototypes/jvm-scoring
+mvn -q org.codehaus.mojo:exec-maven-plugin:3.3.0:java \
+  -Dexec.mainClass=dev.moonservice.scoringprototype.cli.MoonScoringPrototype \
+  -Dexec.args="--request fixtures/prague-preview-request.json"
+```
+
+The equivalent explicit-flag form is:
+
+```bash
+cd prototypes/jvm-scoring
+mvn -q org.codehaus.mojo:exec-maven-plugin:3.3.0:java \
+  -Dexec.mainClass=dev.moonservice.scoringprototype.cli.MoonScoringPrototype \
+  -Dexec.args="--location prague-cz --start 2026-06-29 --days 7 --max-altitude 12 --limit 5"
+```
+
+The request fixture shape is:
+
+```json
+{
+  "locationId": "prague-cz",
+  "start": "2026-06-29",
+  "forecastHorizonDays": 7,
+  "maxMoonAltitudeDegrees": 12,
+  "limit": 5
+}
+```
+
+This is still a prototype under `prototypes/`, not backend scaffolding. It uses
+Astronomy Engine via JitPack and fixed fixture weather only. The `start` value
+is interpreted as a local date in the fixture location timezone.
+
+## Prototype Contract Parity
+
+After running `mvn test` once so dependencies are available, compare the
+retained Python scoring spike, the source-file JVM prototype, and the Maven JVM
+prototype:
+
+```bash
+python3 -B scripts/prototype_contract_parity.py
+```
+
+The Python spike and source-file JVM prototype are retained historical
+references, so exact opportunity times and scores differ intentionally. The
+Maven JVM prototype is the active natural-window contract target.
+
+## Spring Preview Prototype
+
+Run the Spring HTTP contract harness tests:
+
+```bash
+(cd prototypes/jvm-scoring && mvn install)
+(cd prototypes/spring-preview && mvn test)
+```
+
+Run the local prototype endpoint:
+
+```bash
+(cd prototypes/jvm-scoring && mvn install)
+(cd prototypes/spring-preview && mvn spring-boot:run)
+```
+
+The only endpoint is `POST /api/preview`, using the same request shape as
+`prototypes/jvm-scoring/fixtures/prague-preview-request.json`. This remains a
+prototype: no geocoding, live weather, persistence, accounts, feeds, calendar
+generation, Docker, or deployment config. The Spring harness depends on the
+`jvm-scoring-prototype` Maven artifact and calls its public
+`PreviewEvaluator` facade.
+
 ## Verification
 
 For documentation-only changes:
@@ -129,4 +214,9 @@ python3 -B -m py_compile scripts/scoring_contract_spike.py
 python3 -B scripts/real_data_scoring_spike.py --forecast-days 2 --limit 3
 python3 -B -m py_compile scripts/real_data_scoring_spike.py
 java -cp /tmp/astronomy-2.1.19.jar:/tmp/kotlin-stdlib-jdk8-1.6.10.jar:/tmp/kotlin-stdlib-jdk7-1.6.10.jar:/tmp/kotlin-stdlib-1.6.10.jar:/tmp/kotlin-stdlib-common-1.6.10.jar prototypes/jvm-ephemeris/MoonWindowPrototype.java --location prague-cz --start 2026-06-29 --days 7 --step-minutes 30 --min-score 50 --limit 5
+(cd prototypes/jvm-scoring && mvn test)
+(cd prototypes/jvm-scoring && mvn -q org.codehaus.mojo:exec-maven-plugin:3.3.0:java -Dexec.mainClass=dev.moonservice.scoringprototype.cli.MoonScoringPrototype -Dexec.args="--request fixtures/prague-preview-request.json")
+python3 -B scripts/prototype_contract_parity.py
+(cd prototypes/jvm-scoring && mvn install)
+(cd prototypes/spring-preview && mvn test)
 ```

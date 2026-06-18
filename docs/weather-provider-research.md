@@ -94,6 +94,29 @@ Privacy:
 - Open-Meteo states free API logs may contain IP addresses and URLs with geographic coordinates, retained for 90 days.
 - A Moon Service backend can reduce provider exposure by routing requests server-side and rounding coordinates.
 
+Temporal precision:
+
+- Reviewed docs on 2026-06-17: Open-Meteo exposes the cloud-cover fields Moon
+  Service needs as hourly forecast variables.
+- The API also exposes 15-minute forecast variables and supports
+  `forecast_minutely_15`, `start_minutely_15`, and `end_minutely_15` request
+  controls.
+- The 15-minute variable set includes temperature, humidity, dewpoint, apparent
+  temperature, precipitation amount, rain, snowfall, freezing level, sunshine
+  duration, weather code, wind, visibility, CAPE, lightning potential, day/night
+  state, and radiation fields.
+- The 15-minute variable set does not include total/low/mid/high cloud cover or
+  precipitation probability.
+- Native 15-minute data is documented as available only in Central Europe and
+  North America; other regions use interpolated hourly data.
+- Because cloud cover is the most important weather signal for Moon photography,
+  V0 should use hourly weather fields for opportunity segmentation and scoring.
+- Build opportunity segments from hourly provider forecast change points, then
+  merge adjacent intervals with the same derived weather class. Do not use
+  5-minute or 15-minute ephemeris sampling as the product interval shape.
+- 15-minute data can be revisited later for current-condition display or
+  near-term precipitation/visibility refinement.
+
 ### MET Norway Locationforecast
 
 Status: useful reference or secondary provider, not first choice.
@@ -354,6 +377,10 @@ Observed result for Prague:
 Conclusion:
 
 - Open-Meteo has the fields needed by the v0 scoring model.
+- Use hourly weather fields for the first scoring model because cloud cover is
+  the key input and cloud-cover layers are hourly.
+- Segment natural low-Moon windows by hourly provider forecast changes, then
+  merge adjacent intervals with equivalent weather state.
 - Use 7 days as the conservative default forecast horizon for the MVP unless scoring tests show useful value beyond that.
 - A 16-day request is technically available, but model horizons vary by provider and region, so later scoring should reduce confidence for distant forecast hours rather than treating all 16 days equally.
 
@@ -386,8 +413,17 @@ Rules:
 - Use UTC internally.
 - Store provider attribution/source.
 - Keep raw provider payloads only if needed for debugging, and expire them.
-- Cache by rounded coordinate and forecast hour, not by user identity.
+- Cache hourly fields by rounded coordinate and forecast hour, not by user identity.
 - Start with no permanent user-location storage.
+
+Window assessment should derive from one or more `WeatherForecastPoint` records
+or merged forecast-change intervals:
+
+- Maximum precipitation probability over the window.
+- Total or maximum precipitation amount over the window.
+- Minimum visibility over the window.
+- Mean and maximum cloud cover over the window.
+- Dominant and worst weather code over the window.
 
 ## Caching Recommendation
 

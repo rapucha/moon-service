@@ -10,14 +10,40 @@ The core photographic problem is exposure balance. The Moon is much brighter tha
 
 ## Candidate Window
 
-Generate candidate windows around Moon visibility events:
+V0 should generate natural low-Moon windows, not many small scored windows from
+fixed ephemeris samples.
 
+For each local calendar day and location, compute intervals where the apparent
+refracted Moon altitude is between the horizon and the configured low-Moon
+ceiling, initially:
+
+```text
+0 degrees <= Moon altitude <= 12 degrees
+```
+
+The interval boundaries are:
+
+- Local day start, `00:00`, when a low-Moon interval crossed midnight.
 - Moonrise.
 - Moonset.
-- Low-altitude passes near the horizon.
-- Full, gibbous, quarter, and crescent Moon windows when the Moon is low enough and the light/weather context is useful.
+- The Moon crossing upward through the low-Moon ceiling.
+- The Moon crossing downward through the low-Moon ceiling.
+- Local day end, `23:59:59`, when a low-Moon interval continues past midnight.
 
-Initial search horizon should match the selected weather provider's reliable forecast range. If the provider only gives useful confidence for a few days, do not pretend to predict beyond that.
+This usually produces zero, one, or two natural windows per day:
+
+- A set-side window, usually from the downward ceiling crossing or local day
+  start to Moonset or local day end.
+- A rise-side window, usually from Moonrise or local day start to the upward
+  ceiling crossing or local day end.
+
+The implementation may use coarse samples to bracket crossings before solving
+for event times, but sampling cadence is not part of the product contract and
+should not create artificial 5-minute or 15-minute opportunity slices.
+
+Initial search horizon should match the selected weather provider's reliable
+forecast range. If the provider only gives useful confidence for a few days, do
+not pretend to predict beyond that.
 
 ## Initial Inputs
 
@@ -51,15 +77,74 @@ User preferences:
 - Location.
 - Alert lead time.
 - Optional preferred window type, such as low full Moon, crescent, twilight, or daylight Moon.
-- Optional minimum score threshold.
+- Optional weather tolerance or profile later, kept request-scoped until accounts exist.
 
-## V0 Hard Filters
+## V0 Weather Assessment
+
+Assess weather by forecast change intervals, not by a fixed Moon/Sun sampling
+cadence.
+
+The base astronomy step should produce natural low-Moon windows. Weather then
+splits those windows only where the forecast state changes enough to affect the
+recommendation. Adjacent intervals with the same derived weather class should be
+merged back together.
+
+Cloud cover is the most important weather input for Moon photography. Open-Meteo
+exposes total, low, mid, and high cloud-cover fields as hourly variables, not as
+15-minute variables. The 15-minute variable set includes some useful secondary
+fields, such as precipitation amount, visibility, and weather code, but also
+many fields that do not drive the first scoring model, such as temperature,
+humidity, wind, and radiation.
+
+V0 should therefore use hourly forecast fields as the opportunity segmentation
+source. This keeps the model aligned with the most important weather signal
+instead of adding 15-minute complexity around less decisive inputs.
+
+The first weather segmentation pipeline should be:
+
+1. Fetch hourly cloud, precipitation probability, precipitation amount, weather
+   code, and visibility fields for the forecast horizon.
+2. Normalize each hourly provider timestep into a coarse weather class.
+3. Build intervals whose boundaries are provider forecast timestamps and
+   provider value changes, not an arbitrary ephemeris sampling step.
+4. Merge adjacent intervals when the weather class and decision-relevant facts
+   are equivalent.
+5. Intersect the merged weather intervals with the natural low-Moon windows.
+
+Window or segment-level weather facts should include:
+
+- Mean and maximum total cloud cover.
+- Mean or maximum low, mid, and high cloud cover when available.
+- Maximum precipitation probability.
+- Total or maximum precipitation amount.
+- Minimum visibility.
+- Dominant and worst weather code.
+
+The weather label should be intentionally coarse, for example:
+
+```text
+clear
+partly_cloudy
+mixed
+overcast
+precipitation_risk
+poor_visibility
+```
+
+If the forecast is clear or overcast across the whole night, a single merged
+window assessment is enough. The product should avoid implying that tomorrow's
+weather can be trusted more precisely than the provider data and model
+confidence support. 15-minute Open-Meteo fields can be revisited later for
+current-condition display or short-term precipitation refinement, but they
+should not drive the first scoring contract.
+
+## V0 Selection Rules
 
 Reject opportunities when:
 
 - Moon is below the horizon.
 - Moon altitude is too high for the low-Moon use case.
-- Weather is overcast or precipitation risk is high.
+- Weather is clearly hostile across the candidate window.
 - Visibility is below the selected threshold.
 - Forecast confidence is too low to produce an alert, if the provider exposes confidence.
 
@@ -99,23 +184,37 @@ V0 should phrase low-horizon opportunities cautiously:
 Local hills, buildings, or trees may affect exact visibility near the horizon.
 ```
 
-## V0 Score Components
+## V0 Window Assessment
 
-Use an additive score from 0 to 100.
+Do not make the first public model look more exact than its inputs. The
+important output is a ranked set of natural windows with clear facts and a short
+explanation.
 
-Suggested starting weights:
+The service may keep a small numeric score internally to sort windows, but the
+v0 product should treat the score as a ranking aid, not a minute-accurate
+prediction. A coarse public label is acceptable:
 
-- Moon altitude fit: 30 points.
-- Sun/light fit: 25 points.
-- Moon illumination fit: 15 points.
-- Weather fit: 25 points.
-- Forecast confidence: 5 points.
+```text
+excellent
+good
+possible
+poor
+```
 
-Moon altitude fit:
+Sort candidate windows by:
 
-- Best near 1 to 6 degrees.
-- Still useful from 6 to 12 degrees.
-- Penalize below 0 degrees or too close to the horizon if terrain/obstruction is unknown.
+- Weather usability across the merged forecast segment.
+- Useful ambient-light overlap, especially golden hour and civil twilight.
+- Low-Moon geometry within the window.
+- Moon illumination fit for the default photography profile.
+- Forecast confidence, including forecast age and distance into the horizon.
+- Earlier local time when quality is otherwise similar.
+
+Moon altitude assessment:
+
+- The whole candidate window is already constrained to the low-Moon range.
+- Prefer portions near 1 to 6 degrees.
+- Treat extremely low altitudes cautiously because terrain, buildings, and trees are not modeled.
 
 Sun/light fit:
 
@@ -141,7 +240,7 @@ Weather fit:
 
 - Clear sky is good.
 - Partial or textured cloud can be excellent.
-- Overcast, fog, rain, snow, and poor visibility should be rejected or heavily penalized.
+- Overcast, fog, rain, snow, and poor visibility should suppress or strongly lower a window when they dominate the whole interval.
 
 Forecast confidence:
 
@@ -173,7 +272,6 @@ Possible preference controls:
 - Foreground goal: balanced exposure, silhouette, or night landscape.
 - Moon altitude range: very low, low, moderate, or any within the low-Moon limit.
 - Weather tolerance: clear only, partial clouds welcome, or dramatic clouds allowed.
-- Minimum score threshold.
 - Travel or setup lead time.
 
 Preferences should adjust weights and explanations, not hide the raw facts. For
@@ -188,7 +286,7 @@ only in browser `localStorage`.
 
 ## Alert Explanation
 
-Each scored opportunity should include a short explanation:
+Each opportunity should include a short explanation:
 
 ```text
 Moon 4.2 degrees above the east horizon near civil twilight. Forecast is partly cloudy with low precipitation risk.

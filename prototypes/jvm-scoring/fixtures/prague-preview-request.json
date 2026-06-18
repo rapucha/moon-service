@@ -1,0 +1,7 @@
+{
+  "locationId": "prague-cz",
+  "start": "2026-06-29",
+  "forecastHorizonDays": 7,
+  "maxMoonAltitudeDegrees": 12,
+  "limit": 5
+}
