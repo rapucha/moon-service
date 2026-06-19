@@ -22,13 +22,6 @@ class PreviewErrorHandler {
         return invalidRequest("Request body must be valid JSON.");
     }
 
-    record ErrorResponse(
-            String status,
-            String generatedAt,
-            String message
-    ) {
-    }
-
     private static ResponseEntity<ErrorResponse> invalidRequest(String message) {
         return ResponseEntity.status(HttpStatus.BAD_REQUEST)
                 .contentType(MediaType.APPLICATION_JSON)
