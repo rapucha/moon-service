@@ -3,8 +3,8 @@ package dev.moonservice.scoringprototype.input;
 import tools.jackson.core.JacksonException;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
-import dev.moonservice.scoringprototype.fixture.Locations;
 import dev.moonservice.scoringprototype.UsageException;
+import dev.moonservice.scoringprototype.fixture.Locations;
 
 import java.nio.file.Path;
 import java.time.LocalDate;
@@ -27,17 +27,11 @@ public final class RequestConfigReader {
         if (!root.isObject()) {
             throw new UsageException("Request fixture must be a JSON object.");
         }
-        String locationId = text(root, "locationId", Locations.PRAGUE.slug());
-        LocalDate startDate = PrototypeConfig.parseStartDate(text(root, "start", "2026-06-29"));
-        int days = intValue(root, "forecastHorizonDays", PrototypeConfig.DEFAULT_DAYS, 1, 30);
-        double maxMoonAltitudeDegrees = doubleValue(
-                root,
-                "maxMoonAltitudeDegrees",
-                PrototypeConfig.DEFAULT_MAX_MOON_ALTITUDE,
-                0.0,
-                45.0
-        );
-        int limit = intValue(root, "limit", 10, 1, 100);
+        String locationId = text(root, "locationId");
+        LocalDate startDate = PrototypeConfig.parseStartDate(text(root, "start"));
+        int days = intValue(root, "forecastHorizonDays");
+        double maxMoonAltitudeDegrees = maxMoonAltitudeDegrees(root);
+        int limit = intValue(root, "limit");
 
         return new PrototypeConfig(
                 Locations.requireFixture(locationId),
@@ -48,44 +42,35 @@ public final class RequestConfigReader {
         );
     }
 
-    private static String text(JsonNode root, String field, String defaultValue) {
-        JsonNode value = root.path(field);
-        if (value.isMissingNode() || value.isNull()) {
-            return defaultValue;
-        }
+    private static String text(JsonNode root, String field) {
+        JsonNode value = required(root, field);
         if (!value.isString() || value.asString().isBlank()) {
             throw new UsageException(field + " must be a non-empty string in the request fixture.");
         }
         return value.asString();
     }
 
-    private static int intValue(JsonNode root, String field, int defaultValue, int min, int max) {
-        JsonNode value = root.path(field);
-        if (value.isMissingNode() || value.isNull()) {
-            return defaultValue;
-        }
+    private static int intValue(JsonNode root, String field) {
+        JsonNode value = required(root, field);
         if (!value.canConvertToInt()) {
             throw new UsageException(field + " must be an integer in the request fixture.");
         }
-        int parsed = value.asInt();
-        if (parsed < min || parsed > max) {
-            throw new UsageException(field + " must be between " + min + " and " + max + ".");
-        }
-        return parsed;
+        return value.asInt();
     }
 
-    private static double doubleValue(JsonNode root, String field, double defaultValue, double min, double max) {
+    private static double maxMoonAltitudeDegrees(JsonNode root) {
+        JsonNode value = required(root, "maxMoonAltitudeDegrees");
+        if (!value.isNumber()) {
+            throw new UsageException("maxMoonAltitudeDegrees must be numeric in the request fixture.");
+        }
+        return value.asDouble();
+    }
+
+    private static JsonNode required(JsonNode root, String field) {
         JsonNode value = root.path(field);
         if (value.isMissingNode() || value.isNull()) {
-            return defaultValue;
+            throw new UsageException(field + " is required in the request fixture.");
         }
-        if (!value.isNumber()) {
-            throw new UsageException(field + " must be numeric in the request fixture.");
-        }
-        double parsed = value.asDouble();
-        if (!Double.isFinite(parsed) || parsed < min || parsed > max) {
-            throw new UsageException(field + " must be between " + min + " and " + max + ".");
-        }
-        return parsed;
+        return value;
     }
 }

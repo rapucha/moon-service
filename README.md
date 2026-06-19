@@ -125,22 +125,14 @@ cd prototypes/jvm-scoring
 mvn test
 ```
 
-Run the Maven prototype CLI:
+Run the Maven functional fixture harness:
 
 ```bash
 cd prototypes/jvm-scoring
-mvn -q org.codehaus.mojo:exec-maven-plugin:3.3.0:java \
+mvn -q test-compile org.codehaus.mojo:exec-maven-plugin:3.3.0:java \
+  -Dexec.classpathScope=test \
   -Dexec.mainClass=dev.moonservice.scoringprototype.cli.MoonScoringPrototype \
   -Dexec.args="--request fixtures/prague-preview-request.json"
-```
-
-The equivalent explicit-flag form is:
-
-```bash
-cd prototypes/jvm-scoring
-mvn -q org.codehaus.mojo:exec-maven-plugin:3.3.0:java \
-  -Dexec.mainClass=dev.moonservice.scoringprototype.cli.MoonScoringPrototype \
-  -Dexec.args="--location prague-cz --start 2026-06-29 --days 7 --max-altitude 12 --limit 5"
 ```
 
 The request fixture shape is:
@@ -215,7 +207,7 @@ python3 -B scripts/real_data_scoring_spike.py --forecast-days 2 --limit 3
 python3 -B -m py_compile scripts/real_data_scoring_spike.py
 java -cp /tmp/astronomy-2.1.19.jar:/tmp/kotlin-stdlib-jdk8-1.6.10.jar:/tmp/kotlin-stdlib-jdk7-1.6.10.jar:/tmp/kotlin-stdlib-1.6.10.jar:/tmp/kotlin-stdlib-common-1.6.10.jar prototypes/jvm-ephemeris/MoonWindowPrototype.java --location prague-cz --start 2026-06-29 --days 7 --step-minutes 30 --min-score 50 --limit 5
 (cd prototypes/jvm-scoring && mvn test)
-(cd prototypes/jvm-scoring && mvn -q org.codehaus.mojo:exec-maven-plugin:3.3.0:java -Dexec.mainClass=dev.moonservice.scoringprototype.cli.MoonScoringPrototype -Dexec.args="--request fixtures/prague-preview-request.json")
+(cd prototypes/jvm-scoring && mvn -q test-compile org.codehaus.mojo:exec-maven-plugin:3.3.0:java -Dexec.classpathScope=test -Dexec.mainClass=dev.moonservice.scoringprototype.cli.MoonScoringPrototype -Dexec.args="--request fixtures/prague-preview-request.json")
 python3 -B scripts/prototype_contract_parity.py
 (cd prototypes/jvm-scoring && mvn install)
 (cd prototypes/spring-preview && mvn test)

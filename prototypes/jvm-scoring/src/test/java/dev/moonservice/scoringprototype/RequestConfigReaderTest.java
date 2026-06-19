@@ -46,11 +46,16 @@ class RequestConfigReaderTest {
     @ParameterizedTest
     @CsvSource(delimiter = '|', textBlock = """
             [] | Request fixture must be a JSON object.
+            {} | locationId is required in the request fixture.
+            {"locationId": "prague-cz"} | start is required in the request fixture.
+            {"locationId": "prague-cz", "start": "2026-06-29"} | forecastHorizonDays is required in the request fixture.
+            {"locationId": "prague-cz", "start": "2026-06-29", "forecastHorizonDays": 7} | maxMoonAltitudeDegrees is required in the request fixture.
+            {"locationId": "prague-cz", "start": "2026-06-29", "forecastHorizonDays": 7, "maxMoonAltitudeDegrees": 12} | limit is required in the request fixture.
             {"locationId": ""} | locationId must be a non-empty string in the request fixture.
-            {"start": "not-a-date"} | Invalid --start value: not-a-date
-            {"forecastHorizonDays": 0} | forecastHorizonDays must be between 1 and 30.
-            {"limit": 0} | limit must be between 1 and 100.
-            {"maxMoonAltitudeDegrees": 46} | maxMoonAltitudeDegrees must be between 0.0 and 45.0.
+            {"locationId": "prague-cz", "start": "not-a-date", "forecastHorizonDays": 7, "maxMoonAltitudeDegrees": 12, "limit": 5} | Invalid --start value: not-a-date
+            {"locationId": "prague-cz", "start": "2026-06-29", "forecastHorizonDays": 0, "maxMoonAltitudeDegrees": 12, "limit": 5} | forecastHorizonDays must be between 1 and 30.
+            {"locationId": "prague-cz", "start": "2026-06-29", "forecastHorizonDays": 7, "maxMoonAltitudeDegrees": 12, "limit": 0} | limit must be between 1 and 100.
+            {"locationId": "prague-cz", "start": "2026-06-29", "forecastHorizonDays": 7, "maxMoonAltitudeDegrees": 46, "limit": 5} | maxMoonAltitudeDegrees must be between 0.0 and 45.0.
             """)
     void rejectsInvalidRequestFixtures(String json, String message) {
         UsageException ex = assertThrows(
