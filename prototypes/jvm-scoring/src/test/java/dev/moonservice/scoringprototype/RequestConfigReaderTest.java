@@ -11,7 +11,7 @@ import java.nio.file.Path;
 import java.time.Instant;
 import java.time.LocalDate;
 
-import static com.fasterxml.jackson.databind.json.JsonMapper.builder;
+import static tools.jackson.databind.json.JsonMapper.builder;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
@@ -52,7 +52,7 @@ class RequestConfigReaderTest {
             {"limit": 0} | limit must be between 1 and 100.
             {"maxMoonAltitudeDegrees": 46} | maxMoonAltitudeDegrees must be between 0.0 and 45.0.
             """)
-    void rejectsInvalidRequestFixtures(String json, String message) throws Exception {
+    void rejectsInvalidRequestFixtures(String json, String message) {
         UsageException ex = assertThrows(
                 UsageException.class,
                 () -> RequestConfigReader.fromJson(builder().build().readTree(json))

@@ -1,31 +1,27 @@
 package dev.moonservice.springpreview;
 
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.webtestclient.autoconfigure.AutoConfigureWebTestClient;
 import org.springframework.http.MediaType;
-import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.reactive.server.WebTestClient;
 
-import static org.hamcrest.Matchers.startsWith;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-@SpringBootTest
-@AutoConfigureMockMvc
+@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
+@AutoConfigureWebTestClient
 class PreviewControllerTest {
     @Autowired
-    private MockMvc mockMvc;
+    private WebTestClient webTestClient;
 
     @Test
-    void returnsPreviewResponseForPragueFixtureRequest() throws Exception {
-        mockMvc.perform(post("/api/preview")
+    void returnsPreviewResponseForPragueFixtureRequest()  {
+        webTestClient.post().uri("/api/preview")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("""
+                        .bodyValue("""
                                 {
                                   "locationId": "prague-cz",
                                   "start": "2026-06-29",
@@ -33,32 +29,37 @@ class PreviewControllerTest {
                                   "maxMoonAltitudeDegrees": 12,
                                   "limit": 5
                                 }
-                                """))
-                .andExpect(status().isOk())
-                .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
-                .andExpect(jsonPath("$.status").value("ok"))
-                .andExpect(jsonPath("$.location.id").value("openmeteo:prague-cz"))
-                .andExpect(jsonPath("$.forecastHorizonDays").value(7))
-                .andExpect(jsonPath("$.candidateWindowsEvaluated").isNumber())
-                .andExpect(jsonPath("$.opportunities[0].suggestedAt").exists())
-                .andExpect(jsonPath("$.opportunities[0].weather.sourceResolution").value("hourly"))
-                .andExpect(jsonPath("$.opportunities[0].links.ics", startsWith("/o/prague-cz-")));
+                                """)
+                .exchange()
+                .expectStatus().isOk()
+                .expectHeader().contentTypeCompatibleWith(MediaType.APPLICATION_JSON)
+                .expectBody()
+                .jsonPath("$.status").isEqualTo("ok")
+                .jsonPath("$.location.id").isEqualTo("openmeteo:prague-cz")
+                .jsonPath("$.forecastHorizonDays").isEqualTo(7)
+                .jsonPath("$.candidateWindowsEvaluated").isNumber()
+                .jsonPath("$.opportunities[0].suggestedAt").exists()
+                .jsonPath("$.opportunities[0].weather.sourceResolution").isEqualTo("hourly")
+                .jsonPath("$.opportunities[0].links.ics")
+                .value(String.class, value -> assertTrue(value.startsWith("/o/prague-cz-")));
     }
 
     @Test
-    void mapsUnsupportedFixtureLocationToInvalidRequest() throws Exception {
-        mockMvc.perform(post("/api/preview")
+    void mapsUnsupportedFixtureLocationToInvalidRequest() {
+        webTestClient.post().uri("/api/preview")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("""
+                        .bodyValue("""
                                 {
                                   "locationId": "amsterdam-nl",
                                   "start": "2026-06-29"
                                 }
-                                """))
-                .andExpect(status().isBadRequest())
-                .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
-                .andExpect(jsonPath("$.status").value("invalid_request"))
-                .andExpect(jsonPath("$.message").value("Unsupported location for this prototype: amsterdam-nl"));
+                                """)
+                .exchange()
+                .expectStatus().isBadRequest()
+                .expectHeader().contentTypeCompatibleWith(MediaType.APPLICATION_JSON)
+                .expectBody()
+                .jsonPath("$.status").isEqualTo("invalid_request")
+                .jsonPath("$.message").isEqualTo("Unsupported location for this prototype: amsterdam-nl");
     }
 
     @ParameterizedTest
@@ -70,24 +71,28 @@ class PreviewControllerTest {
             {"limit": 0} | limit must be between 1 and 100.
             {"maxMoonAltitudeDegrees": 46} | maxMoonAltitudeDegrees must be between 0.0 and 45.0.
             """)
-    void mapsInvalidRequestBodiesToInvalidRequest(String body, String message) throws Exception {
-        mockMvc.perform(post("/api/preview")
+    void mapsInvalidRequestBodiesToInvalidRequest(String body, String message) {
+        webTestClient.post().uri("/api/preview")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(body))
-                .andExpect(status().isBadRequest())
-                .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
-                .andExpect(jsonPath("$.status").value("invalid_request"))
-                .andExpect(jsonPath("$.message").value(message));
+                        .bodyValue(body)
+                .exchange()
+                .expectStatus().isBadRequest()
+                .expectHeader().contentTypeCompatibleWith(MediaType.APPLICATION_JSON)
+                .expectBody()
+                .jsonPath("$.status").isEqualTo("invalid_request")
+                .jsonPath("$.message").isEqualTo(message);
     }
 
     @Test
-    void mapsMalformedJsonToInvalidRequest() throws Exception {
-        mockMvc.perform(post("/api/preview")
+    void mapsMalformedJsonToInvalidRequest() {
+        webTestClient.post().uri("/api/preview")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{"))
-                .andExpect(status().isBadRequest())
-                .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
-                .andExpect(jsonPath("$.status").value("invalid_request"))
-                .andExpect(jsonPath("$.message").value("Request body must be valid JSON."));
+                        .bodyValue("{")
+                .exchange()
+                .expectStatus().isBadRequest()
+                .expectHeader().contentTypeCompatibleWith(MediaType.APPLICATION_JSON)
+                .expectBody()
+                .jsonPath("$.status").isEqualTo("invalid_request")
+                .jsonPath("$.message").isEqualTo("Request body must be valid JSON.");
     }
 }

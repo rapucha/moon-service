@@ -1,8 +1,8 @@
 package dev.moonservice.scoringprototype.output;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.node.ArrayNode;
-import com.fasterxml.jackson.databind.node.ObjectNode;
+import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.node.ArrayNode;
+import tools.jackson.databind.node.ObjectNode;
 import dev.moonservice.scoringprototype.ephemeris.MoonSample;
 import dev.moonservice.scoringprototype.fixture.Location;
 import dev.moonservice.scoringprototype.fixture.WeatherFixture;

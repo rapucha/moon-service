@@ -1,6 +1,6 @@
 package dev.moonservice.springpreview.web;
 
-import com.fasterxml.jackson.databind.JsonNode;
+import tools.jackson.databind.JsonNode;
 import dev.moonservice.scoringprototype.PreviewEvaluator;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;

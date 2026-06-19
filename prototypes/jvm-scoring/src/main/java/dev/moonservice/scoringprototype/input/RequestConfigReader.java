@@ -1,11 +1,11 @@
 package dev.moonservice.scoringprototype.input;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.core.JacksonException;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
 import dev.moonservice.scoringprototype.fixture.Locations;
 import dev.moonservice.scoringprototype.UsageException;
 
-import java.io.IOException;
 import java.nio.file.Path;
 import java.time.LocalDate;
 
@@ -18,7 +18,7 @@ public final class RequestConfigReader {
     public static PrototypeConfig read(Path path) {
         try {
             return fromJson(MAPPER.readTree(path.toFile()));
-        } catch (IOException ex) {
+        } catch (JacksonException jex) {
             throw new UsageException("Unable to read --request file: " + path);
         }
     }
@@ -53,10 +53,10 @@ public final class RequestConfigReader {
         if (value.isMissingNode() || value.isNull()) {
             return defaultValue;
         }
-        if (!value.isTextual() || value.asText().isBlank()) {
+        if (!value.isString() || value.asString().isBlank()) {
             throw new UsageException(field + " must be a non-empty string in the request fixture.");
         }
-        return value.asText();
+        return value.asString();
     }
 
     private static int intValue(JsonNode root, String field, int defaultValue, int min, int max) {
