@@ -8,13 +8,14 @@ The near-term product is not a full Photographer's Ephemeris clone. It is a web-
 
 ## Current Phase
 
-This repo is in planning and documentation mode with narrow prototypes under
-`prototypes/`.
+This repo is moving from planning/prototype mode into a thin real backend
+spine. Narrow prototypes remain under `prototypes/`, and the first real Spring
+Boot backend module lives under `backend/`.
 
-Do not scaffold production backend, Android, database, or deployment code until
-the MVP architecture, scoring model, ephemeris library, and weather provider
-choices are documented. A thin Spring Boot HTTP contract harness is allowed
-under `prototypes/` when it stays fixture-only and avoids production concerns.
+Do not scaffold Android, database, deployment, accounts, or live provider
+integration code until the relevant MVP boundaries are documented. The backend
+should remain small and web-first: start by replacing fixture-backed seams with
+geocoding, weather, caching, feeds, and `.ics` behavior deliberately.
 
 ## Product Direction
 
@@ -50,6 +51,7 @@ The main unresolved choice is now the exact first web/API contract for city look
 - `docs/mvp-roadmap.md`: milestone plan and implementation order.
 - `prototypes/jvm-scoring/`: minimal Maven JVM scoring/ephemeris prototype with fixture tests.
 - `prototypes/spring-preview/`: thin Spring Boot HTTP contract harness for the preview request/response shape.
+- `backend/`: first Spring Boot backend module, currently fixture-backed through the scoring prototype.
 
 ## Engineering Guidelines
 
@@ -65,13 +67,14 @@ The main unresolved choice is now the exact first web/API contract for city look
 
 ## Suggested Tooling Direction
 
-When implementation starts, the expected stack is:
+As implementation begins, the expected stack remains:
 
 - Backend: Java, Spring Boot, Postgres, Flyway or Liquibase.
 - Android: Kotlin, Jetpack Compose, Room or DataStore, WorkManager, local notifications.
 - Local infrastructure: Docker Compose for Postgres and integration dependencies.
 
-Do not add these tools until the next implementation step explicitly calls for them.
+Do not add Postgres, migrations, Android, or local infrastructure until the
+next implementation step explicitly calls for them.
 
 ## Verification
 
@@ -81,7 +84,7 @@ For documentation-only changes, verify with:
 git diff --check
 ```
 
-For future code changes, add focused build/test commands to this file once the project has actual backend or Android modules.
+For backend code changes, include the focused module tests below.
 
 For the current JVM ephemeris/scoring prototype, after fetching the documented
 jars into `/tmp`, verify with:
@@ -96,6 +99,6 @@ For the Maven-based JVM scoring prototype, verify with:
 (cd prototypes/jvm-scoring && mvn test)
 (cd prototypes/jvm-scoring && mvn -q test-compile org.codehaus.mojo:exec-maven-plugin:3.3.0:java -Dexec.classpathScope=test -Dexec.mainClass=dev.moonservice.scoringprototype.cli.MoonScoringPrototype -Dexec.args="--request fixtures/prague-preview-request.json")
 python3 -B scripts/prototype_contract_parity.py
-(cd prototypes/jvm-scoring && mvn install)
-(cd prototypes/spring-preview && mvn test)
+mvn test -pl prototypes/spring-preview -am
+mvn test -pl backend -am
 ```

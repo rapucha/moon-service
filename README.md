@@ -2,10 +2,10 @@
 
 Moon Service is an early-stage discovery and alert tool for photographers. The goal is to identify upcoming Moon photography opportunities near a selected city or location, with emphasis on a low Moon, useful ambient light, and promising weather.
 
-The project is currently documentation-led with narrow prototypes under
-`prototypes/`. Production backend, Android, database, and deployment
-scaffolding should wait until the MVP contracts and prototype boundaries are
-proven.
+The project is moving from documentation-led prototypes into a thin real
+backend spine. The first backend module is intentionally small and
+fixture-backed; Android, database, deployment, accounts, and live provider
+integrations still wait until their boundaries are proven.
 
 ## MVP Direction
 
@@ -22,7 +22,7 @@ Email alerts, native Android, saved personal preferences, terrain horizon modeli
 
 ## Current Decisions
 
-- Web-first MVP with a small backend later.
+- Web-first MVP with a small backend, starting with a fixture-backed preview endpoint.
 - Open-Meteo Geocoding as the first geocoding provider candidate.
 - Raw Unicode location input, with curated alias/transliteration fallback for known provider gaps.
 - Open-Meteo Weather as the first weather provider candidate.
@@ -43,6 +43,8 @@ Email alerts, native Android, saved personal preferences, terrain horizon modeli
 - `scripts/geocoding_contract_spike.py`: retained Python spike for checking the v0 geocoding contract.
 - `scripts/scoring_contract_spike.py`: retained Python spike for checking the v0 scoring contract with fixture data.
 - `scripts/real_data_scoring_spike.py`: retained Python spike that combines live JPL Horizons ephemeris samples with live Open-Meteo weather.
+- `backend/`: first Spring Boot backend module, currently exposing the
+  fixture-backed preview endpoint outside `prototypes/`.
 - `prototypes/jvm-ephemeris/`: source-file JVM prototype using Astronomy Engine for Moon/Sun samples, low-Moon candidate windows, and fixture-weather scoring.
 - `prototypes/jvm-scoring/`: minimal Maven JVM prototype with natural low-Moon windows, fixture weather scoring, and fixture tests.
 - `prototypes/spring-preview/`: thin Spring Boot HTTP contract harness around the Maven scoring prototype.
@@ -188,6 +190,25 @@ generation, Docker, or deployment config. The Spring harness depends on the
 `jvm-scoring-prototype` Maven artifact and calls its public
 `PreviewEvaluator` facade.
 
+## Backend
+
+Run the first real backend module tests:
+
+```bash
+mvn test -pl backend -am
+```
+
+Run the local backend:
+
+```bash
+mvn spring-boot:run -pl backend -am
+```
+
+The current backend endpoint is still `POST /api/preview` with the same fixture
+request shape as the scoring prototype. This module is the place to replace
+fixture dependencies with geocoding, weather, caching, feeds, and calendar
+exports in later steps.
+
 ## Verification
 
 For documentation-only changes:
@@ -209,6 +230,6 @@ java -cp /tmp/astronomy-2.1.19.jar:/tmp/kotlin-stdlib-jdk8-1.6.10.jar:/tmp/kotli
 (cd prototypes/jvm-scoring && mvn test)
 (cd prototypes/jvm-scoring && mvn -q test-compile org.codehaus.mojo:exec-maven-plugin:3.3.0:java -Dexec.classpathScope=test -Dexec.mainClass=dev.moonservice.scoringprototype.cli.MoonScoringPrototype -Dexec.args="--request fixtures/prague-preview-request.json")
 python3 -B scripts/prototype_contract_parity.py
-(cd prototypes/jvm-scoring && mvn install)
-(cd prototypes/spring-preview && mvn test)
+mvn test -pl prototypes/spring-preview -am
+mvn test -pl backend -am
 ```
