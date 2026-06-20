@@ -1,5 +1,8 @@
 package dev.moonservice.backend.opportunity;
 
+import dev.moonservice.backend.location.ResolvedLocation;
+import dev.moonservice.backend.opportunity.search.OpportunitySearchRequest;
+
 import java.time.Clock;
 import java.time.LocalDate;
 

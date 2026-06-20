@@ -1,5 +1,11 @@
 package dev.moonservice.backend.opportunity;
 
+import dev.moonservice.backend.location.LocationResolver;
+import dev.moonservice.backend.opportunity.search.OpportunityResponse;
+import dev.moonservice.backend.opportunity.search.OpportunitySearchEngine;
+import dev.moonservice.backend.opportunity.search.OpportunitySearchRequest;
+import dev.moonservice.backend.opportunity.search.OpportunitySearchResponse;
+import dev.moonservice.backend.opportunity.search.OpportunityStatusResponse;
 import dev.moonservice.scoringprototype.UsageException;
 import org.springframework.stereotype.Service;
 import tools.jackson.databind.JsonNode;

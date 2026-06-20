@@ -2,6 +2,9 @@ package dev.moonservice.backend.opportunity;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
+import dev.moonservice.backend.location.ResolvedLocation;
+import dev.moonservice.backend.opportunity.search.OpportunityResponse;
+import dev.moonservice.backend.opportunity.search.OpportunitySearchResponse;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneId;

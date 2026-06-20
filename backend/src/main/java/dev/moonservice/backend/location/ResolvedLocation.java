@@ -1,4 +1,4 @@
-package dev.moonservice.backend.opportunity;
+package dev.moonservice.backend.location;
 
 import java.time.ZoneId;
 

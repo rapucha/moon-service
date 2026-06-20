@@ -1,8 +1,8 @@
 package dev.moonservice.backend.opportunity.prototype;
 
-import dev.moonservice.backend.opportunity.OpportunitySearchEngine;
-import dev.moonservice.backend.opportunity.OpportunitySearchRequest;
-import dev.moonservice.backend.opportunity.OpportunitySearchResponse;
+import dev.moonservice.backend.opportunity.search.OpportunitySearchEngine;
+import dev.moonservice.backend.opportunity.search.OpportunitySearchRequest;
+import dev.moonservice.backend.opportunity.search.OpportunitySearchResponse;
 import dev.moonservice.scoringprototype.PreviewEvaluator;
 import tools.jackson.core.JacksonException;
 import tools.jackson.databind.JsonNode;

@@ -1,8 +1,8 @@
 package dev.moonservice.backend.web;
 
-import dev.moonservice.backend.opportunity.OpportunityResponse;
-import dev.moonservice.backend.opportunity.OpportunitySearchResponse;
 import dev.moonservice.backend.opportunity.OpportunitySearchService;
+import dev.moonservice.backend.opportunity.search.OpportunityResponse;
+import dev.moonservice.backend.opportunity.search.OpportunitySearchResponse;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;

@@ -3,6 +3,7 @@ package dev.moonservice.backend.opportunity;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
+import dev.moonservice.backend.opportunity.search.OpportunitySearchRequest;
 import dev.moonservice.scoringprototype.UsageException;
 import org.junit.jupiter.api.Test;
 import tools.jackson.databind.ObjectMapper;

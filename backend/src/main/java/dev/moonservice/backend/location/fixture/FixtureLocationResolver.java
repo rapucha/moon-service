@@ -1,5 +1,7 @@
-package dev.moonservice.backend.opportunity;
+package dev.moonservice.backend.location.fixture;
 
+import dev.moonservice.backend.location.LocationResolver;
+import dev.moonservice.backend.location.ResolvedLocation;
 import java.time.ZoneId;
 import java.util.Locale;
 import java.util.Map;

@@ -1,4 +1,4 @@
-package dev.moonservice.backend.opportunity;
+package dev.moonservice.backend.opportunity.search;
 
 import java.util.List;
 import java.util.Map;
