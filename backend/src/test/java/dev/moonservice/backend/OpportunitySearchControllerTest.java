@@ -5,6 +5,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webtestclient.autoconfigure.AutoConfigureWebTestClient;
@@ -16,6 +17,80 @@ import org.springframework.test.web.reactive.server.WebTestClient;
 class OpportunitySearchControllerTest {
     @Autowired
     private WebTestClient webTestClient;
+
+    @ParameterizedTest
+    @ValueSource(strings = {"Praha", "Prague", "prague-cz"})
+    void returnsOpportunitySearchResponseForFixtureQuery(String query) {
+        webTestClient.get()
+                .uri(uriBuilder -> uriBuilder.path("/api/opportunities")
+                        .queryParam("q", query)
+                        .build())
+                .exchange()
+                .expectStatus().isOk()
+                .expectHeader().contentTypeCompatibleWith(MediaType.APPLICATION_JSON)
+                .expectBody()
+                .jsonPath("$.status").isEqualTo("ok")
+                .jsonPath("$.location.id").isEqualTo("openmeteo:prague-cz")
+                .jsonPath("$.forecastHorizonDays").isEqualTo(7)
+                .jsonPath("$.startsAt").exists()
+                .jsonPath("$.maxMoonAltitudeDegrees").isEqualTo(12.0)
+                .jsonPath("$.opportunities[0].suggestedAt").exists();
+    }
+
+    @Test
+    void returnsLocationNotFoundForUnknownFixtureQuery() {
+        webTestClient.get()
+                .uri(uriBuilder -> uriBuilder.path("/api/opportunities")
+                        .queryParam("q", "Amsterdam")
+                        .build())
+                .exchange()
+                .expectStatus().isOk()
+                .expectHeader().contentTypeCompatibleWith(MediaType.APPLICATION_JSON)
+                .expectBody()
+                .jsonPath("$.status").isEqualTo("location_not_found")
+                .jsonPath("$.message").isEqualTo("No matching location found.")
+                .jsonPath("$.opportunities").doesNotExist();
+    }
+
+    @Test
+    void mapsMissingQueryToInvalidRequest() {
+        webTestClient.get()
+                .uri("/api/opportunities")
+                .exchange()
+                .expectStatus().isBadRequest()
+                .expectHeader().contentTypeCompatibleWith(MediaType.APPLICATION_JSON)
+                .expectBody()
+                .jsonPath("$.status").isEqualTo("invalid_request")
+                .jsonPath("$.message").isEqualTo("q is required.");
+    }
+
+    @Test
+    void mapsBlankQueryToInvalidRequest() {
+        webTestClient.get()
+                .uri(uriBuilder -> uriBuilder.path("/api/opportunities")
+                        .queryParam("q", "   ")
+                        .build())
+                .exchange()
+                .expectStatus().isBadRequest()
+                .expectHeader().contentTypeCompatibleWith(MediaType.APPLICATION_JSON)
+                .expectBody()
+                .jsonPath("$.status").isEqualTo("invalid_request")
+                .jsonPath("$.message").isEqualTo("q must be non-empty.");
+    }
+
+    @Test
+    void mapsTooLongQueryToInvalidRequest() {
+        webTestClient.get()
+                .uri(uriBuilder -> uriBuilder.path("/api/opportunities")
+                        .queryParam("q", "a".repeat(101))
+                        .build())
+                .exchange()
+                .expectStatus().isBadRequest()
+                .expectHeader().contentTypeCompatibleWith(MediaType.APPLICATION_JSON)
+                .expectBody()
+                .jsonPath("$.status").isEqualTo("invalid_request")
+                .jsonPath("$.message").isEqualTo("q must be 100 characters or fewer.");
+    }
 
     @Test
     void returnsOpportunitySearchResponseForPragueFixtureRequest() {

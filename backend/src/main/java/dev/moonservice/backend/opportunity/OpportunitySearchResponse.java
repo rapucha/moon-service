@@ -15,7 +15,7 @@ public record OpportunitySearchResponse(
         List<Opportunity> opportunities,
         List<RejectedWindow> rejected,
         List<Message> messages
-) {
+) implements OpportunityResponse {
     public record Location(
             String id,
             String kind,
