@@ -11,7 +11,7 @@ import org.springframework.web.bind.annotation.ExceptionHandler;
 import java.time.Instant;
 
 @ControllerAdvice
-class PreviewErrorHandler {
+class OpportunitySearchErrorHandler {
     @ExceptionHandler(UsageException.class)
     ResponseEntity<ErrorResponse> invalidRequest(UsageException ex) {
         return invalidRequest(ex.getMessage());

@@ -2,19 +2,19 @@
 
 Purpose
 - Guide work in the real backend module while it grows from fixture-backed
-  preview into the MVP service.
+  opportunity search into the MVP service.
 
 Current Backend Scope
 - Module: `backend/`
 - Framework: Spring Boot.
-- Current endpoint: `POST /api/preview`
+- Current endpoint: `POST /api/opportunities/search`
 - Current dependency: `jvm-scoring-prototype`
 - Current provider behavior: fixture-backed Prague request only.
 
 Design Intent
 - Keep the backend small and explicit.
-- Preserve the preview contract while replacing fixture dependencies one at a
-  time.
+- Preserve the opportunity search contract while replacing fixture dependencies
+  one at a time.
 - Introduce seams before live provider integrations:
   - Geocoding provider.
   - Weather provider.
@@ -24,11 +24,11 @@ Design Intent
 - Keep each provider testable with fakes and fixtures.
 
 Recommended Growth Sequence
-1. Preserve the current fixture-backed preview tests.
-2. Add backend-owned request/response DTOs when the endpoint stops returning
+1. Preserve the current fixture-backed opportunity search tests.
+2. Add backend-owned response DTOs when the endpoint stops returning
    raw prototype JSON.
 3. Add provider interfaces with fixture implementations.
-4. Add query-based `GET /api/preview?q=...` once geocoding is represented.
+4. Add query-based `GET /api/opportunities?q=...` once geocoding is represented.
 5. Add cache interfaces before live weather/geocoding calls become normal.
 6. Add Atom/RSS and `.ics` exports after the opportunity contract is stable.
 7. Add persistence only when cache durability, result IDs, saved alerts, or
@@ -37,7 +37,7 @@ Recommended Growth Sequence
 Guardrails
 - Do not add database or migrations during endpoint/module cleanup.
 - Do not call live provider APIs from unit tests.
-- Do not introduce accounts or cookies for preview lookup.
+- Do not introduce accounts or cookies for opportunity search.
 - Do not silently change public response meanings; update docs and tests.
 - Keep error responses conventional:
   - `400` for invalid request.

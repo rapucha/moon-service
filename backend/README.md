@@ -1,18 +1,19 @@
 # Moon Service Backend
 
 This is the first real backend module for Moon Service. It promotes the tested
-Spring preview contract out of `prototypes/` while keeping the implementation
+Spring HTTP contract out of `prototypes/` while keeping the implementation
 fixture-backed until geocoding, weather, caching, feeds, and calendar exports
 are introduced deliberately.
 
 ## Current Scope
 
 - Spring Boot application outside `prototypes/`.
-- `POST /api/preview` using the same JSON request body as the scoring
+- `POST /api/opportunities/search` using the same JSON request body as the scoring
   prototype fixture.
 - Fixture-backed scoring through the existing `jvm-scoring-prototype` Maven
   artifact.
-- HTTP `400` error mapping for malformed JSON and invalid preview requests.
+- HTTP `400` error mapping for malformed JSON and invalid opportunity search
+  requests.
 
 This module intentionally does not yet include persistence, live geocoding,
 live weather calls, accounts, cookies, feeds, calendar generation, Docker, or
@@ -21,7 +22,7 @@ deployment configuration.
 ## Endpoint
 
 ```http
-POST /api/preview
+POST /api/opportunities/search
 Content-Type: application/json
 ```
 
@@ -42,15 +43,14 @@ Only the Prague fixture is supported for now.
 ## Verify
 
 ```bash
-(cd ../prototypes/jvm-scoring && mvn install)
-mvn test
+mvn test -pl backend -am
 ```
 
 ## Run Locally
 
 ```bash
-(cd ../prototypes/jvm-scoring && mvn install)
-mvn spring-boot:run
+mvn spring-boot:run -pl backend -am
 ```
 
-Then post the request body above to `http://localhost:8080/api/preview`.
+Then post the request body above to
+`http://localhost:8080/api/opportunities/search`.

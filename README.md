@@ -22,7 +22,7 @@ Email alerts, native Android, saved personal preferences, terrain horizon modeli
 
 ## Current Decisions
 
-- Web-first MVP with a small backend, starting with a fixture-backed preview endpoint.
+- Web-first MVP with a small backend, starting with a fixture-backed opportunity search endpoint.
 - Open-Meteo Geocoding as the first geocoding provider candidate.
 - Raw Unicode location input, with curated alias/transliteration fallback for known provider gaps.
 - Open-Meteo Weather as the first weather provider candidate.
@@ -46,7 +46,7 @@ Email alerts, native Android, saved personal preferences, terrain horizon modeli
 - `scripts/scoring_contract_spike.py`: retained Python spike for checking the v0 scoring contract with fixture data.
 - `scripts/real_data_scoring_spike.py`: retained Python spike that combines live JPL Horizons ephemeris samples with live Open-Meteo weather.
 - `backend/`: first Spring Boot backend module, currently exposing the
-  fixture-backed preview endpoint outside `prototypes/`.
+  fixture-backed opportunity search endpoint outside `prototypes/`.
 - `prototypes/jvm-ephemeris/`: source-file JVM prototype using Astronomy Engine for Moon/Sun samples, low-Moon candidate windows, and fixture-weather scoring.
 - `prototypes/jvm-scoring/`: minimal Maven JVM prototype with natural low-Moon windows, fixture weather scoring, and fixture tests.
 - `prototypes/spring-preview/`: thin Spring Boot HTTP contract harness around the Maven scoring prototype.
@@ -206,10 +206,10 @@ Run the local backend:
 mvn spring-boot:run -pl backend -am
 ```
 
-The current backend endpoint is still `POST /api/preview` with the same fixture
-request shape as the scoring prototype. This module is the place to replace
-fixture dependencies with geocoding, weather, caching, feeds, and calendar
-exports in later steps.
+The current backend endpoint is `POST /api/opportunities/search` with the same
+fixture request shape as the scoring prototype. This module is the place to
+replace fixture dependencies with geocoding, weather, caching, feeds, and
+calendar exports in later steps.
 
 ## Verification
 

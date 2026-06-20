@@ -22,10 +22,10 @@ Recommended first routes:
 /o/prague-cz-2026-06-29T1920Z.ics
 ```
 
-The web page can call a single preview endpoint:
+The web page can call a single opportunity search endpoint:
 
 ```http
-GET /api/preview?q=Praha&lang=cs
+GET /api/opportunities?q=Praha&lang=cs
 ```
 
 `lang` is optional. If absent, use `Accept-Language` as a display/ranking hint only.
@@ -113,7 +113,7 @@ The backend must protect both Moon Service and upstream providers.
 
 Application-level limits:
 
-- Rate limit `/api/preview` by IP or coarse anonymous client fingerprint if abuse becomes visible.
+- Rate limit `/api/opportunities` by IP or coarse anonymous client fingerprint if abuse becomes visible.
 - Keep limits generous enough for manual use and testing.
 - Return `status: "rate_limited"` with HTTP `429` when a client is limited.
 - Include a retry hint when possible.
@@ -211,7 +211,7 @@ features:
   feed_generation_enabled
 
 public_api:
-  preview_rate_limit
+  opportunity_search_rate_limit
 ```
 
 The status page should make quota risk visible before exhaustion. If known limits are configured, show warning states at roughly 50 percent, 80 percent, and 95 percent usage.
@@ -619,10 +619,10 @@ RSS/Atom:
 
 ## Internal Service Boundary
 
-Even with a single preview endpoint, keep internal responsibilities separate:
+Even with a single opportunity search endpoint, keep internal responsibilities separate:
 
 ```text
-preview
+opportunity_search
   -> geocoding
   -> fictional location lookup / optional LLM lore fallback
   -> ephemeris

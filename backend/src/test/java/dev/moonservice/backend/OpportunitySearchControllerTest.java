@@ -13,13 +13,13 @@ import org.springframework.test.web.reactive.server.WebTestClient;
 
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @AutoConfigureWebTestClient
-class PreviewControllerTest {
+class OpportunitySearchControllerTest {
     @Autowired
     private WebTestClient webTestClient;
 
     @Test
-    void returnsPreviewResponseForPragueFixtureRequest()  {
-        webTestClient.post().uri("/api/preview")
+    void returnsOpportunitySearchResponseForPragueFixtureRequest() {
+        webTestClient.post().uri("/api/opportunities/search")
                 .contentType(MediaType.APPLICATION_JSON)
                 .bodyValue("""
                         {
@@ -46,7 +46,7 @@ class PreviewControllerTest {
 
     @Test
     void mapsUnsupportedFixtureLocationToInvalidRequest() {
-        webTestClient.post().uri("/api/preview")
+        webTestClient.post().uri("/api/opportunities/search")
                 .contentType(MediaType.APPLICATION_JSON)
                 .bodyValue("""
                         {
@@ -67,20 +67,20 @@ class PreviewControllerTest {
 
     @ParameterizedTest
     @CsvSource(delimiter = '|', textBlock = """
-            [] | Request fixture must be a JSON object.
-            {} | locationId is required in the request fixture.
-            {"locationId": "prague-cz"} | start is required in the request fixture.
-            {"locationId": "prague-cz", "start": "2026-06-29"} | forecastHorizonDays is required in the request fixture.
-            {"locationId": "prague-cz", "start": "2026-06-29", "forecastHorizonDays": 7} | maxMoonAltitudeDegrees is required in the request fixture.
-            {"locationId": "prague-cz", "start": "2026-06-29", "forecastHorizonDays": 7, "maxMoonAltitudeDegrees": 12} | limit is required in the request fixture.
-            {"locationId": ""} | locationId must be a non-empty string in the request fixture.
+            [] | Opportunity search request must be a JSON object.
+            {} | locationId is required in the opportunity search request.
+            {"locationId": "prague-cz"} | start is required in the opportunity search request.
+            {"locationId": "prague-cz", "start": "2026-06-29"} | forecastHorizonDays is required in the opportunity search request.
+            {"locationId": "prague-cz", "start": "2026-06-29", "forecastHorizonDays": 7} | maxMoonAltitudeDegrees is required in the opportunity search request.
+            {"locationId": "prague-cz", "start": "2026-06-29", "forecastHorizonDays": 7, "maxMoonAltitudeDegrees": 12} | limit is required in the opportunity search request.
+            {"locationId": ""} | locationId must be a non-empty string in the opportunity search request.
             {"locationId": "prague-cz", "start": "not-a-date", "forecastHorizonDays": 7, "maxMoonAltitudeDegrees": 12, "limit": 5} | Invalid --start value: not-a-date
             {"locationId": "prague-cz", "start": "2026-06-29", "forecastHorizonDays": 0, "maxMoonAltitudeDegrees": 12, "limit": 5} | forecastHorizonDays must be between 1 and 30.
             {"locationId": "prague-cz", "start": "2026-06-29", "forecastHorizonDays": 7, "maxMoonAltitudeDegrees": 12, "limit": 0} | limit must be between 1 and 100.
             {"locationId": "prague-cz", "start": "2026-06-29", "forecastHorizonDays": 7, "maxMoonAltitudeDegrees": 46, "limit": 5} | maxMoonAltitudeDegrees must be between 0.0 and 45.0.
             """)
     void mapsInvalidRequestBodiesToInvalidRequest(String body, String message) {
-        webTestClient.post().uri("/api/preview")
+        webTestClient.post().uri("/api/opportunities/search")
                 .contentType(MediaType.APPLICATION_JSON)
                 .bodyValue(body)
                 .exchange()
@@ -93,7 +93,7 @@ class PreviewControllerTest {
 
     @Test
     void mapsMalformedJsonToInvalidRequest() {
-        webTestClient.post().uri("/api/preview")
+        webTestClient.post().uri("/api/opportunities/search")
                 .contentType(MediaType.APPLICATION_JSON)
                 .bodyValue("{")
                 .exchange()

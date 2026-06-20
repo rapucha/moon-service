@@ -59,7 +59,7 @@ Escalate Before Proceeding
 Commit and PR Hygiene
 - Keep commits focused by concern.
 - Use conventional commit style when making commits:
-  - `feat(backend): add preview provider seam`
+  - `feat(backend): add opportunity search provider seam`
   - `fix(scoring): handle empty weather fixture`
   - `docs(agent): add context packs`
 - Summaries should include:
