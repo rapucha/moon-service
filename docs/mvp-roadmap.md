@@ -154,24 +154,20 @@ Contract parity as of this step:
 
 The Maven prototype also accepts a request-shaped JSON fixture at `prototypes/jvm-scoring/fixtures/prague-preview-request.json`. This proves the future web/API input boundary without adding HTTP routes, geocoding integration, live weather, feeds, calendar generation, or backend scaffolding.
 
-The first HTTP contract harness now exists as `prototypes/spring-preview/`. It
-uses Spring Boot only to exercise `POST /api/preview` with the same fixture
-request shape, reusing the Maven scoring prototype through the
-`jvm-scoring-prototype` Maven dependency and its public `PreviewEvaluator`
-facade. It is not
-production backend scaffolding: no persistence, geocoding integration, live
-weather calls, accounts, feeds, calendar generation, Docker, deployment, or
-admin surface are included. The Spring harness serves the same JSON formatter
-as the Maven CLI, keeping one response path for the HTTP preview and command
-line prototype.
+The first HTTP contract work has moved from the former Spring preview harness
+into the real `backend/` module. The current backend exposes
+`POST /api/opportunities/search` with the same fixture request shape, reusing
+the Maven scoring prototype through the `jvm-scoring-prototype` Maven
+dependency and its public `PreviewEvaluator` facade behind a backend-owned
+opportunity search seam.
 
-The Spring preview harness now locks down the first invalid-request behavior:
-malformed JSON, non-object JSON, unsupported fixture locations, invalid start
-dates, and out-of-range numeric controls return HTTP `400` with
+The backend now locks down the first invalid-request behavior: malformed JSON,
+non-object JSON, unsupported fixture locations, invalid start dates, and
+out-of-range numeric controls return HTTP `400` with
 `status: "invalid_request"`.
 
-Natural-window scoring refactor now implemented in `prototypes/jvm-scoring/` and
-the Spring preview harness:
+Natural-window scoring refactor now implemented in `prototypes/jvm-scoring/`
+and exercised through the backend:
 
 - Generate natural low-Moon windows per local day from Moonrise, Moonset,
   crossings through the low-Moon altitude ceiling, and local day boundaries.

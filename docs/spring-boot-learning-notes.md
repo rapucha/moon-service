@@ -1,16 +1,17 @@
 # Spring Boot Learning Notes
 
-This note captures a deferred learning exercise for returning to modern web
-backend development using the existing Spring preview prototype.
+This note captures a learning exercise for returning to modern web backend
+development using the real backend module.
 
 ## Context
 
-The current Spring Boot prototype under `prototypes/spring-preview/` is a good
-small exercise app because it is intentionally narrow:
+The current Spring Boot backend under `backend/` is a good small exercise app
+because it is intentionally narrow:
 
-- It exposes one HTTP endpoint, `POST /api/preview`.
-- It wraps the JVM scoring prototype instead of owning domain logic.
-- It has one controller and one MVC test suite.
+- It exposes one HTTP endpoint, `POST /api/opportunities/search`.
+- It wraps the JVM scoring prototype behind a backend-owned opportunity search
+  seam instead of owning all domain logic yet.
+- It has one controller and focused WebTestClient tests.
 - It avoids production concerns such as persistence, accounts, sessions,
   security, deployment, live weather calls, and geocoding.
 
@@ -36,27 +37,30 @@ of a full production application.
 
 ## Exercise To Do Later
 
-Convert the prototype from manual construction to Spring-managed dependency
-injection.
+Continue evolving the backend from a prototype adapter toward idiomatic
+Spring-managed application services.
 
-Current code in `PreviewController` manually creates the evaluator:
+Current shape:
 
-```java
-private final PreviewEvaluator previewEvaluator = new PreviewEvaluator();
+```text
+OpportunitySearchController
+  -> OpportunitySearchService
+      -> OpportunitySearchEngine
+          -> PrototypeOpportunitySearchEngine
+              -> PreviewEvaluator from jvm-scoring-prototype
 ```
 
 Exercise target:
 
-1. Add a Spring configuration class that exposes `PreviewEvaluator` as a bean.
-2. Change `PreviewController` to receive `PreviewEvaluator` through constructor
-   injection.
-3. Run the existing Spring MVC tests to confirm the HTTP contract is unchanged.
-4. Discuss why this is more idiomatic Spring and where the boundary is between
-   controller code and service/domain code.
+1. Add backend-owned response handling without copying prototype details too
+   literally.
+2. Introduce provider interfaces only when geocoding, weather, ephemeris, or
+   scoring boundaries are ready to move into the backend.
+3. Keep controller code thin and push application behavior into services.
+4. Discuss where Spring configuration ends and domain/application code begins.
 
 Suggested verification:
 
 ```bash
-(cd prototypes/jvm-scoring && mvn install)
-(cd prototypes/spring-preview && mvn test)
+mvn test -pl backend -am
 ```

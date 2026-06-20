@@ -51,8 +51,6 @@ Validation
 - If scoring/window generation changed:
   - `(cd prototypes/jvm-scoring && mvn test)`
   - `python3 -B scripts/prototype_contract_parity.py`
-- If Spring preview prototype is intentionally kept aligned:
-  - `mvn test -pl prototypes/spring-preview -am`
 
 Review Questions
 - Is this still fixture-backed, and is that obvious?

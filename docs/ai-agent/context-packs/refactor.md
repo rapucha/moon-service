@@ -52,7 +52,5 @@ Validation
 - Scoring/window refactor:
   - `(cd prototypes/jvm-scoring && mvn test)`
   - `python3 -B scripts/prototype_contract_parity.py`
-- Spring preview refactor:
-  - `mvn test -pl prototypes/spring-preview -am`
 - Always:
   - `git diff --check`

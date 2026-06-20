@@ -14,7 +14,6 @@ When To Use
 Triage Workflow
 1. Reproduce the smallest relevant failure.
    - Backend: `mvn test -pl backend -am`
-   - Spring preview: `mvn test -pl prototypes/spring-preview -am`
    - Scoring: `(cd prototypes/jvm-scoring && mvn test)`
 2. Capture the first failing error.
    - Do not chase later failures until the first one is understood.

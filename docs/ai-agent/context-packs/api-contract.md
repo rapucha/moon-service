@@ -13,7 +13,6 @@ Canonical Contract Sources
 - Design contract: `docs/api-shape.md`.
 - Current implemented backend behavior: backend tests and `backend/README.md`.
 - Current fixture input: `prototypes/jvm-scoring/fixtures/prague-preview-request.json`.
-- Prototype reference only: `prototypes/spring-preview/`.
 
 Workflow
 1. Identify the current and desired contract.

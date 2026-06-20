@@ -16,7 +16,6 @@ Current Shape
 - Active implementation:
   - `backend/`: first real Spring Boot backend spine, currently fixture-backed.
   - `prototypes/jvm-scoring/`: active scoring and ephemeris prototype.
-  - `prototypes/spring-preview/`: HTTP contract harness retained as reference.
   - `prototypes/jvm-ephemeris/`: older source-file ephemeris prototype.
   - `scripts/`: Python spikes and parity checks.
 - Current non-goals:

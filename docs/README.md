@@ -20,7 +20,6 @@ Start Here
 - Implementation modules:
   - `backend/README.md`
   - `prototypes/jvm-scoring/README.md`
-  - `prototypes/spring-preview/README.md`
   - `prototypes/jvm-ephemeris/README.md`
 - AI-agent operating docs:
   - `docs/ai-agent/README.md`
@@ -40,7 +39,7 @@ Documentation Ownership
 
 Future Organization Candidate
 - If `docs/api-shape.md` grows too large, split it into:
-  - `docs/api/preview-api.md`
+  - `docs/api/opportunities-api.md`
   - `docs/api/examples/preview-ok.json`
   - `docs/api/examples/preview-invalid.json`
   - `docs/api/examples/preview-ambiguous.json`

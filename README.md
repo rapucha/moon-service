@@ -49,7 +49,6 @@ Email alerts, native Android, saved personal preferences, terrain horizon modeli
   fixture-backed opportunity search endpoint outside `prototypes/`.
 - `prototypes/jvm-ephemeris/`: source-file JVM prototype using Astronomy Engine for Moon/Sun samples, low-Moon candidate windows, and fixture-weather scoring.
 - `prototypes/jvm-scoring/`: minimal Maven JVM prototype with natural low-Moon windows, fixture weather scoring, and fixture tests.
-- `prototypes/spring-preview/`: thin Spring Boot HTTP contract harness around the Maven scoring prototype.
 
 ## Geocoding Contract Spike
 
@@ -169,29 +168,6 @@ references, so exact opportunity times and scores differ intentionally. The
 Maven JVM prototype remains useful while the backend depends on it, but backend
 tests are the executable contract for backend behavior.
 
-## Spring Preview Prototype
-
-Run the Spring HTTP contract harness tests:
-
-```bash
-(cd prototypes/jvm-scoring && mvn install)
-(cd prototypes/spring-preview && mvn test)
-```
-
-Run the local prototype endpoint:
-
-```bash
-(cd prototypes/jvm-scoring && mvn install)
-(cd prototypes/spring-preview && mvn spring-boot:run)
-```
-
-The only endpoint is `POST /api/preview`, using the same request shape as
-`prototypes/jvm-scoring/fixtures/prague-preview-request.json`. This remains a
-prototype: no geocoding, live weather, persistence, accounts, feeds, calendar
-generation, Docker, or deployment config. The Spring harness depends on the
-`jvm-scoring-prototype` Maven artifact and calls its public
-`PreviewEvaluator` facade.
-
 ## Backend
 
 Run the first real backend module tests:
@@ -237,7 +213,6 @@ python3 -B -m py_compile scripts/real_data_scoring_spike.py
 java -cp /tmp/astronomy-2.1.19.jar:/tmp/kotlin-stdlib-jdk8-1.6.10.jar:/tmp/kotlin-stdlib-jdk7-1.6.10.jar:/tmp/kotlin-stdlib-1.6.10.jar:/tmp/kotlin-stdlib-common-1.6.10.jar prototypes/jvm-ephemeris/MoonWindowPrototype.java --location prague-cz --start 2026-06-29 --days 7 --step-minutes 30 --min-score 50 --limit 5
 (cd prototypes/jvm-scoring && mvn test)
 (cd prototypes/jvm-scoring && mvn -q test-compile org.codehaus.mojo:exec-maven-plugin:3.3.0:java -Dexec.classpathScope=test -Dexec.mainClass=dev.moonservice.scoringprototype.cli.MoonScoringPrototype -Dexec.args="--request fixtures/prague-preview-request.json")
-mvn test -pl prototypes/spring-preview -am
 ```
 
 Run `python3 -B scripts/prototype_contract_parity.py` only for

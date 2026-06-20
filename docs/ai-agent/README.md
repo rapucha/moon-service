@@ -48,14 +48,11 @@ Canonical Context
   - `backend/`
 - Prototypes:
   - `prototypes/jvm-scoring/`
-  - `prototypes/spring-preview/`
   - `prototypes/jvm-ephemeris/`
 
 Validation Quick Reference
 - Ordinary backend work:
   - `mvn test -pl backend -am`
-- Spring preview prototype work:
-  - `mvn test -pl prototypes/spring-preview -am`
 - JVM scoring prototype work:
   - `(cd prototypes/jvm-scoring && mvn test)`
 - Scoring/window migration or prototype retirement:

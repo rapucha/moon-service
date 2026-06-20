@@ -52,7 +52,6 @@ The main unresolved choice is now the exact first web/API contract for city look
 - `docs/geocoding-research.md`: geocoding provider recommendation and city/location lookup privacy notes.
 - `docs/mvp-roadmap.md`: milestone plan and implementation order.
 - `prototypes/jvm-scoring/`: minimal Maven JVM scoring/ephemeris prototype with fixture tests.
-- `prototypes/spring-preview/`: thin Spring Boot HTTP contract harness for the preview request/response shape.
 - `backend/`: first Spring Boot backend module, currently fixture-backed through the scoring prototype.
 
 ## Engineering Guidelines
@@ -113,10 +112,4 @@ Run prototype parity only when changing scoring/window generation, comparing mig
 
 ```bash
 python3 -B scripts/prototype_contract_parity.py
-```
-
-For Spring preview prototype changes, verify with:
-
-```bash
-mvn test -pl prototypes/spring-preview -am
 ```
