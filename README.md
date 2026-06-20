@@ -32,6 +32,8 @@ Email alerts, native Android, saved personal preferences, terrain horizon modeli
 ## Repository Map
 
 - `AGENTS.md`: durable instructions for future coding-agent sessions.
+- `docs/README.md`: human-facing documentation hub.
+- `docs/ai-agent/README.md`: AI-agent operating guide, guardrails, context packs, and checklists.
 - `docs/product-notes.md`: product stance, MVP scope, privacy posture.
 - `docs/architecture.md`: architecture options and current web-first backend direction.
 - `docs/api-shape.md`: first web/API contract.
@@ -153,11 +155,10 @@ This is still a prototype under `prototypes/`, not backend scaffolding. It uses
 Astronomy Engine via JitPack and fixed fixture weather only. The `start` value
 is interpreted as a local date in the fixture location timezone.
 
-## Prototype Contract Parity
+## Prototype Contract Parity Tool
 
-After running `mvn test` once so dependencies are available, compare the
-retained Python scoring spike, the source-file JVM prototype, and the Maven JVM
-prototype:
+Use the parity script only when changing scoring/window generation, comparing
+migration behavior, or retiring a prototype:
 
 ```bash
 python3 -B scripts/prototype_contract_parity.py
@@ -165,7 +166,8 @@ python3 -B scripts/prototype_contract_parity.py
 
 The Python spike and source-file JVM prototype are retained historical
 references, so exact opportunity times and scores differ intentionally. The
-Maven JVM prototype is the active natural-window contract target.
+Maven JVM prototype remains useful while the backend depends on it, but backend
+tests are the executable contract for backend behavior.
 
 ## Spring Preview Prototype
 
@@ -217,7 +219,13 @@ For documentation-only changes:
 git diff --check
 ```
 
-For the current Python spike:
+For ordinary backend changes:
+
+```bash
+mvn test -pl backend -am
+```
+
+For current spike/prototype work:
 
 ```bash
 python3 -B scripts/geocoding_contract_spike.py
@@ -229,7 +237,8 @@ python3 -B -m py_compile scripts/real_data_scoring_spike.py
 java -cp /tmp/astronomy-2.1.19.jar:/tmp/kotlin-stdlib-jdk8-1.6.10.jar:/tmp/kotlin-stdlib-jdk7-1.6.10.jar:/tmp/kotlin-stdlib-1.6.10.jar:/tmp/kotlin-stdlib-common-1.6.10.jar prototypes/jvm-ephemeris/MoonWindowPrototype.java --location prague-cz --start 2026-06-29 --days 7 --step-minutes 30 --min-score 50 --limit 5
 (cd prototypes/jvm-scoring && mvn test)
 (cd prototypes/jvm-scoring && mvn -q test-compile org.codehaus.mojo:exec-maven-plugin:3.3.0:java -Dexec.classpathScope=test -Dexec.mainClass=dev.moonservice.scoringprototype.cli.MoonScoringPrototype -Dexec.args="--request fixtures/prague-preview-request.json")
-python3 -B scripts/prototype_contract_parity.py
 mvn test -pl prototypes/spring-preview -am
-mvn test -pl backend -am
 ```
+
+Run `python3 -B scripts/prototype_contract_parity.py` only for
+scoring/window migration or prototype retirement work.

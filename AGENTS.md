@@ -40,6 +40,8 @@ The main unresolved choice is now the exact first web/API contract for city look
 
 ## Documentation Map
 
+- `docs/README.md`: human-facing documentation hub.
+- `docs/ai-agent/README.md`: active AI-agent operating guide, context packs, and checklists.
 - `docs/moon-service-handover.md`: historical planning handover from the previous session.
 - `docs/product-notes.md`: product stance, users, MVP scope, privacy posture.
 - `docs/architecture.md`: architecture options, recommended hybrid shape, unresolved decisions.
@@ -57,6 +59,7 @@ The main unresolved choice is now the exact first web/API contract for city look
 
 - Keep early changes narrow and documentation-led.
 - Prefer explicit tradeoffs over premature abstractions.
+- State technical judgment directly. Agreement should include reasoning; disagreement should be plain and actionable.
 - Do not introduce mandatory accounts without documenting user value and recovery behavior.
 - Do not permanently store user locations server-side unless saved alerts require it and the privacy model is updated.
 - Design device identity recovery before relying on anonymous device-bound accounts.
@@ -93,12 +96,27 @@ jars into `/tmp`, verify with:
 java -cp /tmp/astronomy-2.1.19.jar:/tmp/kotlin-stdlib-jdk8-1.6.10.jar:/tmp/kotlin-stdlib-jdk7-1.6.10.jar:/tmp/kotlin-stdlib-1.6.10.jar:/tmp/kotlin-stdlib-common-1.6.10.jar prototypes/jvm-ephemeris/MoonWindowPrototype.java --location prague-cz --start 2026-06-29 --days 7 --step-minutes 30 --min-score 50 --limit 5
 ```
 
-For the Maven-based JVM scoring prototype, verify with:
+For ordinary backend changes, verify with:
+
+```bash
+mvn test -pl backend -am
+```
+
+For the Maven-based JVM scoring prototype, verify scoring changes with:
 
 ```bash
 (cd prototypes/jvm-scoring && mvn test)
 (cd prototypes/jvm-scoring && mvn -q test-compile org.codehaus.mojo:exec-maven-plugin:3.3.0:java -Dexec.classpathScope=test -Dexec.mainClass=dev.moonservice.scoringprototype.cli.MoonScoringPrototype -Dexec.args="--request fixtures/prague-preview-request.json")
+```
+
+Run prototype parity only when changing scoring/window generation, comparing migration behavior, or retiring a prototype:
+
+```bash
 python3 -B scripts/prototype_contract_parity.py
+```
+
+For Spring preview prototype changes, verify with:
+
+```bash
 mvn test -pl prototypes/spring-preview -am
-mvn test -pl backend -am
 ```
