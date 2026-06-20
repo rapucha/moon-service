@@ -11,7 +11,7 @@ public class OpportunitySearchService {
         this.opportunitySearchEngine = opportunitySearchEngine;
     }
 
-    public String search(JsonNode request) {
+    public OpportunitySearchResponse search(JsonNode request) {
         return opportunitySearchEngine.search(OpportunitySearchRequest.fromJson(request));
     }
 }

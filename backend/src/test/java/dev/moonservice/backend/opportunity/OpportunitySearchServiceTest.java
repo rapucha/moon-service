@@ -2,6 +2,8 @@ package dev.moonservice.backend.opportunity;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
+import java.util.List;
+
 import org.junit.jupiter.api.Test;
 import tools.jackson.databind.ObjectMapper;
 
@@ -16,10 +18,29 @@ class OpportunitySearchServiceTest {
             assertEquals(7, request.forecastHorizonDays());
             assertEquals(12.0, request.maxMoonAltitudeDegrees());
             assertEquals(5, request.limit());
-            return "{\"status\":\"ok\"}";
+            return new OpportunitySearchResponse(
+                    "ok",
+                    "2026-06-20T17:00:00Z",
+                    new OpportunitySearchResponse.Location(
+                            "openmeteo:prague-cz",
+                            "real_location",
+                            "Prague, Czechia",
+                            50.0755,
+                            14.4378,
+                            200,
+                            "Europe/Prague",
+                            "CZ"),
+                    7,
+                    "2026-06-29T00:00:00Z",
+                    "2026-07-06T00:00:00Z",
+                    3,
+                    12.0,
+                    List.of(),
+                    List.of(),
+                    List.of());
         });
 
-        String response = opportunitySearchService.search(objectMapper.readTree("""
+        OpportunitySearchResponse response = opportunitySearchService.search(objectMapper.readTree("""
                 {
                   "locationId": "prague-cz",
                   "start": "2026-06-29",
@@ -29,6 +50,7 @@ class OpportunitySearchServiceTest {
                 }
                 """));
 
-        assertEquals("{\"status\":\"ok\"}", response);
+        assertEquals("ok", response.status());
+        assertEquals("openmeteo:prague-cz", response.location().id());
     }
 }
