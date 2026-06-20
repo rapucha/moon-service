@@ -42,7 +42,7 @@ public final class WindowGenerator {
         Instant previous = null;
         for (Instant boundary : boundaries) {
             if (previous != null && boundary.isAfter(previous)) {
-                addWindowIfLowMoon(windows, config, samples, previous, boundary);
+                addWindowIfVisibleMoon(windows, config, samples, previous, boundary);
             }
             previous = boundary;
         }
@@ -126,7 +126,7 @@ public final class WindowGenerator {
         return start.plus(Duration.between(start, end).dividedBy(2));
     }
 
-    private static void addWindowIfLowMoon(
+    private static void addWindowIfVisibleMoon(
             List<MoonWindow> windows,
             PrototypeConfig config,
             SampleProvider samples,
@@ -140,7 +140,7 @@ public final class WindowGenerator {
         }
 
         MoonSample suggested = suggestedSample(samples, startsAt, endsAt);
-        String kind = windowKind(samples, startsAt, endsAt);
+        String kind = windowKind(samples, startsAt, endsAt, suggested);
         windows.add(new MoonWindow(config.location(), kind, startsAt, suggested, endsAt));
     }
 
@@ -158,12 +158,28 @@ public final class WindowGenerator {
                 .orElseThrow();
     }
 
-    private static String windowKind(SampleProvider samples, Instant startsAt, Instant endsAt) {
+    private static String windowKind(
+            SampleProvider samples,
+            Instant startsAt,
+            Instant endsAt,
+            MoonSample suggested
+    ) {
         Instant startProbe = min(startsAt.plus(KIND_SAMPLE_OFFSET), midpoint(startsAt, endsAt));
         Instant endProbe = max(endsAt.minus(KIND_SAMPLE_OFFSET), midpoint(startsAt, endsAt));
         double startAltitude = samples.sampleAt(startProbe).moonAltitudeDegrees();
         double endAltitude = samples.sampleAt(endProbe).moonAltitudeDegrees();
-        return endAltitude >= startAltitude ? "moonrise_low" : "moonset_low";
+        String trend = endAltitude >= startAltitude ? "moonrise" : "moonset";
+        return trend + "_" + altitudeBand(suggested.moonAltitudeDegrees());
+    }
+
+    private static String altitudeBand(double altitude) {
+        if (altitude <= 12.0) {
+            return "low";
+        }
+        if (altitude <= 40.0) {
+            return "context";
+        }
+        return "high_context";
     }
 
     private static Instant min(Instant a, Instant b) {

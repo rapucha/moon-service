@@ -23,16 +23,28 @@ public final class ScoringModel {
     }
 
     public static int scoreMoonAltitude(double altitude) {
-        if (altitude < 0.0 || altitude > 12.0) {
+        if (altitude < 0.0 || altitude > 90.0) {
             return 0;
         }
-        if (altitude >= 1.0 && altitude <= 6.0) {
+        if (altitude <= 1.0) {
+            return Math.toIntExact(Math.round(18.0 + altitude * 12.0));
+        }
+        if (altitude <= 6.0) {
             return 30;
         }
-        if (altitude < 1.0) {
-            return Math.toIntExact(Math.round(18.0 + altitude * 6.0));
+        if (altitude <= 12.0) {
+            return Math.toIntExact(Math.round(30.0 - ((altitude - 6.0) / 6.0) * 8.0));
         }
-        return Math.toIntExact(Math.round(30.0 - ((altitude - 6.0) / 6.0) * 12.0));
+        if (altitude <= 25.0) {
+            return Math.toIntExact(Math.round(22.0 - ((altitude - 12.0) / 13.0) * 8.0));
+        }
+        if (altitude <= 40.0) {
+            return Math.toIntExact(Math.round(14.0 - ((altitude - 25.0) / 15.0) * 6.0));
+        }
+        if (altitude <= 70.0) {
+            return Math.toIntExact(Math.round(8.0 - ((altitude - 40.0) / 30.0) * 4.0));
+        }
+        return Math.toIntExact(Math.round(4.0 - ((altitude - 70.0) / 20.0)));
     }
 
     public static int scoreSunLight(double sunAltitude) {

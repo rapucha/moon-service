@@ -240,13 +240,15 @@ fictional_location
 
 ## Opportunity Window Contract
 
-Real opportunities should represent natural low-Moon windows, not artificial
-slices produced by ephemeris sampling.
+Real opportunities should represent natural visible-Moon windows, not artificial
+slices produced by ephemeris sampling. Low Moon remains the strongest default
+use case, but context Moon opportunities should not be excluded when light and
+weather are favorable.
 
 For each local day, the backend should find intervals where the apparent
-refracted Moon altitude is within the configured low-Moon range, initially
-0 to 12 degrees. These intervals are bounded by Moonrise, Moonset, crossings
-through the low-Moon ceiling, and local day boundaries.
+refracted Moon altitude is within the configured visible-Moon range, initially
+0 to 90 degrees. These intervals are bounded by Moonrise, Moonset, optional
+crossings through the configured altitude ceiling, and local day boundaries.
 
 Response rules:
 
@@ -258,12 +260,12 @@ Response rules:
 - Weather fields on an opportunity are aggregates over the merged weather
   interval. V0 uses hourly weather fields because cloud cover is the primary
   scoring input and Open-Meteo exposes cloud-cover layers hourly.
-- Split natural low-Moon windows at provider forecast change boundaries when
+- Split natural visible-Moon windows at provider forecast change boundaries when
   those changes affect the recommendation.
 - Merge adjacent intervals when the derived weather class and
   decision-relevant facts are equivalent.
-- A single opportunity may cover a broad interval when the Moon stays low and
-  the forecast state is stable.
+- A single opportunity may cover a broad interval when the Moon remains visible
+  and the forecast state is stable.
 - Avoid wording that implies minute-level weather certainty.
 
 ## Preview Response Examples

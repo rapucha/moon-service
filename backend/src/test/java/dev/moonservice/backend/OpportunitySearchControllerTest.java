@@ -33,7 +33,7 @@ class OpportunitySearchControllerTest {
                 .jsonPath("$.location.id").isEqualTo("openmeteo:prague-cz")
                 .jsonPath("$.forecastHorizonDays").isEqualTo(7)
                 .jsonPath("$.startsAt").exists()
-                .jsonPath("$.maxMoonAltitudeDegrees").isEqualTo(12.0)
+                .jsonPath("$.maxMoonAltitudeDegrees").isEqualTo(90.0)
                 .jsonPath("$.opportunities[0].suggestedAt").exists();
     }
 
@@ -155,7 +155,7 @@ class OpportunitySearchControllerTest {
             {"locationId": "prague-cz", "start": "not-a-date", "forecastHorizonDays": 7, "maxMoonAltitudeDegrees": 12, "limit": 5} | Invalid --start value: not-a-date
             {"locationId": "prague-cz", "start": "2026-06-29", "forecastHorizonDays": 0, "maxMoonAltitudeDegrees": 12, "limit": 5} | forecastHorizonDays must be between 1 and 30.
             {"locationId": "prague-cz", "start": "2026-06-29", "forecastHorizonDays": 7, "maxMoonAltitudeDegrees": 12, "limit": 0} | limit must be between 1 and 100.
-            {"locationId": "prague-cz", "start": "2026-06-29", "forecastHorizonDays": 7, "maxMoonAltitudeDegrees": 46, "limit": 5} | maxMoonAltitudeDegrees must be between 0.0 and 45.0.
+            {"locationId": "prague-cz", "start": "2026-06-29", "forecastHorizonDays": 7, "maxMoonAltitudeDegrees": 91, "limit": 5} | maxMoonAltitudeDegrees must be between 0.0 and 90.0.
             """)
     void mapsInvalidRequestBodiesToInvalidRequest(String body, String message) {
         webTestClient.post().uri("/api/opportunities/search")

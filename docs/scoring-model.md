@@ -10,25 +10,27 @@ The core photographic problem is exposure balance. The Moon is much brighter tha
 
 ## Candidate Window
 
-V0 should generate natural low-Moon windows, not many small scored windows from
-fixed ephemeris samples.
+V0 should generate natural visible-Moon windows, not many small scored windows
+from fixed ephemeris samples. Low Moon remains the strongest default case, but
+the model should also surface context Moon opportunities when ambient light and
+conditions are promising.
 
 For each local calendar day and location, compute intervals where the apparent
-refracted Moon altitude is between the horizon and the configured low-Moon
+refracted Moon altitude is between the horizon and the configured visible-Moon
 ceiling, initially:
 
 ```text
-0 degrees <= Moon altitude <= 12 degrees
+0 degrees <= Moon altitude <= 90 degrees
 ```
 
 The interval boundaries are:
 
-- Local day start, `00:00`, when a low-Moon interval crossed midnight.
+- Local day start, `00:00`, when a visible-Moon interval crossed midnight.
 - Moonrise.
 - Moonset.
-- The Moon crossing upward through the low-Moon ceiling.
-- The Moon crossing downward through the low-Moon ceiling.
-- Local day end, `23:59:59`, when a low-Moon interval continues past midnight.
+- The Moon crossing upward through the configured visible-Moon ceiling when the ceiling is below zenith.
+- The Moon crossing downward through the configured visible-Moon ceiling when the ceiling is below zenith.
+- Local day end, `23:59:59`, when a visible-Moon interval continues past midnight.
 
 This usually produces zero, one, or two natural windows per day:
 
@@ -84,10 +86,10 @@ User preferences:
 Assess weather by forecast change intervals, not by a fixed Moon/Sun sampling
 cadence.
 
-The base astronomy step should produce natural low-Moon windows. Weather then
-splits those windows only where the forecast state changes enough to affect the
-recommendation. Adjacent intervals with the same derived weather class should be
-merged back together.
+The base astronomy step should produce natural visible-Moon windows. Weather
+then splits those windows only where the forecast state changes enough to affect
+the recommendation. Adjacent intervals with the same derived weather class
+should be merged back together.
 
 Cloud cover is the most important weather input for Moon photography. Open-Meteo
 exposes total, low, mid, and high cloud-cover fields as hourly variables, not as
@@ -109,7 +111,7 @@ The first weather segmentation pipeline should be:
    provider value changes, not an arbitrary ephemeris sampling step.
 4. Merge adjacent intervals when the weather class and decision-relevant facts
    are equivalent.
-5. Intersect the merged weather intervals with the natural low-Moon windows.
+5. Intersect the merged weather intervals with the natural visible-Moon windows.
 
 Window or segment-level weather facts should include:
 
@@ -212,8 +214,10 @@ Sort candidate windows by:
 
 Moon altitude assessment:
 
-- The whole candidate window is already constrained to the low-Moon range.
-- Prefer portions near 1 to 6 degrees.
+- Prefer portions near 1 to 6 degrees for classic horizon compositions.
+- Treat 6 to 12 degrees as strong but slightly less ideal than the lowest clean horizon range.
+- Treat 12 to 40 degrees as context Moon territory: not a premium horizon shot, but still useful with the right ambient light, foreground, trees, aircraft, birds, or skyline elements.
+- Treat 40 to 90 degrees as weaker but not invalid. Good light, balanced illumination, and weather can still make a decent shot.
 - Treat extremely low altitudes cautiously because terrain, buildings, and trees are not modeled.
 
 Sun/light fit:
@@ -259,7 +263,7 @@ score changes based on the photographer's goal.
 
 Possible profile presets:
 
-- `photographer_balanced`: default mix of low Moon, useful ambient light, and reasonable weather.
+- `photographer_balanced`: default mix of low or context Moon, useful ambient light, and reasonable weather.
 - `crescent_twilight`: favors thin or modest crescents near golden hour or civil twilight.
 - `full_moon_horizon`: favors high illumination when the Moon is low, especially near rise/set.
 - `daylight_moon`: allows and favors visible daylight Moon opportunities with enough contrast.
@@ -270,7 +274,7 @@ Possible preference controls:
 - Light preference: daylight, golden hour, civil twilight, nautical twilight, night, or any.
 - Moon type: crescent, quarter, gibbous, full, or any.
 - Foreground goal: balanced exposure, silhouette, or night landscape.
-- Moon altitude range: very low, low, moderate, or any within the low-Moon limit.
+- Moon altitude range: very low, low, context, high context, or any visible Moon.
 - Weather tolerance: clear only, partial clouds welcome, or dramatic clouds allowed.
 - Travel or setup lead time.
 

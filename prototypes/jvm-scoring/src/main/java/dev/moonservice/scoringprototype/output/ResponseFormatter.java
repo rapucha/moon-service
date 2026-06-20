@@ -162,7 +162,7 @@ public final class ResponseFormatter {
     private static void writeDiagnostics(ObjectNode parent) {
         ObjectNode diagnostics = parent.putObject("diagnostics");
         diagnostics.put("note", "Prototype only: fixture weather, no persistence, HTTP API, database, or backend framework.");
-        diagnostics.put("selectionRule", "Natural low-Moon windows bounded by Moon altitude crossings and local day boundaries.");
+        diagnostics.put("selectionRule", "Natural visible-Moon windows bounded by Moon altitude crossings and local day boundaries.");
         diagnostics.put("weatherSource", "fixed_fixture");
         diagnostics.put("weatherResolution", "hourly_fixture");
     }

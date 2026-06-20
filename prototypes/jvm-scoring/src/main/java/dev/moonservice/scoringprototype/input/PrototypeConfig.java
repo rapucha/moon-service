@@ -18,7 +18,7 @@ public record PrototypeConfig(
     static final int MIN_FORECAST_HORIZON_DAYS = 1;
     static final int MAX_FORECAST_HORIZON_DAYS = 30;
     static final double MIN_MAX_MOON_ALTITUDE_DEGREES = 0.0;
-    static final double MAX_MAX_MOON_ALTITUDE_DEGREES = 45.0;
+    static final double MAX_MAX_MOON_ALTITUDE_DEGREES = 90.0;
     static final int MIN_LIMIT = 1;
     static final int MAX_LIMIT = 100;
 

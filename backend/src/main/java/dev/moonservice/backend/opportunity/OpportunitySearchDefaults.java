@@ -5,7 +5,7 @@ import java.time.LocalDate;
 
 public class OpportunitySearchDefaults {
     private static final int FORECAST_HORIZON_DAYS = 7;
-    private static final double MAX_MOON_ALTITUDE_DEGREES = 12.0;
+    private static final double MAX_MOON_ALTITUDE_DEGREES = 90.0;
     private static final int LIMIT = 5;
 
     private final Clock clock;

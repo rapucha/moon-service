@@ -69,6 +69,46 @@ class WindowGeneratorTest {
         assertEquals(config.end(), windows.get(1).endsAt());
     }
 
+    @Test
+    void createsContextWindowForHigherVisibleMoon() {
+        PrototypeConfig config = new PrototypeConfig(
+                Locations.PRAGUE,
+                LocalDate.parse("2026-06-29"),
+                1,
+                90.0,
+                10
+        );
+
+        List<MoonWindow> windows = new WindowGenerator().findWindows(
+                config,
+                instant -> sample(instant, 33.0, 2.0)
+        );
+
+        assertEquals(1, windows.size());
+        MoonWindow window = windows.getFirst();
+        assertEquals("moonrise_context", window.kind());
+        assertEquals(33.0, window.suggested().moonAltitudeDegrees());
+    }
+
+    @Test
+    void createsHighContextWindowWhenMoonIsAboveFortyDegrees() {
+        PrototypeConfig config = new PrototypeConfig(
+                Locations.PRAGUE,
+                LocalDate.parse("2026-06-29"),
+                1,
+                90.0,
+                10
+        );
+
+        List<MoonWindow> windows = new WindowGenerator().findWindows(
+                config,
+                instant -> sample(instant, 55.0, 2.0)
+        );
+
+        assertEquals(1, windows.size());
+        assertEquals("moonrise_high_context", windows.getFirst().kind());
+    }
+
     private static MoonSample sample(Instant instant, double moonAltitude, double sunAltitude) {
         return new MoonSample(instant, moonAltitude, 120.0, 90.0, sunAltitude);
     }

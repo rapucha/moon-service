@@ -48,7 +48,7 @@ class OpportunitySearchServiceTest {
             assertEquals("prague-cz", request.locationId());
             assertEquals("2026-06-21", request.start());
             assertEquals(7, request.forecastHorizonDays());
-            assertEquals(12.0, request.maxMoonAltitudeDegrees());
+            assertEquals(90.0, request.maxMoonAltitudeDegrees());
             assertEquals(5, request.limit());
             return okResponse();
         }, query -> {
