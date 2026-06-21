@@ -14,14 +14,16 @@ are introduced deliberately.
 - Fixture-backed location resolution through the backend-owned `LocationResolver`
   seam. The fixture resolver implements the same provider-facing contract later
   Open-Meteo or another geocoder should implement.
+- Open-Meteo geocoding adapter code under `backend.location.openmeteo`, covered
+  by saved provider JSON fixtures. It is not the active Spring resolver yet.
 - Fixture-backed scoring through the existing `jvm-scoring-prototype` Maven
   artifact.
 - HTTP `400` error mapping for malformed JSON and invalid opportunity search
   requests.
 
-This module intentionally does not yet include persistence, live geocoding,
-live weather calls, accounts, cookies, feeds, calendar generation, Docker, or
-deployment configuration.
+This module intentionally does not yet include persistence, active live
+geocoding, live weather calls, accounts, cookies, feeds, calendar generation,
+Docker, or deployment configuration.
 
 ## Query Endpoint
 
@@ -39,6 +41,20 @@ Current fixture behavior:
 - The resolver contract can also represent provider outage as
   `status: "temporarily_unavailable"` with HTTP `503`; the fixture resolver
   does not currently produce that state.
+
+## Open-Meteo Geocoding Adapter
+
+`OpenMeteoGeocodingClient` implements the backend `LocationResolver` seam, but
+is currently used only by fixture-backed unit tests. It builds encoded
+Open-Meteo Geocoding requests, parses provider-shaped JSON, maps single results
+to resolved locations, multiple results to ambiguous candidates, empty results
+to not found, and malformed/provider failure states to temporarily unavailable.
+
+Manual live drift checks are kept outside Maven:
+
+```bash
+live-tests/run_live_geocoding_tests.sh
+```
 
 ## Direct Fixture Endpoint
 

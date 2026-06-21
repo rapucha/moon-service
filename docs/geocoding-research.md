@@ -112,6 +112,56 @@ Backend
 
 Do not put provider URLs directly into the browser app as the long-term design. A backend keeps provider migration, caching, logging, and privacy controls in one place.
 
+## Backend Provider Adapter Boundary
+
+The backend location seam is `dev.moonservice.backend.location.LocationResolver`.
+The first Open-Meteo adapter lives in
+`dev.moonservice.backend.location.openmeteo.OpenMeteoGeocodingClient` and is
+tested with saved provider-shaped JSON fixtures only.
+
+Current adapter scope:
+
+- Builds Open-Meteo Geocoding requests against
+  `https://geocoding-api.open-meteo.com/v1/search`.
+- Sends `name=<raw query>`, `count=10`, `language=en`, and `format=json`.
+- Uses encoded query parameters; do not build the provider URL by raw string
+  concatenation.
+- Maps one complete provider result to `LocationResolution.resolved`.
+- Maps multiple complete provider results to `LocationResolution.ambiguous` in
+  provider order.
+- Maps a valid empty `results` array to `LocationResolution.notFound`.
+- Maps transport failures, HTTP failures, invalid JSON, missing `results`, or a
+  non-array `results` shape to `LocationResolution.temporarilyUnavailable`.
+- Uses Open-Meteo's provider id as the backend candidate id with an
+  `openmeteo:` prefix, such as `openmeteo:3067696`.
+- Retains the fields the current backend resolver contract can carry:
+  candidate id, display name, timezone, and country code.
+
+This adapter is not the active Spring `LocationResolver` bean yet. The backend
+still uses `FixtureLocationResolver` by default because the scoring prototype is
+still fixture-location based and cannot yet consume arbitrary provider
+coordinates/elevation from real geocoding results. Add runtime provider
+selection only after the backend request/scoring path can handle coordinate
+backed real locations.
+
+Fixture-backed adapter tests live under:
+
+```text
+backend/src/test/java/dev/moonservice/backend/location/openmeteo/
+backend/src/test/resources/fixtures/openmeteo/geocoding/
+```
+
+Keep ordinary backend tests network-free. To check live provider drift manually,
+run:
+
+```bash
+live-tests/run_live_geocoding_tests.sh
+```
+
+That command calls the external provider and writes
+`live-tests/reports/openmeteo-geocoding.html`; do not include it in the normal
+Maven loop.
+
 ## First UX Recommendation
 
 Start with a simple search form:
