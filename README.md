@@ -45,8 +45,10 @@ Email alerts, native Android, saved personal preferences, terrain horizon modeli
 - `scripts/geocoding_contract_spike.py`: retained Python spike for checking the v0 geocoding contract.
 - `scripts/scoring_contract_spike.py`: retained Python spike for checking the v0 scoring contract with fixture data.
 - `scripts/real_data_scoring_spike.py`: retained Python spike that combines live JPL Horizons ephemeris samples with live Open-Meteo weather.
-- `backend/`: first Spring Boot backend module, currently exposing the
-  fixture-backed opportunity search endpoint outside `prototypes/`.
+- `live-tests/`: pytest-based manual checks for external provider drift.
+- `backend/`: first Spring Boot backend module, currently exposing
+  fixture-backed query and direct opportunity-search endpoints outside
+  `prototypes/`.
 - `prototypes/jvm-ephemeris/`: source-file JVM prototype using Astronomy Engine for Moon/Sun samples, low-Moon candidate windows, and fixture-weather scoring.
 - `prototypes/jvm-scoring/`: minimal Maven JVM prototype with natural low-Moon windows, fixture weather scoring, and fixture tests.
 
@@ -182,10 +184,43 @@ Run the local backend:
 mvn spring-boot:run -pl backend -am
 ```
 
-The current backend endpoint is `POST /api/opportunities/search` with the same
-fixture request shape as the scoring prototype. This module is the place to
-replace fixture dependencies with geocoding, weather, caching, feeds, and
-calendar exports in later steps.
+The current backend endpoints are:
+
+```http
+GET /api/opportunities?q=Praha
+POST /api/opportunities/search
+```
+
+The query endpoint uses a fixture-backed `LocationResolver` provider seam that
+can represent resolved, ambiguous, and not-found location lookups. The direct
+POST endpoint keeps the same fixture request shape as the scoring prototype.
+This module is the place to replace fixture dependencies with geocoding,
+weather, caching, feeds, and calendar exports in later steps.
+
+## Live Provider Checks
+
+The live tests are manual drift checks for external providers. They are not
+part of normal backend validation and do not run from Maven. See
+`live-tests/README.md` for the rationale, including why these checks use pytest
+and when they should be run.
+
+Run the Open-Meteo geocoding drift check with a local virtual environment and
+self-contained HTML report:
+
+```bash
+live-tests/run_live_geocoding_tests.sh
+```
+
+The default report path is:
+
+```text
+live-tests/reports/openmeteo-geocoding.html
+```
+
+These tests call live Open-Meteo endpoints and intentionally check broad
+provider behavior such as expected Prague ambiguity and documented native-script
+misses. A failure means provider assumptions may have drifted and should be
+reviewed; it is not the normal backend unit-test contract.
 
 ## Verification
 

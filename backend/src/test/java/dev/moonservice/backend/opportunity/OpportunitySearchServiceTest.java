@@ -1,14 +1,17 @@
 package dev.moonservice.backend.opportunity;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.fail;
 
+import dev.moonservice.backend.location.LocationQuery;
+import dev.moonservice.backend.location.LocationResolution;
 import dev.moonservice.backend.location.ResolvedLocation;
+import dev.moonservice.backend.opportunity.search.LocationCandidatesResponse;
 import dev.moonservice.backend.opportunity.search.OpportunityResponse;
 import dev.moonservice.backend.opportunity.search.OpportunitySearchResponse;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneId;
-import java.util.Optional;
 
 import org.junit.jupiter.api.Test;
 import tools.jackson.databind.ObjectMapper;
@@ -55,11 +58,12 @@ class OpportunitySearchServiceTest {
             assertEquals(5, request.limit());
             return okResponse();
         }, query -> {
-            assertEquals("Praha", query);
-            return Optional.of(new ResolvedLocation(
+            assertEquals(new LocationQuery("Praha"), query);
+            return LocationResolution.resolved(new ResolvedLocation(
                     "prague-cz",
                     "Prague, Czechia",
-                    ZoneId.of("Europe/Prague")));
+                    ZoneId.of("Europe/Prague"),
+                    "CZ"));
         }, defaults);
 
         OpportunityResponse response = opportunitySearchService.searchByQuery(" Praha ");
@@ -72,14 +76,50 @@ class OpportunitySearchServiceTest {
         OpportunitySearchService opportunitySearchService = new OpportunitySearchService(request -> {
             assertEquals("2026-06-20", request.start());
             return okResponse();
-        }, query -> Optional.of(new ResolvedLocation(
+        }, query -> LocationResolution.resolved(new ResolvedLocation(
                 "test-location",
                 "Test Location",
-                ZoneId.of("America/New_York"))), defaults);
+                ZoneId.of("America/New_York"),
+                "US")), defaults);
 
         OpportunityResponse response = opportunitySearchService.searchByQuery("test");
 
         assertEquals("ok", response.status());
+    }
+
+    @Test
+    void returnsAmbiguousLocationWithoutCallingOpportunityEngine() {
+        OpportunitySearchService opportunitySearchService = new OpportunitySearchService(request ->
+                fail("Engine should not be called until an ambiguous location is selected."), query ->
+                LocationResolution.ambiguous(java.util.List.of(
+                        new ResolvedLocation(
+                                "springfield-mo-us",
+                                "Springfield, Missouri, United States",
+                                ZoneId.of("America/Chicago"),
+                                "US"),
+                        new ResolvedLocation(
+                                "springfield-il-us",
+                                "Springfield, Illinois, United States",
+                                ZoneId.of("America/Chicago"),
+                                "US"))), defaults);
+
+        OpportunityResponse response = opportunitySearchService.searchByQuery("Springfield");
+
+        assertEquals("ambiguous_location", response.status());
+        LocationCandidatesResponse candidatesResponse = (LocationCandidatesResponse) response;
+        assertEquals(2, candidatesResponse.candidates().size());
+        assertEquals("springfield-mo-us", candidatesResponse.candidates().getFirst().id());
+    }
+
+    @Test
+    void returnsTemporarilyUnavailableWhenLocationProviderFails() {
+        OpportunitySearchService opportunitySearchService = new OpportunitySearchService(request ->
+                fail("Engine should not be called when location lookup is unavailable."), query ->
+                LocationResolution.temporarilyUnavailable(), defaults);
+
+        OpportunityResponse response = opportunitySearchService.searchByQuery("Praha");
+
+        assertEquals("temporarily_unavailable", response.status());
     }
 
     private static OpportunitySearchResponse okResponse() {

@@ -325,6 +325,13 @@ Conclusion:
 
 The retained script `scripts/geocoding_contract_spike.py` exercises the documented lookup flow with fixtures by default and can optionally query live Open-Meteo Geocoding with `--live`.
 
+The manual pytest live check in `live-tests/test_openmeteo_geocoding.py` is a
+provider drift check, not a backend unit-test contract. Run it with
+`live-tests/run_live_geocoding_tests.sh` to create a local virtual environment,
+install test dependencies, call live Open-Meteo Geocoding, and write an HTML
+report. It verifies broad assumptions such as expected Prague ambiguity, known
+native-script misses, and one-character query behavior.
+
 Live recheck:
 
 - Date run: 2026-06-14 Europe/Prague local time.

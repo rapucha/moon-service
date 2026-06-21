@@ -7,9 +7,14 @@ Purpose
 Current Backend Scope
 - Module: `backend/`
 - Framework: Spring Boot.
-- Current endpoint: `POST /api/opportunities/search`
+- Current endpoints:
+  - `GET /api/opportunities?q=Praha`
+  - `POST /api/opportunities/search`
 - Current dependency: `jvm-scoring-prototype`
-- Current provider behavior: fixture-backed Prague request only.
+- Current provider behavior: fixture-backed location resolution and scoring.
+  The location seam can represent resolved, ambiguous, not-found, and
+  temporarily-unavailable lookup results, but it does not call live geocoding
+  providers yet.
 
 Design Intent
 - Keep the backend small and explicit.
@@ -28,8 +33,8 @@ Recommended Growth Sequence
 2. Add backend-owned response DTOs when the endpoint stops returning
    raw prototype JSON.
 3. Add provider interfaces with fixture implementations.
-4. Add query-based `GET /api/opportunities?q=...` once geocoding is represented.
-5. Add cache interfaces before live weather/geocoding calls become normal.
+4. Add cache interfaces before live weather/geocoding calls become normal.
+5. Add an Open-Meteo geocoding adapter behind the existing location seam.
 6. Add Atom/RSS and `.ics` exports after the opportunity contract is stable.
 7. Add persistence only when cache durability, result IDs, saved alerts, or
    similar product needs require it.

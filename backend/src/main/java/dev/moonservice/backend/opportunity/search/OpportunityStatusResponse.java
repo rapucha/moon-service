@@ -13,4 +13,11 @@ public record OpportunityStatusResponse(
                 Instant.now().toString(),
                 "No matching location found.");
     }
+
+    public static OpportunityStatusResponse temporarilyUnavailable() {
+        return new OpportunityStatusResponse(
+                "temporarily_unavailable",
+                Instant.now().toString(),
+                "Location lookup is temporarily unavailable.");
+    }
 }

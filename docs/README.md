@@ -21,6 +21,7 @@ Start Here
   - `backend/README.md`
   - `prototypes/jvm-scoring/README.md`
   - `prototypes/jvm-ephemeris/README.md`
+  - `live-tests/README.md`
 - AI-agent operating docs:
   - `docs/ai-agent/README.md`
 

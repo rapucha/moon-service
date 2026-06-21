@@ -1,6 +1,9 @@
 package dev.moonservice.backend.opportunity;
 
+import dev.moonservice.backend.location.LocationQuery;
+import dev.moonservice.backend.location.LocationResolution;
 import dev.moonservice.backend.location.LocationResolver;
+import dev.moonservice.backend.opportunity.search.LocationCandidatesResponse;
 import dev.moonservice.backend.opportunity.search.OpportunityResponse;
 import dev.moonservice.backend.opportunity.search.OpportunitySearchEngine;
 import dev.moonservice.backend.opportunity.search.OpportunitySearchRequest;
@@ -34,7 +37,14 @@ public class OpportunitySearchService {
 
     public OpportunityResponse searchByQuery(String rawQuery) {
         String query = normalizeQuery(rawQuery);
-        return locationResolver.resolve(query)
+        LocationResolution resolution = locationResolver.resolve(new LocationQuery(query));
+        if (resolution.isAmbiguous()) {
+            return LocationCandidatesResponse.ambiguous(resolution.candidates());
+        }
+        if (resolution.isTemporarilyUnavailable()) {
+            return OpportunityStatusResponse.temporarilyUnavailable();
+        }
+        return resolution.singleCandidate()
                 .<OpportunityResponse>map(location -> opportunitySearchEngine.search(
                         opportunitySearchDefaults.requestFor(location)))
                 .orElseGet(OpportunityStatusResponse::locationNotFound);

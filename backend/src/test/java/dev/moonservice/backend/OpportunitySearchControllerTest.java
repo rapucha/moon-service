@@ -53,6 +53,24 @@ class OpportunitySearchControllerTest {
     }
 
     @Test
+    void returnsAmbiguousLocationForFixtureProviderCandidates() {
+        webTestClient.get()
+                .uri(uriBuilder -> uriBuilder.path("/api/opportunities")
+                        .queryParam("q", "Springfield")
+                        .build())
+                .exchange()
+                .expectStatus().isOk()
+                .expectHeader().contentTypeCompatibleWith(MediaType.APPLICATION_JSON)
+                .expectBody()
+                .jsonPath("$.status").isEqualTo("ambiguous_location")
+                .jsonPath("$.candidates[0].kind").isEqualTo("real_location")
+                .jsonPath("$.candidates[0].id").isEqualTo("springfield-mo-us")
+                .jsonPath("$.candidates[0].timezone").isEqualTo("America/Chicago")
+                .jsonPath("$.candidates[1].id").isEqualTo("springfield-il-us")
+                .jsonPath("$.opportunities").doesNotExist();
+    }
+
+    @Test
     void mapsMissingQueryToInvalidRequest() {
         webTestClient.get()
                 .uri("/api/opportunities")

@@ -3,6 +3,8 @@ package dev.moonservice.backend.web;
 import dev.moonservice.backend.opportunity.OpportunitySearchService;
 import dev.moonservice.backend.opportunity.search.OpportunityResponse;
 import dev.moonservice.backend.opportunity.search.OpportunitySearchResponse;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -19,12 +21,20 @@ class OpportunitySearchController {
     }
 
     @GetMapping("/api/opportunities")
-    OpportunityResponse searchByQuery(@RequestParam(name = "q", required = false) String query) {
-        return opportunitySearchService.searchByQuery(query);
+    ResponseEntity<OpportunityResponse> searchByQuery(@RequestParam(name = "q", required = false) String query) {
+        OpportunityResponse response = opportunitySearchService.searchByQuery(query);
+        return ResponseEntity.status(httpStatusFor(response)).body(response);
     }
 
     @PostMapping("/api/opportunities/search")
     OpportunitySearchResponse search(@RequestBody JsonNode request) {
         return opportunitySearchService.search(request);
+    }
+
+    private static HttpStatus httpStatusFor(OpportunityResponse response) {
+        if ("temporarily_unavailable".equals(response.status())) {
+            return HttpStatus.SERVICE_UNAVAILABLE;
+        }
+        return HttpStatus.OK;
     }
 }
