@@ -49,6 +49,14 @@ is currently used only by fixture-backed unit tests. It builds encoded
 Open-Meteo Geocoding requests, parses provider-shaped JSON, maps single results
 to resolved locations, multiple results to ambiguous candidates, empty results
 to not found, and malformed/provider failure states to temporarily unavailable.
+The Spring `RestClient` transport classifies rate limits, transient HTTP
+failures, non-retryable HTTP failures, IO failures, and timeouts as typed
+provider exceptions. A retrying transport decorator uses Spring `RetryTemplate`
+with a narrow provider retry policy: at most one retry for HTTP `429`, `502`,
+`503`, `504`, timeout, or IO failure. It avoids retries for non-retryable HTTP
+statuses, malformed provider payloads, blank response bodies, and valid empty
+results. Short `Retry-After` values are honored before retrying; long
+`Retry-After` delays fail fast.
 Resolved locations now carry a backend location ID, a structured provider
 location ID, latitude, longitude, elevation, timezone, and country code. The
 fixture resolver remains active because the scoring prototype still expects
