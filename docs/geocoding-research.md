@@ -132,17 +132,22 @@ Current adapter scope:
 - Maps a valid empty `results` array to `LocationResolution.notFound`.
 - Maps transport failures, HTTP failures, invalid JSON, missing `results`, or a
   non-array `results` shape to `LocationResolution.temporarilyUnavailable`.
-- Uses Open-Meteo's provider id as the backend candidate id with an
-  `openmeteo:` prefix, such as `openmeteo:3067696`.
-- Retains the fields the current backend resolver contract can carry:
-  candidate id, display name, timezone, and country code.
+- Keeps the backend location id separate from the structured provider location
+  id. For example, an Open-Meteo result may map to backend id
+  `openmeteo-3067696` and `ProviderLocationId(OPEN_METEO, "3067696")`, which
+  serializes as `openmeteo:3067696`.
+- Retains the coordinate-backed fields the backend resolver contract can now
+  carry: backend location id, structured provider location id, display name,
+  latitude, longitude, elevation, timezone, and country code.
 
 This adapter is not the active Spring `LocationResolver` bean yet. The backend
 still uses `FixtureLocationResolver` by default because the scoring prototype is
-still fixture-location based and cannot yet consume arbitrary provider
-coordinates/elevation from real geocoding results. Add runtime provider
-selection only after the backend request/scoring path can handle coordinate
-backed real locations.
+still fixture-location based and cannot yet score arbitrary coordinate-backed
+real locations. Fixture `locationId` values therefore remain compatible with
+the scoring prototype slugs, while `ProviderLocationId` records where the
+candidate came from without relying on formatted string prefixes. Add runtime
+provider selection only after the opportunity search engine can consume the
+resolved location's coordinates/elevation instead of only a fixture slug.
 
 Fixture-backed adapter tests live under:
 

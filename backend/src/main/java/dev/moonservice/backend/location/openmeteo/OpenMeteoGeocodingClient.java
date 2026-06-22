@@ -3,6 +3,8 @@ package dev.moonservice.backend.location.openmeteo;
 import dev.moonservice.backend.location.LocationQuery;
 import dev.moonservice.backend.location.LocationResolution;
 import dev.moonservice.backend.location.LocationResolver;
+import dev.moonservice.backend.location.LocationProvider;
+import dev.moonservice.backend.location.ProviderLocationId;
 import dev.moonservice.backend.location.ResolvedLocation;
 import org.springframework.web.util.UriComponentsBuilder;
 import tools.jackson.core.JacksonException;
@@ -20,13 +22,14 @@ import java.time.ZoneId;
 import java.time.zone.ZoneRulesException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.OptionalDouble;
 
 public class OpenMeteoGeocodingClient implements LocationResolver {
     static final URI DEFAULT_ENDPOINT = URI.create("https://geocoding-api.open-meteo.com/v1/search");
     private static final Duration DEFAULT_TIMEOUT = Duration.ofSeconds(10);
     private static final int DEFAULT_RESULT_COUNT = 10;
     private static final String DEFAULT_LANGUAGE = "en";
-    private static final String PROVIDER_ID_PREFIX = "openmeteo:";
+    private static final String BACKEND_LOCATION_ID_PREFIX = LocationProvider.OPEN_METEO.id() + "-";
 
     private final URI endpoint;
     private final String language;
@@ -130,8 +133,17 @@ public class OpenMeteoGeocodingClient implements LocationResolver {
         String name = stringFieldOrBlank(result, "name");
         String timezone = stringFieldOrBlank(result, "timezone");
         String countryCode = stringFieldOrBlank(result, "country_code");
+        OptionalDouble latitude = finiteDoubleField(result, "latitude");
+        OptionalDouble longitude = finiteDoubleField(result, "longitude");
+        OptionalDouble elevation = finiteDoubleField(result, "elevation");
 
-        if (providerId.isBlank() || name.isBlank() || timezone.isBlank() || countryCode.isBlank()) {
+        if (providerId.isBlank()
+                || name.isBlank()
+                || timezone.isBlank()
+                || countryCode.isBlank()
+                || latitude.isEmpty()
+                || longitude.isEmpty()
+                || elevation.isEmpty()) {
             return java.util.Optional.empty();
         }
 
@@ -143,10 +155,18 @@ public class OpenMeteoGeocodingClient implements LocationResolver {
         }
 
         return java.util.Optional.of(new ResolvedLocation(
-                PROVIDER_ID_PREFIX + providerId,
+                backendLocationId(providerId),
+                new ProviderLocationId(LocationProvider.OPEN_METEO, providerId),
                 displayName(result, name, countryCode),
+                latitude.getAsDouble(),
+                longitude.getAsDouble(),
+                (int) Math.round(elevation.getAsDouble()),
                 zoneId,
                 countryCode));
+    }
+
+    private static String backendLocationId(String providerId) {
+        return BACKEND_LOCATION_ID_PREFIX + providerId;
     }
 
     private static String displayName(JsonNode result, String name, String countryCode) {
@@ -166,6 +186,24 @@ public class OpenMeteoGeocodingClient implements LocationResolver {
 
     private static String stringFieldOrBlank(JsonNode node, String fieldName) {
         return node.path(fieldName).asString().strip();
+    }
+
+    private static OptionalDouble finiteDoubleField(JsonNode node, String fieldName) {
+        String rawValue = stringFieldOrBlank(node, fieldName);
+        if (rawValue.isBlank()) {
+            return OptionalDouble.empty();
+        }
+
+        double value;
+        try {
+            value = Double.parseDouble(rawValue);
+        } catch (NumberFormatException ex) {
+            return OptionalDouble.empty();
+        }
+        if (!Double.isFinite(value)) {
+            return OptionalDouble.empty();
+        }
+        return OptionalDouble.of(value);
     }
 
     private record JavaHttpOpenMeteoGeocodingTransport(HttpClient httpClient) implements OpenMeteoGeocodingTransport {

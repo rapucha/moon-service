@@ -4,7 +4,9 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.fail;
 
 import dev.moonservice.backend.location.LocationQuery;
+import dev.moonservice.backend.location.LocationProvider;
 import dev.moonservice.backend.location.LocationResolution;
+import dev.moonservice.backend.location.ProviderLocationId;
 import dev.moonservice.backend.location.ResolvedLocation;
 import dev.moonservice.backend.opportunity.search.LocationCandidatesResponse;
 import dev.moonservice.backend.opportunity.search.OpportunityResponse;
@@ -61,7 +63,11 @@ class OpportunitySearchServiceTest {
             assertEquals(new LocationQuery("Praha"), query);
             return LocationResolution.resolved(new ResolvedLocation(
                     "prague-cz",
+                    fixtureProviderLocationId("prague-cz"),
                     "Prague, Czechia",
+                    50.08804,
+                    14.42076,
+                    202,
                     ZoneId.of("Europe/Prague"),
                     "CZ"));
         }, defaults);
@@ -78,7 +84,11 @@ class OpportunitySearchServiceTest {
             return okResponse();
         }, query -> LocationResolution.resolved(new ResolvedLocation(
                 "test-location",
+                fixtureProviderLocationId("test-location"),
                 "Test Location",
+                40.7128,
+                -74.0060,
+                10,
                 ZoneId.of("America/New_York"),
                 "US")), defaults);
 
@@ -94,12 +104,20 @@ class OpportunitySearchServiceTest {
                 LocationResolution.ambiguous(java.util.List.of(
                         new ResolvedLocation(
                                 "springfield-mo-us",
+                                fixtureProviderLocationId("springfield-mo-us"),
                                 "Springfield, Missouri, United States",
+                                37.21533,
+                                -93.29824,
+                                396,
                                 ZoneId.of("America/Chicago"),
                                 "US"),
                         new ResolvedLocation(
                                 "springfield-il-us",
+                                fixtureProviderLocationId("springfield-il-us"),
                                 "Springfield, Illinois, United States",
+                                39.80172,
+                                -89.64371,
+                                182,
                                 ZoneId.of("America/Chicago"),
                                 "US"))), defaults);
 
@@ -143,5 +161,9 @@ class OpportunitySearchServiceTest {
                 java.util.List.of(),
                 java.util.List.of(),
                 java.util.List.of());
+    }
+
+    private static ProviderLocationId fixtureProviderLocationId(String providerId) {
+        return new ProviderLocationId(LocationProvider.FIXTURE, providerId);
     }
 }

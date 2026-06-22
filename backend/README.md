@@ -49,6 +49,10 @@ is currently used only by fixture-backed unit tests. It builds encoded
 Open-Meteo Geocoding requests, parses provider-shaped JSON, maps single results
 to resolved locations, multiple results to ambiguous candidates, empty results
 to not found, and malformed/provider failure states to temporarily unavailable.
+Resolved locations now carry a backend location ID, a structured provider
+location ID, latitude, longitude, elevation, timezone, and country code. The
+fixture resolver remains active because the scoring prototype still expects
+fixture slugs such as `prague-cz`.
 
 Manual live drift checks are kept outside Maven:
 

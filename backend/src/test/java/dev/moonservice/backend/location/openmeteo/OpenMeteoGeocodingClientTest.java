@@ -37,8 +37,12 @@ class OpenMeteoGeocodingClientTest {
         LocationResolution resolution = client.resolve(new LocationQuery("Praha"));
 
         assertEquals(LocationResolution.Status.RESOLVED, resolution.status());
-        assertEquals("openmeteo:3067696", resolution.candidates().getFirst().locationId());
+        assertEquals("openmeteo-3067696", resolution.candidates().getFirst().locationId());
+        assertEquals("openmeteo:3067696", resolution.candidates().getFirst().providerLocationId().serialized());
         assertEquals("Praha, Hlavni mesto Praha, Czechia", resolution.candidates().getFirst().displayName());
+        assertEquals(50.08804, resolution.candidates().getFirst().latitude());
+        assertEquals(14.42076, resolution.candidates().getFirst().longitude());
+        assertEquals(202, resolution.candidates().getFirst().elevationMeters());
         assertEquals("Europe/Prague", resolution.candidates().getFirst().zoneId().getId());
         assertEquals("CZ", resolution.candidates().getFirst().countryCode());
         assertEquals(
@@ -55,10 +59,15 @@ class OpenMeteoGeocodingClientTest {
 
         assertEquals(LocationResolution.Status.AMBIGUOUS, resolution.status());
         assertEquals(3, resolution.candidates().size());
-        assertEquals("openmeteo:3067696", resolution.candidates().get(0).locationId());
+        assertEquals("openmeteo-3067696", resolution.candidates().get(0).locationId());
+        assertEquals("openmeteo:3067696", resolution.candidates().get(0).providerLocationId().serialized());
         assertEquals("Prague, Hlavni mesto Praha, Czechia", resolution.candidates().get(0).displayName());
-        assertEquals("openmeteo:4548393", resolution.candidates().get(1).locationId());
+        assertEquals("openmeteo-4548393", resolution.candidates().get(1).locationId());
+        assertEquals("openmeteo:4548393", resolution.candidates().get(1).providerLocationId().serialized());
         assertEquals("Prague, Oklahoma, United States", resolution.candidates().get(1).displayName());
+        assertEquals(35.48674, resolution.candidates().get(1).latitude());
+        assertEquals(-96.68502, resolution.candidates().get(1).longitude());
+        assertEquals(309, resolution.candidates().get(1).elevationMeters());
         assertEquals("America/Chicago", resolution.candidates().get(1).zoneId().getId());
     }
 
