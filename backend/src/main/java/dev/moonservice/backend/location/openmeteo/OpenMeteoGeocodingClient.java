@@ -6,17 +6,13 @@ import dev.moonservice.backend.location.LocationResolver;
 import dev.moonservice.backend.location.LocationProvider;
 import dev.moonservice.backend.location.ProviderLocationId;
 import dev.moonservice.backend.location.ResolvedLocation;
+import org.springframework.web.client.RestClient;
 import org.springframework.web.util.UriComponentsBuilder;
 import tools.jackson.core.JacksonException;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 
-import java.io.IOException;
 import java.net.URI;
-import java.net.http.HttpClient;
-import java.net.http.HttpRequest;
-import java.net.http.HttpResponse;
-import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.time.ZoneId;
 import java.time.zone.ZoneRulesException;
@@ -27,6 +23,8 @@ import java.util.OptionalDouble;
 public class OpenMeteoGeocodingClient implements LocationResolver {
     static final URI DEFAULT_ENDPOINT = URI.create("https://geocoding-api.open-meteo.com/v1/search");
     private static final Duration DEFAULT_TIMEOUT = Duration.ofSeconds(10);
+    private static final int MAX_TRANSPORT_RETRIES = 1;
+    private static final Duration MAX_RETRY_AFTER = Duration.ofSeconds(1);
     private static final int DEFAULT_RESULT_COUNT = 10;
     private static final String DEFAULT_LANGUAGE = "en";
     private static final String BACKEND_LOCATION_ID_PREFIX = LocationProvider.OPEN_METEO.id() + "-";
@@ -44,7 +42,10 @@ public class OpenMeteoGeocodingClient implements LocationResolver {
                 DEFAULT_LANGUAGE,
                 DEFAULT_RESULT_COUNT,
                 DEFAULT_TIMEOUT,
-                new JavaHttpOpenMeteoGeocodingTransport(HttpClient.newHttpClient()),
+                new RetryingOpenMeteoGeocodingTransport(
+                        new RestClientOpenMeteoGeocodingTransport(RestClient.builder(), DEFAULT_TIMEOUT),
+                        MAX_TRANSPORT_RETRIES,
+                        MAX_RETRY_AFTER),
                 new ObjectMapper());
     }
 
@@ -73,10 +74,7 @@ public class OpenMeteoGeocodingClient implements LocationResolver {
         String body;
         try {
             body = transport.get(requestUri(query), timeout);
-        } catch (InterruptedException ex) {
-            Thread.currentThread().interrupt();
-            return LocationResolution.temporarilyUnavailable();
-        } catch (IOException ex) {
+        } catch (OpenMeteoGeocodingTransportException ex) {
             return LocationResolution.temporarilyUnavailable();
         }
 
@@ -205,28 +203,4 @@ public class OpenMeteoGeocodingClient implements LocationResolver {
         }
         return OptionalDouble.of(value);
     }
-
-    private record JavaHttpOpenMeteoGeocodingTransport(HttpClient httpClient) implements OpenMeteoGeocodingTransport {
-        @Override
-        public String get(URI requestUri, Duration timeout) throws IOException, InterruptedException {
-            HttpRequest request = HttpRequest.newBuilder(requestUri)
-                    .timeout(timeout)
-                    .header("Accept", "application/json")
-                    .header("User-Agent", "moon-service-backend/0.1")
-                    .GET()
-                    .build();
-            HttpResponse<String> response = httpClient.send(
-                    request,
-                    HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
-            if (response.statusCode() < 200 || response.statusCode() >= 300) {
-                throw new IOException("Open-Meteo Geocoding returned HTTP " + response.statusCode());
-            }
-            return response.body();
-        }
-    }
-}
-
-@FunctionalInterface
-interface OpenMeteoGeocodingTransport {
-    String get(URI requestUri, Duration timeout) throws IOException, InterruptedException;
 }

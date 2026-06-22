@@ -42,7 +42,6 @@ The main unresolved choice is now the exact first web/API contract for city look
 
 - `docs/README.md`: human-facing documentation hub.
 - `docs/ai-agent/README.md`: active AI-agent operating guide, context packs, and checklists.
-- `docs/moon-service-handover.md`: historical planning handover from the previous session.
 - `docs/product-notes.md`: product stance, users, MVP scope, privacy posture.
 - `docs/architecture.md`: architecture options, recommended hybrid shape, unresolved decisions.
 - `docs/api-shape.md`: first web/API contract, statuses, result kinds, localStorage, RSS/Atom, and `.ics` rules.
