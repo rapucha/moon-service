@@ -81,6 +81,15 @@ User preferences:
 - Optional preferred window type, such as low full Moon, crescent, twilight, or daylight Moon.
 - Optional weather tolerance or profile later, kept request-scoped until accounts exist.
 
+Future recurring event context:
+
+- Optional recurring subject or event pattern.
+- Days of week, recurrence rule, or known operating calendar.
+- Approximate local time or time range.
+- Early/late tolerance window.
+- Optional route, direction, azimuth, or subject position when known.
+- Source confidence and active date range.
+
 ## V0 Weather Assessment
 
 Assess weather by forecast change intervals, not by a fixed Moon/Sun sampling
@@ -251,6 +260,49 @@ Forecast confidence:
 - Use confidence to reduce alert urgency.
 - If confidence is not available, expose a neutral confidence state rather than fabricating precision.
 
+## Future Recurring Event Context
+
+Some opportunities are valuable because a repeatable real-world subject may
+appear during a usable Moon window. Examples include an aircraft approach that
+usually crosses a view at about the same local time, a train or ferry on a
+regular schedule, a weekly public event, or another user-defined recurring
+pattern.
+
+This should be modeled as event context layered onto the existing astronomy,
+light, and weather score. Candidate generation should still begin with natural
+visible-Moon windows. The recurring event layer then builds expected event
+occurrence windows, expands them by the configured early/late tolerance, and
+intersects them with the Moon/weather windows.
+
+Event-aware score components should include:
+
+- Whether the event uncertainty window overlaps a useful Moon window.
+- How close the expected event time is to the best Moon/light/weather portion of
+  the window.
+- The amount of timing tolerance needed for the match.
+- Source reliability, cancellation risk, and schedule age.
+- Direction or azimuth fit when the event has a known route or subject position.
+- The base Moon, light, exposure-balance, and weather score.
+
+The output should explain uncertainty directly. Prefer wording such as:
+
+```text
+The Moon window is strong from 18:40 to 19:15. This recurring flight often
+passes between 18:50 and 19:05, but timing can shift by about 15 minutes.
+```
+
+Do not present event-aware opportunities as confirmed sightings unless a live
+provider is deliberately integrated. For flights and other transport examples,
+delays, early arrivals, route changes, cancellations, and provider gaps are part
+of the model and should reduce confidence or broaden the displayed time range.
+
+Subscriptions for recurring event-aware opportunities should generate a rolling
+set of future candidate occurrences, not a single static alert. Without accounts,
+the first version should be request-scoped, shareable by URL, or represented as
+a public feed/calendar link when the event pattern is nonpersonal. Personal
+saved event subscriptions require the privacy model to cover stored preferences,
+notification delivery, retention, and deletion.
+
 ## Future Scoring Profiles
 
 V0 should start with one default `photographer_balanced` scoring profile. The
@@ -268,6 +320,8 @@ Possible profile presets:
 - `full_moon_horizon`: favors high illumination when the Moon is low, especially near rise/set.
 - `daylight_moon`: allows and favors visible daylight Moon opportunities with enough contrast.
 - `night_silhouette`: accepts darker foreground conditions when silhouette or night-landscape intent is explicit.
+- `recurring_event_overlap`: favors Moon windows that overlap an approximate
+  recurring event pattern, with explicit timing uncertainty.
 
 Possible preference controls:
 
@@ -277,6 +331,7 @@ Possible preference controls:
 - Moon altitude range: very low, low, context, high context, or any visible Moon.
 - Weather tolerance: clear only, partial clouds welcome, or dramatic clouds allowed.
 - Travel or setup lead time.
+- Recurring event pattern, days, local time window, and early/late tolerance.
 
 Preferences should adjust weights and explanations, not hide the raw facts. For
 example, a daylight profile may score daylight higher than the v0 default, while
@@ -316,6 +371,8 @@ V0 ignores:
 - Shooting position versus subject position.
 - Lens focal length and field of view.
 - Forecast model disagreement unless the provider exposes it.
+- Recurring event delays, early arrivals, route changes, cancellations, or
+  schedule drift unless an event provider is integrated later.
 
 These are acceptable limitations for an alert-first MVP, but the UI should avoid claiming exact composition guidance.
 
@@ -325,3 +382,6 @@ These are acceptable limitations for an alert-first MVP, but the UI should avoid
 - Validate the recommended weather provider in `docs/weather-provider-research.md` against local forecast examples and map its fields into the model.
 - Collect real sample days for known good and bad Moon photography conditions.
 - Tune thresholds from examples rather than preference alone.
+- Collect real recurring-event examples and decide whether v1 should support
+  only user-entered patterns, curated public patterns, or live provider-backed
+  schedules.

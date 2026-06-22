@@ -19,6 +19,7 @@ Small backend
   - scoring rules
   - weather cache
   - provider quota counters and private admin status page
+  - later recurring event pattern matching for approximate public or user-defined events
   - later terrain horizon support for exact shooting positions
   - later saved alerts and email delivery
 
@@ -108,6 +109,9 @@ Recommended boundary:
 - Backend records provider call counters and cache hit/miss counts for operational visibility.
 - Backend avoids permanent location storage in the first version.
 - RSS/Atom feeds and `.ics` export are the first low-friction follow-up options.
+- Recurring event-aware matching, such as approximate flight or transport
+  patterns, is deferred until the base city lookup and Moon/weather score are
+  useful.
 - Email alerts remain later because they require storing email plus location preferences.
 - Android local notifications remain a later milestone for recurring personal alerts.
 
@@ -192,6 +196,9 @@ Android:
 - Admin/ops storage: where provider call counters, cache metrics, and recent errors live before a full database exists.
 - Identity timing: no identity for one-off lookup; add optional email or anonymous identity only when saved alerts require it.
 - Notification timing: RSS/Atom and `.ics` first; email later; Android local notifications later.
+- Recurring event context: whether to begin with user-entered approximate
+  patterns, curated public patterns, or provider-backed schedules; how to
+  represent timing uncertainty, cancellations, and route changes.
 - Distribution/community: Reddit is manual/community validation only; Mastodon and Bluesky are not planned.
 - Data retention: whether backend request logs may contain coordinates, and how to scrub or minimize them.
 - Terrain horizon modeling: deferred until users can provide exact shooting positions; city-level lookup cannot reliably account for hills, buildings, or trees.

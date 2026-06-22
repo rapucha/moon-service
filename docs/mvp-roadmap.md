@@ -112,6 +112,8 @@ Exit criteria:
 - Push notifications.
 - Email alerts.
 - Calendar integration.
+- Recurring event-aware scoring and subscriptions, including specific flights,
+  transport routes, public event patterns, or user-defined weekly schedules.
 - Automated Reddit posting.
 - Mastodon/Bluesky integration.
 - Map planning.

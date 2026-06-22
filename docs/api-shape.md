@@ -592,6 +592,50 @@ Example:
 ]
 ```
 
+## Future Event-Aware Search
+
+The first `/api/opportunities?q=...` contract is location-focused. Recurring
+event-aware search should be added later only after the base location, Moon,
+weather, feed, and calendar behavior works.
+
+A later event-aware request can either extend the lookup with an optional event
+context or use a separate endpoint. The event context should describe an
+approximate recurring pattern, not a guaranteed occurrence:
+
+```text
+event_kind
+display_name
+days_of_week or recurrence_rule
+local_time_window
+early_late_tolerance_minutes
+active_date_range
+optional route/direction/azimuth fields
+source and confidence fields
+```
+
+Event-aware responses should keep the base opportunity facts and add event
+match facts, for example:
+
+```text
+eventMatch:
+  expectedLocalWindow
+  uncertaintyWindow
+  overlapWindow
+  timingConfidence
+  source
+  caveat
+```
+
+Do not expose event-aware matches as exact minute-level predictions. Flights,
+transport schedules, and other recurring events can be delayed, early, rerouted,
+or cancelled. If the system does not use a live event provider, response copy
+must say that the event timing is approximate.
+
+Public RSS/Atom or `.ics` links may be acceptable for canonical, nonpersonal
+event patterns encoded in a URL. Personal saved event subscriptions require the
+privacy and storage model to cover stored preferences, notification delivery,
+retention, and deletion before implementation.
+
 ## Feed And Calendar Rules
 
 RSS/Atom:
@@ -634,3 +678,14 @@ opportunity_search
 ```
 
 This keeps the public API simple without making the backend design hard to change.
+
+Recurring event-aware search can later add:
+
+```text
+  -> recurring event pattern validation
+  -> event occurrence window generation
+  -> event/Moon/weather overlap scoring
+```
+
+Keep this out of the v0 lookup until the simpler city opportunity contract is
+stable.
