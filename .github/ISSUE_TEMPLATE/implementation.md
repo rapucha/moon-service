@@ -16,7 +16,7 @@ The concrete outcome this issue should deliver.
 
 ## Branch
 
-Add the work branch once implementation starts.
+Add the work branch link once implementation starts.
 
 ## Pull Request
 

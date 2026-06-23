@@ -12,7 +12,7 @@ What decision needs to be made, and why now.
 
 ## Branch
 
-Add the work branch if this decision needs a docs/process change.
+Add the work branch link if this decision needs a docs/process change.
 
 ## Pull Request
 

@@ -1,7 +1,7 @@
 ## Summary
 
 - Related issue:
-- Branch:
+- Branch: [branch-name](https://github.com/rapucha/moon-service/tree/branch-name)
 
 ## Scope
 
