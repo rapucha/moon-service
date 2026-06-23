@@ -51,8 +51,12 @@ GitHub Permissions
   requires changing GitHub Actions workflows.
 
 Branch Protection Policy
-- Protect `spring-enterprise-ish-refactor` while it is the integration branch.
-- Protect `main` if it becomes the direct integration or release branch.
+- Protect every active integration or release branch.
+- Today that means `spring-enterprise-ish-refactor`, because it is the current
+  integration branch.
+- If `main` becomes the direct integration or release branch, protect `main`.
+- If future long-lived integration branches are introduced, protect them before
+  they start receiving routine PR merges.
 - Require pull requests before merging to protected branches.
 - Once the agent account is active, require at least one human approving review
   for agent-authored pull requests.
