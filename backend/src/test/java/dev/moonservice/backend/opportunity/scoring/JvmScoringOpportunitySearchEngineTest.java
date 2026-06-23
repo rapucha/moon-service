@@ -1,4 +1,4 @@
-package dev.moonservice.backend.opportunity.prototype;
+package dev.moonservice.backend.opportunity.scoring;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -14,10 +14,10 @@ import org.junit.jupiter.api.Test;
 
 import java.time.ZoneId;
 
-class PrototypeOpportunitySearchEngineTest {
+class JvmScoringOpportunitySearchEngineTest {
     @Test
     void scoresResolvedLocationCoordinatesWithoutFixtureLocationId() {
-        PrototypeOpportunitySearchEngine engine = new PrototypeOpportunitySearchEngine(new PreviewEvaluator());
+        JvmScoringOpportunitySearchEngine engine = new JvmScoringOpportunitySearchEngine(new PreviewEvaluator());
         ResolvedLocation amsterdam = new ResolvedLocation(
                 "amsterdam-nl",
                 new ProviderLocationId(LocationProvider.OPEN_METEO, "2759794"),

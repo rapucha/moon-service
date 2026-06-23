@@ -3,7 +3,7 @@ package dev.moonservice.backend.config;
 import dev.moonservice.backend.location.LocationResolver;
 import dev.moonservice.backend.location.openmeteo.OpenMeteoGeocodingClient;
 import dev.moonservice.backend.opportunity.OpportunitySearchDefaults;
-import dev.moonservice.backend.opportunity.prototype.PrototypeOpportunitySearchEngine;
+import dev.moonservice.backend.opportunity.scoring.JvmScoringOpportunitySearchEngine;
 import dev.moonservice.backend.opportunity.search.OpportunitySearchEngine;
 import dev.moonservice.scoringprototype.PreviewEvaluator;
 import org.springframework.beans.factory.annotation.Value;
@@ -28,7 +28,7 @@ class OpportunitySearchConfiguration {
 
     @Bean
     OpportunitySearchEngine opportunitySearchEngine(PreviewEvaluator previewEvaluator) {
-        return new PrototypeOpportunitySearchEngine(previewEvaluator);
+        return new JvmScoringOpportunitySearchEngine(previewEvaluator);
     }
 
     @Bean

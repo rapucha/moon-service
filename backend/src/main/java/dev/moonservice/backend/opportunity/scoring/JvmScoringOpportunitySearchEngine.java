@@ -1,10 +1,9 @@
-package dev.moonservice.backend.opportunity.prototype;
+package dev.moonservice.backend.opportunity.scoring;
 
 import dev.moonservice.backend.location.ResolvedLocation;
 import dev.moonservice.backend.opportunity.search.OpportunitySearchEngine;
 import dev.moonservice.backend.opportunity.search.OpportunitySearchRequest;
 import dev.moonservice.backend.opportunity.search.OpportunitySearchResponse;
-import dev.moonservice.scoringprototype.UsageException;
 import dev.moonservice.scoringprototype.PreviewEvaluator;
 import dev.moonservice.scoringprototype.fixture.Location;
 import dev.moonservice.scoringprototype.input.PrototypeConfig;
@@ -17,24 +16,21 @@ import tools.jackson.databind.ObjectMapper;
 import tools.jackson.databind.node.ObjectNode;
 
 import java.time.Instant;
-import java.time.LocalDate;
-import java.time.ZoneOffset;
-import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
 import java.util.Map;
 
-public class PrototypeOpportunitySearchEngine implements OpportunitySearchEngine {
+public class JvmScoringOpportunitySearchEngine implements OpportunitySearchEngine {
     private static final ObjectMapper MAPPER = new ObjectMapper();
 
     private final PreviewEvaluator previewEvaluator;
     private final OpportunityService opportunityService;
     private final ResponseFormatter responseFormatter;
 
-    public PrototypeOpportunitySearchEngine(PreviewEvaluator previewEvaluator) {
+    public JvmScoringOpportunitySearchEngine(PreviewEvaluator previewEvaluator) {
         this(previewEvaluator, new OpportunityService(), new ResponseFormatter());
     }
 
-    PrototypeOpportunitySearchEngine(
+    JvmScoringOpportunitySearchEngine(
             PreviewEvaluator previewEvaluator,
             OpportunityService opportunityService,
             ResponseFormatter responseFormatter
@@ -48,7 +44,7 @@ public class PrototypeOpportunitySearchEngine implements OpportunitySearchEngine
     public OpportunitySearchResponse search(OpportunitySearchRequest request) {
         ObjectNode prototypeRequest = MAPPER.createObjectNode();
         prototypeRequest.put("locationId", request.locationId());
-        prototypeRequest.put("start", request.start());
+        prototypeRequest.put("start", request.startDate().toString());
         prototypeRequest.put("forecastHorizonDays", request.forecastHorizonDays());
         prototypeRequest.put("maxMoonAltitudeDegrees", request.maxMoonAltitudeDegrees());
         prototypeRequest.put("limit", request.limit());
@@ -59,7 +55,7 @@ public class PrototypeOpportunitySearchEngine implements OpportunitySearchEngine
     public OpportunitySearchResponse search(ResolvedLocation location, OpportunitySearchRequest request) {
         PrototypeConfig config = new PrototypeConfig(
                 toPrototypeLocation(location),
-                parseStartDate(request.start()),
+                request.startDate(),
                 request.forecastHorizonDays(),
                 request.maxMoonAltitudeDegrees(),
                 request.limit());
@@ -78,17 +74,6 @@ public class PrototypeOpportunitySearchEngine implements OpportunitySearchEngine
                 location.elevationMeters(),
                 location.zoneId().getId(),
                 location.countryCode());
-    }
-
-    private static LocalDate parseStartDate(String value) {
-        try {
-            if (value.length() == 10) {
-                return LocalDate.parse(value);
-            }
-            return Instant.parse(value).atZone(ZoneOffset.UTC).toLocalDate();
-        } catch (DateTimeParseException ex) {
-            throw new UsageException("Invalid --start value: " + value);
-        }
     }
 
     private static OpportunitySearchResponse toBackendResponse(String prototypeJson) {

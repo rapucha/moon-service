@@ -3,24 +3,56 @@ package dev.moonservice.backend.opportunity.search;
 import dev.moonservice.scoringprototype.UsageException;
 import tools.jackson.databind.JsonNode;
 
+import java.time.Instant;
+import java.time.LocalDate;
+import java.time.ZoneOffset;
+import java.time.format.DateTimeParseException;
+
 public record OpportunitySearchRequest(
         String locationId,
-        String start,
+        LocalDate startDate,
         int forecastHorizonDays,
         double maxMoonAltitudeDegrees,
         int limit
 ) {
+    public OpportunitySearchRequest(
+            String locationId,
+            String start,
+            int forecastHorizonDays,
+            double maxMoonAltitudeDegrees,
+            int limit
+    ) {
+        this(locationId, parseIsoLocalDateOrUtcInstantDate(start), forecastHorizonDays, maxMoonAltitudeDegrees, limit);
+    }
+
     public static OpportunitySearchRequest fromJson(JsonNode root) {
         if (!root.isObject()) {
             throw new UsageException("Opportunity search request must be a JSON object.");
         }
         return new OpportunitySearchRequest(
                 text(root, "locationId"),
-                text(root, "start"),
+                parseIsoLocalDateOrUtcInstantDate(text(root, "start")),
                 intValue(root, "forecastHorizonDays"),
                 maxMoonAltitudeDegrees(root),
                 intValue(root, "limit")
         );
+    }
+
+    public String start() {
+        return startDate.toString();
+    }
+
+    private static LocalDate parseIsoLocalDateOrUtcInstantDate(String value) {
+        try {
+            return LocalDate.parse(value);
+        } catch (DateTimeParseException localDateFailure) {
+            try {
+                return Instant.parse(value).atZone(ZoneOffset.UTC).toLocalDate();
+            } catch (DateTimeParseException instantFailure) {
+                instantFailure.addSuppressed(localDateFailure);
+                throw new UsageException("Invalid --start value: " + value, instantFailure);
+            }
+        }
     }
 
     private static String text(JsonNode root, String field) {
