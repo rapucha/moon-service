@@ -56,6 +56,13 @@ In scope:
 - Provide dynamic public `.ics` calendar feeds for canonical real locations, generated on demand and cached.
 - Provide `.ics` export for individual events.
 
+Tracked MVP implementation issues:
+
+- Coordinate-backed opportunity search: [#13](https://github.com/rapucha/moon-service/issues/13).
+- Weather-backed scoring: [#14](https://github.com/rapucha/moon-service/issues/14).
+- First web lookup and shareable result page: [#15](https://github.com/rapucha/moon-service/issues/15).
+- Public feeds and calendar exports: [#16](https://github.com/rapucha/moon-service/issues/16).
+
 Out of scope for the first MVP:
 
 - Mandatory accounts.
@@ -88,6 +95,9 @@ The first useful version can be request-scoped or encoded in a shareable URL,
 RSS/Atom feed, or `.ics` calendar feed. Personal saved subscriptions should
 wait until the privacy model covers stored preferences, notification endpoints,
 retention, update behavior, and deletion.
+
+The scoring-context follow-up for this direction is tracked by
+[#3](https://github.com/rapucha/moon-service/issues/3).
 
 The product must phrase event-aware results as planning cues, not guarantees.
 For aircraft and other transport examples, do not imply real-time tracking,
