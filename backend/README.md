@@ -1,9 +1,8 @@
 # Moon Service Backend
 
 This is the first real backend module for Moon Service. It promotes the tested
-Spring HTTP contract out of `prototypes/` while keeping weather fixture-backed
-until weather, caching, feeds, and calendar exports are introduced
-deliberately.
+Spring HTTP contract out of `prototypes/` while keeping caching, feeds, and
+calendar exports deliberately out of scope.
 
 ## Current Scope
 
@@ -17,14 +16,18 @@ deliberately.
   by saved provider JSON fixtures. It can be selected for live city/location
   lookup with `moon.location.resolver=open-meteo`.
 - Coordinate-backed Moon/Sun window generation and scoring through the existing
-  `jvm-scoring-prototype` Maven artifact, still using fixed fixture weather.
+  `jvm-scoring-prototype` Maven artifact.
+- Open-Meteo weather forecast adapter code under `backend.weather.openmeteo`,
+  covered by saved provider JSON fixtures. It can be selected for live hourly
+  forecast lookup with `moon.weather.provider=open-meteo`.
 - HTTP `400` error mapping for malformed JSON and invalid opportunity search
   requests.
 
-This module intentionally does not yet include persistence, live weather calls,
+This module intentionally does not yet include persistence, weather caching,
 accounts, cookies, feeds, calendar generation, Docker, or deployment
-configuration. Missing or unknown `moon.location.resolver` values fail startup;
-the runtime backend does not include a fixture resolver mode.
+configuration. Missing or unknown `moon.location.resolver` or
+`moon.weather.provider` values fail startup; the runtime backend does not
+include fixture provider modes.
 
 ## Query Endpoint
 
@@ -32,17 +35,18 @@ the runtime backend does not include a fixture resolver mode.
 GET /api/opportunities?q=Praha
 ```
 
-The location resolver must be configured explicitly:
+The location resolver and weather provider must be configured explicitly:
 
 ```bash
-mvn spring-boot:run -pl backend -am -Dspring-boot.run.arguments=--moon.location.resolver=open-meteo
+mvn spring-boot:run -pl backend -am \
+  -Dspring-boot.run.arguments="--moon.location.resolver=open-meteo --moon.weather.provider=open-meteo"
 ```
 
 With that setting, the same query endpoint uses Open-Meteo Geocoding for
 location resolution and can return resolved, ambiguous, not found, or
 temporarily unavailable location states from the provider path. A resolved city
 uses its backend location ID, provider ID, coordinates, elevation, timezone, and
-country code for opportunity generation.
+country code for opportunity generation and hourly weather lookup.
 
 ## Open-Meteo Geocoding Adapter
 
@@ -68,6 +72,25 @@ Manual live drift checks are kept outside Maven:
 
 ```bash
 live-tests/run_live_geocoding_tests.sh
+```
+
+## Open-Meteo Weather Adapter
+
+`OpenMeteoWeatherClient` implements the backend `WeatherForecastProvider` seam
+and can be selected with `moon.weather.provider=open-meteo`. It requests hourly
+cloud cover, low/mid/high cloud cover, precipitation probability,
+precipitation amount, weather code, and visibility from Open-Meteo Forecast.
+The adapter normalizes provider-shaped hourly records into backend weather
+facts used by the scoring model. Malformed payloads, empty responses, HTTP
+failures, IO failures, timeouts, and rate limits fail the dependency boundary
+instead of producing fake no-op opportunities.
+
+The Maven test suite uses saved provider JSON fixtures and fake weather
+providers; it never calls the live weather API. Manual live weather drift checks
+are kept outside Maven:
+
+```bash
+live-tests/run_live_weather_tests.sh
 ```
 
 ## Direct Fixture Endpoint
@@ -104,7 +127,8 @@ mvn test -pl backend -am
 ## Run Locally
 
 ```bash
-mvn spring-boot:run -pl backend -am -Dspring-boot.run.arguments=--moon.location.resolver=open-meteo
+mvn spring-boot:run -pl backend -am \
+  -Dspring-boot.run.arguments="--moon.location.resolver=open-meteo --moon.weather.provider=open-meteo"
 ```
 
 Then post the request body above to
@@ -118,7 +142,7 @@ curl 'http://localhost:8080/api/opportunities?q=Springfield'
 
 `Springfield` is useful for manually checking ambiguity handling. A query that
 Open-Meteo resolves to a single location should return coordinate-backed
-opportunities with fixed fixture weather until live weather integration lands.
+opportunities with live Open-Meteo hourly weather.
 
 To exercise the direct fixture-backed scoring path manually:
 

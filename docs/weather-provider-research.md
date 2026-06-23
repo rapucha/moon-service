@@ -40,11 +40,20 @@ Moon Service backend
   - avoids permanent user-location storage unless push/sync is added
 ```
 
-The first Open-Meteo weather integration is tracked by
-[#14](https://github.com/rapucha/moon-service/issues/14). Provider-call
-protection and backend observability are tracked separately by
+The first Open-Meteo weather adapter lives under
+`backend/src/main/java/dev/moonservice/backend/weather/openmeteo/` and is
+tracked by [#14](https://github.com/rapucha/moon-service/issues/14). It is
+fixture-tested in Maven and can be checked against live provider drift with:
+
+```bash
+live-tests/run_live_weather_tests.sh
+```
+
+Provider-call protection and backend observability are tracked separately by
 [#8](https://github.com/rapucha/moon-service/issues/8) and
-[#9](https://github.com/rapucha/moon-service/issues/9).
+[#9](https://github.com/rapucha/moon-service/issues/9). Containerized backend
+live smoke testing is tracked by
+[#27](https://github.com/rapucha/moon-service/issues/27).
 
 Why not direct Android calls as the default:
 

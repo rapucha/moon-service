@@ -121,6 +121,8 @@ than only in this roadmap:
   thresholds with real Moon photography examples.
 - [#19](https://github.com/rapucha/moon-service/issues/19): choose the alpha
   hosting and backup boundary before deployment-specific work.
+- [#27](https://github.com/rapucha/moon-service/issues/27): add a
+  containerized backend live smoke test.
 
 Existing supporting follow-ups:
 
@@ -199,6 +201,12 @@ and provider metadata for opportunity generation instead of requiring a
 prototype fixture location ID. The direct fixture endpoint remains Prague-only
 for deterministic scoring/prototype checks.
 
+The query-shaped endpoint also uses the backend Open-Meteo weather provider
+seam for normalized hourly forecast facts when `moon.weather.provider=open-meteo`
+is configured. Maven tests keep this network-free with provider fixtures and
+fake weather providers; direct live provider drift checks live under
+`live-tests/`.
+
 The backend now locks down the first invalid-request behavior: malformed JSON,
 non-object JSON, unsupported fixture locations, invalid start dates, and
 out-of-range numeric controls return HTTP `400` with
@@ -216,8 +224,8 @@ and exercised through the backend:
   opportunity-shaping control.
 - Use hourly Open-Meteo weather fields for V0 because cloud cover is the key
   scoring input and cloud-cover layers are hourly.
-- The fixed weather fixture is represented as one stable hourly weather state;
-  real hourly forecast-change splitting is tracked by
-  [#14](https://github.com/rapucha/moon-service/issues/14).
+- The resolved-location backend path can score with live hourly forecast facts;
+  deeper weather-change interval splitting and merging can be refined after the
+  first adapter is in place.
 - Returned windows are selected by top `limit`; request-level `minScore` was
   removed from the Maven and Spring prototype contract.

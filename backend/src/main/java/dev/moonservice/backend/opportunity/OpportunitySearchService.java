@@ -10,6 +10,7 @@ import dev.moonservice.backend.opportunity.search.OpportunitySearchEngine;
 import dev.moonservice.backend.opportunity.search.OpportunitySearchRequest;
 import dev.moonservice.backend.opportunity.search.OpportunitySearchResponse;
 import dev.moonservice.backend.opportunity.search.OpportunityStatusResponse;
+import dev.moonservice.backend.weather.WeatherForecastUnavailableException;
 import org.springframework.stereotype.Service;
 import tools.jackson.databind.JsonNode;
 
@@ -50,7 +51,12 @@ public class OpportunitySearchService {
     }
 
     private OpportunityResponse searchResolvedLocation(ResolvedLocation location) {
-        return opportunitySearchEngine.search(location, opportunitySearchDefaults.requestFor(location));
+        try {
+            return opportunitySearchEngine.search(location, opportunitySearchDefaults.requestFor(location));
+        } catch (WeatherForecastUnavailableException ex) {
+            return OpportunityStatusResponse.temporarilyUnavailable(
+                    "Opportunity weather lookup is temporarily unavailable.");
+        }
     }
 
     private static String normalizeQuery(String rawQuery) {

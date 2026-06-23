@@ -13,6 +13,8 @@ import dev.moonservice.backend.opportunity.search.OpportunityResponse;
 import dev.moonservice.backend.opportunity.search.OpportunitySearchEngine;
 import dev.moonservice.backend.opportunity.search.OpportunitySearchRequest;
 import dev.moonservice.backend.opportunity.search.OpportunitySearchResponse;
+import dev.moonservice.backend.opportunity.search.OpportunityStatusResponse;
+import dev.moonservice.backend.weather.WeatherForecastUnavailableException;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneId;
@@ -151,6 +153,38 @@ class OpportunitySearchServiceTest {
         OpportunityResponse response = opportunitySearchService.searchByQuery("Praha");
 
         assertEquals("temporarily_unavailable", response.status());
+    }
+
+    @Test
+    void returnsTemporarilyUnavailableWhenWeatherProviderFails() {
+        ResolvedLocation amsterdam = new ResolvedLocation(
+                "amsterdam-nl",
+                new ProviderLocationId(LocationProvider.OPEN_METEO, "2759794"),
+                "Amsterdam, North Holland, Netherlands",
+                52.37403,
+                4.88969,
+                13,
+                ZoneId.of("Europe/Amsterdam"),
+                "NL");
+        OpportunitySearchService opportunitySearchService = new OpportunitySearchService(new OpportunitySearchEngine() {
+            @Override
+            public OpportunitySearchResponse search(OpportunitySearchRequest request) {
+                fail("Query search should pass the resolved location to the engine.");
+                return okResponse();
+            }
+
+            @Override
+            public OpportunitySearchResponse search(ResolvedLocation location, OpportunitySearchRequest request) {
+                throw new WeatherForecastUnavailableException("Weather provider failed.");
+            }
+        }, query -> LocationResolution.resolved(amsterdam), defaults);
+
+        OpportunityResponse response = opportunitySearchService.searchByQuery("Amsterdam");
+
+        assertEquals("temporarily_unavailable", response.status());
+        assertEquals(
+                "Opportunity weather lookup is temporarily unavailable.",
+                ((OpportunityStatusResponse) response).message());
     }
 
     @Test

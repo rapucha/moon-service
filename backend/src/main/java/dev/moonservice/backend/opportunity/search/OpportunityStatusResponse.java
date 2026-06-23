@@ -15,9 +15,13 @@ public record OpportunityStatusResponse(
     }
 
     public static OpportunityStatusResponse temporarilyUnavailable() {
+        return temporarilyUnavailable("Location lookup is temporarily unavailable.");
+    }
+
+    public static OpportunityStatusResponse temporarilyUnavailable(String message) {
         return new OpportunityStatusResponse(
                 "temporarily_unavailable",
                 Instant.now().toString(),
-                "Location lookup is temporarily unavailable.");
+                message);
     }
 }

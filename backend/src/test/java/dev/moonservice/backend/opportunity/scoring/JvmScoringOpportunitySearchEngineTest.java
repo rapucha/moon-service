@@ -12,10 +12,14 @@ import dev.moonservice.backend.location.ResolvedLocation;
 import dev.moonservice.backend.opportunity.InvalidOpportunitySearchRequestException;
 import dev.moonservice.backend.opportunity.search.OpportunitySearchRequest;
 import dev.moonservice.backend.opportunity.search.OpportunitySearchResponse;
+import dev.moonservice.backend.weather.HourlyWeather;
+import dev.moonservice.backend.weather.WeatherForecast;
+import dev.moonservice.backend.weather.WeatherForecastProvider;
 import dev.moonservice.scoringprototype.PreviewEvaluator;
 import org.junit.jupiter.api.Test;
 
 import java.time.ZoneId;
+import java.util.concurrent.atomic.AtomicReference;
 
 class JvmScoringOpportunitySearchEngineTest {
     @Test
@@ -33,6 +37,45 @@ class JvmScoringOpportunitySearchEngineTest {
         assertFalse(response.opportunities().isEmpty());
         assertTrue(response.opportunities().getFirst().id().startsWith("amsterdam-nl-"));
         assertTrue(response.opportunities().getFirst().links().get("ics").startsWith("/o/amsterdam-nl-"));
+    }
+
+    @Test
+    void scoresResolvedLocationWithWeatherForecastProviderData() {
+        AtomicReference<ResolvedLocation> requestedLocation = new AtomicReference<>();
+        AtomicReference<Integer> requestedForecastHorizonDays = new AtomicReference<>();
+        WeatherForecastProvider provider = (location, startsAt, endsAt, forecastHorizonDays) -> {
+            requestedLocation.set(location);
+            requestedForecastHorizonDays.set(forecastHorizonDays);
+            return WeatherForecast.fixed(new HourlyWeather(
+                    startsAt,
+                    82,
+                    70,
+                    45,
+                    20,
+                    35,
+                    0.8,
+                    12000,
+                    61,
+                    2.0));
+        };
+        JvmScoringOpportunitySearchEngine engine = new JvmScoringOpportunitySearchEngine(
+                new PreviewEvaluator(),
+                provider);
+
+        OpportunitySearchResponse response = engine.search(
+                amsterdam(),
+                new OpportunitySearchRequest("amsterdam-nl", "2026-06-29", 7, 90.0, 5));
+
+        OpportunitySearchResponse.Weather weather = response.opportunities().getFirst().weather();
+        assertEquals(amsterdam(), requestedLocation.get());
+        assertEquals(7, requestedForecastHorizonDays.get());
+        assertEquals(82, weather.cloudCoverMeanPercent());
+        assertEquals(70, weather.lowCloudCoverMaxPercent());
+        assertEquals(35, weather.precipitationProbabilityMaxPercent());
+        assertEquals(0.8, weather.precipitationMm());
+        assertEquals(12000, weather.visibilityMinMeters());
+        assertEquals(61, weather.weatherCode());
+        assertEquals("rain likely", weather.summary());
     }
 
     @Test

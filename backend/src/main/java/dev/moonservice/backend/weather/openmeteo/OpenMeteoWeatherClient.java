@@ -1,0 +1,241 @@
+package dev.moonservice.backend.weather.openmeteo;
+
+import dev.moonservice.backend.location.ResolvedLocation;
+import dev.moonservice.backend.weather.HourlyWeather;
+import dev.moonservice.backend.weather.HourlyWeatherForecast;
+import dev.moonservice.backend.weather.WeatherForecast;
+import dev.moonservice.backend.weather.WeatherForecastProvider;
+import dev.moonservice.backend.weather.WeatherForecastUnavailableException;
+import org.springframework.web.client.RestClient;
+import org.springframework.web.util.UriComponentsBuilder;
+import tools.jackson.core.JacksonException;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
+
+import java.net.URI;
+import java.time.Duration;
+import java.time.Instant;
+import java.time.ZoneOffset;
+import java.time.format.DateTimeFormatter;
+import java.time.temporal.ChronoUnit;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Locale;
+import java.util.OptionalDouble;
+import java.util.OptionalInt;
+import java.util.OptionalLong;
+
+public class OpenMeteoWeatherClient implements WeatherForecastProvider {
+    static final URI DEFAULT_ENDPOINT = URI.create("https://api.open-meteo.com/v1/forecast");
+    private static final Duration DEFAULT_TIMEOUT = Duration.ofSeconds(10);
+    private static final double FORECAST_AGE_HOURS = 1.0;
+    private static final String HOURLY_VARIABLES = String.join(
+            ",",
+            "cloud_cover",
+            "cloud_cover_low",
+            "cloud_cover_mid",
+            "cloud_cover_high",
+            "precipitation_probability",
+            "precipitation",
+            "weather_code",
+            "visibility");
+    private static final DateTimeFormatter OPEN_METEO_HOUR =
+            DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm").withZone(ZoneOffset.UTC);
+
+    private final URI endpoint;
+    private final Duration timeout;
+    private final OpenMeteoWeatherTransport transport;
+    private final ObjectMapper objectMapper;
+
+    public OpenMeteoWeatherClient() {
+        this(
+                DEFAULT_ENDPOINT,
+                DEFAULT_TIMEOUT,
+                new RestClientOpenMeteoWeatherTransport(RestClient.builder(), DEFAULT_TIMEOUT),
+                new ObjectMapper());
+    }
+
+    OpenMeteoWeatherClient(OpenMeteoWeatherTransport transport) {
+        this(DEFAULT_ENDPOINT, DEFAULT_TIMEOUT, transport, new ObjectMapper());
+    }
+
+    OpenMeteoWeatherClient(
+            URI endpoint,
+            Duration timeout,
+            OpenMeteoWeatherTransport transport,
+            ObjectMapper objectMapper
+    ) {
+        this.endpoint = endpoint;
+        this.timeout = timeout;
+        this.transport = transport;
+        this.objectMapper = objectMapper;
+    }
+
+    @Override
+    public WeatherForecast forecastFor(
+            ResolvedLocation location,
+            Instant startsAt,
+            Instant endsAt,
+            int forecastHorizonDays
+    ) {
+        String body;
+        try {
+            body = transport.get(requestUri(location, startsAt, endsAt), timeout);
+        } catch (OpenMeteoWeatherTransportException ex) {
+            throw new WeatherForecastUnavailableException("Weather lookup is temporarily unavailable.", ex);
+        }
+
+        if (body == null || body.isBlank()) {
+            throw new WeatherForecastUnavailableException("Weather provider returned an empty response.");
+        }
+
+        JsonNode root;
+        try {
+            root = objectMapper.readTree(body);
+        } catch (JacksonException ex) {
+            throw new WeatherForecastUnavailableException("Weather provider response was not valid JSON.", ex);
+        }
+
+        return toForecast(root);
+    }
+
+    URI requestUri(ResolvedLocation location, Instant startsAt, Instant endsAt) {
+        Instant startHour = startsAt.truncatedTo(ChronoUnit.HOURS);
+        Instant endHour = endsAt.minusSeconds(1).truncatedTo(ChronoUnit.HOURS);
+        if (endHour.isBefore(startHour)) {
+            throw new IllegalArgumentException("Weather forecast end must be after start.");
+        }
+
+        return UriComponentsBuilder.fromUri(endpoint)
+                .queryParam("latitude", coordinate(location.latitude()))
+                .queryParam("longitude", coordinate(location.longitude()))
+                .queryParam("elevation", location.elevationMeters())
+                .queryParam("hourly", HOURLY_VARIABLES)
+                .queryParam("timezone", "UTC")
+                .queryParam("timeformat", "unixtime")
+                .queryParam("start_hour", OPEN_METEO_HOUR.format(startHour))
+                .queryParam("end_hour", OPEN_METEO_HOUR.format(endHour))
+                .build()
+                .encode()
+                .toUri();
+    }
+
+    private static WeatherForecast toForecast(JsonNode root) {
+        JsonNode hourly = root.path("hourly");
+        JsonNode times = hourly.path("time");
+        if (!times.isArray()) {
+            throw new WeatherForecastUnavailableException("Weather provider response did not include hourly time data.");
+        }
+
+        int size = times.size();
+        if (size == 0) {
+            throw new WeatherForecastUnavailableException("Weather provider response did not include hourly records.");
+        }
+
+        List<HourlyWeather> hours = new ArrayList<>();
+        for (int index = 0; index < size; index++) {
+            hours.add(new HourlyWeather(
+                    instantAt(times, index),
+                    percentAt(hourly, "cloud_cover", index, size),
+                    percentAt(hourly, "cloud_cover_low", index, size),
+                    percentAt(hourly, "cloud_cover_mid", index, size),
+                    percentAt(hourly, "cloud_cover_high", index, size),
+                    percentAt(hourly, "precipitation_probability", index, size),
+                    nonNegativeDoubleAt(hourly, "precipitation", index, size),
+                    nonNegativeIntAt(hourly, "visibility", index, size),
+                    nonNegativeIntAt(hourly, "weather_code", index, size),
+                    FORECAST_AGE_HOURS
+            ));
+        }
+        return new HourlyWeatherForecast(hours);
+    }
+
+    private static Instant instantAt(JsonNode times, int index) {
+        OptionalLong value = longValue(times.get(index));
+        if (value.isEmpty()) {
+            throw new WeatherForecastUnavailableException("Weather provider returned an invalid hourly timestamp.");
+        }
+        return Instant.ofEpochSecond(value.getAsLong());
+    }
+
+    private static int percentAt(JsonNode hourly, String fieldName, int index, int expectedSize) {
+        int value = nonNegativeIntAt(hourly, fieldName, index, expectedSize);
+        if (value > 100) {
+            throw new WeatherForecastUnavailableException("Weather provider field " + fieldName + " was above 100.");
+        }
+        return value;
+    }
+
+    private static int nonNegativeIntAt(JsonNode hourly, String fieldName, int index, int expectedSize) {
+        JsonNode values = arrayField(hourly, fieldName, expectedSize);
+        OptionalInt value = intValue(values.get(index));
+        if (value.isEmpty() || value.getAsInt() < 0) {
+            throw new WeatherForecastUnavailableException("Weather provider returned invalid " + fieldName + ".");
+        }
+        return value.getAsInt();
+    }
+
+    private static double nonNegativeDoubleAt(JsonNode hourly, String fieldName, int index, int expectedSize) {
+        JsonNode values = arrayField(hourly, fieldName, expectedSize);
+        OptionalDouble value = doubleValue(values.get(index));
+        if (value.isEmpty() || value.getAsDouble() < 0.0) {
+            throw new WeatherForecastUnavailableException("Weather provider returned invalid " + fieldName + ".");
+        }
+        return value.getAsDouble();
+    }
+
+    private static JsonNode arrayField(JsonNode hourly, String fieldName, int expectedSize) {
+        JsonNode values = hourly.path(fieldName);
+        if (!values.isArray() || values.size() != expectedSize) {
+            throw new WeatherForecastUnavailableException(
+                    "Weather provider field " + fieldName + " did not match hourly time data.");
+        }
+        return values;
+    }
+
+    private static OptionalLong longValue(JsonNode node) {
+        if (node == null) {
+            return OptionalLong.empty();
+        }
+        try {
+            return OptionalLong.of(Long.parseLong(node.asString()));
+        } catch (NumberFormatException ex) {
+            return OptionalLong.empty();
+        }
+    }
+
+    private static OptionalInt intValue(JsonNode node) {
+        if (node == null) {
+            return OptionalInt.empty();
+        }
+        try {
+            double value = Double.parseDouble(node.asString());
+            if (!Double.isFinite(value)) {
+                return OptionalInt.empty();
+            }
+            return OptionalInt.of(Math.toIntExact(Math.round(value)));
+        } catch (ArithmeticException | NumberFormatException ex) {
+            return OptionalInt.empty();
+        }
+    }
+
+    private static OptionalDouble doubleValue(JsonNode node) {
+        if (node == null) {
+            return OptionalDouble.empty();
+        }
+        try {
+            double value = Double.parseDouble(node.asString());
+            if (!Double.isFinite(value)) {
+                return OptionalDouble.empty();
+            }
+            return OptionalDouble.of(value);
+        } catch (NumberFormatException ex) {
+            return OptionalDouble.empty();
+        }
+    }
+
+    private static String coordinate(double value) {
+        double rounded = Math.round(value * 10000.0) / 10000.0;
+        return String.format(Locale.ROOT, "%.4f", rounded);
+    }
+}
