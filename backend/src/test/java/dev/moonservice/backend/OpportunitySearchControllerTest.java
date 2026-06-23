@@ -2,25 +2,41 @@ package dev.moonservice.backend;
 
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import dev.moonservice.backend.location.LocationResolver;
+import dev.moonservice.backend.location.openmeteo.TestOpenMeteoLocationResolver;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.boot.webtestclient.autoconfigure.AutoConfigureWebTestClient;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Primary;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.reactive.server.WebTestClient;
 
-@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
+@SpringBootTest(
+        webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
+        properties = "moon.location.resolver=open-meteo")
 @AutoConfigureWebTestClient
 class OpportunitySearchControllerTest {
     @Autowired
     private WebTestClient webTestClient;
 
+    @TestConfiguration
+    static class TestOpenMeteoLocationResolverConfiguration {
+        @Bean
+        @Primary
+        LocationResolver testOpenMeteoLocationResolver() {
+            return new TestOpenMeteoLocationResolver();
+        }
+    }
+
     @ParameterizedTest
     @ValueSource(strings = {"Praha", "Prague", "prague-cz"})
-    void returnsOpportunitySearchResponseForFixtureQuery(String query) {
+    void returnsOpportunitySearchResponseForTestOpenMeteoQuery(String query) {
         webTestClient.get()
                 .uri(uriBuilder -> uriBuilder.path("/api/opportunities")
                         .queryParam("q", query)
@@ -38,7 +54,7 @@ class OpportunitySearchControllerTest {
     }
 
     @Test
-    void returnsLocationNotFoundForUnknownFixtureQuery() {
+    void returnsLocationNotFoundForUnknownTestOpenMeteoQuery() {
         webTestClient.get()
                 .uri(uriBuilder -> uriBuilder.path("/api/opportunities")
                         .queryParam("q", "Amsterdam")
@@ -53,7 +69,7 @@ class OpportunitySearchControllerTest {
     }
 
     @Test
-    void returnsAmbiguousLocationForFixtureProviderCandidates() {
+    void returnsAmbiguousLocationForTestOpenMeteoProviderCandidates() {
         webTestClient.get()
                 .uri(uriBuilder -> uriBuilder.path("/api/opportunities")
                         .queryParam("q", "Springfield")

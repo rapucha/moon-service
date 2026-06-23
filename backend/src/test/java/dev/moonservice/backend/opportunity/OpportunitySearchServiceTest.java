@@ -10,6 +10,8 @@ import dev.moonservice.backend.location.ProviderLocationId;
 import dev.moonservice.backend.location.ResolvedLocation;
 import dev.moonservice.backend.opportunity.search.LocationCandidatesResponse;
 import dev.moonservice.backend.opportunity.search.OpportunityResponse;
+import dev.moonservice.backend.opportunity.search.OpportunitySearchEngine;
+import dev.moonservice.backend.opportunity.search.OpportunitySearchRequest;
 import dev.moonservice.backend.opportunity.search.OpportunitySearchResponse;
 import java.time.Clock;
 import java.time.Instant;
@@ -63,7 +65,7 @@ class OpportunitySearchServiceTest {
             assertEquals(new LocationQuery("Praha"), query);
             return LocationResolution.resolved(new ResolvedLocation(
                     "prague-cz",
-                    fixtureProviderLocationId("prague-cz"),
+                    providerLocationId("prague-cz"),
                     "Prague, Czechia",
                     50.08804,
                     14.42076,
@@ -84,7 +86,7 @@ class OpportunitySearchServiceTest {
             return okResponse();
         }, query -> LocationResolution.resolved(new ResolvedLocation(
                 "test-location",
-                fixtureProviderLocationId("test-location"),
+                providerLocationId("test-location"),
                 "Test Location",
                 40.7128,
                 -74.0060,
@@ -104,7 +106,7 @@ class OpportunitySearchServiceTest {
                 LocationResolution.ambiguous(java.util.List.of(
                         new ResolvedLocation(
                                 "springfield-mo-us",
-                                fixtureProviderLocationId("springfield-mo-us"),
+                                providerLocationId("springfield-mo-us"),
                                 "Springfield, Missouri, United States",
                                 37.21533,
                                 -93.29824,
@@ -113,7 +115,7 @@ class OpportunitySearchServiceTest {
                                 "US"),
                         new ResolvedLocation(
                                 "springfield-il-us",
-                                fixtureProviderLocationId("springfield-il-us"),
+                                providerLocationId("springfield-il-us"),
                                 "Springfield, Illinois, United States",
                                 39.80172,
                                 -89.64371,
@@ -136,6 +138,34 @@ class OpportunitySearchServiceTest {
                 LocationResolution.temporarilyUnavailable(), defaults);
 
         OpportunityResponse response = opportunitySearchService.searchByQuery("Praha");
+
+        assertEquals("temporarily_unavailable", response.status());
+    }
+
+    @Test
+    void returnsTemporarilyUnavailableWhenResolvedLocationCannotBeScoredYet() {
+        OpportunitySearchService opportunitySearchService = new OpportunitySearchService(new OpportunitySearchEngine() {
+            @Override
+            public OpportunitySearchResponse search(OpportunitySearchRequest request) {
+                fail("Engine should not be called when it does not support the resolved location.");
+                return okResponse();
+            }
+
+            @Override
+            public boolean supportsLocation(ResolvedLocation location) {
+                return false;
+            }
+        }, query -> LocationResolution.resolved(new ResolvedLocation(
+                "openmeteo-123",
+                new ProviderLocationId(LocationProvider.OPEN_METEO, "123"),
+                "Amsterdam, North Holland, Netherlands",
+                52.37403,
+                4.88969,
+                13,
+                ZoneId.of("Europe/Amsterdam"),
+                "NL")), defaults);
+
+        OpportunityResponse response = opportunitySearchService.searchByQuery("Amsterdam");
 
         assertEquals("temporarily_unavailable", response.status());
     }
@@ -163,7 +193,7 @@ class OpportunitySearchServiceTest {
                 java.util.List.of());
     }
 
-    private static ProviderLocationId fixtureProviderLocationId(String providerId) {
-        return new ProviderLocationId(LocationProvider.FIXTURE, providerId);
+    private static ProviderLocationId providerLocationId(String providerId) {
+        return new ProviderLocationId(LocationProvider.OPEN_METEO, providerId);
     }
 }
