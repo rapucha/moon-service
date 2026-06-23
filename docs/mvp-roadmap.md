@@ -104,6 +104,39 @@ Exit criteria:
 - Alpha can run for a few users without manual daily intervention.
 - Known privacy and operational risks are documented.
 
+## Tracked MVP Backlog
+
+Near-term implementation and decision work is tracked in GitHub issues rather
+than only in this roadmap:
+
+- [#13](https://github.com/rapucha/moon-service/issues/13): replace
+  fixture-only opportunity search with a coordinate-backed engine.
+- [#14](https://github.com/rapucha/moon-service/issues/14): integrate
+  Open-Meteo weather forecasts into opportunity scoring.
+- [#15](https://github.com/rapucha/moon-service/issues/15): build the first
+  web lookup flow and shareable result page.
+- [#16](https://github.com/rapucha/moon-service/issues/16): add public feeds
+  and iCalendar exports for real opportunities.
+- [#17](https://github.com/rapucha/moon-service/issues/17): decide whether
+  Astronomy Engine through JitPack is acceptable before real backend adoption.
+- [#18](https://github.com/rapucha/moon-service/issues/18): calibrate scoring
+  thresholds with real Moon photography examples.
+- [#19](https://github.com/rapucha/moon-service/issues/19): choose the alpha
+  hosting and backup boundary before deployment-specific work.
+
+Existing supporting follow-ups:
+
+- [#3](https://github.com/rapucha/moon-service/issues/3): extensible scoring
+  context for future interests and recurring events.
+- [#5](https://github.com/rapucha/moon-service/issues/5): decouple controller
+  tests from provider identity details.
+- [#7](https://github.com/rapucha/moon-service/issues/7): decide bot identity
+  policy for agent-created pull requests.
+- [#8](https://github.com/rapucha/moon-service/issues/8): add basic
+  provider-call scalability protections.
+- [#9](https://github.com/rapucha/moon-service/issues/9): add basic backend
+  observability.
+
 ## Deferred Features
 
 - Mandatory accounts.
@@ -163,6 +196,10 @@ the Maven scoring prototype through the `jvm-scoring-prototype` Maven
 dependency and its public `PreviewEvaluator` facade behind a backend-owned
 opportunity search seam.
 
+Replacing that fixture-only downstream opportunity engine with one that can use
+resolved coordinates is tracked by
+[#13](https://github.com/rapucha/moon-service/issues/13).
+
 The backend now locks down the first invalid-request behavior: malformed JSON,
 non-object JSON, unsupported fixture locations, invalid start dates, and
 out-of-range numeric controls return HTTP `400` with
@@ -181,6 +218,7 @@ and exercised through the backend:
 - Use hourly Open-Meteo weather fields for V0 because cloud cover is the key
   scoring input and cloud-cover layers are hourly.
 - The fixed weather fixture is represented as one stable hourly weather state;
-  real hourly forecast-change splitting remains a later live-weather step.
+  real hourly forecast-change splitting is tracked by
+  [#14](https://github.com/rapucha/moon-service/issues/14).
 - Returned windows are selected by top `limit`; request-level `minScore` was
   removed from the Maven and Spring prototype contract.

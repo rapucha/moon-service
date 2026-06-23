@@ -627,6 +627,9 @@ For the first backend MVP:
 - Do not log raw queries that look like street addresses unless needed for debugging.
 - If provider quota is exhausted, return a temporary service state rather than pretending the location was not found.
 
+Provider-call caching and in-flight coalescing are tracked by
+[#8](https://github.com/rapucha/moon-service/issues/8).
+
 ## Quota Observability
 
 Track outbound geocoding provider calls locally.
@@ -645,6 +648,9 @@ Admin visibility:
 - Show configured provider limits and percent used when known.
 - Warn at roughly 50 percent, 80 percent, and 95 percent usage.
 - Keep geocoding explicit-submit only in v0; do not add autocomplete until quota behavior is understood.
+
+Backend metrics and operator visibility are tracked by
+[#9](https://github.com/rapucha/moon-service/issues/9).
 
 If using Nominatim public API:
 
@@ -689,3 +695,8 @@ Geocoding research reinforces the web-first backend MVP:
 - Should browser geolocation be offered as a separate opt-in path?
 - How long should canonical location records be cached before refresh?
 - When, if ever, should exact address or landmark search be supported?
+
+The first web lookup flow, including ambiguity handling in the form, is tracked
+by [#15](https://github.com/rapucha/moon-service/issues/15). Cache TTLs and
+provider-call protection are tracked by
+[#8](https://github.com/rapucha/moon-service/issues/8).

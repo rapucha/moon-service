@@ -22,6 +22,12 @@ Recommended first routes:
 /o/prague-cz-2026-06-29T1920Z.ics
 ```
 
+Implementation tracking:
+[#15](https://github.com/rapucha/moon-service/issues/15) for the web lookup and
+shareable result flow, and
+[#16](https://github.com/rapucha/moon-service/issues/16) for feeds and
+calendar exports.
+
 The web page can call a single opportunity search endpoint:
 
 ```http
@@ -638,6 +644,9 @@ retention, and deletion before implementation.
 
 ## Feed And Calendar Rules
 
+Implementation tracking:
+[#16](https://github.com/rapucha/moon-service/issues/16).
+
 RSS/Atom:
 
 - Only for real public opportunities.
@@ -676,6 +685,11 @@ opportunity_search
   -> scoring
   -> feed/calendar link assembly
 ```
+
+The coordinate-backed opportunity engine is tracked by
+[#13](https://github.com/rapucha/moon-service/issues/13), and the live weather
+integration is tracked by
+[#14](https://github.com/rapucha/moon-service/issues/14).
 
 This keeps the public API simple without making the backend design hard to change.
 

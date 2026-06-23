@@ -378,10 +378,15 @@ These are acceptable limitations for an alert-first MVP, but the UI should avoid
 
 ## Research Needed
 
-- Validate the recommended ephemeris candidate in `docs/ephemeris-research.md` against JPL Horizons before using it in product scoring.
-- Validate the recommended weather provider in `docs/weather-provider-research.md` against local forecast examples and map its fields into the model.
-- Collect real sample days for known good and bad Moon photography conditions.
-- Tune thresholds from examples rather than preference alone.
+- Initial Astronomy Engine validation is recorded in
+  `docs/ephemeris-research.md`; the remaining build-policy decision is tracked
+  by [#17](https://github.com/rapucha/moon-service/issues/17).
+- Validate the recommended weather provider integration against local forecast
+  examples and map its fields into the model as part of
+  [#14](https://github.com/rapucha/moon-service/issues/14).
+- Collect real sample days for known good and bad Moon photography conditions
+  and tune thresholds from examples as part of
+  [#18](https://github.com/rapucha/moon-service/issues/18).
 - Collect real recurring-event examples and decide whether v1 should support
   only user-entered patterns, curated public patterns, or live provider-backed
-  schedules.
+  schedules as part of [#3](https://github.com/rapucha/moon-service/issues/3).
