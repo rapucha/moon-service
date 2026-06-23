@@ -2,6 +2,7 @@ package dev.moonservice.backend.opportunity;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import dev.moonservice.backend.opportunity.search.OpportunitySearchRequest;
@@ -47,7 +48,7 @@ class OpportunitySearchRequestTest {
     }
 
     @Test
-    void preservesInvalidStartCause() throws Exception {
+    void rejectsUnsupportedStartShapeWithoutTrialParsing() throws Exception {
         UsageException exception = assertThrows(
                 UsageException.class,
                 () -> OpportunitySearchRequest.fromJson(objectMapper.readTree("""
@@ -61,8 +62,43 @@ class OpportunitySearchRequestTest {
                         """)));
 
         assertEquals("Invalid --start value: not-a-date", exception.getMessage());
+        assertNull(exception.getCause());
+    }
+
+    @Test
+    void preservesMalformedIsoDateCause() throws Exception {
+        UsageException exception = assertThrows(
+                UsageException.class,
+                () -> OpportunitySearchRequest.fromJson(objectMapper.readTree("""
+                        {
+                          "locationId": "prague-cz",
+                          "start": "2026-13-40",
+                          "forecastHorizonDays": 7,
+                          "maxMoonAltitudeDegrees": 12,
+                          "limit": 5
+                        }
+                        """)));
+
+        assertEquals("Invalid --start value: 2026-13-40", exception.getMessage());
         assertNotNull(exception.getCause());
-        assertEquals(1, exception.getCause().getSuppressed().length);
+    }
+
+    @Test
+    void preservesMalformedUtcInstantCause() throws Exception {
+        UsageException exception = assertThrows(
+                UsageException.class,
+                () -> OpportunitySearchRequest.fromJson(objectMapper.readTree("""
+                        {
+                          "locationId": "prague-cz",
+                          "start": "2026-06-29T99:30:00Z",
+                          "forecastHorizonDays": 7,
+                          "maxMoonAltitudeDegrees": 12,
+                          "limit": 5
+                        }
+                        """)));
+
+        assertEquals("Invalid --start value: 2026-06-29T99:30:00Z", exception.getMessage());
+        assertNotNull(exception.getCause());
     }
 
     @Test

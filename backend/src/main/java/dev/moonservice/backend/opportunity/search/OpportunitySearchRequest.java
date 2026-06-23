@@ -7,6 +7,7 @@ import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneOffset;
 import java.time.format.DateTimeParseException;
+import java.util.regex.Pattern;
 
 public record OpportunitySearchRequest(
         String locationId,
@@ -15,6 +16,9 @@ public record OpportunitySearchRequest(
         double maxMoonAltitudeDegrees,
         int limit
 ) {
+    private static final Pattern ISO_LOCAL_DATE = Pattern.compile("\\d{4}-\\d{2}-\\d{2}");
+    private static final Pattern UTC_INSTANT = Pattern.compile("\\d{4}-\\d{2}-\\d{2}T.+Z");
+
     public OpportunitySearchRequest(
             String locationId,
             String start,
@@ -43,15 +47,28 @@ public record OpportunitySearchRequest(
     }
 
     private static LocalDate parseIsoLocalDateOrUtcInstantDate(String value) {
+        if (ISO_LOCAL_DATE.matcher(value).matches()) {
+            return parseIsoLocalDate(value);
+        }
+        if (UTC_INSTANT.matcher(value).matches()) {
+            return parseUtcInstantDate(value);
+        }
+        throw new UsageException("Invalid --start value: " + value);
+    }
+
+    private static LocalDate parseIsoLocalDate(String value) {
         try {
             return LocalDate.parse(value);
-        } catch (DateTimeParseException localDateFailure) {
-            try {
-                return Instant.parse(value).atZone(ZoneOffset.UTC).toLocalDate();
-            } catch (DateTimeParseException instantFailure) {
-                instantFailure.addSuppressed(localDateFailure);
-                throw new UsageException("Invalid --start value: " + value, instantFailure);
-            }
+        } catch (DateTimeParseException ex) {
+            throw new UsageException("Invalid --start value: " + value, ex);
+        }
+    }
+
+    private static LocalDate parseUtcInstantDate(String value) {
+        try {
+            return Instant.parse(value).atZone(ZoneOffset.UTC).toLocalDate();
+        } catch (DateTimeParseException ex) {
+            throw new UsageException("Invalid --start value: " + value, ex);
         }
     }
 
