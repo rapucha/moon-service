@@ -58,6 +58,8 @@ Escalate Before Proceeding
 
 Commit and PR Hygiene
 - Keep commits focused by concern.
+- Follow `docs/ai-agent/github-identity.md` for agent-authored GitHub
+  branches, commits, pull requests, issue updates, and review comments.
 - Use conventional commit style when making commits:
   - `feat(backend): add opportunity search provider seam`
   - `fix(scoring): handle empty weather fixture`
