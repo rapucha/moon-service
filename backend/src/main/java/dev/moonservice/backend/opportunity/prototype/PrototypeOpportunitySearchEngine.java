@@ -1,5 +1,6 @@
 package dev.moonservice.backend.opportunity.prototype;
 
+import dev.moonservice.backend.location.ResolvedLocation;
 import dev.moonservice.backend.opportunity.search.OpportunitySearchEngine;
 import dev.moonservice.backend.opportunity.search.OpportunitySearchRequest;
 import dev.moonservice.backend.opportunity.search.OpportunitySearchResponse;
@@ -31,6 +32,11 @@ public class PrototypeOpportunitySearchEngine implements OpportunitySearchEngine
         prototypeRequest.put("maxMoonAltitudeDegrees", request.maxMoonAltitudeDegrees());
         prototypeRequest.put("limit", request.limit());
         return toBackendResponse(previewEvaluator.evaluateJson(prototypeRequest));
+    }
+
+    @Override
+    public boolean supportsLocation(ResolvedLocation location) {
+        return "prague-cz".equals(location.locationId());
     }
 
     private static OpportunitySearchResponse toBackendResponse(String prototypeJson) {

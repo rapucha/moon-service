@@ -3,6 +3,7 @@ package dev.moonservice.backend.opportunity;
 import dev.moonservice.backend.location.LocationQuery;
 import dev.moonservice.backend.location.LocationResolution;
 import dev.moonservice.backend.location.LocationResolver;
+import dev.moonservice.backend.location.ResolvedLocation;
 import dev.moonservice.backend.opportunity.search.LocationCandidatesResponse;
 import dev.moonservice.backend.opportunity.search.OpportunityResponse;
 import dev.moonservice.backend.opportunity.search.OpportunitySearchEngine;
@@ -45,9 +46,15 @@ public class OpportunitySearchService {
             return OpportunityStatusResponse.temporarilyUnavailable();
         }
         return resolution.singleCandidate()
-                .<OpportunityResponse>map(location -> opportunitySearchEngine.search(
-                        opportunitySearchDefaults.requestFor(location)))
+                .<OpportunityResponse>map(this::searchResolvedLocation)
                 .orElseGet(OpportunityStatusResponse::locationNotFound);
+    }
+
+    private OpportunityResponse searchResolvedLocation(ResolvedLocation location) {
+        if (!opportunitySearchEngine.supportsLocation(location)) {
+            return OpportunityStatusResponse.temporarilyUnavailable();
+        }
+        return opportunitySearchEngine.search(opportunitySearchDefaults.requestFor(location));
     }
 
     private static String normalizeQuery(String rawQuery) {

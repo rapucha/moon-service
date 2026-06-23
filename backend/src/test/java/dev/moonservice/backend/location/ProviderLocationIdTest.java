@@ -15,10 +15,10 @@ class ProviderLocationIdTest {
 
     @Test
     void trimsProviderId() {
-        ProviderLocationId providerLocationId = new ProviderLocationId(LocationProvider.FIXTURE, " prague-cz ");
+        ProviderLocationId providerLocationId = new ProviderLocationId(LocationProvider.OPEN_METEO, " prague-cz ");
 
         assertEquals("prague-cz", providerLocationId.providerId());
-        assertEquals("fixture:prague-cz", providerLocationId.serialized());
+        assertEquals("openmeteo:prague-cz", providerLocationId.serialized());
     }
 
     @Test
