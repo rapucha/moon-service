@@ -99,6 +99,17 @@ Setup Checklist
 9. Enable branch protection review requirements after the agent account can
    open PRs.
 
+Smoke Test
+- Before enabling required human reviews, open one small issue-backed pull
+  request from the agent account.
+- Verify the issue, branch, pull request, comments, and commits show the agent
+  account identity.
+- Verify commits use the agent account's GitHub noreply email.
+- Verify the human owner can review the pull request as a separate GitHub
+  identity.
+- Merge the smoke-test pull request before treating the agent-account workflow
+  as ready for protected branch review requirements.
+
 When To Revisit
 - More than one repository needs agent automation.
 - Token rotation or permission auditing becomes burdensome.
