@@ -1,19 +1,22 @@
 # Agent GitHub Identity Policy
 
 Purpose
-- Define how AI-agent work should appear in GitHub.
+- Define how agent-authored work should appear in GitHub.
 - Let the human owner review and approve agent-created pull requests without
   GitHub treating the owner as the PR author.
 - Keep repository permissions small and auditable.
 
 Decision
-- Use a dedicated machine-user GitHub account for Moon Service agent work now.
+- Use a dedicated GitHub user account, called the agent account in this policy,
+  for Moon Service agent work now.
 - Defer a GitHub App until this repo needs installation tokens, multi-repo
-  automation, or finer lifecycle controls than a machine user can provide.
-- Do not store bot credentials, tokens, or setup secrets in this repository.
+  automation, or finer lifecycle controls than a dedicated user account can
+  provide.
+- Do not store agent account credentials, tokens, or setup secrets in this
+  repository.
 
 Rationale
-- A machine user solves the immediate review problem: agent-created branches,
+- An agent account solves the immediate review problem: agent-created branches,
   pull requests, issue updates, and review comments are authored by a separate
   GitHub identity.
 - The repo is currently small enough that a GitHub App would add setup and
@@ -27,13 +30,13 @@ Public Identity
 - Use a commit author name that matches that account, for example
   `Moon Service Agent`.
 - Use the account's GitHub noreply email for commits:
-  `<github-user-id>+<bot-login>@users.noreply.github.com`.
-- Keep the machine user's email private in GitHub account settings.
+  `<github-user-id>+<agent-login>@users.noreply.github.com`.
+- Keep the agent account's email private in GitHub account settings.
 - Configure Git identity locally per repository, not globally, unless the same
-  bot identity is intentionally reused across repositories.
+  agent identity is intentionally reused across repositories.
 
 GitHub Permissions
-- Add the machine user as a collaborator with Write access to this repository.
+- Add the agent account as a collaborator with Write access to this repository.
 - Grant only the permissions needed to do agent workflow work:
   - push issue branches;
   - create and update pull requests;
@@ -51,7 +54,7 @@ Branch Protection Policy
 - Protect `spring-enterprise-ish-refactor` while it is the integration branch.
 - Protect `main` if it becomes the direct integration or release branch.
 - Require pull requests before merging to protected branches.
-- Once the machine user is active, require at least one human approving review
+- Once the agent account is active, require at least one human approving review
   for agent-authored pull requests.
 - Require conversation resolution before merge.
 - Dismiss stale approvals when new commits are pushed after review.
@@ -59,7 +62,7 @@ Branch Protection Policy
   placeholder required checks that would block every PR; keep local validation
   evidence in the PR body.
 - Block force pushes and branch deletion on protected branches.
-- Do not allow the machine user to bypass branch protection.
+- Do not allow the agent account to bypass branch protection.
 
 Workflow
 - Agent work should use issue-backed branches named
@@ -70,25 +73,27 @@ Workflow
   branch protection requires it.
 - If a PR is still authored by the human account during the transition, formal
   self-approval is not meaningful; use PR discussion and local validation until
-  the machine user is active.
+  the agent account is active.
 - If the human owner directly edits an agent branch, keep that visible in the
   commit history instead of rewriting authorship.
 
 Setup Checklist
-1. Create or choose the dedicated GitHub machine-user account.
+1. Create or choose the dedicated GitHub user account that will act as the
+   agent account.
 2. Enable two-factor authentication and private email on that account.
-3. Add the machine user as a repository collaborator with Write access.
+3. Add the agent account as a repository collaborator with Write access.
 4. Create a fine-grained token or equivalent local GitHub authentication for
    this repository only.
 5. Store the credential outside the repository.
 6. Configure repository-local Git author identity:
    - `git config user.name "Moon Service Agent"`
-   - `git config user.email "<github-user-id>+<bot-login>@users.noreply.github.com"`
-7. Confirm `git config --local --get user.email` uses the bot noreply email.
-8. Confirm GitHub CLI or remote authentication writes as the machine user
+   - `git config user.email "<github-user-id>+<agent-login>@users.noreply.github.com"`
+7. Confirm `git config --local --get user.email` uses the agent account's
+   noreply email.
+8. Confirm GitHub CLI or remote authentication writes as the agent account
    before opening agent-authored PRs.
-9. Enable branch protection review requirements after the bot account can open
-   PRs.
+9. Enable branch protection review requirements after the agent account can
+   open PRs.
 
 When To Revisit
 - More than one repository needs agent automation.
