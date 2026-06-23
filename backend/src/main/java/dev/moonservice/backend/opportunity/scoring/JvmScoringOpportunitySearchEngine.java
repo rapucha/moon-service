@@ -1,10 +1,17 @@
-package dev.moonservice.backend.opportunity.prototype;
+package dev.moonservice.backend.opportunity.scoring;
 
 import dev.moonservice.backend.location.ResolvedLocation;
+import dev.moonservice.backend.opportunity.InvalidOpportunitySearchRequestException;
 import dev.moonservice.backend.opportunity.search.OpportunitySearchEngine;
 import dev.moonservice.backend.opportunity.search.OpportunitySearchRequest;
 import dev.moonservice.backend.opportunity.search.OpportunitySearchResponse;
 import dev.moonservice.scoringprototype.PreviewEvaluator;
+import dev.moonservice.scoringprototype.UsageException;
+import dev.moonservice.scoringprototype.fixture.Location;
+import dev.moonservice.scoringprototype.input.PrototypeConfig;
+import dev.moonservice.scoringprototype.output.ResponseFormatter;
+import dev.moonservice.scoringprototype.service.OpportunityService;
+import dev.moonservice.scoringprototype.service.PrototypeResult;
 import tools.jackson.core.JacksonException;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
@@ -14,29 +21,69 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Map;
 
-public class PrototypeOpportunitySearchEngine implements OpportunitySearchEngine {
+public class JvmScoringOpportunitySearchEngine implements OpportunitySearchEngine {
     private static final ObjectMapper MAPPER = new ObjectMapper();
 
     private final PreviewEvaluator previewEvaluator;
+    private final OpportunityService opportunityService;
+    private final ResponseFormatter responseFormatter;
 
-    public PrototypeOpportunitySearchEngine(PreviewEvaluator previewEvaluator) {
+    public JvmScoringOpportunitySearchEngine(PreviewEvaluator previewEvaluator) {
+        this(previewEvaluator, new OpportunityService(), new ResponseFormatter());
+    }
+
+    JvmScoringOpportunitySearchEngine(
+            PreviewEvaluator previewEvaluator,
+            OpportunityService opportunityService,
+            ResponseFormatter responseFormatter
+    ) {
         this.previewEvaluator = previewEvaluator;
+        this.opportunityService = opportunityService;
+        this.responseFormatter = responseFormatter;
     }
 
     @Override
     public OpportunitySearchResponse search(OpportunitySearchRequest request) {
         ObjectNode prototypeRequest = MAPPER.createObjectNode();
         prototypeRequest.put("locationId", request.locationId());
-        prototypeRequest.put("start", request.start());
+        prototypeRequest.put("start", request.startDate().toString());
         prototypeRequest.put("forecastHorizonDays", request.forecastHorizonDays());
         prototypeRequest.put("maxMoonAltitudeDegrees", request.maxMoonAltitudeDegrees());
         prototypeRequest.put("limit", request.limit());
-        return toBackendResponse(previewEvaluator.evaluateJson(prototypeRequest));
+        try {
+            return toBackendResponse(previewEvaluator.evaluateJson(prototypeRequest));
+        } catch (UsageException ex) {
+            throw new InvalidOpportunitySearchRequestException(ex.getMessage(), ex);
+        }
     }
 
     @Override
-    public boolean supportsLocation(ResolvedLocation location) {
-        return "prague-cz".equals(location.locationId());
+    public OpportunitySearchResponse search(ResolvedLocation location, OpportunitySearchRequest request) {
+        try {
+            PrototypeConfig config = new PrototypeConfig(
+                    toPrototypeLocation(location),
+                    request.startDate(),
+                    request.forecastHorizonDays(),
+                    request.maxMoonAltitudeDegrees(),
+                    request.limit());
+            PrototypeResult result = opportunityService.evaluate(config);
+            return toBackendResponse(responseFormatter.format(result));
+        } catch (UsageException ex) {
+            throw new IllegalStateException("Resolved opportunity scoring request was invalid.", ex);
+        }
+    }
+
+    private static Location toPrototypeLocation(ResolvedLocation location) {
+        return new Location(
+                location.locationId(),
+                "real_location",
+                location.providerLocationId().serialized(),
+                location.displayName(),
+                location.latitude(),
+                location.longitude(),
+                location.elevationMeters(),
+                location.zoneId().getId(),
+                location.countryCode());
     }
 
     private static OpportunitySearchResponse toBackendResponse(String prototypeJson) {

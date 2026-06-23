@@ -40,10 +40,20 @@ public class TestOpenMeteoLocationResolver implements LocationResolver {
             182,
             ZoneId.of("America/Chicago"),
             "US");
+    private static final ResolvedLocation AMSTERDAM = new ResolvedLocation(
+            "amsterdam-nl",
+            new ProviderLocationId(LocationProvider.OPEN_METEO, "2759794"),
+            "Amsterdam, North Holland, Netherlands",
+            52.37403,
+            4.88969,
+            13,
+            ZoneId.of("Europe/Amsterdam"),
+            "NL");
     private static final Map<String, LocationResolution> TEST_RESULTS = Map.of(
             "praha", LocationResolution.resolved(PRAGUE),
             "prague", LocationResolution.resolved(PRAGUE),
             "prague-cz", LocationResolution.resolved(PRAGUE),
+            "amsterdam", LocationResolution.resolved(AMSTERDAM),
             "springfield", LocationResolution.ambiguous(List.of(SPRINGFIELD_MISSOURI, SPRINGFIELD_ILLINOIS))
     );
 

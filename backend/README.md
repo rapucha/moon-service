@@ -1,9 +1,9 @@
 # Moon Service Backend
 
 This is the first real backend module for Moon Service. It promotes the tested
-Spring HTTP contract out of `prototypes/` while keeping opportunity generation
-fixture-backed until weather, caching, feeds, and calendar exports are
-introduced deliberately.
+Spring HTTP contract out of `prototypes/` while keeping weather fixture-backed
+until weather, caching, feeds, and calendar exports are introduced
+deliberately.
 
 ## Current Scope
 
@@ -16,8 +16,8 @@ introduced deliberately.
 - Open-Meteo geocoding adapter code under `backend.location.openmeteo`, covered
   by saved provider JSON fixtures. It can be selected for live city/location
   lookup with `moon.location.resolver=open-meteo`.
-- Fixture-backed scoring through the existing `jvm-scoring-prototype` Maven
-  artifact.
+- Coordinate-backed Moon/Sun window generation and scoring through the existing
+  `jvm-scoring-prototype` Maven artifact, still using fixed fixture weather.
 - HTTP `400` error mapping for malformed JSON and invalid opportunity search
   requests.
 
@@ -40,11 +40,9 @@ mvn spring-boot:run -pl backend -am -Dspring-boot.run.arguments=--moon.location.
 
 With that setting, the same query endpoint uses Open-Meteo Geocoding for
 location resolution and can return resolved, ambiguous, not found, or
-temporarily unavailable location states from the provider path. Opportunity
-generation is still backed by the scoring prototype, so arbitrary Open-Meteo
-location IDs are not yet supported by the downstream scoring step. A resolved
-city whose provider ID cannot be scored yet returns `temporarily_unavailable`
-rather than `invalid_request` on the query endpoint.
+temporarily unavailable location states from the provider path. A resolved city
+uses its backend location ID, provider ID, coordinates, elevation, timezone, and
+country code for opportunity generation.
 
 ## Open-Meteo Geocoding Adapter
 
@@ -64,7 +62,7 @@ results. Short `Retry-After` values are honored before retrying; long
 Resolved locations now carry a backend location ID, a structured provider
 location ID, latitude, longitude, elevation, timezone, and country code. The
 test suite still uses a test-only Open-Meteo resolver double that returns
-prototype-compatible backend location IDs such as `prague-cz`.
+saved provider-shaped locations without calling the live provider.
 
 Manual live drift checks are kept outside Maven:
 
@@ -119,9 +117,8 @@ curl 'http://localhost:8080/api/opportunities?q=Springfield'
 ```
 
 `Springfield` is useful for manually checking ambiguity handling. A query that
-Open-Meteo resolves to a single non-fixture location may still return
-`temporarily_unavailable` until the opportunity engine supports arbitrary
-provider-backed locations.
+Open-Meteo resolves to a single location should return coordinate-backed
+opportunities with fixed fixture weather until live weather integration lands.
 
 To exercise the direct fixture-backed scoring path manually:
 

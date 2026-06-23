@@ -10,7 +10,6 @@ import dev.moonservice.backend.opportunity.search.OpportunitySearchEngine;
 import dev.moonservice.backend.opportunity.search.OpportunitySearchRequest;
 import dev.moonservice.backend.opportunity.search.OpportunitySearchResponse;
 import dev.moonservice.backend.opportunity.search.OpportunityStatusResponse;
-import dev.moonservice.scoringprototype.UsageException;
 import org.springframework.stereotype.Service;
 import tools.jackson.databind.JsonNode;
 
@@ -51,25 +50,22 @@ public class OpportunitySearchService {
     }
 
     private OpportunityResponse searchResolvedLocation(ResolvedLocation location) {
-        if (!opportunitySearchEngine.supportsLocation(location)) {
-            return OpportunityStatusResponse.temporarilyUnavailable();
-        }
-        return opportunitySearchEngine.search(opportunitySearchDefaults.requestFor(location));
+        return opportunitySearchEngine.search(location, opportunitySearchDefaults.requestFor(location));
     }
 
     private static String normalizeQuery(String rawQuery) {
         if (rawQuery == null) {
-            throw new UsageException("q is required.");
+            throw new InvalidOpportunitySearchRequestException("q is required.");
         }
         String query = rawQuery.strip().replaceAll("\\s+", " ");
         if (query.isBlank()) {
-            throw new UsageException("q must be non-empty.");
+            throw new InvalidOpportunitySearchRequestException("q must be non-empty.");
         }
         if (containsUnsupportedControlCharacter(query)) {
-            throw new UsageException("q contains unsupported control characters.");
+            throw new InvalidOpportunitySearchRequestException("q contains unsupported control characters.");
         }
         if (query.codePointCount(0, query.length()) > MAX_QUERY_CHARACTERS) {
-            throw new UsageException("q must be 100 characters or fewer.");
+            throw new InvalidOpportunitySearchRequestException("q must be 100 characters or fewer.");
         }
         return query;
     }

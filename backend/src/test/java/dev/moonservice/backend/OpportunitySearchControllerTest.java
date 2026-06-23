@@ -46,7 +46,7 @@ class OpportunitySearchControllerTest {
                 .expectHeader().contentTypeCompatibleWith(MediaType.APPLICATION_JSON)
                 .expectBody()
                 .jsonPath("$.status").isEqualTo("ok")
-                .jsonPath("$.location.id").isEqualTo("openmeteo:prague-cz")
+                .jsonPath("$.location.id").isEqualTo("openmeteo:3067696")
                 .jsonPath("$.forecastHorizonDays").isEqualTo(7)
                 .jsonPath("$.startsAt").exists()
                 .jsonPath("$.maxMoonAltitudeDegrees").isEqualTo(90.0)
@@ -57,7 +57,7 @@ class OpportunitySearchControllerTest {
     void returnsLocationNotFoundForUnknownTestOpenMeteoQuery() {
         webTestClient.get()
                 .uri(uriBuilder -> uriBuilder.path("/api/opportunities")
-                        .queryParam("q", "Amsterdam")
+                        .queryParam("q", "Not A Real Test City")
                         .build())
                 .exchange()
                 .expectStatus().isOk()
@@ -66,6 +66,27 @@ class OpportunitySearchControllerTest {
                 .jsonPath("$.status").isEqualTo("location_not_found")
                 .jsonPath("$.message").isEqualTo("No matching location found.")
                 .jsonPath("$.opportunities").doesNotExist();
+    }
+
+    @Test
+    void returnsOpportunitySearchResponseForNonFixtureResolvedLocation() {
+        webTestClient.get()
+                .uri(uriBuilder -> uriBuilder.path("/api/opportunities")
+                        .queryParam("q", "Amsterdam")
+                        .build())
+                .exchange()
+                .expectStatus().isOk()
+                .expectHeader().contentTypeCompatibleWith(MediaType.APPLICATION_JSON)
+                .expectBody()
+                .jsonPath("$.status").isEqualTo("ok")
+                .jsonPath("$.location.id").isEqualTo("openmeteo:2759794")
+                .jsonPath("$.location.displayName").isEqualTo("Amsterdam, North Holland, Netherlands")
+                .jsonPath("$.location.timezone").isEqualTo("Europe/Amsterdam")
+                .jsonPath("$.forecastHorizonDays").isEqualTo(7)
+                .jsonPath("$.opportunities[0].id").value(String.class, value ->
+                        assertTrue(value.startsWith("amsterdam-nl-")))
+                .jsonPath("$.opportunities[0].links.ics").value(String.class, value ->
+                        assertTrue(value.startsWith("/o/amsterdam-nl-")));
     }
 
     @Test

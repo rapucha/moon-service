@@ -1,6 +1,6 @@
 package dev.moonservice.backend.web;
 
-import dev.moonservice.scoringprototype.UsageException;
+import dev.moonservice.backend.opportunity.InvalidOpportunitySearchRequestException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -12,8 +12,8 @@ import java.time.Instant;
 
 @ControllerAdvice
 class OpportunitySearchErrorHandler {
-    @ExceptionHandler(UsageException.class)
-    ResponseEntity<ErrorResponse> invalidRequest(UsageException ex) {
+    @ExceptionHandler(InvalidOpportunitySearchRequestException.class)
+    ResponseEntity<ErrorResponse> invalidRequest(InvalidOpportunitySearchRequestException ex) {
         return invalidRequest(ex.getMessage());
     }
 
