@@ -5,7 +5,7 @@ import dev.moonservice.backend.location.ResolvedLocation;
 public interface OpportunitySearchEngine {
     OpportunitySearchResponse search(OpportunitySearchRequest request);
 
-    default boolean supportsLocation(ResolvedLocation location) {
-        return true;
+    default OpportunitySearchResponse search(ResolvedLocation location, OpportunitySearchRequest request) {
+        return search(request);
     }
 }

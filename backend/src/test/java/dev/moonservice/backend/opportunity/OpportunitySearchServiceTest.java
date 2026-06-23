@@ -54,24 +54,35 @@ class OpportunitySearchServiceTest {
 
     @Test
     void resolvesQueryBeforeDelegatingToConfiguredEngine() {
-        OpportunitySearchService opportunitySearchService = new OpportunitySearchService(request -> {
-            assertEquals("prague-cz", request.locationId());
-            assertEquals("2026-06-21", request.start());
-            assertEquals(7, request.forecastHorizonDays());
-            assertEquals(90.0, request.maxMoonAltitudeDegrees());
-            assertEquals(5, request.limit());
-            return okResponse();
+        ResolvedLocation prague = new ResolvedLocation(
+                "prague-cz",
+                providerLocationId("prague-cz"),
+                "Prague, Czechia",
+                50.08804,
+                14.42076,
+                202,
+                ZoneId.of("Europe/Prague"),
+                "CZ");
+        OpportunitySearchService opportunitySearchService = new OpportunitySearchService(new OpportunitySearchEngine() {
+            @Override
+            public OpportunitySearchResponse search(OpportunitySearchRequest request) {
+                fail("Query search should pass the resolved location to the engine.");
+                return okResponse();
+            }
+
+            @Override
+            public OpportunitySearchResponse search(ResolvedLocation location, OpportunitySearchRequest request) {
+                assertEquals(prague, location);
+                assertEquals("prague-cz", request.locationId());
+                assertEquals("2026-06-21", request.start());
+                assertEquals(7, request.forecastHorizonDays());
+                assertEquals(90.0, request.maxMoonAltitudeDegrees());
+                assertEquals(5, request.limit());
+                return okResponse();
+            }
         }, query -> {
             assertEquals(new LocationQuery("Praha"), query);
-            return LocationResolution.resolved(new ResolvedLocation(
-                    "prague-cz",
-                    providerLocationId("prague-cz"),
-                    "Prague, Czechia",
-                    50.08804,
-                    14.42076,
-                    202,
-                    ZoneId.of("Europe/Prague"),
-                    "CZ"));
+            return LocationResolution.resolved(prague);
         }, defaults);
 
         OpportunityResponse response = opportunitySearchService.searchByQuery(" Praha ");
@@ -143,31 +154,34 @@ class OpportunitySearchServiceTest {
     }
 
     @Test
-    void returnsTemporarilyUnavailableWhenResolvedLocationCannotBeScoredYet() {
-        OpportunitySearchService opportunitySearchService = new OpportunitySearchService(new OpportunitySearchEngine() {
-            @Override
-            public OpportunitySearchResponse search(OpportunitySearchRequest request) {
-                fail("Engine should not be called when it does not support the resolved location.");
-                return okResponse();
-            }
-
-            @Override
-            public boolean supportsLocation(ResolvedLocation location) {
-                return false;
-            }
-        }, query -> LocationResolution.resolved(new ResolvedLocation(
-                "openmeteo-123",
-                new ProviderLocationId(LocationProvider.OPEN_METEO, "123"),
+    void scoresResolvedNonFixtureLocationThroughEngine() {
+        ResolvedLocation amsterdam = new ResolvedLocation(
+                "amsterdam-nl",
+                new ProviderLocationId(LocationProvider.OPEN_METEO, "2759794"),
                 "Amsterdam, North Holland, Netherlands",
                 52.37403,
                 4.88969,
                 13,
                 ZoneId.of("Europe/Amsterdam"),
-                "NL")), defaults);
+                "NL");
+        OpportunitySearchService opportunitySearchService = new OpportunitySearchService(new OpportunitySearchEngine() {
+            @Override
+            public OpportunitySearchResponse search(OpportunitySearchRequest request) {
+                fail("Query search should pass the resolved location to the engine.");
+                return okResponse();
+            }
+
+            @Override
+            public OpportunitySearchResponse search(ResolvedLocation location, OpportunitySearchRequest request) {
+                assertEquals(amsterdam, location);
+                assertEquals("amsterdam-nl", request.locationId());
+                return okResponse();
+            }
+        }, query -> LocationResolution.resolved(amsterdam), defaults);
 
         OpportunityResponse response = opportunitySearchService.searchByQuery("Amsterdam");
 
-        assertEquals("temporarily_unavailable", response.status());
+        assertEquals("ok", response.status());
     }
 
     private static OpportunitySearchResponse okResponse() {

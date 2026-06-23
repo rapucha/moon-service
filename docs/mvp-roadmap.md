@@ -109,8 +109,6 @@ Exit criteria:
 Near-term implementation and decision work is tracked in GitHub issues rather
 than only in this roadmap:
 
-- [#13](https://github.com/rapucha/moon-service/issues/13): replace
-  fixture-only opportunity search with a coordinate-backed engine.
 - [#14](https://github.com/rapucha/moon-service/issues/14): integrate
   Open-Meteo weather forecasts into opportunity scoring.
 - [#15](https://github.com/rapucha/moon-service/issues/15): build the first
@@ -196,9 +194,10 @@ the Maven scoring prototype through the `jvm-scoring-prototype` Maven
 dependency and its public `PreviewEvaluator` facade behind a backend-owned
 opportunity search seam.
 
-Replacing that fixture-only downstream opportunity engine with one that can use
-resolved coordinates is tracked by
-[#13](https://github.com/rapucha/moon-service/issues/13).
+The query-shaped endpoint now uses resolved coordinates, elevation, timezone,
+and provider metadata for opportunity generation instead of requiring a
+prototype fixture location ID. The direct fixture endpoint remains Prague-only
+for deterministic scoring/prototype checks.
 
 The backend now locks down the first invalid-request behavior: malformed JSON,
 non-object JSON, unsupported fixture locations, invalid start dates, and

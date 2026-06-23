@@ -51,10 +51,7 @@ public class OpportunitySearchService {
     }
 
     private OpportunityResponse searchResolvedLocation(ResolvedLocation location) {
-        if (!opportunitySearchEngine.supportsLocation(location)) {
-            return OpportunityStatusResponse.temporarilyUnavailable();
-        }
-        return opportunitySearchEngine.search(opportunitySearchDefaults.requestFor(location));
+        return opportunitySearchEngine.search(location, opportunitySearchDefaults.requestFor(location));
     }
 
     private static String normalizeQuery(String rawQuery) {

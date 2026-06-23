@@ -4,13 +4,22 @@ import dev.moonservice.backend.location.ResolvedLocation;
 import dev.moonservice.backend.opportunity.search.OpportunitySearchEngine;
 import dev.moonservice.backend.opportunity.search.OpportunitySearchRequest;
 import dev.moonservice.backend.opportunity.search.OpportunitySearchResponse;
+import dev.moonservice.scoringprototype.UsageException;
 import dev.moonservice.scoringprototype.PreviewEvaluator;
+import dev.moonservice.scoringprototype.fixture.Location;
+import dev.moonservice.scoringprototype.input.PrototypeConfig;
+import dev.moonservice.scoringprototype.output.ResponseFormatter;
+import dev.moonservice.scoringprototype.service.OpportunityService;
+import dev.moonservice.scoringprototype.service.PrototypeResult;
 import tools.jackson.core.JacksonException;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 import tools.jackson.databind.node.ObjectNode;
 
 import java.time.Instant;
+import java.time.LocalDate;
+import java.time.ZoneOffset;
+import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
 import java.util.Map;
 
@@ -18,9 +27,21 @@ public class PrototypeOpportunitySearchEngine implements OpportunitySearchEngine
     private static final ObjectMapper MAPPER = new ObjectMapper();
 
     private final PreviewEvaluator previewEvaluator;
+    private final OpportunityService opportunityService;
+    private final ResponseFormatter responseFormatter;
 
     public PrototypeOpportunitySearchEngine(PreviewEvaluator previewEvaluator) {
+        this(previewEvaluator, new OpportunityService(), new ResponseFormatter());
+    }
+
+    PrototypeOpportunitySearchEngine(
+            PreviewEvaluator previewEvaluator,
+            OpportunityService opportunityService,
+            ResponseFormatter responseFormatter
+    ) {
         this.previewEvaluator = previewEvaluator;
+        this.opportunityService = opportunityService;
+        this.responseFormatter = responseFormatter;
     }
 
     @Override
@@ -35,8 +56,39 @@ public class PrototypeOpportunitySearchEngine implements OpportunitySearchEngine
     }
 
     @Override
-    public boolean supportsLocation(ResolvedLocation location) {
-        return "prague-cz".equals(location.locationId());
+    public OpportunitySearchResponse search(ResolvedLocation location, OpportunitySearchRequest request) {
+        PrototypeConfig config = new PrototypeConfig(
+                toPrototypeLocation(location),
+                parseStartDate(request.start()),
+                request.forecastHorizonDays(),
+                request.maxMoonAltitudeDegrees(),
+                request.limit());
+        PrototypeResult result = opportunityService.evaluate(config);
+        return toBackendResponse(responseFormatter.format(result));
+    }
+
+    private static Location toPrototypeLocation(ResolvedLocation location) {
+        return new Location(
+                location.locationId(),
+                "real_location",
+                location.providerLocationId().serialized(),
+                location.displayName(),
+                location.latitude(),
+                location.longitude(),
+                location.elevationMeters(),
+                location.zoneId().getId(),
+                location.countryCode());
+    }
+
+    private static LocalDate parseStartDate(String value) {
+        try {
+            if (value.length() == 10) {
+                return LocalDate.parse(value);
+            }
+            return Instant.parse(value).atZone(ZoneOffset.UTC).toLocalDate();
+        } catch (DateTimeParseException ex) {
+            throw new UsageException("Invalid --start value: " + value);
+        }
     }
 
     private static OpportunitySearchResponse toBackendResponse(String prototypeJson) {
