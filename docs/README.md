@@ -24,6 +24,7 @@ Start Here
   - `live-tests/README.md`
 - AI-agent operating docs:
   - `docs/ai-agent/README.md`
+  - `docs/ai-agent/github-identity.md`
 
 Current Canonical API Location
 - `docs/api-shape.md` is currently the human-owned API design document.

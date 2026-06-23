@@ -19,18 +19,20 @@ Use These Docs
    docs.
 3. Read `operating-guide.md` for the standard contribution workflow.
 4. Read `policies.md` for guardrails and escalation triggers.
-5. Load the relevant context pack before substantial changes:
+5. Read `github-identity.md` before creating or managing agent-authored
+   branches, pull requests, or GitHub comments.
+6. Load the relevant context pack before substantial changes:
    - `context-packs/architecture.md`
    - `context-packs/backend-spine.md`
    - `context-packs/api-contract.md`
    - `context-packs/refactor.md`
    - `context-packs/test-authoring.md`
    - `context-packs/fix-build.md`
-6. Use checklists before finishing:
+7. Use checklists before finishing:
    - `checklists/change-review.md`
    - `checklists/api-contract-change.md`
    - `checklists/module-addition.md`
-7. For multi-session or complex work, use `state/task-template.md`.
+8. For multi-session or complex work, use `state/task-template.md`.
 
 Canonical Context
 - Product direction:
