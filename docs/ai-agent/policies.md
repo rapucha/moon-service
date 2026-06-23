@@ -53,6 +53,9 @@ Escalate Before Proceeding
 - New external services, paid providers, or provider terms/privacy assumptions.
 - Security-sensitive behavior: auth, rate limiting, secrets, consent,
   unsubscribe, deletion, retention.
+- Any switch from the agent account to the human owner account for GitHub CLI,
+  Git, browser, token, SSH, or other repo workflow actions. The agent must
+  explain why the switch appears necessary and wait for explicit approval.
 - CI/build failures that cannot be reproduced or fixed with narrow local
   changes.
 

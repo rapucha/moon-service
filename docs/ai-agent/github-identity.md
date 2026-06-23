@@ -81,6 +81,21 @@ Workflow
 - If the human owner directly edits an agent branch, keep that visible in the
   commit history instead of rewriting authorship.
 
+Account Switching Guardrail
+- Agents must not switch GitHub CLI, Git, browser, token, SSH, or other repo
+  workflow identity from the agent account to the human owner account unless
+  the human explicitly approves that exact switch.
+- If an agent believes solving a problem requires switching to the owner
+  account, the agent must stop, notify the human, explain what is happening,
+  state why the owner account appears necessary, and wait for approval or
+  denial before switching.
+- If approval is denied, the agent may provide additional technical reasoning
+  or safer alternatives, but must not switch accounts.
+- Owner-account use should be treated as exceptional and temporary. After an
+  explicitly approved switch, the agent should return GitHub CLI and repo
+  workflow defaults to the agent account as soon as the approved action is
+  complete.
+
 Setup Checklist
 1. Create or choose the dedicated GitHub user account that will act as the
    agent account.
