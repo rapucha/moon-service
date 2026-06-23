@@ -1,10 +1,12 @@
 package dev.moonservice.backend.opportunity.scoring;
 
 import dev.moonservice.backend.location.ResolvedLocation;
+import dev.moonservice.backend.opportunity.InvalidOpportunitySearchRequestException;
 import dev.moonservice.backend.opportunity.search.OpportunitySearchEngine;
 import dev.moonservice.backend.opportunity.search.OpportunitySearchRequest;
 import dev.moonservice.backend.opportunity.search.OpportunitySearchResponse;
 import dev.moonservice.scoringprototype.PreviewEvaluator;
+import dev.moonservice.scoringprototype.UsageException;
 import dev.moonservice.scoringprototype.fixture.Location;
 import dev.moonservice.scoringprototype.input.PrototypeConfig;
 import dev.moonservice.scoringprototype.output.ResponseFormatter;
@@ -48,19 +50,27 @@ public class JvmScoringOpportunitySearchEngine implements OpportunitySearchEngin
         prototypeRequest.put("forecastHorizonDays", request.forecastHorizonDays());
         prototypeRequest.put("maxMoonAltitudeDegrees", request.maxMoonAltitudeDegrees());
         prototypeRequest.put("limit", request.limit());
-        return toBackendResponse(previewEvaluator.evaluateJson(prototypeRequest));
+        try {
+            return toBackendResponse(previewEvaluator.evaluateJson(prototypeRequest));
+        } catch (UsageException ex) {
+            throw new InvalidOpportunitySearchRequestException(ex.getMessage(), ex);
+        }
     }
 
     @Override
     public OpportunitySearchResponse search(ResolvedLocation location, OpportunitySearchRequest request) {
-        PrototypeConfig config = new PrototypeConfig(
-                toPrototypeLocation(location),
-                request.startDate(),
-                request.forecastHorizonDays(),
-                request.maxMoonAltitudeDegrees(),
-                request.limit());
-        PrototypeResult result = opportunityService.evaluate(config);
-        return toBackendResponse(responseFormatter.format(result));
+        try {
+            PrototypeConfig config = new PrototypeConfig(
+                    toPrototypeLocation(location),
+                    request.startDate(),
+                    request.forecastHorizonDays(),
+                    request.maxMoonAltitudeDegrees(),
+                    request.limit());
+            PrototypeResult result = opportunityService.evaluate(config);
+            return toBackendResponse(responseFormatter.format(result));
+        } catch (UsageException ex) {
+            throw new IllegalStateException("Resolved opportunity scoring request was invalid.", ex);
+        }
     }
 
     private static Location toPrototypeLocation(ResolvedLocation location) {

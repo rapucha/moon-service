@@ -1,6 +1,6 @@
 package dev.moonservice.backend.opportunity.search;
 
-import dev.moonservice.scoringprototype.UsageException;
+import dev.moonservice.backend.opportunity.InvalidOpportunitySearchRequestException;
 import tools.jackson.databind.JsonNode;
 
 import java.time.Instant;
@@ -31,7 +31,7 @@ public record OpportunitySearchRequest(
 
     public static OpportunitySearchRequest fromJson(JsonNode root) {
         if (!root.isObject()) {
-            throw new UsageException("Opportunity search request must be a JSON object.");
+            throw new InvalidOpportunitySearchRequestException("Opportunity search request must be a JSON object.");
         }
         return new OpportunitySearchRequest(
                 text(root, "locationId"),
@@ -53,14 +53,14 @@ public record OpportunitySearchRequest(
         if (UTC_INSTANT.matcher(value).matches()) {
             return parseUtcInstantDate(value);
         }
-        throw new UsageException("Invalid --start value: " + value);
+        throw new InvalidOpportunitySearchRequestException("Invalid --start value: " + value);
     }
 
     private static LocalDate parseIsoLocalDate(String value) {
         try {
             return LocalDate.parse(value);
         } catch (DateTimeParseException ex) {
-            throw new UsageException("Invalid --start value: " + value, ex);
+            throw new InvalidOpportunitySearchRequestException("Invalid --start value: " + value, ex);
         }
     }
 
@@ -68,14 +68,15 @@ public record OpportunitySearchRequest(
         try {
             return Instant.parse(value).atZone(ZoneOffset.UTC).toLocalDate();
         } catch (DateTimeParseException ex) {
-            throw new UsageException("Invalid --start value: " + value, ex);
+            throw new InvalidOpportunitySearchRequestException("Invalid --start value: " + value, ex);
         }
     }
 
     private static String text(JsonNode root, String field) {
         JsonNode value = required(root, field);
         if (!value.isString() || value.asString().isBlank()) {
-            throw new UsageException(field + " must be a non-empty string in the opportunity search request.");
+            throw new InvalidOpportunitySearchRequestException(
+                    field + " must be a non-empty string in the opportunity search request.");
         }
         return value.asString();
     }
@@ -83,7 +84,8 @@ public record OpportunitySearchRequest(
     private static int intValue(JsonNode root, String field) {
         JsonNode value = required(root, field);
         if (!value.canConvertToInt()) {
-            throw new UsageException(field + " must be an integer in the opportunity search request.");
+            throw new InvalidOpportunitySearchRequestException(
+                    field + " must be an integer in the opportunity search request.");
         }
         return value.asInt();
     }
@@ -91,7 +93,8 @@ public record OpportunitySearchRequest(
     private static double maxMoonAltitudeDegrees(JsonNode root) {
         JsonNode value = required(root, "maxMoonAltitudeDegrees");
         if (!value.isNumber()) {
-            throw new UsageException("maxMoonAltitudeDegrees must be numeric in the opportunity search request.");
+            throw new InvalidOpportunitySearchRequestException(
+                    "maxMoonAltitudeDegrees must be numeric in the opportunity search request.");
         }
         return value.asDouble();
     }
@@ -99,7 +102,8 @@ public record OpportunitySearchRequest(
     private static JsonNode required(JsonNode root, String field) {
         JsonNode value = root.path(field);
         if (value.isMissingNode() || value.isNull()) {
-            throw new UsageException(field + " is required in the opportunity search request.");
+            throw new InvalidOpportunitySearchRequestException(
+                    field + " is required in the opportunity search request.");
         }
         return value;
     }

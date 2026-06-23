@@ -6,7 +6,6 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import dev.moonservice.backend.opportunity.search.OpportunitySearchRequest;
-import dev.moonservice.scoringprototype.UsageException;
 import org.junit.jupiter.api.Test;
 import tools.jackson.databind.ObjectMapper;
 
@@ -49,8 +48,8 @@ class OpportunitySearchRequestTest {
 
     @Test
     void rejectsUnsupportedStartShapeWithoutTrialParsing() throws Exception {
-        UsageException exception = assertThrows(
-                UsageException.class,
+        InvalidOpportunitySearchRequestException exception = assertThrows(
+                InvalidOpportunitySearchRequestException.class,
                 () -> OpportunitySearchRequest.fromJson(objectMapper.readTree("""
                         {
                           "locationId": "prague-cz",
@@ -67,8 +66,8 @@ class OpportunitySearchRequestTest {
 
     @Test
     void preservesMalformedIsoDateCause() throws Exception {
-        UsageException exception = assertThrows(
-                UsageException.class,
+        InvalidOpportunitySearchRequestException exception = assertThrows(
+                InvalidOpportunitySearchRequestException.class,
                 () -> OpportunitySearchRequest.fromJson(objectMapper.readTree("""
                         {
                           "locationId": "prague-cz",
@@ -85,8 +84,8 @@ class OpportunitySearchRequestTest {
 
     @Test
     void preservesMalformedUtcInstantCause() throws Exception {
-        UsageException exception = assertThrows(
-                UsageException.class,
+        InvalidOpportunitySearchRequestException exception = assertThrows(
+                InvalidOpportunitySearchRequestException.class,
                 () -> OpportunitySearchRequest.fromJson(objectMapper.readTree("""
                         {
                           "locationId": "prague-cz",
@@ -103,8 +102,8 @@ class OpportunitySearchRequestTest {
 
     @Test
     void rejectsNonObjectRequest() throws Exception {
-        UsageException exception = assertThrows(
-                UsageException.class,
+        InvalidOpportunitySearchRequestException exception = assertThrows(
+                InvalidOpportunitySearchRequestException.class,
                 () -> OpportunitySearchRequest.fromJson(objectMapper.readTree("[]")));
 
         assertEquals("Opportunity search request must be a JSON object.", exception.getMessage());
