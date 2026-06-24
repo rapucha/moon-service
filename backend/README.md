@@ -151,3 +151,7 @@ curl -X POST 'http://localhost:8080/api/opportunities/search' \
   -H 'Content-Type: application/json' \
   -d '{"locationId":"prague-cz","start":"2026-06-29","forecastHorizonDays":7,"maxMoonAltitudeDegrees":12,"limit":5}'
 ```
+
+Manual IntelliJ HTTP Client requests, curl examples, and a Postman collection
+are available under `backend/http/`. They are review/debug tooling only, not
+automated tests.

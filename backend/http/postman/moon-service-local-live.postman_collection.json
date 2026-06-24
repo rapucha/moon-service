@@ -1,0 +1,329 @@
+{
+  "info": {
+    "name": "Moon Service Local Live",
+    "description": "Manual local requests for a backend started with Open-Meteo live providers. These requests are review/debug aids, not CI tests.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:8080"
+    },
+    {
+      "key": "resolvedQuery",
+      "value": "Zakopane"
+    },
+    {
+      "key": "ambiguousQuery",
+      "value": "Springfield"
+    },
+    {
+      "key": "notFoundQuery",
+      "value": "MoonServiceDefinitelyNotAPlace"
+    },
+    {
+      "key": "tooLongQuery",
+      "value": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    }
+  ],
+  "item": [
+    {
+      "name": "Live Query Endpoint",
+      "item": [
+        {
+          "name": "Resolved live lookup",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/opportunities?q={{resolvedQuery}}",
+              "variable": [],
+              "path": [
+                "api",
+                "opportunities"
+              ],
+              "query": [
+                {
+                  "key": "q",
+                  "value": "{{resolvedQuery}}"
+                }
+              ]
+            },
+            "description": "Expected product state: ok, unless the live provider is unavailable or changes behavior."
+          }
+        },
+        {
+          "name": "Ambiguous live lookup",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/opportunities?q={{ambiguousQuery}}",
+              "variable": [],
+              "path": [
+                "api",
+                "opportunities"
+              ],
+              "query": [
+                {
+                  "key": "q",
+                  "value": "{{ambiguousQuery}}"
+                }
+              ]
+            },
+            "description": "Expected product state: ambiguous_location."
+          }
+        },
+        {
+          "name": "Location not found",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/opportunities?q={{notFoundQuery}}",
+              "variable": [],
+              "path": [
+                "api",
+                "opportunities"
+              ],
+              "query": [
+                {
+                  "key": "q",
+                  "value": "{{notFoundQuery}}"
+                }
+              ]
+            },
+            "description": "Expected product state: location_not_found."
+          }
+        },
+        {
+          "name": "Missing q",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/opportunities",
+              "variable": [],
+              "path": [
+                "api",
+                "opportunities"
+              ]
+            },
+            "description": "Expected HTTP status: 400 invalid_request."
+          }
+        },
+        {
+          "name": "Blank q",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/opportunities?q=%20%20%20",
+              "variable": [],
+              "path": [
+                "api",
+                "opportunities"
+              ],
+              "query": [
+                {
+                  "key": "q",
+                  "value": "%20%20%20"
+                }
+              ]
+            },
+            "description": "Expected HTTP status: 400 invalid_request."
+          }
+        },
+        {
+          "name": "Too long q",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/opportunities?q={{tooLongQuery}}",
+              "variable": [],
+              "path": [
+                "api",
+                "opportunities"
+              ],
+              "query": [
+                {
+                  "key": "q",
+                  "value": "{{tooLongQuery}}"
+                }
+              ]
+            },
+            "description": "Expected HTTP status: 400 invalid_request."
+          }
+        },
+        {
+          "name": "Unsupported direction mark",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/opportunities?q=%E2%80%8E",
+              "variable": [],
+              "path": [
+                "api",
+                "opportunities"
+              ],
+              "query": [
+                {
+                  "key": "q",
+                  "value": "%E2%80%8E"
+                }
+              ]
+            },
+            "description": "Expected HTTP status: 400 invalid_request."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Direct Fixture Endpoint",
+      "item": [
+        {
+          "name": "Prague fixture-backed scoring request",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"locationId\": \"prague-cz\",\n  \"start\": \"2026-06-29\",\n  \"forecastHorizonDays\": 7,\n  \"maxMoonAltitudeDegrees\": 12,\n  \"limit\": 5\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/opportunities/search",
+              "variable": [],
+              "path": [
+                "api",
+                "opportunities",
+                "search"
+              ]
+            },
+            "description": "Deterministic fixture-backed endpoint. Use the query endpoint for live geocoding/weather wiring checks."
+          }
+        },
+        {
+          "name": "Unsupported direct fixture location",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"locationId\": \"amsterdam-nl\",\n  \"start\": \"2026-06-29\",\n  \"forecastHorizonDays\": 7,\n  \"maxMoonAltitudeDegrees\": 12,\n  \"limit\": 5\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/opportunities/search",
+              "variable": [],
+              "path": [
+                "api",
+                "opportunities",
+                "search"
+              ]
+            },
+            "description": "Expected HTTP status: 400 invalid_request."
+          }
+        },
+        {
+          "name": "Invalid direct fixture request",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"locationId\": \"prague-cz\",\n  \"start\": \"2026-06-29\",\n  \"forecastHorizonDays\": 7,\n  \"maxMoonAltitudeDegrees\": 12\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/opportunities/search",
+              "variable": [],
+              "path": [
+                "api",
+                "opportunities",
+                "search"
+              ]
+            },
+            "description": "Expected HTTP status: 400 invalid_request."
+          }
+        }
+      ]
+    }
+  ]
+}
