@@ -62,6 +62,14 @@ The main unresolved choice is now the exact first web/API contract for city look
 - Do not permanently store user locations server-side unless saved alerts require it and the privacy model is updated.
 - Design device identity recovery before relying on anonymous device-bound accounts.
 - Treat Android Auto Backup and Firebase Cloud Messaging as conveniences with platform assumptions, not universal guarantees.
+- Treat user wording as intentional. If the user phrases a request as a
+  question or feasibility check, such as starting with "can you", "could you",
+  "is it possible", "should we", or ending with a question mark, answer the
+  question first and do not make code, documentation, GitHub, or other mutating
+  changes yet. Begin implementation only after the user gives a clear
+  imperative instruction, such as "do it", "go ahead", "implement", "update",
+  or "create". If the wording is ambiguous, ask what outcome is required before
+  changing files or external state.
 - Use GitHub issues as the source of truth for actionable implementation work, technical debt, follow-ups, and decision tasks. Product and architecture docs should capture strategy and decisions, but the next implementation step should come from an open issue unless the user explicitly asks for exploratory work first.
 - Use the existing `enhancement` and `documentation` labels for feature and docs work. Use `mvp`, `tech-debt`, `decision`, `blocked`, and `follow-up` labels when they clarify issue triage.
 - For issue-backed implementation work, use a branch name that mentions the issue number, preferably `issue-<number>-short-topic`, and update the issue to link to the branch where the work is being done.
