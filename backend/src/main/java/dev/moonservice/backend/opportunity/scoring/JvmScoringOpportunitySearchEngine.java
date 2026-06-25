@@ -35,18 +35,9 @@ public class JvmScoringOpportunitySearchEngine implements OpportunitySearchEngin
             PreviewEvaluator previewEvaluator,
             WeatherForecastProvider weatherForecastProvider
     ) {
-        this(previewEvaluator, new OpportunityService(), new ResponseFormatter(), weatherForecastProvider);
-    }
-
-    JvmScoringOpportunitySearchEngine(
-            PreviewEvaluator previewEvaluator,
-            OpportunityService opportunityService,
-            ResponseFormatter responseFormatter,
-            WeatherForecastProvider weatherForecastProvider
-    ) {
         this.previewEvaluator = previewEvaluator;
-        this.opportunityService = opportunityService;
-        this.responseFormatter = responseFormatter;
+        this.opportunityService = new OpportunityService();
+        this.responseFormatter = new ResponseFormatter();
         this.weatherForecastProvider = weatherForecastProvider;
     }
 
