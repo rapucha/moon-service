@@ -97,6 +97,17 @@ class OpenMeteoGeocodingClientTest {
         assertEquals(1, transport.calls());
     }
 
+    @Test
+    void mapsMissingProviderResultsFieldToLocationNotFound() throws Exception {
+        ScriptedTransport transport = new ScriptedTransport(ResponseStep.success(fixture("no-results-field.json")));
+        OpenMeteoGeocodingClient client = new OpenMeteoGeocodingClient(transport);
+
+        LocationResolution resolution = client.resolve(new LocationQuery("MoonServiceDefinitelyNotAPlace"));
+
+        assertEquals(LocationResolution.Status.NOT_FOUND, resolution.status());
+        assertEquals(1, transport.calls());
+    }
+
     @ParameterizedTest
     @ValueSource(strings = {"empty-response.json", "malformed-results.json"})
     void mapsMalformedOrEmptyProviderShapeToTemporarilyUnavailable(String fixtureName) throws Exception {

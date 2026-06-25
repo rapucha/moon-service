@@ -105,6 +105,11 @@ public class OpenMeteoGeocodingClient implements LocationResolver {
 
     private static LocationResolution toResolution(JsonNode root) {
         JsonNode results = root.path("results");
+        if (results.isMissingNode()) {
+            return root.path("generationtime_ms").isNumber()
+                    ? LocationResolution.notFound()
+                    : LocationResolution.temporarilyUnavailable();
+        }
         if (!results.isArray()) {
             return LocationResolution.temporarilyUnavailable();
         }
