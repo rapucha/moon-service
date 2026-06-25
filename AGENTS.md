@@ -75,6 +75,10 @@ The main unresolved choice is now the exact first web/API contract for city look
 - For issue-backed implementation work, use a branch name that mentions the issue number, preferably `issue-<number>-short-topic`, and update the issue to link to the branch where the work is being done.
 - Merge issue-backed implementation work through a pull request; do not merge implementation branches directly.
 - Pull requests must mention the issue or issues they address. Completed implementation issues should be closed through, or at least explicitly link to, the pull request that delivered the work.
+- Agent-authored pull requests should assign `rapucha` and request review from
+  `rapucha` when created. Use `gh pr create --assignee rapucha --reviewer
+  rapucha ...`; the repository workflow also applies this to non-draft PRs
+  opened by `moon-service-agent`.
 - Session handover files are transient working notes for context resets, laptop shutdowns, or other session-boundary handoffs. Do not commit them by default; commit one only when explicitly useful as durable project state. Prefer replacing or removing old handovers instead of accumulating them.
 - At the end of implementation tasks, stage all intended source, test, and documentation changes with `git add` so they are ready for commit. Leave unrelated, generated, IDE-only, or otherwise intentionally excluded files unstaged, and call them out in the final response.
 - In this environment, `git push` requires network access and sandboxed DNS has repeatedly failed. When the user asks to push any branch or remote, run the push with escalated permissions immediately instead of first attempting a sandboxed push.
