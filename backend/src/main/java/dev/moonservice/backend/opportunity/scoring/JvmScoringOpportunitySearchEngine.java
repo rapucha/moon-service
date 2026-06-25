@@ -5,12 +5,10 @@ import dev.moonservice.backend.opportunity.InvalidOpportunitySearchRequestExcept
 import dev.moonservice.backend.opportunity.search.OpportunitySearchEngine;
 import dev.moonservice.backend.opportunity.search.OpportunitySearchRequest;
 import dev.moonservice.backend.opportunity.search.OpportunitySearchResponse;
-import dev.moonservice.backend.weather.HourlyWeather;
 import dev.moonservice.backend.weather.WeatherForecast;
 import dev.moonservice.backend.weather.WeatherForecastProvider;
 import dev.moonservice.scoringprototype.PreviewEvaluator;
 import dev.moonservice.scoringprototype.UsageException;
-import dev.moonservice.scoringprototype.fixture.WeatherFixture;
 import dev.moonservice.scoringprototype.fixture.Location;
 import dev.moonservice.scoringprototype.input.PrototypeConfig;
 import dev.moonservice.scoringprototype.output.ResponseFormatter;
@@ -32,10 +30,6 @@ public class JvmScoringOpportunitySearchEngine implements OpportunitySearchEngin
     private final OpportunityService opportunityService;
     private final ResponseFormatter responseFormatter;
     private final WeatherForecastProvider weatherForecastProvider;
-
-    public JvmScoringOpportunitySearchEngine(PreviewEvaluator previewEvaluator) {
-        this(previewEvaluator, fixedWeatherForecastProvider());
-    }
 
     public JvmScoringOpportunitySearchEngine(
             PreviewEvaluator previewEvaluator,
@@ -105,25 +99,6 @@ public class JvmScoringOpportunitySearchEngine implements OpportunitySearchEngin
                 location.elevationMeters(),
                 location.zoneId().getId(),
                 location.countryCode());
-    }
-
-    private static WeatherForecastProvider fixedWeatherForecastProvider() {
-        return (location, startsAt, endsAt, forecastHorizonDays) ->
-                WeatherForecast.fixed(toHourlyWeather(startsAt, WeatherFixture.PRAGUE_PARTLY_CLOUDY));
-    }
-
-    private static HourlyWeather toHourlyWeather(Instant startsAt, WeatherFixture weather) {
-        return new HourlyWeather(
-                startsAt,
-                weather.cloudCoverPercent(),
-                weather.lowCloudCoverPercent(),
-                weather.midCloudCoverPercent(),
-                weather.highCloudCoverPercent(),
-                weather.precipitationProbabilityPercent(),
-                weather.precipitationMm(),
-                weather.visibilityMeters(),
-                weather.weatherCode(),
-                weather.forecastAgeHours());
     }
 
     private static OpportunitySearchResponse toBackendResponse(String prototypeJson) {

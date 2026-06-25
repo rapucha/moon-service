@@ -22,11 +22,11 @@ public final class OpportunityService {
         this(
                 new EphemerisSampler(),
                 new WindowGenerator(),
-                WindowWeatherProvider.fixed(WeatherFixture.PRAGUE_PARTLY_CLOUDY));
+                WindowWeatherProvider.sameWeatherForEveryWindow(WeatherFixture.PRAGUE_PARTLY_CLOUDY));
     }
 
     OpportunityService(EphemerisSampler sampler, WindowGenerator windowGenerator, WeatherFixture weather) {
-        this(sampler, windowGenerator, WindowWeatherProvider.fixed(weather));
+        this(sampler, windowGenerator, WindowWeatherProvider.sameWeatherForEveryWindow(weather));
     }
 
     OpportunityService(EphemerisSampler sampler, WindowGenerator windowGenerator, WindowWeatherProvider weatherProvider) {

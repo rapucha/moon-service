@@ -21,13 +21,12 @@ import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
-import java.util.OptionalDouble;
-import java.util.OptionalInt;
-import java.util.OptionalLong;
 
 public class OpenMeteoWeatherClient implements WeatherForecastProvider {
     static final URI DEFAULT_ENDPOINT = URI.create("https://api.open-meteo.com/v1/forecast");
     private static final Duration DEFAULT_TIMEOUT = Duration.ofSeconds(10);
+    private static final int MAX_TRANSPORT_RETRIES = 1;
+    private static final Duration MAX_RETRY_AFTER = Duration.ofSeconds(1);
     private static final double FORECAST_AGE_HOURS = 1.0;
     private static final String HOURLY_VARIABLES = String.join(
             ",",
@@ -51,7 +50,10 @@ public class OpenMeteoWeatherClient implements WeatherForecastProvider {
         this(
                 DEFAULT_ENDPOINT,
                 DEFAULT_TIMEOUT,
-                new RestClientOpenMeteoWeatherTransport(RestClient.builder(), DEFAULT_TIMEOUT),
+                new RetryingOpenMeteoWeatherTransport(
+                        new RestClientOpenMeteoWeatherTransport(RestClient.builder(), DEFAULT_TIMEOUT),
+                        MAX_TRANSPORT_RETRIES,
+                        MAX_RETRY_AFTER),
                 new ObjectMapper());
     }
 
@@ -151,11 +153,7 @@ public class OpenMeteoWeatherClient implements WeatherForecastProvider {
     }
 
     private static Instant instantAt(JsonNode times, int index) {
-        OptionalLong value = longValue(times.get(index));
-        if (value.isEmpty()) {
-            throw new WeatherForecastUnavailableException("Weather provider returned an invalid hourly timestamp.");
-        }
-        return Instant.ofEpochSecond(value.getAsLong());
+        return Instant.ofEpochSecond(longValue(times.get(index), "hourly timestamp"));
     }
 
     private static int percentAt(JsonNode hourly, String fieldName, int index, int expectedSize) {
@@ -168,20 +166,20 @@ public class OpenMeteoWeatherClient implements WeatherForecastProvider {
 
     private static int nonNegativeIntAt(JsonNode hourly, String fieldName, int index, int expectedSize) {
         JsonNode values = arrayField(hourly, fieldName, expectedSize);
-        OptionalInt value = intValue(values.get(index));
-        if (value.isEmpty() || value.getAsInt() < 0) {
+        int value = intValue(values.get(index), fieldName);
+        if (value < 0) {
             throw new WeatherForecastUnavailableException("Weather provider returned invalid " + fieldName + ".");
         }
-        return value.getAsInt();
+        return value;
     }
 
     private static double nonNegativeDoubleAt(JsonNode hourly, String fieldName, int index, int expectedSize) {
         JsonNode values = arrayField(hourly, fieldName, expectedSize);
-        OptionalDouble value = doubleValue(values.get(index));
-        if (value.isEmpty() || value.getAsDouble() < 0.0) {
+        double value = doubleValue(values.get(index), fieldName);
+        if (value < 0.0) {
             throw new WeatherForecastUnavailableException("Weather provider returned invalid " + fieldName + ".");
         }
-        return value.getAsDouble();
+        return value;
     }
 
     private static JsonNode arrayField(JsonNode hourly, String fieldName, int expectedSize) {
@@ -193,44 +191,44 @@ public class OpenMeteoWeatherClient implements WeatherForecastProvider {
         return values;
     }
 
-    private static OptionalLong longValue(JsonNode node) {
+    private static long longValue(JsonNode node, String fieldName) {
         if (node == null) {
-            return OptionalLong.empty();
+            throw new WeatherForecastUnavailableException("Weather provider returned invalid " + fieldName + ".");
         }
         try {
-            return OptionalLong.of(Long.parseLong(node.asString()));
+            return Long.parseLong(node.asString());
         } catch (NumberFormatException ex) {
-            return OptionalLong.empty();
+            throw new WeatherForecastUnavailableException("Weather provider returned invalid " + fieldName + ".", ex);
         }
     }
 
-    private static OptionalInt intValue(JsonNode node) {
+    private static int intValue(JsonNode node, String fieldName) {
         if (node == null) {
-            return OptionalInt.empty();
+            throw new WeatherForecastUnavailableException("Weather provider returned invalid " + fieldName + ".");
         }
         try {
             double value = Double.parseDouble(node.asString());
             if (!Double.isFinite(value)) {
-                return OptionalInt.empty();
+                throw new WeatherForecastUnavailableException("Weather provider returned invalid " + fieldName + ".");
             }
-            return OptionalInt.of(Math.toIntExact(Math.round(value)));
+            return Math.toIntExact(Math.round(value));
         } catch (ArithmeticException | NumberFormatException ex) {
-            return OptionalInt.empty();
+            throw new WeatherForecastUnavailableException("Weather provider returned invalid " + fieldName + ".", ex);
         }
     }
 
-    private static OptionalDouble doubleValue(JsonNode node) {
+    private static double doubleValue(JsonNode node, String fieldName) {
         if (node == null) {
-            return OptionalDouble.empty();
+            throw new WeatherForecastUnavailableException("Weather provider returned invalid " + fieldName + ".");
         }
         try {
             double value = Double.parseDouble(node.asString());
             if (!Double.isFinite(value)) {
-                return OptionalDouble.empty();
+                throw new WeatherForecastUnavailableException("Weather provider returned invalid " + fieldName + ".");
             }
-            return OptionalDouble.of(value);
+            return value;
         } catch (NumberFormatException ex) {
-            return OptionalDouble.empty();
+            throw new WeatherForecastUnavailableException("Weather provider returned invalid " + fieldName + ".", ex);
         }
     }
 

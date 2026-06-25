@@ -29,6 +29,8 @@ import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneId;
+import java.util.Arrays;
+import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.atomic.AtomicReference;
 
@@ -105,6 +107,33 @@ class OpenMeteoWeatherClientTest {
     }
 
     @Test
+    void mapsInvalidHourlyValuesToUnavailable() {
+        OpenMeteoWeatherClient client = new OpenMeteoWeatherClient((requestUri, timeout) -> """
+                {
+                  "hourly": {
+                    "time": [1782691200],
+                    "cloud_cover": ["not-a-number"],
+                    "cloud_cover_low": [3],
+                    "cloud_cover_mid": [4],
+                    "cloud_cover_high": [5],
+                    "precipitation_probability": [6],
+                    "precipitation": [0],
+                    "weather_code": [2],
+                    "visibility": [24000]
+                  }
+                }
+                """);
+
+        assertThrows(
+                WeatherForecastUnavailableException.class,
+                () -> client.forecastFor(
+                        amsterdam(),
+                        Instant.parse("2026-06-29T00:00:00Z"),
+                        Instant.parse("2026-06-30T00:00:00Z"),
+                        7));
+    }
+
+    @Test
     void mapsInvalidJsonToUnavailable() {
         OpenMeteoWeatherClient client = new OpenMeteoWeatherClient((requestUri, timeout) -> "{");
 
@@ -166,6 +195,76 @@ class OpenMeteoWeatherClientTest {
         server.verify();
     }
 
+    @Test
+    void retriesTransientHttpFailureOnce() throws Exception {
+        ScriptedTransport transport = new ScriptedTransport(
+                ResponseStep.failure(OpenMeteoWeatherTransportException.transientHttp(503, Optional.empty())),
+                ResponseStep.success(fixture("amsterdam-hourly.json")));
+        OpenMeteoWeatherClient client = new OpenMeteoWeatherClient(retrying(transport));
+
+        WeatherForecast forecast = client.forecastFor(
+                amsterdam(),
+                Instant.parse("2026-06-29T00:00:00Z"),
+                Instant.parse("2026-06-29T02:00:00Z"),
+                7);
+
+        assertEquals(22, forecast.weatherAt(Instant.parse("2026-06-29T00:30:00Z")).cloudCoverPercent());
+        assertEquals(2, transport.calls());
+    }
+
+    @Test
+    void retriesRateLimitWhenRetryAfterIsShort() throws Exception {
+        ScriptedTransport transport = new ScriptedTransport(
+                ResponseStep.failure(OpenMeteoWeatherTransportException.rateLimited(
+                        429,
+                        Optional.of(Duration.ZERO))),
+                ResponseStep.success(fixture("amsterdam-hourly.json")));
+        OpenMeteoWeatherClient client = new OpenMeteoWeatherClient(retrying(transport));
+
+        WeatherForecast forecast = client.forecastFor(
+                amsterdam(),
+                Instant.parse("2026-06-29T00:00:00Z"),
+                Instant.parse("2026-06-29T02:00:00Z"),
+                7);
+
+        assertEquals(22, forecast.weatherAt(Instant.parse("2026-06-29T00:30:00Z")).cloudCoverPercent());
+        assertEquals(2, transport.calls());
+    }
+
+    @Test
+    void doesNotRetryRateLimitWhenRetryAfterIsLong() {
+        ScriptedTransport transport = new ScriptedTransport(ResponseStep.failure(
+                OpenMeteoWeatherTransportException.rateLimited(
+                        429,
+                        Optional.of(Duration.ofSeconds(60)))));
+        OpenMeteoWeatherClient client = new OpenMeteoWeatherClient(retrying(transport));
+
+        assertThrows(
+                WeatherForecastUnavailableException.class,
+                () -> client.forecastFor(
+                        amsterdam(),
+                        Instant.parse("2026-06-29T00:00:00Z"),
+                        Instant.parse("2026-06-29T02:00:00Z"),
+                        7));
+        assertEquals(1, transport.calls());
+    }
+
+    @Test
+    void doesNotRetryNonRetryableHttpFailure() {
+        ScriptedTransport transport = new ScriptedTransport(ResponseStep.failure(
+                OpenMeteoWeatherTransportException.nonRetryableHttp(404, Optional.empty())));
+        OpenMeteoWeatherClient client = new OpenMeteoWeatherClient(retrying(transport));
+
+        assertThrows(
+                WeatherForecastUnavailableException.class,
+                () -> client.forecastFor(
+                        amsterdam(),
+                        Instant.parse("2026-06-29T00:00:00Z"),
+                        Instant.parse("2026-06-29T02:00:00Z"),
+                        7));
+        assertEquals(1, transport.calls());
+    }
+
     private static ResolvedLocation amsterdam() {
         return new ResolvedLocation(
                 "amsterdam-nl",
@@ -186,7 +285,50 @@ class OpenMeteoWeatherClientTest {
         }
     }
 
+    private static OpenMeteoWeatherTransport retrying(OpenMeteoWeatherTransport transport) {
+        return new RetryingOpenMeteoWeatherTransport(
+                transport,
+                1,
+                Duration.ofSeconds(1));
+    }
+
     private static String throwFailure(OpenMeteoWeatherTransportException failure) {
         throw failure;
+    }
+
+    private record ResponseStep(String body, OpenMeteoWeatherTransportException failure) {
+        static ResponseStep success(String body) {
+            return new ResponseStep(body, null);
+        }
+
+        static ResponseStep failure(OpenMeteoWeatherTransportException failure) {
+            return new ResponseStep(null, failure);
+        }
+    }
+
+    private static final class ScriptedTransport implements OpenMeteoWeatherTransport {
+        private final List<ResponseStep> steps;
+        private int calls;
+
+        private ScriptedTransport(ResponseStep... steps) {
+            this.steps = Arrays.asList(steps);
+        }
+
+        @Override
+        public String get(URI requestUri, Duration timeout) throws OpenMeteoWeatherTransportException {
+            if (calls >= steps.size()) {
+                throw new AssertionError("Unexpected Open-Meteo transport call.");
+            }
+            ResponseStep step = steps.get(calls);
+            calls++;
+            if (step.failure() != null) {
+                throw step.failure();
+            }
+            return step.body();
+        }
+
+        int calls() {
+            return calls;
+        }
     }
 }

@@ -32,6 +32,6 @@ public final class TestWeatherForecastProvider implements WeatherForecastProvide
             Instant endsAt,
             int forecastHorizonDays
     ) {
-        return WeatherForecast.fixed(weather);
+        return instant -> weather;
     }
 }

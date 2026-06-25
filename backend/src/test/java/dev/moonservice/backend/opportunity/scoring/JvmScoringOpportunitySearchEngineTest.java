@@ -13,18 +13,19 @@ import dev.moonservice.backend.opportunity.InvalidOpportunitySearchRequestExcept
 import dev.moonservice.backend.opportunity.search.OpportunitySearchRequest;
 import dev.moonservice.backend.opportunity.search.OpportunitySearchResponse;
 import dev.moonservice.backend.weather.HourlyWeather;
-import dev.moonservice.backend.weather.WeatherForecast;
 import dev.moonservice.backend.weather.WeatherForecastProvider;
 import dev.moonservice.scoringprototype.PreviewEvaluator;
+import dev.moonservice.scoringprototype.fixture.WeatherFixture;
 import org.junit.jupiter.api.Test;
 
+import java.time.Instant;
 import java.time.ZoneId;
 import java.util.concurrent.atomic.AtomicReference;
 
 class JvmScoringOpportunitySearchEngineTest {
     @Test
     void scoresResolvedLocationCoordinatesWithoutFixtureLocationId() {
-        JvmScoringOpportunitySearchEngine engine = new JvmScoringOpportunitySearchEngine(new PreviewEvaluator());
+        JvmScoringOpportunitySearchEngine engine = engineWithPartlyCloudyWeather();
 
         OpportunitySearchResponse response = engine.search(
                 amsterdam(),
@@ -46,7 +47,7 @@ class JvmScoringOpportunitySearchEngineTest {
         WeatherForecastProvider provider = (location, startsAt, endsAt, forecastHorizonDays) -> {
             requestedLocation.set(location);
             requestedForecastHorizonDays.set(forecastHorizonDays);
-            return WeatherForecast.fixed(new HourlyWeather(
+            HourlyWeather weather = new HourlyWeather(
                     startsAt,
                     82,
                     70,
@@ -56,7 +57,8 @@ class JvmScoringOpportunitySearchEngineTest {
                     0.8,
                     12000,
                     61,
-                    2.0));
+                    2.0);
+            return instant -> weather;
         };
         JvmScoringOpportunitySearchEngine engine = new JvmScoringOpportunitySearchEngine(
                 new PreviewEvaluator(),
@@ -80,7 +82,7 @@ class JvmScoringOpportunitySearchEngineTest {
 
     @Test
     void translatesDirectPrototypeValidationFailuresToInvalidRequest() {
-        JvmScoringOpportunitySearchEngine engine = new JvmScoringOpportunitySearchEngine(new PreviewEvaluator());
+        JvmScoringOpportunitySearchEngine engine = engineWithUnusedWeather();
 
         InvalidOpportunitySearchRequestException exception = assertThrows(
                 InvalidOpportunitySearchRequestException.class,
@@ -92,7 +94,7 @@ class JvmScoringOpportunitySearchEngineTest {
 
     @Test
     void treatsResolvedPrototypeValidationFailuresAsInternalInvariants() {
-        JvmScoringOpportunitySearchEngine engine = new JvmScoringOpportunitySearchEngine(new PreviewEvaluator());
+        JvmScoringOpportunitySearchEngine engine = engineWithUnusedWeather();
 
         IllegalStateException exception = assertThrows(
                 IllegalStateException.class,
@@ -112,5 +114,32 @@ class JvmScoringOpportunitySearchEngineTest {
                 13,
                 ZoneId.of("Europe/Amsterdam"),
                 "NL");
+    }
+
+    private static JvmScoringOpportunitySearchEngine engineWithPartlyCloudyWeather() {
+        return new JvmScoringOpportunitySearchEngine(new PreviewEvaluator(), (location, startsAt, endsAt, days) -> {
+            HourlyWeather weather = toHourlyWeather(startsAt, WeatherFixture.PRAGUE_PARTLY_CLOUDY);
+            return instant -> weather;
+        });
+    }
+
+    private static JvmScoringOpportunitySearchEngine engineWithUnusedWeather() {
+        return new JvmScoringOpportunitySearchEngine(new PreviewEvaluator(), (location, startsAt, endsAt, days) -> {
+            throw new AssertionError("Weather provider should not be called by this test.");
+        });
+    }
+
+    private static HourlyWeather toHourlyWeather(Instant startsAt, WeatherFixture weather) {
+        return new HourlyWeather(
+                startsAt,
+                weather.cloudCoverPercent(),
+                weather.lowCloudCoverPercent(),
+                weather.midCloudCoverPercent(),
+                weather.highCloudCoverPercent(),
+                weather.precipitationProbabilityPercent(),
+                weather.precipitationMm(),
+                weather.visibilityMeters(),
+                weather.weatherCode(),
+                weather.forecastAgeHours());
     }
 }

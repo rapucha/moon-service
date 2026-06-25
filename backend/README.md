@@ -84,6 +84,10 @@ The adapter normalizes provider-shaped hourly records into backend weather
 facts used by the scoring model. Malformed payloads, empty responses, HTTP
 failures, IO failures, timeouts, and rate limits fail the dependency boundary
 instead of producing fake no-op opportunities.
+The transport uses Spring `RestClient` for HTTP and a small Spring
+`RetryTemplate` wrapper for at most one retry on HTTP `429`, `502`, `503`,
+`504`, timeout, or IO failure. Short `Retry-After` values are honored before
+retrying; long retry delays fail fast.
 
 The Maven test suite uses saved provider JSON fixtures and fake weather
 providers; it never calls the live weather API. Manual live weather drift checks
@@ -130,6 +134,10 @@ mvn test -pl backend -am
 mvn spring-boot:run -pl backend -am \
   -Dspring-boot.run.arguments="--moon.location.resolver=open-meteo --moon.weather.provider=open-meteo"
 ```
+
+Use those same two program arguments when starting the application from an IDE.
+The backend intentionally fails startup when provider choices are missing so a
+local or deployed process does not silently choose a live provider mode.
 
 Then post the request body above to
 `http://localhost:8080/api/opportunities/search`.

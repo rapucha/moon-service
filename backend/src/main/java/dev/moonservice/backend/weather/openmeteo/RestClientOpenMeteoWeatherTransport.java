@@ -1,6 +1,7 @@
 package dev.moonservice.backend.weather.openmeteo;
 
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.client.ClientHttpResponse;
 import org.springframework.http.client.SimpleClientHttpRequestFactory;
@@ -13,7 +14,10 @@ import java.net.SocketTimeoutException;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
+import java.util.Collections;
+import java.util.IdentityHashMap;
 import java.util.Optional;
+import java.util.Set;
 
 final class RestClientOpenMeteoWeatherTransport implements OpenMeteoWeatherTransport {
     private static final String USER_AGENT = "moon-service-backend/0.1";
@@ -61,10 +65,12 @@ final class RestClientOpenMeteoWeatherTransport implements OpenMeteoWeatherTrans
 
     private static OpenMeteoWeatherTransportException httpFailure(int statusCode, HttpHeaders headers) {
         Optional<Duration> retryAfter = retryAfter(headers);
-        if (statusCode == 429) {
+        if (statusCode == HttpStatus.TOO_MANY_REQUESTS.value()) {
             return OpenMeteoWeatherTransportException.rateLimited(statusCode, retryAfter);
         }
-        if (statusCode == 502 || statusCode == 503 || statusCode == 504) {
+        if (statusCode == HttpStatus.BAD_GATEWAY.value()
+                || statusCode == HttpStatus.SERVICE_UNAVAILABLE.value()
+                || statusCode == HttpStatus.GATEWAY_TIMEOUT.value()) {
             return OpenMeteoWeatherTransportException.transientHttp(statusCode, retryAfter);
         }
         return OpenMeteoWeatherTransportException.nonRetryableHttp(statusCode, retryAfter);
@@ -95,8 +101,8 @@ final class RestClientOpenMeteoWeatherTransport implements OpenMeteoWeatherTrans
     }
 
     private static boolean isTimeout(Throwable throwable) {
-        Throwable cursor = throwable;
-        while (cursor != null) {
+        Set<Throwable> seen = Collections.newSetFromMap(new IdentityHashMap<>());
+        for (Throwable cursor = throwable; cursor != null && seen.add(cursor); cursor = cursor.getCause()) {
             if (cursor instanceof SocketTimeoutException) {
                 return true;
             }
@@ -104,7 +110,6 @@ final class RestClientOpenMeteoWeatherTransport implements OpenMeteoWeatherTrans
             if (message != null && message.toLowerCase().contains("timed out")) {
                 return true;
             }
-            cursor = cursor.getCause();
         }
         return false;
     }

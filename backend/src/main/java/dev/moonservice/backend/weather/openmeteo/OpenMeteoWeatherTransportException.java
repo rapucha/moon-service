@@ -67,6 +67,15 @@ final class OpenMeteoWeatherTransportException extends RuntimeException {
                 cause);
     }
 
+    boolean canRetry(Duration maxRetryAfter) {
+        if (!kind.isRetryable()) {
+            return false;
+        }
+        return retryAfter()
+                .map(delay -> !delay.isNegative() && delay.compareTo(maxRetryAfter) <= 0)
+                .orElse(true);
+    }
+
     OpenMeteoWeatherFailureKind kind() {
         return kind;
     }
