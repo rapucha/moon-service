@@ -15,6 +15,8 @@ calendar exports deliberately out of scope.
 - Open-Meteo geocoding adapter code under `backend.location.openmeteo`, covered
   by saved provider JSON fixtures. It can be selected for live city/location
   lookup with `moon.location.resolver=open-meteo`.
+- Shared Open-Meteo HTTP transport, retry, and failure classification code
+  under `backend.openmeteo`.
 - Coordinate-backed Moon/Sun window generation and scoring through the existing
   `jvm-scoring-prototype` Maven artifact.
 - Open-Meteo weather forecast adapter code under `backend.weather.openmeteo`,
@@ -59,14 +61,14 @@ Live no-match responses have also been observed as `generationtime_ms` with no
 `results` field; that provider-shaped response maps to not found, while an
 arbitrary empty object or malformed `results` shape still maps to temporarily
 unavailable.
-The Spring `RestClient` transport classifies rate limits, transient HTTP
-failures, non-retryable HTTP failures, IO failures, and timeouts as typed
-provider exceptions. A retrying transport decorator uses Spring `RetryTemplate`
-with a narrow provider retry policy: at most one retry for HTTP `429`, `502`,
-`503`, `504`, timeout, or IO failure. It avoids retries for non-retryable HTTP
-statuses, malformed provider payloads, blank response bodies, and valid empty
-results. Short `Retry-After` values are honored before retrying; long
-`Retry-After` delays fail fast.
+The shared Open-Meteo `RestClient` transport classifies rate limits, transient
+HTTP failures, non-retryable HTTP failures, IO failures, and timeouts as typed
+provider exceptions. A shared retrying transport decorator uses Spring
+`RetryTemplate` with a narrow provider retry policy: at most one retry for HTTP
+`429`, `502`, `503`, `504`, timeout, or IO failure. It avoids retries for
+non-retryable HTTP statuses, malformed provider payloads, blank response
+bodies, and valid empty results. Short `Retry-After` values are honored before
+retrying; long `Retry-After` delays fail fast.
 Resolved locations now carry a backend location ID, a structured provider
 location ID, latitude, longitude, elevation, timezone, and country code. The
 test suite still uses a test-only Open-Meteo resolver double that returns
@@ -88,10 +90,10 @@ The adapter normalizes provider-shaped hourly records into backend weather
 facts used by the scoring model. Malformed payloads, empty responses, HTTP
 failures, IO failures, timeouts, and rate limits fail the dependency boundary
 instead of producing fake no-op opportunities.
-The transport uses Spring `RestClient` for HTTP and a small Spring
-`RetryTemplate` wrapper for at most one retry on HTTP `429`, `502`, `503`,
-`504`, timeout, or IO failure. Short `Retry-After` values are honored before
-retrying; long retry delays fail fast.
+The weather client uses the same shared Open-Meteo `RestClient` transport and
+Spring `RetryTemplate` wrapper as geocoding: at most one retry on HTTP `429`,
+`502`, `503`, `504`, timeout, or IO failure. Short `Retry-After` values are
+honored before retrying; long retry delays fail fast.
 
 The Maven test suite uses saved provider JSON fixtures and fake weather
 providers; it never calls the live weather API. Manual live weather drift checks

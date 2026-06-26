@@ -6,6 +6,10 @@ import dev.moonservice.backend.weather.HourlyWeatherForecast;
 import dev.moonservice.backend.weather.WeatherForecast;
 import dev.moonservice.backend.weather.WeatherForecastProvider;
 import dev.moonservice.backend.weather.WeatherForecastUnavailableException;
+import dev.moonservice.backend.openmeteo.OpenMeteoTransport;
+import dev.moonservice.backend.openmeteo.OpenMeteoTransportException;
+import dev.moonservice.backend.openmeteo.RestClientOpenMeteoTransport;
+import dev.moonservice.backend.openmeteo.RetryingOpenMeteoTransport;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.util.UriComponentsBuilder;
 import tools.jackson.core.JacksonException;
@@ -42,33 +46,29 @@ public class OpenMeteoWeatherClient implements WeatherForecastProvider {
             DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm").withZone(ZoneOffset.UTC);
 
     private final URI endpoint;
-    private final Duration timeout;
-    private final OpenMeteoWeatherTransport transport;
+    private final OpenMeteoTransport transport;
     private final ObjectMapper objectMapper;
 
     public OpenMeteoWeatherClient() {
         this(
                 DEFAULT_ENDPOINT,
-                DEFAULT_TIMEOUT,
-                new RetryingOpenMeteoWeatherTransport(
-                        new RestClientOpenMeteoWeatherTransport(RestClient.builder(), DEFAULT_TIMEOUT),
+                new RetryingOpenMeteoTransport(
+                        new RestClientOpenMeteoTransport(RestClient.builder(), DEFAULT_TIMEOUT),
                         MAX_TRANSPORT_RETRIES,
                         MAX_RETRY_AFTER),
                 new ObjectMapper());
     }
 
-    OpenMeteoWeatherClient(OpenMeteoWeatherTransport transport) {
-        this(DEFAULT_ENDPOINT, DEFAULT_TIMEOUT, transport, new ObjectMapper());
+    OpenMeteoWeatherClient(OpenMeteoTransport transport) {
+        this(DEFAULT_ENDPOINT, transport, new ObjectMapper());
     }
 
     OpenMeteoWeatherClient(
             URI endpoint,
-            Duration timeout,
-            OpenMeteoWeatherTransport transport,
+            OpenMeteoTransport transport,
             ObjectMapper objectMapper
     ) {
         this.endpoint = endpoint;
-        this.timeout = timeout;
         this.transport = transport;
         this.objectMapper = objectMapper;
     }
@@ -82,8 +82,8 @@ public class OpenMeteoWeatherClient implements WeatherForecastProvider {
     ) {
         String body;
         try {
-            body = transport.get(requestUri(location, startsAt, endsAt), timeout);
-        } catch (OpenMeteoWeatherTransportException ex) {
+            body = transport.get(requestUri(location, startsAt, endsAt));
+        } catch (OpenMeteoTransportException ex) {
             throw new WeatherForecastUnavailableException("Weather lookup is temporarily unavailable.", ex);
         }
 

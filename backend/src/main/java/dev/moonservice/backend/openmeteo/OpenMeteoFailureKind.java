@@ -1,6 +1,6 @@
-package dev.moonservice.backend.weather.openmeteo;
+package dev.moonservice.backend.openmeteo;
 
-enum OpenMeteoWeatherFailureKind {
+public enum OpenMeteoFailureKind {
     RATE_LIMIT(true),
     TRANSIENT_HTTP_FAILURE(true),
     NON_RETRYABLE_HTTP_FAILURE(false),
@@ -9,11 +9,11 @@ enum OpenMeteoWeatherFailureKind {
 
     private final boolean retryable;
 
-    OpenMeteoWeatherFailureKind(boolean retryable) {
+    OpenMeteoFailureKind(boolean retryable) {
         this.retryable = retryable;
     }
 
-    boolean isRetryable() {
+    public boolean isRetryable() {
         return retryable;
     }
 }

@@ -6,6 +6,10 @@ import dev.moonservice.backend.location.LocationResolver;
 import dev.moonservice.backend.location.LocationProvider;
 import dev.moonservice.backend.location.ProviderLocationId;
 import dev.moonservice.backend.location.ResolvedLocation;
+import dev.moonservice.backend.openmeteo.OpenMeteoTransport;
+import dev.moonservice.backend.openmeteo.OpenMeteoTransportException;
+import dev.moonservice.backend.openmeteo.RestClientOpenMeteoTransport;
+import dev.moonservice.backend.openmeteo.RetryingOpenMeteoTransport;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.util.UriComponentsBuilder;
 import tools.jackson.core.JacksonException;
@@ -32,8 +36,7 @@ public class OpenMeteoGeocodingClient implements LocationResolver {
     private final URI endpoint;
     private final String language;
     private final int resultCount;
-    private final Duration timeout;
-    private final OpenMeteoGeocodingTransport transport;
+    private final OpenMeteoTransport transport;
     private final ObjectMapper objectMapper;
 
     public OpenMeteoGeocodingClient() {
@@ -41,30 +44,27 @@ public class OpenMeteoGeocodingClient implements LocationResolver {
                 DEFAULT_ENDPOINT,
                 DEFAULT_LANGUAGE,
                 DEFAULT_RESULT_COUNT,
-                DEFAULT_TIMEOUT,
-                new RetryingOpenMeteoGeocodingTransport(
-                        new RestClientOpenMeteoGeocodingTransport(RestClient.builder(), DEFAULT_TIMEOUT),
+                new RetryingOpenMeteoTransport(
+                        new RestClientOpenMeteoTransport(RestClient.builder(), DEFAULT_TIMEOUT),
                         MAX_TRANSPORT_RETRIES,
                         MAX_RETRY_AFTER),
                 new ObjectMapper());
     }
 
-    OpenMeteoGeocodingClient(OpenMeteoGeocodingTransport transport) {
-        this(DEFAULT_ENDPOINT, DEFAULT_LANGUAGE, DEFAULT_RESULT_COUNT, DEFAULT_TIMEOUT, transport, new ObjectMapper());
+    OpenMeteoGeocodingClient(OpenMeteoTransport transport) {
+        this(DEFAULT_ENDPOINT, DEFAULT_LANGUAGE, DEFAULT_RESULT_COUNT, transport, new ObjectMapper());
     }
 
     OpenMeteoGeocodingClient(
             URI endpoint,
             String language,
             int resultCount,
-            Duration timeout,
-            OpenMeteoGeocodingTransport transport,
+            OpenMeteoTransport transport,
             ObjectMapper objectMapper
     ) {
         this.endpoint = endpoint;
         this.language = language;
         this.resultCount = resultCount;
-        this.timeout = timeout;
         this.transport = transport;
         this.objectMapper = objectMapper;
     }
@@ -73,8 +73,8 @@ public class OpenMeteoGeocodingClient implements LocationResolver {
     public LocationResolution resolve(LocationQuery query) {
         String body;
         try {
-            body = transport.get(requestUri(query), timeout);
-        } catch (OpenMeteoGeocodingTransportException ex) {
+            body = transport.get(requestUri(query));
+        } catch (OpenMeteoTransportException ex) {
             return LocationResolution.temporarilyUnavailable();
         }
 

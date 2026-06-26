@@ -135,12 +135,13 @@ Current adapter scope:
 - Maps transport failures, HTTP failures, invalid JSON, missing `results`
   without the Open-Meteo response marker, or a non-array `results` shape to
   `LocationResolution.temporarilyUnavailable`.
-- Uses a Spring `RestClient` transport that classifies rate limits, transient
-  HTTP failures, non-retryable HTTP failures, IO failures, and timeouts as typed
+- Uses the shared `dev.moonservice.backend.openmeteo.OpenMeteoTransport` seam.
+  Its Spring `RestClient` implementation classifies rate limits, transient HTTP
+  failures, non-retryable HTTP failures, IO failures, and timeouts as typed
   provider exceptions.
-- Applies a small retrying transport decorator using Spring `RetryTemplate` with
-  at most one retry for transient failures: HTTP `429`, `502`, `503`, `504`,
-  timeout, or IO failure.
+- Applies the shared Open-Meteo retrying transport decorator using Spring
+  `RetryTemplate` with at most one retry for transient failures: HTTP `429`,
+  `502`, `503`, `504`, timeout, or IO failure.
 - Does not retry non-retryable HTTP statuses, malformed provider payloads, blank
   response bodies, valid empty `results` arrays, or provider-shaped no-match
   responses.

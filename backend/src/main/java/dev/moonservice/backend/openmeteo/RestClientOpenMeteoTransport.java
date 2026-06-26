@@ -17,22 +17,19 @@ import java.time.Duration;
 import java.util.Locale;
 import java.util.Optional;
 
-public final class OpenMeteoRestTransport {
+public final class RestClientOpenMeteoTransport implements OpenMeteoTransport {
     private static final String USER_AGENT = "moon-service-backend/0.1";
 
     private final RestClient restClient;
 
-    public OpenMeteoRestTransport(RestClient.Builder restClientBuilder) {
-        this.restClient = restClientBuilder.clone().build();
-    }
-
-    public OpenMeteoRestTransport(RestClient.Builder restClientBuilder, Duration timeout) {
+    public RestClientOpenMeteoTransport(RestClient.Builder restClientBuilder, Duration timeout) {
         this.restClient = restClientBuilder.clone()
                 .requestFactory(requestFactory(timeout))
                 .build();
     }
 
-    public String get(URI requestUri) throws OpenMeteoRestTransportException {
+    @Override
+    public String get(URI requestUri) throws OpenMeteoTransportException {
         try {
             return restClient.get()
                     .uri(requestUri)
@@ -42,7 +39,7 @@ public final class OpenMeteoRestTransport {
         } catch (ResourceAccessException ex) {
             throw accessFailure(ex);
         } catch (RestClientException ex) {
-            throw OpenMeteoRestTransportException.ioFailure(ex);
+            throw OpenMeteoTransportException.ioFailure(ex);
         }
     }
 
@@ -60,22 +57,22 @@ public final class OpenMeteoRestTransport {
         throw httpFailure(response.getStatusCode().value(), response.getHeaders());
     }
 
-    private static OpenMeteoRestTransportException httpFailure(int statusCode, HttpHeaders headers) {
+    private static OpenMeteoTransportException httpFailure(int statusCode, HttpHeaders headers) {
         Optional<Duration> retryAfter = retryAfter(headers);
         if (statusCode == HttpStatus.TOO_MANY_REQUESTS.value()) {
-            return OpenMeteoRestTransportException.rateLimited(statusCode, retryAfter);
+            return OpenMeteoTransportException.rateLimited(statusCode, retryAfter);
         }
         if (statusCode == HttpStatus.BAD_GATEWAY.value()
                 || statusCode == HttpStatus.SERVICE_UNAVAILABLE.value()
                 || statusCode == HttpStatus.GATEWAY_TIMEOUT.value()) {
-            return OpenMeteoRestTransportException.transientHttp(statusCode, retryAfter);
+            return OpenMeteoTransportException.transientHttp(statusCode, retryAfter);
         }
-        return OpenMeteoRestTransportException.nonRetryableHttp(statusCode, retryAfter);
+        return OpenMeteoTransportException.nonRetryableHttp(statusCode, retryAfter);
     }
 
     private static Optional<Duration> retryAfter(HttpHeaders headers) {
         return Optional.ofNullable(headers.getFirst(HttpHeaders.RETRY_AFTER))
-                .flatMap(OpenMeteoRestTransport::retryAfter);
+                .flatMap(RestClientOpenMeteoTransport::retryAfter);
     }
 
     private static Optional<Duration> retryAfter(String rawValue) {
@@ -90,11 +87,11 @@ public final class OpenMeteoRestTransport {
         }
     }
 
-    private static OpenMeteoRestTransportException accessFailure(ResourceAccessException ex) {
+    private static OpenMeteoTransportException accessFailure(ResourceAccessException ex) {
         if (isTimeout(ex)) {
-            return OpenMeteoRestTransportException.timeout(ex);
+            return OpenMeteoTransportException.timeout(ex);
         }
-        return OpenMeteoRestTransportException.ioFailure(ex);
+        return OpenMeteoTransportException.ioFailure(ex);
     }
 
     private static boolean isTimeout(ResourceAccessException ex) {
@@ -104,6 +101,9 @@ public final class OpenMeteoRestTransport {
     }
 
     private static boolean messageMentionsTimeout(Throwable throwable) {
+        if (throwable == null) {
+            return false;
+        }
         String message = throwable.getMessage();
         return message != null && message.toLowerCase(Locale.ROOT).contains("timed out");
     }

@@ -2,14 +2,12 @@ package dev.moonservice.backend.location.openmeteo;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.springframework.test.web.client.match.MockRestRequestMatchers.header;
-import static org.springframework.test.web.client.match.MockRestRequestMatchers.requestTo;
-import static org.springframework.test.web.client.response.MockRestResponseCreators.withServiceUnavailable;
-import static org.springframework.test.web.client.response.MockRestResponseCreators.withSuccess;
 
 import dev.moonservice.backend.location.LocationQuery;
 import dev.moonservice.backend.location.LocationResolution;
+import dev.moonservice.backend.openmeteo.OpenMeteoTransport;
+import dev.moonservice.backend.openmeteo.OpenMeteoTransportException;
+import dev.moonservice.backend.openmeteo.RetryingOpenMeteoTransport;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.URI;
@@ -22,15 +20,11 @@ import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
-import org.springframework.http.HttpHeaders;
-import org.springframework.http.MediaType;
-import org.springframework.test.web.client.MockRestServiceServer;
-import org.springframework.web.client.RestClient;
 
 class OpenMeteoGeocodingClientTest {
     @Test
     void buildsOpenMeteoGeocodingRequest() {
-        OpenMeteoGeocodingClient client = new OpenMeteoGeocodingClient((requestUri, timeout) -> "{}");
+        OpenMeteoGeocodingClient client = new OpenMeteoGeocodingClient(requestUri -> "{}");
 
         URI requestUri = client.requestUri(new LocationQuery("Praha"));
 
@@ -43,7 +37,7 @@ class OpenMeteoGeocodingClientTest {
     void sendsEncodedRequestAndMapsSingleProviderResultToResolvedLocation() throws Exception {
         String responseBody = fixture("praha-resolved.json");
         AtomicReference<URI> capturedRequestUri = new AtomicReference<>();
-        OpenMeteoGeocodingClient client = new OpenMeteoGeocodingClient((requestUri, timeout) -> {
+        OpenMeteoGeocodingClient client = new OpenMeteoGeocodingClient(requestUri -> {
             capturedRequestUri.set(requestUri);
             return responseBody;
         });
@@ -67,7 +61,7 @@ class OpenMeteoGeocodingClientTest {
     @Test
     void mapsMultipleProviderResultsToAmbiguousLocation() throws Exception {
         String responseBody = fixture("prague-ambiguous.json");
-        OpenMeteoGeocodingClient client = new OpenMeteoGeocodingClient((requestUri, timeout) ->
+        OpenMeteoGeocodingClient client = new OpenMeteoGeocodingClient(requestUri ->
                 responseBody);
 
         LocationResolution resolution = client.resolve(new LocationQuery("Prague"));
@@ -112,7 +106,7 @@ class OpenMeteoGeocodingClientTest {
     @ValueSource(strings = {"empty-response.json", "malformed-results.json"})
     void mapsMalformedOrEmptyProviderShapeToTemporarilyUnavailable(String fixtureName) throws Exception {
         String responseBody = fixture(fixtureName);
-        OpenMeteoGeocodingClient client = new OpenMeteoGeocodingClient((requestUri, timeout) ->
+        OpenMeteoGeocodingClient client = new OpenMeteoGeocodingClient(requestUri ->
                 responseBody);
 
         LocationResolution resolution = client.resolve(new LocationQuery("Praha"));
@@ -133,8 +127,8 @@ class OpenMeteoGeocodingClientTest {
 
     @Test
     void mapsTransportFailureToTemporarilyUnavailable() {
-        OpenMeteoGeocodingClient client = new OpenMeteoGeocodingClient((requestUri, timeout) ->
-                throwFailure(OpenMeteoGeocodingTransportException.ioFailure(null)));
+        OpenMeteoGeocodingClient client = new OpenMeteoGeocodingClient(requestUri ->
+                throwFailure(OpenMeteoTransportException.ioFailure(null)));
 
         LocationResolution resolution = client.resolve(new LocationQuery("Praha"));
 
@@ -142,44 +136,9 @@ class OpenMeteoGeocodingClientTest {
     }
 
     @Test
-    void restClientTransportReturnsSuccessfulResponseBody() {
-        URI requestUri = URI.create("https://geocoding-api.open-meteo.com/v1/search?name=Praha");
-        RestClient.Builder builder = RestClient.builder();
-        MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
-        server.expect(requestTo(requestUri))
-                .andExpect(header(HttpHeaders.USER_AGENT, "moon-service-backend/0.1"))
-                .andRespond(withSuccess("{}", MediaType.APPLICATION_JSON));
-        RestClientOpenMeteoGeocodingTransport transport = new RestClientOpenMeteoGeocodingTransport(builder);
-
-        String body = transport.get(requestUri, Duration.ofSeconds(10));
-
-        assertEquals("{}", body);
-        server.verify();
-    }
-
-    @Test
-    void restClientTransportClassifiesRetryAfterFailure() {
-        URI requestUri = URI.create("https://geocoding-api.open-meteo.com/v1/search?name=Praha");
-        RestClient.Builder builder = RestClient.builder();
-        MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
-        server.expect(requestTo(requestUri))
-                .andRespond(withServiceUnavailable().header(HttpHeaders.RETRY_AFTER, "1"));
-        RestClientOpenMeteoGeocodingTransport transport = new RestClientOpenMeteoGeocodingTransport(builder);
-
-        OpenMeteoGeocodingTransportException failure = assertThrows(
-                OpenMeteoGeocodingTransportException.class,
-                () -> transport.get(requestUri, Duration.ofSeconds(10)));
-
-        assertEquals(OpenMeteoGeocodingFailureKind.TRANSIENT_HTTP_FAILURE, failure.kind());
-        assertEquals(Optional.of(503), failure.statusCode());
-        assertEquals(Optional.of(Duration.ofSeconds(1)), failure.retryAfter());
-        server.verify();
-    }
-
-    @Test
     void retriesTransientHttpFailureOnce() throws Exception {
         ScriptedTransport transport = new ScriptedTransport(
-                ResponseStep.failure(OpenMeteoGeocodingTransportException.transientHttp(503, Optional.empty())),
+                ResponseStep.failure(OpenMeteoTransportException.transientHttp(503, Optional.empty())),
                 ResponseStep.success(fixture("praha-resolved.json")));
         OpenMeteoGeocodingClient client = new OpenMeteoGeocodingClient(retrying(transport));
 
@@ -192,7 +151,7 @@ class OpenMeteoGeocodingClientTest {
     @Test
     void retriesRateLimitWhenRetryAfterIsShort() throws Exception {
         ScriptedTransport transport = new ScriptedTransport(
-                ResponseStep.failure(OpenMeteoGeocodingTransportException.rateLimited(
+                ResponseStep.failure(OpenMeteoTransportException.rateLimited(
                         429,
                         Optional.of(Duration.ZERO))),
                 ResponseStep.success(fixture("praha-resolved.json")));
@@ -207,7 +166,7 @@ class OpenMeteoGeocodingClientTest {
     @Test
     void retriesIoFailureOnce() throws Exception {
         ScriptedTransport transport = new ScriptedTransport(
-                ResponseStep.failure(OpenMeteoGeocodingTransportException.ioFailure(null)),
+                ResponseStep.failure(OpenMeteoTransportException.ioFailure(null)),
                 ResponseStep.success(fixture("praha-resolved.json")));
         OpenMeteoGeocodingClient client = new OpenMeteoGeocodingClient(retrying(transport));
 
@@ -220,7 +179,7 @@ class OpenMeteoGeocodingClientTest {
     @Test
     void doesNotRetryRateLimitWhenRetryAfterIsLong() {
         ScriptedTransport transport = new ScriptedTransport(ResponseStep.failure(
-                OpenMeteoGeocodingTransportException.rateLimited(
+                OpenMeteoTransportException.rateLimited(
                         429,
                         Optional.of(Duration.ofSeconds(60)))));
         OpenMeteoGeocodingClient client = new OpenMeteoGeocodingClient(retrying(transport));
@@ -234,7 +193,7 @@ class OpenMeteoGeocodingClientTest {
     @Test
     void doesNotRetryNonRetryableHttpFailure() {
         ScriptedTransport transport = new ScriptedTransport(ResponseStep.failure(
-                OpenMeteoGeocodingTransportException.nonRetryableHttp(404, Optional.empty())));
+                OpenMeteoTransportException.nonRetryableHttp(404, Optional.empty())));
         OpenMeteoGeocodingClient client = new OpenMeteoGeocodingClient(retrying(transport));
 
         LocationResolution resolution = client.resolve(new LocationQuery("Praha"));
@@ -251,28 +210,28 @@ class OpenMeteoGeocodingClientTest {
         }
     }
 
-    private static OpenMeteoGeocodingTransport retrying(OpenMeteoGeocodingTransport transport) {
-        return new RetryingOpenMeteoGeocodingTransport(
+    private static OpenMeteoTransport retrying(OpenMeteoTransport transport) {
+        return new RetryingOpenMeteoTransport(
                 transport,
                 1,
                 Duration.ofSeconds(1));
     }
 
-    private static String throwFailure(OpenMeteoGeocodingTransportException failure) {
+    private static String throwFailure(OpenMeteoTransportException failure) {
         throw failure;
     }
 
-    private record ResponseStep(String body, OpenMeteoGeocodingTransportException failure) {
+    private record ResponseStep(String body, OpenMeteoTransportException failure) {
         static ResponseStep success(String body) {
             return new ResponseStep(body, null);
         }
 
-        static ResponseStep failure(OpenMeteoGeocodingTransportException failure) {
+        static ResponseStep failure(OpenMeteoTransportException failure) {
             return new ResponseStep(null, failure);
         }
     }
 
-    private static final class ScriptedTransport implements OpenMeteoGeocodingTransport {
+    private static final class ScriptedTransport implements OpenMeteoTransport {
         private final List<ResponseStep> steps;
         private int calls;
 
@@ -281,7 +240,7 @@ class OpenMeteoGeocodingClientTest {
         }
 
         @Override
-        public String get(URI requestUri, Duration timeout) throws OpenMeteoGeocodingTransportException {
+        public String get(URI requestUri) throws OpenMeteoTransportException {
             if (calls >= steps.size()) {
                 throw new AssertionError("Unexpected Open-Meteo transport call.");
             }

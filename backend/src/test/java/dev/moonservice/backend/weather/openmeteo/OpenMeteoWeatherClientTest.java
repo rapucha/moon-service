@@ -3,24 +3,19 @@ package dev.moonservice.backend.weather.openmeteo;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.springframework.test.web.client.match.MockRestRequestMatchers.header;
-import static org.springframework.test.web.client.match.MockRestRequestMatchers.requestTo;
-import static org.springframework.test.web.client.response.MockRestResponseCreators.withSuccess;
-import static org.springframework.test.web.client.response.MockRestResponseCreators.withTooManyRequests;
 
 import dev.moonservice.backend.location.LocationProvider;
 import dev.moonservice.backend.location.ProviderLocationId;
 import dev.moonservice.backend.location.ResolvedLocation;
+import dev.moonservice.backend.openmeteo.OpenMeteoTransport;
+import dev.moonservice.backend.openmeteo.OpenMeteoTransportException;
+import dev.moonservice.backend.openmeteo.RetryingOpenMeteoTransport;
 import dev.moonservice.backend.weather.HourlyWeather;
 import dev.moonservice.backend.weather.WeatherForecast;
 import dev.moonservice.backend.weather.WeatherForecastUnavailableException;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
-import org.springframework.http.HttpHeaders;
-import org.springframework.http.MediaType;
-import org.springframework.test.web.client.MockRestServiceServer;
-import org.springframework.web.client.RestClient;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -37,7 +32,7 @@ import java.util.concurrent.atomic.AtomicReference;
 class OpenMeteoWeatherClientTest {
     @Test
     void buildsOpenMeteoWeatherRequest() {
-        OpenMeteoWeatherClient client = new OpenMeteoWeatherClient((requestUri, timeout) -> "{}");
+        OpenMeteoWeatherClient client = new OpenMeteoWeatherClient(requestUri -> "{}");
 
         URI requestUri = client.requestUri(
                 amsterdam(),
@@ -62,7 +57,7 @@ class OpenMeteoWeatherClientTest {
     void mapsProviderHourlyForecastToNormalizedWeather() throws Exception {
         String responseBody = fixture("amsterdam-hourly.json");
         AtomicReference<URI> capturedRequestUri = new AtomicReference<>();
-        OpenMeteoWeatherClient client = new OpenMeteoWeatherClient((requestUri, timeout) -> {
+        OpenMeteoWeatherClient client = new OpenMeteoWeatherClient(requestUri -> {
             capturedRequestUri.set(requestUri);
             return responseBody;
         });
@@ -94,7 +89,7 @@ class OpenMeteoWeatherClientTest {
     @ValueSource(strings = {"missing-hourly.json", "malformed-hourly-length.json"})
     void mapsMalformedProviderShapeToUnavailable(String fixtureName) throws Exception {
         String responseBody = fixture(fixtureName);
-        OpenMeteoWeatherClient client = new OpenMeteoWeatherClient((requestUri, timeout) ->
+        OpenMeteoWeatherClient client = new OpenMeteoWeatherClient(requestUri ->
                 responseBody);
 
         assertThrows(
@@ -108,7 +103,7 @@ class OpenMeteoWeatherClientTest {
 
     @Test
     void mapsInvalidHourlyValuesToUnavailable() {
-        OpenMeteoWeatherClient client = new OpenMeteoWeatherClient((requestUri, timeout) -> """
+        OpenMeteoWeatherClient client = new OpenMeteoWeatherClient(requestUri -> """
                 {
                   "hourly": {
                     "time": [1782691200],
@@ -135,7 +130,7 @@ class OpenMeteoWeatherClientTest {
 
     @Test
     void mapsInvalidJsonToUnavailable() {
-        OpenMeteoWeatherClient client = new OpenMeteoWeatherClient((requestUri, timeout) -> "{");
+        OpenMeteoWeatherClient client = new OpenMeteoWeatherClient(requestUri -> "{");
 
         assertThrows(
                 WeatherForecastUnavailableException.class,
@@ -148,8 +143,8 @@ class OpenMeteoWeatherClientTest {
 
     @Test
     void mapsTransportFailureToUnavailable() {
-        OpenMeteoWeatherClient client = new OpenMeteoWeatherClient((requestUri, timeout) ->
-                throwFailure(OpenMeteoWeatherTransportException.ioFailure(null)));
+        OpenMeteoWeatherClient client = new OpenMeteoWeatherClient(requestUri ->
+                throwFailure(OpenMeteoTransportException.ioFailure(null)));
 
         assertThrows(
                 WeatherForecastUnavailableException.class,
@@ -161,44 +156,9 @@ class OpenMeteoWeatherClientTest {
     }
 
     @Test
-    void restClientTransportReturnsSuccessfulResponseBody() {
-        URI requestUri = URI.create("https://api.open-meteo.com/v1/forecast?latitude=52.3740");
-        RestClient.Builder builder = RestClient.builder();
-        MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
-        server.expect(requestTo(requestUri))
-                .andExpect(header(HttpHeaders.USER_AGENT, "moon-service-backend/0.1"))
-                .andRespond(withSuccess("{}", MediaType.APPLICATION_JSON));
-        RestClientOpenMeteoWeatherTransport transport = new RestClientOpenMeteoWeatherTransport(builder);
-
-        String body = transport.get(requestUri, Duration.ofSeconds(10));
-
-        assertEquals("{}", body);
-        server.verify();
-    }
-
-    @Test
-    void restClientTransportClassifiesRateLimitFailure() {
-        URI requestUri = URI.create("https://api.open-meteo.com/v1/forecast?latitude=52.3740");
-        RestClient.Builder builder = RestClient.builder();
-        MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
-        server.expect(requestTo(requestUri))
-                .andRespond(withTooManyRequests().header(HttpHeaders.RETRY_AFTER, "1"));
-        RestClientOpenMeteoWeatherTransport transport = new RestClientOpenMeteoWeatherTransport(builder);
-
-        OpenMeteoWeatherTransportException failure = assertThrows(
-                OpenMeteoWeatherTransportException.class,
-                () -> transport.get(requestUri, Duration.ofSeconds(10)));
-
-        assertEquals(OpenMeteoWeatherFailureKind.RATE_LIMIT, failure.kind());
-        assertEquals(Optional.of(429), failure.statusCode());
-        assertEquals(Optional.of(Duration.ofSeconds(1)), failure.retryAfter());
-        server.verify();
-    }
-
-    @Test
     void retriesTransientHttpFailureOnce() throws Exception {
         ScriptedTransport transport = new ScriptedTransport(
-                ResponseStep.failure(OpenMeteoWeatherTransportException.transientHttp(503, Optional.empty())),
+                ResponseStep.failure(OpenMeteoTransportException.transientHttp(503, Optional.empty())),
                 ResponseStep.success(fixture("amsterdam-hourly.json")));
         OpenMeteoWeatherClient client = new OpenMeteoWeatherClient(retrying(transport));
 
@@ -215,7 +175,7 @@ class OpenMeteoWeatherClientTest {
     @Test
     void retriesRateLimitWhenRetryAfterIsShort() throws Exception {
         ScriptedTransport transport = new ScriptedTransport(
-                ResponseStep.failure(OpenMeteoWeatherTransportException.rateLimited(
+                ResponseStep.failure(OpenMeteoTransportException.rateLimited(
                         429,
                         Optional.of(Duration.ZERO))),
                 ResponseStep.success(fixture("amsterdam-hourly.json")));
@@ -234,7 +194,7 @@ class OpenMeteoWeatherClientTest {
     @Test
     void doesNotRetryRateLimitWhenRetryAfterIsLong() {
         ScriptedTransport transport = new ScriptedTransport(ResponseStep.failure(
-                OpenMeteoWeatherTransportException.rateLimited(
+                OpenMeteoTransportException.rateLimited(
                         429,
                         Optional.of(Duration.ofSeconds(60)))));
         OpenMeteoWeatherClient client = new OpenMeteoWeatherClient(retrying(transport));
@@ -252,7 +212,7 @@ class OpenMeteoWeatherClientTest {
     @Test
     void doesNotRetryNonRetryableHttpFailure() {
         ScriptedTransport transport = new ScriptedTransport(ResponseStep.failure(
-                OpenMeteoWeatherTransportException.nonRetryableHttp(404, Optional.empty())));
+                OpenMeteoTransportException.nonRetryableHttp(404, Optional.empty())));
         OpenMeteoWeatherClient client = new OpenMeteoWeatherClient(retrying(transport));
 
         assertThrows(
@@ -285,28 +245,28 @@ class OpenMeteoWeatherClientTest {
         }
     }
 
-    private static OpenMeteoWeatherTransport retrying(OpenMeteoWeatherTransport transport) {
-        return new RetryingOpenMeteoWeatherTransport(
+    private static OpenMeteoTransport retrying(OpenMeteoTransport transport) {
+        return new RetryingOpenMeteoTransport(
                 transport,
                 1,
                 Duration.ofSeconds(1));
     }
 
-    private static String throwFailure(OpenMeteoWeatherTransportException failure) {
+    private static String throwFailure(OpenMeteoTransportException failure) {
         throw failure;
     }
 
-    private record ResponseStep(String body, OpenMeteoWeatherTransportException failure) {
+    private record ResponseStep(String body, OpenMeteoTransportException failure) {
         static ResponseStep success(String body) {
             return new ResponseStep(body, null);
         }
 
-        static ResponseStep failure(OpenMeteoWeatherTransportException failure) {
+        static ResponseStep failure(OpenMeteoTransportException failure) {
             return new ResponseStep(null, failure);
         }
     }
 
-    private static final class ScriptedTransport implements OpenMeteoWeatherTransport {
+    private static final class ScriptedTransport implements OpenMeteoTransport {
         private final List<ResponseStep> steps;
         private int calls;
 
@@ -315,7 +275,7 @@ class OpenMeteoWeatherClientTest {
         }
 
         @Override
-        public String get(URI requestUri, Duration timeout) throws OpenMeteoWeatherTransportException {
+        public String get(URI requestUri) throws OpenMeteoTransportException {
             if (calls >= steps.size()) {
                 throw new AssertionError("Unexpected Open-Meteo transport call.");
             }

@@ -41,9 +41,13 @@ Moon Service backend
 ```
 
 The first Open-Meteo weather adapter lives under
-`backend/src/main/java/dev/moonservice/backend/weather/openmeteo/` and is
-tracked by [#14](https://github.com/rapucha/moon-service/issues/14). It is
-fixture-tested in Maven and can be checked against live provider drift with:
+`backend/src/main/java/dev/moonservice/backend/weather/openmeteo/`, with shared
+Open-Meteo HTTP transport, retry, and failure classification under
+`backend/src/main/java/dev/moonservice/backend/openmeteo/`. The weather client
+maps shared transport failures to `WeatherForecastUnavailableException`.
+This work is tracked by [#14](https://github.com/rapucha/moon-service/issues/14).
+It is fixture-tested in Maven and can be checked against live provider drift
+with:
 
 ```bash
 live-tests/run_live_weather_tests.sh
