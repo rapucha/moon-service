@@ -106,6 +106,7 @@ public class OpenMeteoGeocodingClient implements LocationResolver {
     private static LocationResolution toResolution(JsonNode root) {
         JsonNode results = root.path("results");
         if (results.isMissingNode()) {
+            // Open-Meteo returns normal no-match responses with generationtime_ms and no results field.
             return root.path("generationtime_ms").isNumber()
                     ? LocationResolution.notFound()
                     : LocationResolution.temporarilyUnavailable();

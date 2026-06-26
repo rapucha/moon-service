@@ -130,8 +130,11 @@ Current adapter scope:
 - Maps multiple complete provider results to `LocationResolution.ambiguous` in
   provider order.
 - Maps a valid empty `results` array to `LocationResolution.notFound`.
-- Maps transport failures, HTTP failures, invalid JSON, missing `results`, or a
-  non-array `results` shape to `LocationResolution.temporarilyUnavailable`.
+- Maps the observed Open-Meteo no-match shape, `generationtime_ms` with no
+  `results` field, to `LocationResolution.notFound`.
+- Maps transport failures, HTTP failures, invalid JSON, missing `results`
+  without the Open-Meteo response marker, or a non-array `results` shape to
+  `LocationResolution.temporarilyUnavailable`.
 - Uses a Spring `RestClient` transport that classifies rate limits, transient
   HTTP failures, non-retryable HTTP failures, IO failures, and timeouts as typed
   provider exceptions.
@@ -139,7 +142,8 @@ Current adapter scope:
   at most one retry for transient failures: HTTP `429`, `502`, `503`, `504`,
   timeout, or IO failure.
 - Does not retry non-retryable HTTP statuses, malformed provider payloads, blank
-  response bodies, or valid empty `results` arrays.
+  response bodies, valid empty `results` arrays, or provider-shaped no-match
+  responses.
 - Honors short `Retry-After` values before retrying; longer rate-limit delays
   fail fast as `temporarilyUnavailable`.
 - Keeps the backend location id separate from the structured provider location
