@@ -135,9 +135,9 @@ mvn test -pl backend -am
 
 ## Container Smoke Test
 
-The repository includes a Dockerfile for packaging the backend runtime. It uses
-a Maven/JDK 25 builder stage and a Java 25 JRE runtime stage; Maven is not
-present in the final image.
+The repository includes `backend/Dockerfile` for packaging the backend runtime.
+It uses a Maven/JDK 25 builder stage and a Java 25 JRE runtime stage; Maven is
+not present in the final image.
 
 Run the opt-in containerized live smoke check with:
 

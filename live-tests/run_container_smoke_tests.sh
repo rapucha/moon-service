@@ -30,7 +30,7 @@ command -v docker >/dev/null 2>&1 || {
 mkdir -p "$REPORT_DIR"
 
 DOCKER_BUILDKIT="${DOCKER_BUILDKIT:-1}" \
-  docker build -t "$IMAGE_TAG" -f "$REPO_DIR/Dockerfile" "$REPO_DIR"
+  docker build -t "$IMAGE_TAG" -f "$REPO_DIR/backend/Dockerfile" "$REPO_DIR"
 
 CONTAINER_ID="$(docker run -d --rm \
   -p 127.0.0.1::8080 \
@@ -45,6 +45,7 @@ BASE_URL="http://127.0.0.1:$HOST_PORT"
 "$PYTHON_BIN" - "$BASE_URL" <<'PY'
 import sys
 import time
+from http.client import HTTPException
 from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 
@@ -62,6 +63,8 @@ while time.monotonic() < deadline:
             sys.exit(0)
         last_error = ex
     except URLError as ex:
+        last_error = ex
+    except (HTTPException, TimeoutError, ConnectionError) as ex:
         last_error = ex
     time.sleep(1)
 

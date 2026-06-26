@@ -182,7 +182,7 @@ live-tests/run_container_smoke_tests.sh
 
 The script:
 
-- builds the backend image from the root `Dockerfile`;
+- builds the backend image from `backend/Dockerfile`;
 - uses `maven:3.9.16-eclipse-temurin-25-noble` only as the builder stage;
 - uses `eclipse-temurin:25.0.3_9-jre-noble` as the final runtime image;
 - runs the app with `moon.location.resolver=open-meteo` and
