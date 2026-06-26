@@ -12,15 +12,20 @@ import dev.moonservice.backend.location.ResolvedLocation;
 import dev.moonservice.backend.opportunity.InvalidOpportunitySearchRequestException;
 import dev.moonservice.backend.opportunity.search.OpportunitySearchRequest;
 import dev.moonservice.backend.opportunity.search.OpportunitySearchResponse;
+import dev.moonservice.backend.weather.HourlyWeather;
+import dev.moonservice.backend.weather.WeatherForecastProvider;
 import dev.moonservice.scoringprototype.PreviewEvaluator;
+import dev.moonservice.scoringprototype.fixture.WeatherFixture;
 import org.junit.jupiter.api.Test;
 
+import java.time.Instant;
 import java.time.ZoneId;
+import java.util.concurrent.atomic.AtomicReference;
 
 class JvmScoringOpportunitySearchEngineTest {
     @Test
     void scoresResolvedLocationCoordinatesWithoutFixtureLocationId() {
-        JvmScoringOpportunitySearchEngine engine = new JvmScoringOpportunitySearchEngine(new PreviewEvaluator());
+        JvmScoringOpportunitySearchEngine engine = engineWithPartlyCloudyWeather();
 
         OpportunitySearchResponse response = engine.search(
                 amsterdam(),
@@ -36,8 +41,48 @@ class JvmScoringOpportunitySearchEngineTest {
     }
 
     @Test
+    void scoresResolvedLocationWithWeatherForecastProviderData() {
+        AtomicReference<ResolvedLocation> requestedLocation = new AtomicReference<>();
+        AtomicReference<Integer> requestedForecastHorizonDays = new AtomicReference<>();
+        WeatherForecastProvider provider = (location, startsAt, endsAt, forecastHorizonDays) -> {
+            requestedLocation.set(location);
+            requestedForecastHorizonDays.set(forecastHorizonDays);
+            HourlyWeather weather = new HourlyWeather(
+                    startsAt,
+                    82,
+                    70,
+                    45,
+                    20,
+                    35,
+                    0.8,
+                    12000,
+                    61,
+                    2.0);
+            return instant -> weather;
+        };
+        JvmScoringOpportunitySearchEngine engine = new JvmScoringOpportunitySearchEngine(
+                new PreviewEvaluator(),
+                provider);
+
+        OpportunitySearchResponse response = engine.search(
+                amsterdam(),
+                new OpportunitySearchRequest("amsterdam-nl", "2026-06-29", 7, 90.0, 5));
+
+        OpportunitySearchResponse.Weather weather = response.opportunities().getFirst().weather();
+        assertEquals(amsterdam(), requestedLocation.get());
+        assertEquals(7, requestedForecastHorizonDays.get());
+        assertEquals(82, weather.cloudCoverMeanPercent());
+        assertEquals(70, weather.lowCloudCoverMaxPercent());
+        assertEquals(35, weather.precipitationProbabilityMaxPercent());
+        assertEquals(0.8, weather.precipitationMm());
+        assertEquals(12000, weather.visibilityMinMeters());
+        assertEquals(61, weather.weatherCode());
+        assertEquals("rain likely", weather.summary());
+    }
+
+    @Test
     void translatesDirectPrototypeValidationFailuresToInvalidRequest() {
-        JvmScoringOpportunitySearchEngine engine = new JvmScoringOpportunitySearchEngine(new PreviewEvaluator());
+        JvmScoringOpportunitySearchEngine engine = engineWithUnusedWeather();
 
         InvalidOpportunitySearchRequestException exception = assertThrows(
                 InvalidOpportunitySearchRequestException.class,
@@ -49,7 +94,7 @@ class JvmScoringOpportunitySearchEngineTest {
 
     @Test
     void treatsResolvedPrototypeValidationFailuresAsInternalInvariants() {
-        JvmScoringOpportunitySearchEngine engine = new JvmScoringOpportunitySearchEngine(new PreviewEvaluator());
+        JvmScoringOpportunitySearchEngine engine = engineWithUnusedWeather();
 
         IllegalStateException exception = assertThrows(
                 IllegalStateException.class,
@@ -69,5 +114,32 @@ class JvmScoringOpportunitySearchEngineTest {
                 13,
                 ZoneId.of("Europe/Amsterdam"),
                 "NL");
+    }
+
+    private static JvmScoringOpportunitySearchEngine engineWithPartlyCloudyWeather() {
+        return new JvmScoringOpportunitySearchEngine(new PreviewEvaluator(), (location, startsAt, endsAt, days) -> {
+            HourlyWeather weather = toHourlyWeather(startsAt, WeatherFixture.PRAGUE_PARTLY_CLOUDY);
+            return instant -> weather;
+        });
+    }
+
+    private static JvmScoringOpportunitySearchEngine engineWithUnusedWeather() {
+        return new JvmScoringOpportunitySearchEngine(new PreviewEvaluator(), (location, startsAt, endsAt, days) -> {
+            throw new AssertionError("Weather provider should not be called by this test.");
+        });
+    }
+
+    private static HourlyWeather toHourlyWeather(Instant startsAt, WeatherFixture weather) {
+        return new HourlyWeather(
+                startsAt,
+                weather.cloudCoverPercent(),
+                weather.lowCloudCoverPercent(),
+                weather.midCloudCoverPercent(),
+                weather.highCloudCoverPercent(),
+                weather.precipitationProbabilityPercent(),
+                weather.precipitationMm(),
+                weather.visibilityMeters(),
+                weather.weatherCode(),
+                weather.forecastAgeHours());
     }
 }

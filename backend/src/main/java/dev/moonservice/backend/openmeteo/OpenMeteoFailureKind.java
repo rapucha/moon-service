@@ -1,20 +1,19 @@
-package dev.moonservice.backend.location.openmeteo;
+package dev.moonservice.backend.openmeteo;
 
-enum OpenMeteoGeocodingFailureKind {
+public enum OpenMeteoFailureKind {
     RATE_LIMIT(true),
     TRANSIENT_HTTP_FAILURE(true),
     NON_RETRYABLE_HTTP_FAILURE(false),
-    TIMEOUT(true),
     IO_FAILURE(true),
-    INTERRUPTED(false);
+    TIMEOUT(true);
 
     private final boolean retryable;
 
-    OpenMeteoGeocodingFailureKind(boolean retryable) {
+    OpenMeteoFailureKind(boolean retryable) {
         this.retryable = retryable;
     }
 
-    boolean isRetryable() {
+    public boolean isRetryable() {
         return retryable;
     }
 }

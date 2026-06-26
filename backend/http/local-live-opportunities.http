@@ -1,0 +1,74 @@
+@baseUrl = http://localhost:8080
+@resolvedQuery = Zakopane
+@ambiguousQuery = Springfield
+@notFoundQuery = MoonServiceDefinitelyNotAPlace
+@tooLongQuery = aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+
+# Start the backend first:
+# mvn spring-boot:run -pl backend -am -Dspring-boot.run.arguments="--moon.location.resolver=open-meteo --moon.weather.provider=open-meteo"
+
+### Resolved live lookup
+GET {{baseUrl}}/api/opportunities?q={{resolvedQuery}}
+Accept: application/json
+
+### Ambiguous live lookup
+GET {{baseUrl}}/api/opportunities?q={{ambiguousQuery}}
+Accept: application/json
+
+### Location not found
+GET {{baseUrl}}/api/opportunities?q={{notFoundQuery}}
+Accept: application/json
+
+### Missing q
+GET {{baseUrl}}/api/opportunities
+Accept: application/json
+
+### Blank q
+GET {{baseUrl}}/api/opportunities?q=%20%20%20
+Accept: application/json
+
+### Too long q
+GET {{baseUrl}}/api/opportunities?q={{tooLongQuery}}
+Accept: application/json
+
+### Unsupported direction mark
+GET {{baseUrl}}/api/opportunities?q=%E2%80%8E
+Accept: application/json
+
+### Direct fixture-backed scoring request
+POST {{baseUrl}}/api/opportunities/search
+Accept: application/json
+Content-Type: application/json
+
+{
+  "locationId": "prague-cz",
+  "start": "2026-06-29",
+  "forecastHorizonDays": 7,
+  "maxMoonAltitudeDegrees": 12,
+  "limit": 5
+}
+
+### Unsupported direct fixture location
+POST {{baseUrl}}/api/opportunities/search
+Accept: application/json
+Content-Type: application/json
+
+{
+  "locationId": "amsterdam-nl",
+  "start": "2026-06-29",
+  "forecastHorizonDays": 7,
+  "maxMoonAltitudeDegrees": 12,
+  "limit": 5
+}
+
+### Invalid direct fixture request
+POST {{baseUrl}}/api/opportunities/search
+Accept: application/json
+Content-Type: application/json
+
+{
+  "locationId": "prague-cz",
+  "start": "2026-06-29",
+  "forecastHorizonDays": 7,
+  "maxMoonAltitudeDegrees": 12
+}

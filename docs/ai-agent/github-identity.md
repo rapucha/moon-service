@@ -73,6 +73,12 @@ Workflow
   `issue-<number>-short-topic`.
 - Agent-created PRs should mention the issue they address and use `Closes #N`
   when the PR fully resolves the issue.
+- Agent-created PRs should be assigned to `rapucha` and request `rapucha` as a
+  reviewer when created:
+  - `gh pr create --assignee rapucha --reviewer rapucha ...`
+- The repository also has a `pull_request_target` workflow that assigns
+  `rapucha` and requests review from `rapucha` for non-draft PRs opened by
+  `moon-service-agent`. The workflow must not checkout or execute PR code.
 - The human owner should review agent-authored PRs through GitHub review when
   branch protection requires it.
 - If a PR is still authored by the human account during the transition, formal

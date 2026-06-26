@@ -4,6 +4,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import dev.moonservice.backend.location.LocationResolver;
 import dev.moonservice.backend.location.openmeteo.TestOpenMeteoLocationResolver;
+import dev.moonservice.backend.weather.TestWeatherForecastProvider;
+import dev.moonservice.backend.weather.WeatherForecastProvider;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
@@ -19,7 +21,10 @@ import org.springframework.test.web.reactive.server.WebTestClient;
 
 @SpringBootTest(
         webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
-        properties = "moon.location.resolver=open-meteo")
+        properties = {
+                "moon.location.resolver=open-meteo",
+                "moon.weather.provider=open-meteo"
+        })
 @AutoConfigureWebTestClient
 class OpportunitySearchControllerTest {
     @Autowired
@@ -31,6 +36,12 @@ class OpportunitySearchControllerTest {
         @Primary
         LocationResolver testOpenMeteoLocationResolver() {
             return new TestOpenMeteoLocationResolver();
+        }
+
+        @Bean
+        @Primary
+        WeatherForecastProvider testWeatherForecastProvider() {
+            return new TestWeatherForecastProvider();
         }
     }
 

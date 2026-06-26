@@ -28,10 +28,19 @@ backend docs rely on observed behavior such as:
 - One-character place names such as `Å` and `Y` need stricter handling because
   broad fuzzy lookup is ambiguous and provider behavior is limited.
 
+Open-Meteo Weather is currently the first weather provider candidate. The
+backend weather adapter relies on observed behavior such as:
+
+- Hourly forecast responses include total, low, mid, and high cloud cover.
+- Hourly forecast responses include precipitation probability, precipitation
+  amount, weather code, and visibility.
+- Requested hourly fields return arrays aligned with the `hourly.time` array.
+- `timeformat=unixtime` returns hourly timestamps as Unix seconds.
+
 These checks are intentionally broad. They should catch provider drift,
-response-shape changes, rate-limit problems, or changed native-script support
-without pretending that provider ranking and display names are stable product
-contracts.
+response-shape changes, rate-limit problems, changed native-script support, or
+missing hourly weather fields without pretending that provider ranking, display
+names, or exact forecasts are stable product contracts.
 
 ## Why Python And Pytest
 
@@ -52,7 +61,9 @@ Failsafe/JUnit setup without changing the backend contract.
 Run these checks when provider assumptions matter:
 
 - Before implementing or changing the Open-Meteo geocoding adapter.
+- Before implementing or changing the Open-Meteo weather adapter.
 - When updating geocoding fixtures, aliases, or provider-mapping code.
+- When updating weather fixtures or weather field mapping code.
 - Before a public alpha or after changing provider configuration.
 - On a manual schedule if Open-Meteo behavior drift would affect product
   confidence.
@@ -67,24 +78,27 @@ Moon Service code is broken.
 ## Run With Virtualenv And HTML Report
 
 Use the helper script to create or reuse a local virtual environment, install
-the live-test dependencies, run the Open-Meteo geocoding drift check, and write
-a self-contained HTML report:
+the live-test dependencies, run one Open-Meteo drift check, and write a
+self-contained HTML report:
 
 ```bash
 live-tests/run_live_geocoding_tests.sh
+live-tests/run_live_weather_tests.sh
 ```
 
 Default paths:
 
 ```text
 virtualenv: live-tests/.venv/
-report:     live-tests/reports/openmeteo-geocoding.html
+reports:    live-tests/reports/openmeteo-geocoding.html
+            live-tests/reports/openmeteo-weather.html
 ```
 
 The script accepts extra pytest arguments after its own defaults:
 
 ```bash
 live-tests/run_live_geocoding_tests.sh -k Prague
+live-tests/run_live_weather_tests.sh -k Amsterdam
 ```
 
 Override paths if needed:
@@ -93,6 +107,10 @@ Override paths if needed:
 MOON_SERVICE_LIVE_TEST_VENV=/tmp/moon-live-venv \
 MOON_SERVICE_LIVE_TEST_REPORT=/tmp/openmeteo-geocoding.html \
   live-tests/run_live_geocoding_tests.sh
+
+MOON_SERVICE_LIVE_TEST_VENV=/tmp/moon-live-venv \
+MOON_SERVICE_LIVE_TEST_REPORT=/tmp/openmeteo-weather.html \
+  live-tests/run_live_weather_tests.sh
 ```
 
 ## Manual Setup
@@ -117,3 +135,22 @@ Without `MOON_SERVICE_RUN_LIVE_TESTS=1`, pytest collects the tests but skips
 them. Failures usually mean the live provider behavior changed and the backend
 fixtures, alias table, or mapping assumptions should be reviewed; they do not
 automatically mean the backend unit contract is broken.
+
+## Open-Meteo Weather Drift Check
+
+Run explicitly:
+
+```bash
+MOON_SERVICE_RUN_LIVE_TESTS=1 python3 -m pytest live-tests -m live_weather \
+  --html=live-tests/reports/openmeteo-weather.html \
+  --self-contained-html
+```
+
+Without `MOON_SERVICE_RUN_LIVE_TESTS=1`, pytest collects the tests but skips
+them. Failures usually mean the live provider behavior changed and the backend
+weather fixtures or mapping assumptions should be reviewed; they do not
+automatically mean the backend unit contract is broken.
+
+Containerized backend live smoke testing is separate from these direct provider
+drift checks and is tracked by
+[#27](https://github.com/rapucha/moon-service/issues/27).

@@ -686,9 +686,9 @@ opportunity_search
   -> feed/calendar link assembly
 ```
 
-The coordinate-backed opportunity engine is tracked by
-[#13](https://github.com/rapucha/moon-service/issues/13), and the live weather
-integration is tracked by
+The coordinate-backed opportunity engine was delivered through
+[#13](https://github.com/rapucha/moon-service/issues/13). The first Open-Meteo
+weather integration is tracked by
 [#14](https://github.com/rapucha/moon-service/issues/14).
 
 This keeps the public API simple without making the backend design hard to change.

@@ -5,6 +5,8 @@ import dev.moonservice.backend.location.openmeteo.OpenMeteoGeocodingClient;
 import dev.moonservice.backend.opportunity.OpportunitySearchDefaults;
 import dev.moonservice.backend.opportunity.scoring.JvmScoringOpportunitySearchEngine;
 import dev.moonservice.backend.opportunity.search.OpportunitySearchEngine;
+import dev.moonservice.backend.weather.WeatherForecastProvider;
+import dev.moonservice.backend.weather.openmeteo.OpenMeteoWeatherClient;
 import dev.moonservice.scoringprototype.PreviewEvaluator;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
@@ -27,16 +29,25 @@ class OpportunitySearchConfiguration {
     }
 
     @Bean
-    OpportunitySearchEngine opportunitySearchEngine(PreviewEvaluator previewEvaluator) {
-        return new JvmScoringOpportunitySearchEngine(previewEvaluator);
+    OpportunitySearchEngine opportunitySearchEngine(
+            PreviewEvaluator previewEvaluator,
+            WeatherForecastProvider weatherForecastProvider
+    ) {
+        return new JvmScoringOpportunitySearchEngine(previewEvaluator, weatherForecastProvider);
     }
 
     @Bean
     @ConditionalOnMissingBean(LocationResolver.class)
     LocationResolver locationResolver(@Value("${moon.location.resolver:}") String resolver) {
-        return switch (LocationResolverMode.from(resolver)) {
-            case OPEN_METEO -> new OpenMeteoGeocodingClient();
-        };
+        requireOpenMeteoProvider("moon.location.resolver", resolver);
+        return new OpenMeteoGeocodingClient();
+    }
+
+    @Bean
+    @ConditionalOnMissingBean(WeatherForecastProvider.class)
+    WeatherForecastProvider weatherForecastProvider(@Value("${moon.weather.provider:}") String provider) {
+        requireOpenMeteoProvider("moon.weather.provider", provider);
+        return new OpenMeteoWeatherClient();
     }
 
     @Bean
@@ -44,28 +55,14 @@ class OpportunitySearchConfiguration {
         return new OpportunitySearchDefaults(clock);
     }
 
-    private enum LocationResolverMode {
-        OPEN_METEO("open-meteo");
-
-        private final String propertyValue;
-
-        LocationResolverMode(String propertyValue) {
-            this.propertyValue = propertyValue;
+    private static void requireOpenMeteoProvider(String propertyName, String rawValue) {
+        String normalized = rawValue == null ? "" : rawValue.strip().toLowerCase(Locale.ROOT);
+        if (normalized.isBlank()) {
+            throw new IllegalArgumentException(propertyName + " is required. Use open-meteo.");
         }
-
-        private static LocationResolverMode from(String rawValue) {
-            String normalized = rawValue == null ? "" : rawValue.strip().toLowerCase(Locale.ROOT);
-            if (normalized.isBlank()) {
-                throw new IllegalArgumentException(
-                        "moon.location.resolver is required. Use open-meteo.");
-            }
-            for (LocationResolverMode mode : values()) {
-                if (mode.propertyValue.equals(normalized)) {
-                    return mode;
-                }
-            }
+        if (!"open-meteo".equals(normalized)) {
             throw new IllegalArgumentException(
-                    "Unsupported moon.location.resolver value: " + rawValue + ". Use open-meteo.");
+                    "Unsupported " + propertyName + " value: " + rawValue + ". Use open-meteo.");
         }
     }
 }

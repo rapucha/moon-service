@@ -5,6 +5,8 @@ import dev.moonservice.backend.opportunity.InvalidOpportunitySearchRequestExcept
 import dev.moonservice.backend.opportunity.search.OpportunitySearchEngine;
 import dev.moonservice.backend.opportunity.search.OpportunitySearchRequest;
 import dev.moonservice.backend.opportunity.search.OpportunitySearchResponse;
+import dev.moonservice.backend.weather.WeatherForecast;
+import dev.moonservice.backend.weather.WeatherForecastProvider;
 import dev.moonservice.scoringprototype.PreviewEvaluator;
 import dev.moonservice.scoringprototype.UsageException;
 import dev.moonservice.scoringprototype.fixture.Location;
@@ -27,19 +29,16 @@ public class JvmScoringOpportunitySearchEngine implements OpportunitySearchEngin
     private final PreviewEvaluator previewEvaluator;
     private final OpportunityService opportunityService;
     private final ResponseFormatter responseFormatter;
+    private final WeatherForecastProvider weatherForecastProvider;
 
-    public JvmScoringOpportunitySearchEngine(PreviewEvaluator previewEvaluator) {
-        this(previewEvaluator, new OpportunityService(), new ResponseFormatter());
-    }
-
-    JvmScoringOpportunitySearchEngine(
+    public JvmScoringOpportunitySearchEngine(
             PreviewEvaluator previewEvaluator,
-            OpportunityService opportunityService,
-            ResponseFormatter responseFormatter
+            WeatherForecastProvider weatherForecastProvider
     ) {
         this.previewEvaluator = previewEvaluator;
-        this.opportunityService = opportunityService;
-        this.responseFormatter = responseFormatter;
+        this.opportunityService = new OpportunityService();
+        this.responseFormatter = new ResponseFormatter();
+        this.weatherForecastProvider = weatherForecastProvider;
     }
 
     @Override
@@ -66,7 +65,14 @@ public class JvmScoringOpportunitySearchEngine implements OpportunitySearchEngin
                     request.forecastHorizonDays(),
                     request.maxMoonAltitudeDegrees(),
                     request.limit());
-            PrototypeResult result = opportunityService.evaluate(config);
+            WeatherForecast forecast = weatherForecastProvider.forecastFor(
+                    location,
+                    config.start(),
+                    config.end(),
+                    request.forecastHorizonDays());
+            PrototypeResult result = opportunityService.evaluate(
+                    config,
+                    window -> forecast.weatherAt(window.suggested().instant()).toWeatherFixture());
             return toBackendResponse(responseFormatter.format(result));
         } catch (UsageException ex) {
             throw new IllegalStateException("Resolved opportunity scoring request was invalid.", ex);

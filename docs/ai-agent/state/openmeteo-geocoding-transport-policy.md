@@ -34,12 +34,13 @@ Plan
   - Revert transport policy changes; the adapter can return to one request plus `temporarily_unavailable` on failure.
 
 Files
-- Planned edits:
+- Current implementation files:
   - `backend/src/main/java/dev/moonservice/backend/location/openmeteo/OpenMeteoGeocodingClient.java` - resolver/client mapping.
-  - `backend/src/main/java/dev/moonservice/backend/location/openmeteo/RestClientOpenMeteoGeocodingTransport.java` - Spring HTTP transport.
-  - `backend/src/main/java/dev/moonservice/backend/location/openmeteo/RetryingOpenMeteoGeocodingTransport.java` - Spring `RetryTemplate` decorator.
-  - `backend/src/main/java/dev/moonservice/backend/location/openmeteo/OpenMeteoGeocodingRetryPolicy.java` - narrow provider retry policy and short `Retry-After` backoff.
-  - `backend/src/main/java/dev/moonservice/backend/location/openmeteo/OpenMeteoGeocodingTransportException.java` - transport failure classification.
+  - `backend/src/main/java/dev/moonservice/backend/openmeteo/OpenMeteoTransport.java` - shared Open-Meteo transport seam.
+  - `backend/src/main/java/dev/moonservice/backend/openmeteo/RestClientOpenMeteoTransport.java` - shared Spring HTTP transport.
+  - `backend/src/main/java/dev/moonservice/backend/openmeteo/RetryingOpenMeteoTransport.java` - shared Spring `RetryTemplate` decorator.
+  - `backend/src/main/java/dev/moonservice/backend/openmeteo/OpenMeteoRetryPolicy.java` - narrow provider retry policy and short `Retry-After` backoff.
+  - `backend/src/main/java/dev/moonservice/backend/openmeteo/OpenMeteoTransportException.java` - shared transport failure classification.
   - `backend/src/test/java/dev/moonservice/backend/location/openmeteo/OpenMeteoGeocodingClientTest.java` - retry/error classification tests with fake transport.
   - `docs/geocoding-research.md` and `backend/README.md` - document runtime transport policy once implemented.
 - Generated or local-only files:

@@ -21,6 +21,13 @@ Core Principles
 - Explicit tradeoffs: document why a dependency, provider, or boundary is being
   introduced.
 - Validation evidence: report exact commands and outcomes.
+- Respect question wording: when the user asks a question or feasibility check,
+  such as "can you...", "could you...", "is it possible...", "should we...",
+  or any request ending with a question mark, answer it as a question and do not
+  make code, documentation, GitHub, or other mutating changes yet.
+- Start mutating work only from clear instructions in imperative mood, such as
+  "do it", "go ahead", "implement", "update", or "create"; if the requested
+  outcome is ambiguous, clarify before changing files or external state.
 
 Security and Privacy
 - Do not commit secrets, tokens, API keys, local credentials, or private URLs.
