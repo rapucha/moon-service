@@ -26,10 +26,9 @@ calendar exports deliberately out of scope.
   requests.
 
 This module intentionally does not yet include persistence, weather caching,
-accounts, cookies, feeds, calendar generation, Docker, or deployment
-configuration. Missing or unknown `moon.location.resolver` or
-`moon.weather.provider` values fail startup; the runtime backend does not
-include fixture provider modes.
+accounts, cookies, feeds, calendar generation, or deployment configuration.
+Missing or unknown `moon.location.resolver` or `moon.weather.provider` values
+fail startup; the runtime backend does not include fixture provider modes.
 
 ## Query Endpoint
 
@@ -133,6 +132,26 @@ query-shaped flow covers the needed behavior.
 ```bash
 mvn test -pl backend -am
 ```
+
+## Container Smoke Test
+
+The repository includes `backend/Dockerfile` for packaging the backend runtime.
+It uses a Maven/JDK 25 builder stage and a Java 25 JRE runtime stage; Maven is
+not present in the final image.
+
+Run the opt-in containerized live smoke check with:
+
+```bash
+live-tests/run_container_smoke_tests.sh
+```
+
+The script builds the image, starts the container on a random localhost port
+with Open-Meteo geocoding and weather enabled, waits for the app to listen,
+calls `GET /api/opportunities?q=Zakopane`, verifies required API fields, writes
+an HTML report under `live-tests/reports/`, and removes the container.
+
+This smoke check is intentionally outside Maven because it requires Docker,
+network access, and live providers.
 
 ## Run Locally
 
