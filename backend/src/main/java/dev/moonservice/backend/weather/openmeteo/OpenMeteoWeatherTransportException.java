@@ -1,5 +1,7 @@
 package dev.moonservice.backend.weather.openmeteo;
 
+import dev.moonservice.backend.openmeteo.OpenMeteoRestTransportException;
+
 import java.time.Duration;
 import java.util.Objects;
 import java.util.Optional;
@@ -67,6 +69,16 @@ final class OpenMeteoWeatherTransportException extends RuntimeException {
                 cause);
     }
 
+    static OpenMeteoWeatherTransportException fromRestTransport(OpenMeteoRestTransportException failure) {
+        return switch (failure.kind()) {
+            case RATE_LIMIT -> rateLimited(requiredStatusCode(failure), failure.retryAfter());
+            case TRANSIENT_HTTP_FAILURE -> transientHttp(requiredStatusCode(failure), failure.retryAfter());
+            case NON_RETRYABLE_HTTP_FAILURE -> nonRetryableHttp(requiredStatusCode(failure), failure.retryAfter());
+            case IO_FAILURE -> ioFailure(failure.getCause());
+            case TIMEOUT -> timeout(failure.getCause());
+        };
+    }
+
     boolean canRetry(Duration maxRetryAfter) {
         if (!kind.isRetryable()) {
             return false;
@@ -86,5 +98,10 @@ final class OpenMeteoWeatherTransportException extends RuntimeException {
 
     Optional<Duration> retryAfter() {
         return Optional.ofNullable(retryAfter);
+    }
+
+    private static int requiredStatusCode(OpenMeteoRestTransportException failure) {
+        return failure.statusCode().orElseThrow(() ->
+                new IllegalArgumentException("Open-Meteo REST HTTP failure did not include a status code."));
     }
 }
