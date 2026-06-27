@@ -127,8 +127,11 @@ Current adapter scope:
 - Uses encoded query parameters; do not build the provider URL by raw string
   concatenation.
 - Maps one complete provider result to `LocationResolution.resolved`.
-- Maps multiple complete provider results to `LocationResolution.ambiguous` in
-  provider order.
+- Filters nearby provider-noise results, currently Open-Meteo `PPLX` districts
+  and `AIRP` airport records, when they share the same country, first admin
+  area, timezone, and rough city radius as a canonical populated-place result.
+- Maps the remaining complete provider results to `LocationResolution.ambiguous`
+  in provider order when more than one meaningfully distinct place remains.
 - Maps a valid empty `results` array to `LocationResolution.notFound`.
 - Maps the observed Open-Meteo no-match shape, `generationtime_ms` with no
   `results` field, to `LocationResolution.notFound`.
@@ -149,20 +152,19 @@ Current adapter scope:
   fail fast as `temporarilyUnavailable`.
 - Keeps the backend location id separate from the structured provider location
   id. For example, an Open-Meteo result may map to backend id
-  `openmeteo-3067696` and `ProviderLocationId(OPEN_METEO, "3067696")`, which
+  `moon-service-3067696` and `ProviderLocationId(OPEN_METEO, "3067696")`, which
   serializes as `openmeteo:3067696`.
 - Retains the coordinate-backed fields the backend resolver contract can now
   carry: backend location id, structured provider location id, display name,
   latitude, longitude, elevation, timezone, and country code.
 
-This adapter is not the active Spring `LocationResolver` bean yet. The backend
-still uses `FixtureLocationResolver` by default because the scoring prototype is
-still fixture-location based and cannot yet score arbitrary coordinate-backed
-real locations. Fixture `locationId` values therefore remain compatible with
-the scoring prototype slugs, while `ProviderLocationId` records where the
-candidate came from without relying on formatted string prefixes. Add runtime
-provider selection only after the opportunity search engine can consume the
-resolved location's coordinates/elevation instead of only a fixture slug.
+This adapter can be selected as the Spring `LocationResolver` with
+`moon.location.resolver=open-meteo`. Runtime provider selection is explicit:
+missing or unsupported provider configuration fails startup rather than silently
+choosing fixture behavior. The resolved-location opportunity path now consumes
+coordinates, elevation, timezone, and provider metadata from the selected
+location. Test-only resolver doubles still provide stable fixture locations for
+network-free controller and service tests.
 
 Fixture-backed adapter tests live under:
 

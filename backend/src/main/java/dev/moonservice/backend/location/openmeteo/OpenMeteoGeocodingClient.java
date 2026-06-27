@@ -28,6 +28,7 @@ import java.util.OptionalDouble;
 public class OpenMeteoGeocodingClient implements LocationResolver {
     static final URI DEFAULT_ENDPOINT = URI.create("https://geocoding-api.open-meteo.com/v1/search");
     static final URI DEFAULT_GET_ENDPOINT = URI.create("https://geocoding-api.open-meteo.com/v1/get");
+    private static final double SAME_CITY_NOISE_DISTANCE_KM = 50.0;
     private static final Duration DEFAULT_TIMEOUT = Duration.ofSeconds(10);
     private static final int MAX_TRANSPORT_RETRIES = 1;
     private static final Duration MAX_RETRY_AFTER = Duration.ofSeconds(1);
@@ -177,18 +178,19 @@ public class OpenMeteoGeocodingClient implements LocationResolver {
             return LocationResolution.notFound();
         }
 
-        List<ResolvedLocation> candidates = new ArrayList<>();
+        List<ProviderCandidate> candidates = new ArrayList<>();
         for (JsonNode result : results) {
-            toLocation(result).ifPresent(candidates::add);
+            toProviderCandidate(result).ifPresent(candidates::add);
         }
 
         if (candidates.isEmpty()) {
             return LocationResolution.temporarilyUnavailable();
         }
-        if (candidates.size() == 1) {
-            return LocationResolution.resolved(candidates.getFirst());
+        List<ResolvedLocation> meaningfulCandidates = meaningfulLocations(candidates);
+        if (meaningfulCandidates.size() == 1) {
+            return LocationResolution.resolved(meaningfulCandidates.getFirst());
         }
-        return LocationResolution.ambiguous(candidates);
+        return LocationResolution.ambiguous(meaningfulCandidates);
     }
 
     private static LocationResolution toSingleLocationResolution(JsonNode root) {
@@ -198,10 +200,16 @@ public class OpenMeteoGeocodingClient implements LocationResolver {
     }
 
     private static java.util.Optional<ResolvedLocation> toLocation(JsonNode result) {
+        return toProviderCandidate(result).map(ProviderCandidate::location);
+    }
+
+    private static java.util.Optional<ProviderCandidate> toProviderCandidate(JsonNode result) {
         String providerId = stringFieldOrBlank(result, "id");
         String name = stringFieldOrBlank(result, "name");
         String timezone = stringFieldOrBlank(result, "timezone");
         String countryCode = stringFieldOrBlank(result, "country_code");
+        String featureCode = stringFieldOrBlank(result, "feature_code");
+        String admin1Id = stringFieldOrBlank(result, "admin1_id");
         OptionalDouble latitude = finiteDoubleField(result, "latitude");
         OptionalDouble longitude = finiteDoubleField(result, "longitude");
         OptionalDouble elevation = finiteDoubleField(result, "elevation");
@@ -223,7 +231,7 @@ public class OpenMeteoGeocodingClient implements LocationResolver {
             return java.util.Optional.empty();
         }
 
-        return java.util.Optional.of(new ResolvedLocation(
+        ResolvedLocation location = new ResolvedLocation(
                 backendLocationId(providerId),
                 new ProviderLocationId(LocationProvider.OPEN_METEO, providerId),
                 displayName(result, name, countryCode),
@@ -231,7 +239,69 @@ public class OpenMeteoGeocodingClient implements LocationResolver {
                 longitude.getAsDouble(),
                 (int) Math.round(elevation.getAsDouble()),
                 zoneId,
-                countryCode));
+                countryCode);
+        return java.util.Optional.of(new ProviderCandidate(location, featureCode, admin1Id));
+    }
+
+    private static List<ResolvedLocation> meaningfulLocations(List<ProviderCandidate> candidates) {
+        List<ResolvedLocation> meaningful = new ArrayList<>();
+        for (ProviderCandidate candidate : candidates) {
+            if (!isSameCityProviderNoise(candidate, candidates)) {
+                meaningful.add(candidate.location());
+            }
+        }
+        return meaningful;
+    }
+
+    private static boolean isSameCityProviderNoise(
+            ProviderCandidate candidate,
+            List<ProviderCandidate> candidates
+    ) {
+        if (!isCollapsibleProviderNoise(candidate)) {
+            return false;
+        }
+        for (ProviderCandidate canonical : candidates) {
+            if (canonical != candidate
+                    && isCanonicalPopulatedPlace(canonical)
+                    && isSameAdminArea(candidate, canonical)
+                    && distanceKm(candidate.location(), canonical.location()) <= SAME_CITY_NOISE_DISTANCE_KM) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static boolean isCanonicalPopulatedPlace(ProviderCandidate candidate) {
+        return switch (candidate.featureCode()) {
+            case "PPLC", "PPLA", "PPLA2", "PPLA3", "PPLA4", "PPL" -> true;
+            default -> false;
+        };
+    }
+
+    private static boolean isCollapsibleProviderNoise(ProviderCandidate candidate) {
+        return switch (candidate.featureCode()) {
+            case "AIRP", "PPLX" -> true;
+            default -> false;
+        };
+    }
+
+    private static boolean isSameAdminArea(ProviderCandidate left, ProviderCandidate right) {
+        return left.location().countryCode().equals(right.location().countryCode())
+                && left.location().zoneId().equals(right.location().zoneId())
+                && !left.admin1Id().isBlank()
+                && left.admin1Id().equals(right.admin1Id());
+    }
+
+    private static double distanceKm(ResolvedLocation left, ResolvedLocation right) {
+        double leftLatitude = Math.toRadians(left.latitude());
+        double rightLatitude = Math.toRadians(right.latitude());
+        double latitudeDelta = rightLatitude - leftLatitude;
+        double longitudeDelta = Math.toRadians(right.longitude() - left.longitude());
+        double a = Math.sin(latitudeDelta / 2.0) * Math.sin(latitudeDelta / 2.0)
+                + Math.cos(leftLatitude) * Math.cos(rightLatitude)
+                * Math.sin(longitudeDelta / 2.0) * Math.sin(longitudeDelta / 2.0);
+        a = Math.min(1.0, Math.max(0.0, a));
+        return 6371.0 * 2.0 * Math.atan2(Math.sqrt(a), Math.sqrt(1.0 - a));
     }
 
     private static String backendLocationId(String providerId) {
@@ -273,5 +343,12 @@ public class OpenMeteoGeocodingClient implements LocationResolver {
             return OptionalDouble.empty();
         }
         return OptionalDouble.of(value);
+    }
+
+    private record ProviderCandidate(
+            ResolvedLocation location,
+            String featureCode,
+            String admin1Id
+    ) {
     }
 }

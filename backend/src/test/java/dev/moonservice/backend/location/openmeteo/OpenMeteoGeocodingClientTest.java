@@ -112,6 +112,39 @@ class OpenMeteoGeocodingClientTest {
     }
 
     @Test
+    void collapsesSameCityProviderNoiseToCanonicalLocation() throws Exception {
+        String responseBody = fixture("prague-czechia-same-city-noise.json");
+        OpenMeteoGeocodingClient client = new OpenMeteoGeocodingClient(requestUri ->
+                responseBody);
+
+        LocationResolution resolution = client.resolve(new LocationQuery("prague, czechia"));
+
+        assertEquals(LocationResolution.Status.RESOLVED, resolution.status());
+        assertEquals(1, resolution.candidates().size());
+        assertEquals("moon-service-3067696", resolution.candidates().getFirst().locationId());
+        assertEquals("openmeteo:3067696", resolution.candidates().getFirst().providerLocationId().serialized());
+        assertEquals("Prague, Czechia", resolution.candidates().getFirst().displayName());
+    }
+
+    @Test
+    void keepsDistinctSameNameCitiesAmbiguous() throws Exception {
+        String responseBody = fixture("springfield-ambiguous.json");
+        OpenMeteoGeocodingClient client = new OpenMeteoGeocodingClient(requestUri ->
+                responseBody);
+
+        LocationResolution resolution = client.resolve(new LocationQuery("Springfield"));
+
+        assertEquals(LocationResolution.Status.AMBIGUOUS, resolution.status());
+        assertEquals(3, resolution.candidates().size());
+        assertEquals("moon-service-4409896", resolution.candidates().get(0).locationId());
+        assertEquals("Springfield, Missouri, United States", resolution.candidates().get(0).displayName());
+        assertEquals("moon-service-4250542", resolution.candidates().get(1).locationId());
+        assertEquals("Springfield, Illinois, United States", resolution.candidates().get(1).displayName());
+        assertEquals("moon-service-4951788", resolution.candidates().get(2).locationId());
+        assertEquals("Springfield, Massachusetts, United States", resolution.candidates().get(2).displayName());
+    }
+
+    @Test
     void mapsValidEmptyProviderResultsToLocationNotFound() throws Exception {
         ScriptedTransport transport = new ScriptedTransport(ResponseStep.success(fixture("tokyo-native-script-miss.json")));
         OpenMeteoGeocodingClient client = new OpenMeteoGeocodingClient(transport);
