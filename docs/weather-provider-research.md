@@ -525,6 +525,6 @@ Weather provider research pushes the MVP toward the hybrid architecture:
 - Should raw provider payloads be stored at all, or only normalized derived fields?
 
 The alpha hosting/commercial-use boundary is tracked by
-[#19](https://github.com/rapucha/moon-service/issues/19). Initial scoring
+[#19](https://github.com/rapucha/moon-service/issues/19). Empirical scoring
 calibration is tracked by
-[#18](https://github.com/rapucha/moon-service/issues/18).
+[#33](https://github.com/rapucha/moon-service/issues/33).

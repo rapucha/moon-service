@@ -117,8 +117,8 @@ than only in this roadmap:
   and iCalendar exports for real opportunities.
 - [#17](https://github.com/rapucha/moon-service/issues/17): decide whether
   Astronomy Engine through JitPack is acceptable before real backend adoption.
-- [#18](https://github.com/rapucha/moon-service/issues/18): calibrate scoring
-  thresholds with real Moon photography examples.
+- [#18](https://github.com/rapucha/moon-service/issues/18): define and test v0
+  scoring policy.
 - [#19](https://github.com/rapucha/moon-service/issues/19): choose the alpha
   hosting and backup boundary before deployment-specific work.
 - [#27](https://github.com/rapucha/moon-service/issues/27): add a

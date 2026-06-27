@@ -1,10 +1,8 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Moon Service">
   <rect width="64" height="64" rx="14" fill="#1f2522"/>
-  <circle cx="43" cy="18" r="10" fill="#f8f1cf"/>
-  <circle cx="48" cy="14" r="10" fill="#1f2522"/>
-  <rect x="14" y="38" width="36" height="16" rx="5" fill="#f6f7f4"/>
-  <path d="M20 38l5-7h14l5 7" fill="#f6f7f4"/>
-  <circle cx="32" cy="46" r="6" fill="#2e6f5c"/>
-  <circle cx="32" cy="46" r="3" fill="#f6f7f4"/>
-  <path d="M11 55h42" stroke="#8a5a21" stroke-width="4" stroke-linecap="round"/>
+  <circle cx="43" cy="18" r="15" fill="#f8f1cf"/>
+  <circle cx="50" cy="14" r="15" fill="#1f2522"/>
+  <rect x="12" y="36" width="40" height="18" rx="5" fill="#f6f7f4"/>
+  <rect x="22" y="31" width="20" height="8" rx="3" fill="#f6f7f4"/>
+  <circle cx="32" cy="45" r="9" fill="#2e6f5c"/>
 </svg>

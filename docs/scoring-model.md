@@ -47,6 +47,20 @@ Initial search horizon should match the selected weather provider's reliable
 forecast range. If the provider only gives useful confidence for a few days, do
 not pretend to predict beyond that.
 
+## Window And Suggested Time Contract
+
+The public result should distinguish the broad opportunity window from the
+suggested best time inside that window.
+
+- `startsAt` and `endsAt` describe the natural interval where the Moon is visible
+  for the location and remains inside the configured visible-Moon ceiling.
+- `suggestedAt` is the strongest moment found inside that interval according to
+  the v0 rule-based score.
+- The service should not present `suggestedAt` as a guaranteed best photograph,
+  exact landmark alignment, or exact local-horizon visibility time.
+- UI, feed, and calendar wording should say that local hills, buildings, trees,
+  and foreground choices may affect exact visibility and composition.
+
 ## Initial Inputs
 
 Moon geometry:
@@ -260,6 +274,32 @@ Forecast confidence:
 - Use confidence to reduce alert urgency.
 - If confidence is not available, expose a neutral confidence state rather than fabricating precision.
 
+## V0 Scoring Policy Tests
+
+The first executable scoring tests should protect product policy, not claim
+empirical validation. They should use representative synthetic Moon, Sun, and
+weather facts to ensure the rule-based score stays aligned with the MVP promise.
+
+Required v0 policy expectations:
+
+- A low Moon with useful ambient light should rank above comparable deep-night
+  cases because foreground detail is more plausible.
+- A low deep-night full Moon can remain possible, but should carry a foreground
+  risk explanation.
+- High or high-context Moon windows are allowed, but should rank below otherwise
+  comparable low-Moon windows for the default photographer-balanced profile.
+- Hostile weather should strongly lower an otherwise strong geometry/light case.
+- A thin crescent in favorable twilight should remain possible and should use
+  subtle-crescent explanation text rather than being rejected only for low
+  illumination.
+- Tests should prefer relative ordering and public labels over brittle exact
+  total-score assertions.
+
+These tests are regression guardrails for v0 product judgment. They do not
+replace empirical calibration against real observations or historical photos,
+which is tracked separately by
+[#33](https://github.com/rapucha/moon-service/issues/33).
+
 ## Future Recurring Event Context
 
 Some opportunities are valuable because a repeatable real-world subject may
@@ -386,7 +426,7 @@ These are acceptable limitations for an alert-first MVP, but the UI should avoid
   [#14](https://github.com/rapucha/moon-service/issues/14).
 - Collect real sample days for known good and bad Moon photography conditions
   and tune thresholds from examples as part of
-  [#18](https://github.com/rapucha/moon-service/issues/18).
+  [#33](https://github.com/rapucha/moon-service/issues/33).
 - Collect real recurring-event examples and decide whether v1 should support
   only user-entered patterns, curated public patterns, or live provider-backed
   schedules as part of [#3](https://github.com/rapucha/moon-service/issues/3).
