@@ -32,7 +32,7 @@ class JvmScoringOpportunitySearchEngineTest {
                 new OpportunitySearchRequest("amsterdam-nl", "2026-06-29", 7, 90.0, 5));
 
         assertEquals("ok", response.status());
-        assertEquals("openmeteo:2759794", response.location().id());
+        assertEquals("amsterdam-nl", response.location().id());
         assertEquals("Amsterdam, North Holland, Netherlands", response.location().displayName());
         assertEquals("Europe/Amsterdam", response.location().timezone());
         assertFalse(response.opportunities().isEmpty());

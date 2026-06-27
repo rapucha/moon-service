@@ -83,7 +83,7 @@ public class JvmScoringOpportunitySearchEngine implements OpportunitySearchEngin
         return new Location(
                 location.locationId(),
                 "real_location",
-                location.providerLocationId().serialized(),
+                location.locationId(),
                 location.displayName(),
                 location.latitude(),
                 location.longitude(),

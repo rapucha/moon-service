@@ -8,7 +8,7 @@ calendar exports deliberately out of scope.
 
 - Spring Boot application outside `prototypes/`.
 - `GET /api/opportunities?q=Praha` as the query-shaped public lookup path.
-- `GET /api/opportunities?locationId=openmeteo-3067696` for selecting one
+- `GET /api/opportunities?locationId=moon-service-3067696` for selecting one
   backend location candidate after ambiguous city lookup.
 - Browser lookup page at `/search?q=Praha`, backed by the query-shaped API.
 - `POST /api/opportunities/search` using the same JSON request body as the scoring
@@ -63,8 +63,8 @@ HTML/CSS/JavaScript from the backend, calls `GET /api/opportunities?q=...` only
 after an explicit form submit or a shared `/search?q=...` page load, and renders
 the documented product states without exposing provider internals.
 Ambiguous-location choices call the same endpoint with a selected backend
-location ID, for example `GET /api/opportunities?locationId=openmeteo-3067696`,
-and are shareable as `/search?locationId=openmeteo-3067696`.
+location ID, for example `GET /api/opportunities?locationId=moon-service-3067696`,
+and are shareable as `/search?locationId=moon-service-3067696`.
 
 The page keeps recent searches only in browser `localStorage` under
 `moonService.recentSearches.v1`. Entries contain display name, location ID, and

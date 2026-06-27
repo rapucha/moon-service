@@ -490,8 +490,11 @@
     if (request.locationId) {
       return request.locationId;
     }
+    if (location.id && location.id.indexOf("moon-service-") === 0) {
+      return location.id;
+    }
     if (location.id && location.id.indexOf("openmeteo:") === 0) {
-      return "openmeteo-" + location.id.substring("openmeteo:".length);
+      return "moon-service-" + location.id.substring("openmeteo:".length);
     }
     return location.id || "";
   }

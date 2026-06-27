@@ -33,7 +33,7 @@ public class OpenMeteoGeocodingClient implements LocationResolver {
     private static final Duration MAX_RETRY_AFTER = Duration.ofSeconds(1);
     private static final int DEFAULT_RESULT_COUNT = 10;
     private static final String DEFAULT_LANGUAGE = "en";
-    private static final String BACKEND_LOCATION_ID_PREFIX = LocationProvider.OPEN_METEO.id() + "-";
+    private static final String BACKEND_LOCATION_ID_PREFIX = "moon-service-";
 
     private final URI endpoint;
     private final URI getEndpoint;

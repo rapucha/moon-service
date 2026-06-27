@@ -43,10 +43,10 @@ class OpenMeteoGeocodingClientTest {
             return responseBody;
         });
 
-        LocationResolution resolution = client.resolveLocationId("openmeteo-3067696");
+        LocationResolution resolution = client.resolveLocationId("moon-service-3067696");
 
         assertEquals(LocationResolution.Status.RESOLVED, resolution.status());
-        assertEquals("openmeteo-3067696", resolution.candidates().getFirst().locationId());
+        assertEquals("moon-service-3067696", resolution.candidates().getFirst().locationId());
         assertEquals("openmeteo:3067696", resolution.candidates().getFirst().providerLocationId().serialized());
         assertEquals("Prague, Hlavni mesto Praha, Czechia", resolution.candidates().getFirst().displayName());
         assertEquals(
@@ -76,7 +76,7 @@ class OpenMeteoGeocodingClientTest {
         LocationResolution resolution = client.resolve(new LocationQuery("Praha"));
 
         assertEquals(LocationResolution.Status.RESOLVED, resolution.status());
-        assertEquals("openmeteo-3067696", resolution.candidates().getFirst().locationId());
+        assertEquals("moon-service-3067696", resolution.candidates().getFirst().locationId());
         assertEquals("openmeteo:3067696", resolution.candidates().getFirst().providerLocationId().serialized());
         assertEquals("Praha, Hlavni mesto Praha, Czechia", resolution.candidates().getFirst().displayName());
         assertEquals(50.08804, resolution.candidates().getFirst().latitude());
@@ -99,10 +99,10 @@ class OpenMeteoGeocodingClientTest {
 
         assertEquals(LocationResolution.Status.AMBIGUOUS, resolution.status());
         assertEquals(3, resolution.candidates().size());
-        assertEquals("openmeteo-3067696", resolution.candidates().get(0).locationId());
+        assertEquals("moon-service-3067696", resolution.candidates().get(0).locationId());
         assertEquals("openmeteo:3067696", resolution.candidates().get(0).providerLocationId().serialized());
         assertEquals("Prague, Hlavni mesto Praha, Czechia", resolution.candidates().get(0).displayName());
-        assertEquals("openmeteo-4548393", resolution.candidates().get(1).locationId());
+        assertEquals("moon-service-4548393", resolution.candidates().get(1).locationId());
         assertEquals("openmeteo:4548393", resolution.candidates().get(1).providerLocationId().serialized());
         assertEquals("Prague, Oklahoma, United States", resolution.candidates().get(1).displayName());
         assertEquals(35.48674, resolution.candidates().get(1).latitude());
