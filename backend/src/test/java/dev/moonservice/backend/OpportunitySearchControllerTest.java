@@ -75,6 +75,7 @@ class OpportunitySearchControllerTest {
                 .expectBody(String.class)
                 .value(body -> {
                     assertTrue(body.contains("id=\"search-form\""));
+                    assertTrue(body.contains("href=\"/favicon.svg\""));
                     assertTrue(body.contains("Find a Moon window near a city"));
                     assertTrue(body.contains("Privacy and caveats"));
                 });
@@ -101,6 +102,17 @@ class OpportunitySearchControllerTest {
                 .expectHeader().contentTypeCompatibleWith("text/css")
                 .expectBody(String.class)
                 .value(body -> assertTrue(body.contains(".opportunity-card")));
+
+        webTestClient.get()
+                .uri("/favicon.svg")
+                .exchange()
+                .expectStatus().isOk()
+                .expectHeader().contentTypeCompatibleWith("image/svg+xml")
+                .expectBody(String.class)
+                .value(body -> {
+                    assertTrue(body.contains("aria-label=\"Moon Service\""));
+                    assertTrue(body.contains("viewBox=\"0 0 64 64\""));
+                });
     }
 
     @Test
