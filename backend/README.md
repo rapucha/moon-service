@@ -8,6 +8,9 @@ calendar exports deliberately out of scope.
 
 - Spring Boot application outside `prototypes/`.
 - `GET /api/opportunities?q=Praha` as the query-shaped public lookup path.
+- `GET /api/opportunities?locationId=openmeteo-3067696` for selecting one
+  backend location candidate after ambiguous city lookup.
+- Browser lookup page at `/search?q=Praha`, backed by the query-shaped API.
 - `POST /api/opportunities/search` using the same JSON request body as the scoring
   prototype fixture.
 - Runtime city/location resolution is Open-Meteo backed through the
@@ -48,6 +51,36 @@ location resolution and can return resolved, ambiguous, not found, or
 temporarily unavailable location states from the provider path. A resolved city
 uses its backend location ID, provider ID, coordinates, elevation, timezone, and
 country code for opportunity generation and hourly weather lookup.
+
+## Browser Lookup Page
+
+```http
+GET /search?q=Praha
+```
+
+The browser page is the first anonymous MVP lookup flow. It serves static
+HTML/CSS/JavaScript from the backend, calls `GET /api/opportunities?q=...` only
+after an explicit form submit or a shared `/search?q=...` page load, and renders
+the documented product states without exposing provider internals.
+Ambiguous-location choices call the same endpoint with a selected backend
+location ID, for example `GET /api/opportunities?locationId=openmeteo-3067696`,
+and are shareable as `/search?locationId=openmeteo-3067696`.
+
+The page keeps recent searches only in browser `localStorage` under
+`moonService.recentSearches.v1`. Entries contain display name, location ID, and
+timezone only; the page still works if browser storage is unavailable. It does
+not create accounts, cookies, email subscriptions, or server-side user profiles.
+
+Manual browser checks for frontend behavior:
+
+- Open `/search`, submit `Praha`, and confirm opportunities render with Moon,
+  Sun/light, weather, score, and caveat details.
+- Open `/search?q=Praha` directly and confirm the page is shareable without an
+  account.
+- Search `Springfield` and confirm the ambiguous-location state presents
+  actionable choices that resolve through `locationId`.
+- Search an unknown place and confirm the not-found state is actionable.
+- Clear recent searches and confirm only browser-local entries are removed.
 
 ## Open-Meteo Geocoding Adapter
 

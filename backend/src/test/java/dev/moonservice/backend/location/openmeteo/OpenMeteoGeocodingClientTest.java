@@ -2,6 +2,7 @@ package dev.moonservice.backend.location.openmeteo;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.fail;
 
 import dev.moonservice.backend.location.LocationQuery;
 import dev.moonservice.backend.location.LocationResolution;
@@ -31,6 +32,36 @@ class OpenMeteoGeocodingClientTest {
         assertEquals(
                 "https://geocoding-api.open-meteo.com/v1/search?name=Praha&count=10&language=en&format=json",
                 requestUri.toString());
+    }
+
+    @Test
+    void buildsOpenMeteoLocationIdRequestAndMapsSingleProviderResult() throws Exception {
+        String responseBody = fixture("prague-get.json");
+        AtomicReference<URI> capturedRequestUri = new AtomicReference<>();
+        OpenMeteoGeocodingClient client = new OpenMeteoGeocodingClient(requestUri -> {
+            capturedRequestUri.set(requestUri);
+            return responseBody;
+        });
+
+        LocationResolution resolution = client.resolveLocationId("openmeteo-3067696");
+
+        assertEquals(LocationResolution.Status.RESOLVED, resolution.status());
+        assertEquals("openmeteo-3067696", resolution.candidates().getFirst().locationId());
+        assertEquals("openmeteo:3067696", resolution.candidates().getFirst().providerLocationId().serialized());
+        assertEquals("Prague, Hlavni mesto Praha, Czechia", resolution.candidates().getFirst().displayName());
+        assertEquals(
+                "https://geocoding-api.open-meteo.com/v1/get?id=3067696&language=en&format=json",
+                capturedRequestUri.get().toString());
+    }
+
+    @Test
+    void mapsUnsupportedLocationIdToNotFoundWithoutProviderCall() {
+        OpenMeteoGeocodingClient client = new OpenMeteoGeocodingClient(requestUri ->
+                fail("Unsupported backend location IDs should not call Open-Meteo."));
+
+        LocationResolution resolution = client.resolveLocationId("springfield-mo-us");
+
+        assertEquals(LocationResolution.Status.NOT_FOUND, resolution.status());
     }
 
     @Test

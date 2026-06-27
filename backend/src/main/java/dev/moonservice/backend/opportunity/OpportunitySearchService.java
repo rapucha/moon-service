@@ -36,9 +36,31 @@ public class OpportunitySearchService {
         return opportunitySearchEngine.search(OpportunitySearchRequest.fromJson(request));
     }
 
+    public OpportunityResponse search(String rawQuery, String rawLocationId) {
+        boolean hasQuery = rawQuery != null && !rawQuery.isBlank();
+        boolean hasLocationId = rawLocationId != null && !rawLocationId.isBlank();
+        if (hasQuery && hasLocationId) {
+            throw new InvalidOpportunitySearchRequestException("Use q or locationId, not both.");
+        }
+        if (hasLocationId) {
+            return searchByLocationId(rawLocationId);
+        }
+        return searchByQuery(rawQuery);
+    }
+
     public OpportunityResponse searchByQuery(String rawQuery) {
         String query = normalizeQuery(rawQuery);
         LocationResolution resolution = locationResolver.resolve(new LocationQuery(query));
+        return searchLocationResolution(resolution);
+    }
+
+    public OpportunityResponse searchByLocationId(String rawLocationId) {
+        String locationId = normalizeLocationId(rawLocationId);
+        LocationResolution resolution = locationResolver.resolveLocationId(locationId);
+        return searchLocationResolution(resolution);
+    }
+
+    private OpportunityResponse searchLocationResolution(LocationResolution resolution) {
         if (resolution.isAmbiguous()) {
             return LocationCandidatesResponse.ambiguous(resolution.candidates());
         }
@@ -74,6 +96,23 @@ public class OpportunitySearchService {
             throw new InvalidOpportunitySearchRequestException("q must be 100 characters or fewer.");
         }
         return query;
+    }
+
+    private static String normalizeLocationId(String rawLocationId) {
+        if (rawLocationId == null) {
+            throw new InvalidOpportunitySearchRequestException("locationId is required.");
+        }
+        String locationId = rawLocationId.strip();
+        if (locationId.isBlank()) {
+            throw new InvalidOpportunitySearchRequestException("locationId must be non-empty.");
+        }
+        if (containsUnsupportedControlCharacter(locationId)) {
+            throw new InvalidOpportunitySearchRequestException("locationId contains unsupported control characters.");
+        }
+        if (locationId.codePointCount(0, locationId.length()) > MAX_QUERY_CHARACTERS) {
+            throw new InvalidOpportunitySearchRequestException("locationId must be 100 characters or fewer.");
+        }
+        return locationId;
     }
 
     private static boolean containsUnsupportedControlCharacter(String value) {
