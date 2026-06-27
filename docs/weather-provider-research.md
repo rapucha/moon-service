@@ -40,6 +40,25 @@ Moon Service backend
   - avoids permanent user-location storage unless push/sync is added
 ```
 
+The first Open-Meteo weather adapter lives under
+`backend/src/main/java/dev/moonservice/backend/weather/openmeteo/`, with shared
+Open-Meteo HTTP transport, retry, and failure classification under
+`backend/src/main/java/dev/moonservice/backend/openmeteo/`. The weather client
+maps shared transport failures to `WeatherForecastUnavailableException`.
+This work is tracked by [#14](https://github.com/rapucha/moon-service/issues/14).
+It is fixture-tested in Maven and can be checked against live provider drift
+with:
+
+```bash
+live-tests/run_live_weather_tests.sh
+```
+
+Provider-call protection and backend observability are tracked separately by
+[#8](https://github.com/rapucha/moon-service/issues/8) and
+[#9](https://github.com/rapucha/moon-service/issues/9). Containerized backend
+live smoke testing is tracked by
+[#27](https://github.com/rapucha/moon-service/issues/27).
+
 Why not direct Android calls as the default:
 
 - Direct calls expose user IP addresses and exact requested coordinates to the weather provider.
@@ -436,6 +455,11 @@ For the first backend prototype:
 - Store derived normalized weather points longer only if needed for scoring repeatability.
 - If provider quota is exhausted, surface a temporary service state rather than returning an empty opportunity list.
 
+Weather cache behavior should be coordinated with
+[#14](https://github.com/rapucha/moon-service/issues/14) and the broader
+provider-call protection work in
+[#8](https://github.com/rapucha/moon-service/issues/8).
+
 ## Quota Observability
 
 Track outbound weather provider calls locally because providers may not expose exact real-time quota usage.
@@ -499,3 +523,8 @@ Weather provider research pushes the MVP toward the hybrid architecture:
 - How much coordinate rounding is acceptable before weather quality suffers in hills, mountains, or coastal areas?
 - Should forecast confidence be derived from provider/model age and forecast horizon, or should ensemble data be added later?
 - Should raw provider payloads be stored at all, or only normalized derived fields?
+
+The alpha hosting/commercial-use boundary is tracked by
+[#19](https://github.com/rapucha/moon-service/issues/19). Initial scoring
+calibration is tracked by
+[#18](https://github.com/rapucha/moon-service/issues/18).

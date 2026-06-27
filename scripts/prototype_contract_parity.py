@@ -76,7 +76,9 @@ def main() -> int:
     maven_response = run_json([
         "mvn",
         "-q",
+        "test-compile",
         "org.codehaus.mojo:exec-maven-plugin:3.3.0:java",
+        "-Dexec.classpathScope=test",
         "-Dexec.mainClass=dev.moonservice.scoringprototype.cli.MoonScoringPrototype",
         "-Dexec.args=--request fixtures/prague-preview-request.json",
     ], cwd=ROOT / "prototypes/jvm-scoring")

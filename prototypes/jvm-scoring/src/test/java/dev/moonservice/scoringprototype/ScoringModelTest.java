@@ -16,9 +16,15 @@ class ScoringModelTest {
         assertEquals(18, ScoringModel.scoreMoonAltitude(0.0));
         assertEquals(30, ScoringModel.scoreMoonAltitude(1.0));
         assertEquals(30, ScoringModel.scoreMoonAltitude(6.0));
-        assertEquals(24, ScoringModel.scoreMoonAltitude(9.0));
-        assertEquals(18, ScoringModel.scoreMoonAltitude(12.0));
-        assertEquals(0, ScoringModel.scoreMoonAltitude(12.1));
+        assertEquals(26, ScoringModel.scoreMoonAltitude(9.0));
+        assertEquals(22, ScoringModel.scoreMoonAltitude(12.0));
+        assertEquals(14, ScoringModel.scoreMoonAltitude(25.0));
+        assertEquals(11, ScoringModel.scoreMoonAltitude(33.0));
+        assertEquals(8, ScoringModel.scoreMoonAltitude(40.0));
+        assertEquals(7, ScoringModel.scoreMoonAltitude(50.0));
+        assertEquals(4, ScoringModel.scoreMoonAltitude(70.0));
+        assertEquals(3, ScoringModel.scoreMoonAltitude(90.0));
+        assertEquals(0, ScoringModel.scoreMoonAltitude(90.1));
     }
 
     @Test

@@ -112,6 +112,76 @@ Backend
 
 Do not put provider URLs directly into the browser app as the long-term design. A backend keeps provider migration, caching, logging, and privacy controls in one place.
 
+## Backend Provider Adapter Boundary
+
+The backend location seam is `dev.moonservice.backend.location.LocationResolver`.
+The first Open-Meteo adapter lives in
+`dev.moonservice.backend.location.openmeteo.OpenMeteoGeocodingClient` and is
+tested with saved provider-shaped JSON fixtures only.
+
+Current adapter scope:
+
+- Builds Open-Meteo Geocoding requests against
+  `https://geocoding-api.open-meteo.com/v1/search`.
+- Sends `name=<raw query>`, `count=10`, `language=en`, and `format=json`.
+- Uses encoded query parameters; do not build the provider URL by raw string
+  concatenation.
+- Maps one complete provider result to `LocationResolution.resolved`.
+- Maps multiple complete provider results to `LocationResolution.ambiguous` in
+  provider order.
+- Maps a valid empty `results` array to `LocationResolution.notFound`.
+- Maps the observed Open-Meteo no-match shape, `generationtime_ms` with no
+  `results` field, to `LocationResolution.notFound`.
+- Maps transport failures, HTTP failures, invalid JSON, missing `results`
+  without the Open-Meteo response marker, or a non-array `results` shape to
+  `LocationResolution.temporarilyUnavailable`.
+- Uses the shared `dev.moonservice.backend.openmeteo.OpenMeteoTransport` seam.
+  Its Spring `RestClient` implementation classifies rate limits, transient HTTP
+  failures, non-retryable HTTP failures, IO failures, and timeouts as typed
+  provider exceptions.
+- Applies the shared Open-Meteo retrying transport decorator using Spring
+  `RetryTemplate` with at most one retry for transient failures: HTTP `429`,
+  `502`, `503`, `504`, timeout, or IO failure.
+- Does not retry non-retryable HTTP statuses, malformed provider payloads, blank
+  response bodies, valid empty `results` arrays, or provider-shaped no-match
+  responses.
+- Honors short `Retry-After` values before retrying; longer rate-limit delays
+  fail fast as `temporarilyUnavailable`.
+- Keeps the backend location id separate from the structured provider location
+  id. For example, an Open-Meteo result may map to backend id
+  `openmeteo-3067696` and `ProviderLocationId(OPEN_METEO, "3067696")`, which
+  serializes as `openmeteo:3067696`.
+- Retains the coordinate-backed fields the backend resolver contract can now
+  carry: backend location id, structured provider location id, display name,
+  latitude, longitude, elevation, timezone, and country code.
+
+This adapter is not the active Spring `LocationResolver` bean yet. The backend
+still uses `FixtureLocationResolver` by default because the scoring prototype is
+still fixture-location based and cannot yet score arbitrary coordinate-backed
+real locations. Fixture `locationId` values therefore remain compatible with
+the scoring prototype slugs, while `ProviderLocationId` records where the
+candidate came from without relying on formatted string prefixes. Add runtime
+provider selection only after the opportunity search engine can consume the
+resolved location's coordinates/elevation instead of only a fixture slug.
+
+Fixture-backed adapter tests live under:
+
+```text
+backend/src/test/java/dev/moonservice/backend/location/openmeteo/
+backend/src/test/resources/fixtures/openmeteo/geocoding/
+```
+
+Keep ordinary backend tests network-free. To check live provider drift manually,
+run:
+
+```bash
+live-tests/run_live_geocoding_tests.sh
+```
+
+That command calls the external provider and writes
+`live-tests/reports/openmeteo-geocoding.html`; do not include it in the normal
+Maven loop.
+
 ## First UX Recommendation
 
 Start with a simple search form:
@@ -324,6 +394,13 @@ Conclusion:
 ## Contract Spike Notes
 
 The retained script `scripts/geocoding_contract_spike.py` exercises the documented lookup flow with fixtures by default and can optionally query live Open-Meteo Geocoding with `--live`.
+
+The manual pytest live check in `live-tests/test_openmeteo_geocoding.py` is a
+provider drift check, not a backend unit-test contract. Run it with
+`live-tests/run_live_geocoding_tests.sh` to create a local virtual environment,
+install test dependencies, call live Open-Meteo Geocoding, and write an HTML
+report. It verifies broad assumptions such as expected Prague ambiguity, known
+native-script misses, and one-character query behavior.
 
 Live recheck:
 
@@ -555,6 +632,9 @@ For the first backend MVP:
 - Do not log raw queries that look like street addresses unless needed for debugging.
 - If provider quota is exhausted, return a temporary service state rather than pretending the location was not found.
 
+Provider-call caching and in-flight coalescing are tracked by
+[#8](https://github.com/rapucha/moon-service/issues/8).
+
 ## Quota Observability
 
 Track outbound geocoding provider calls locally.
@@ -573,6 +653,9 @@ Admin visibility:
 - Show configured provider limits and percent used when known.
 - Warn at roughly 50 percent, 80 percent, and 95 percent usage.
 - Keep geocoding explicit-submit only in v0; do not add autocomplete until quota behavior is understood.
+
+Backend metrics and operator visibility are tracked by
+[#9](https://github.com/rapucha/moon-service/issues/9).
 
 If using Nominatim public API:
 
@@ -617,3 +700,8 @@ Geocoding research reinforces the web-first backend MVP:
 - Should browser geolocation be offered as a separate opt-in path?
 - How long should canonical location records be cached before refresh?
 - When, if ever, should exact address or landmark search be supported?
+
+The first web lookup flow, including ambiguity handling in the form, is tracked
+by [#15](https://github.com/rapucha/moon-service/issues/15). Cache TTLs and
+provider-call protection are tracked by
+[#8](https://github.com/rapucha/moon-service/issues/8).

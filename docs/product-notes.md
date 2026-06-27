@@ -17,6 +17,13 @@ The first user is a photographer who wants a quick answer for local Moon shots:
 
 The product should support one-off location lookup before saved compositions. Exact landmark alignment is a later feature.
 
+A later user may care about repeatable subjects or events, not only the Moon
+and weather by themselves. For example, a certain aircraft approach, train,
+ferry, or other local subject may pass through a useful part of the sky at
+approximately the same local time on some days. Moon Service should eventually
+help users find and follow Moon opportunities that overlap those recurring but
+imperfectly timed events.
+
 ## MVP User Promise
 
 No account required. Enter a city or location and see the next promising Moon opportunity. Use RSS/Atom feeds or `.ics` export for low-friction follow-up. Add email or Android later only if recurring personal alerts become useful.
@@ -49,6 +56,13 @@ In scope:
 - Provide dynamic public `.ics` calendar feeds for canonical real locations, generated on demand and cached.
 - Provide `.ics` export for individual events.
 
+Tracked MVP implementation issues:
+
+- Coordinate-backed opportunity search: [#13](https://github.com/rapucha/moon-service/issues/13).
+- Weather-backed scoring: [#14](https://github.com/rapucha/moon-service/issues/14).
+- First web lookup and shareable result page: [#15](https://github.com/rapucha/moon-service/issues/15).
+- Public feeds and calendar exports: [#16](https://github.com/rapucha/moon-service/issues/16).
+
 Out of scope for the first MVP:
 
 - Mandatory accounts.
@@ -57,11 +71,38 @@ Out of scope for the first MVP:
 - Exact address autocomplete.
 - Full map planning.
 - Exact house/church/landmark alignment.
+- Recurring event-aware matching, such as specific flights, transport routes,
+  or user-defined weekly event patterns.
 - Terrain and obstruction modeling.
 - Cross-device sync.
 - Calendar OAuth.
 - Email alerts.
 - Paid subscriptions.
+
+## Recurring Event Direction
+
+Some good photography opportunities are not just "the Moon is good here"; they
+are "the Moon is good when this repeatable subject may appear." A future scoring
+layer should allow approximate recurring event context such as:
+
+- Days of week or other recurrence rules.
+- Approximate local time or time range.
+- Early/late tolerance, because real events can be delayed, cancelled, or early.
+- Optional route, direction, azimuth, or subject position when known.
+- Active date range and source confidence.
+
+The first useful version can be request-scoped or encoded in a shareable URL,
+RSS/Atom feed, or `.ics` calendar feed. Personal saved subscriptions should
+wait until the privacy model covers stored preferences, notification endpoints,
+retention, update behavior, and deletion.
+
+The scoring-context follow-up for this direction is tracked by
+[#3](https://github.com/rapucha/moon-service/issues/3).
+
+The product must phrase event-aware results as planning cues, not guarantees.
+For aircraft and other transport examples, do not imply real-time tracking,
+exact pass timing, or confirmed operation unless a live provider is deliberately
+integrated and documented.
 
 ## Privacy Stance
 
@@ -169,6 +210,8 @@ Device-only identity must not become a trap. Recovery should be designed early, 
 - Horizon elevation and terrain modeling.
 - Skyline or building obstruction checks.
 - Saved compositions.
+- Recurring event-aware opportunities, such as aircraft approaches, transport
+  routes, public events, or user-defined weekly patterns.
 - `.ics` export and later calendar OAuth.
 - Email alerts for users who opt in.
 - Telegram-style broadcast channels for popular cities or regions.

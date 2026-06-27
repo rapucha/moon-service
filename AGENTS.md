@@ -8,13 +8,14 @@ The near-term product is not a full Photographer's Ephemeris clone. It is a web-
 
 ## Current Phase
 
-This repo is in planning and documentation mode with narrow prototypes under
-`prototypes/`.
+This repo is moving from planning/prototype mode into a thin real backend
+spine. Narrow prototypes remain under `prototypes/`, and the first real Spring
+Boot backend module lives under `backend/`.
 
-Do not scaffold production backend, Android, database, or deployment code until
-the MVP architecture, scoring model, ephemeris library, and weather provider
-choices are documented. A thin Spring Boot HTTP contract harness is allowed
-under `prototypes/` when it stays fixture-only and avoids production concerns.
+Do not scaffold Android, database, deployment, accounts, or live provider
+integration code until the relevant MVP boundaries are documented. The backend
+should remain small and web-first: start by replacing fixture-backed seams with
+geocoding, weather, caching, feeds, and `.ics` behavior deliberately.
 
 ## Product Direction
 
@@ -39,7 +40,8 @@ The main unresolved choice is now the exact first web/API contract for city look
 
 ## Documentation Map
 
-- `docs/moon-service-handover.md`: historical planning handover from the previous session.
+- `docs/README.md`: human-facing documentation hub.
+- `docs/ai-agent/README.md`: active AI-agent operating guide, context packs, and checklists.
 - `docs/product-notes.md`: product stance, users, MVP scope, privacy posture.
 - `docs/architecture.md`: architecture options, recommended hybrid shape, unresolved decisions.
 - `docs/api-shape.md`: first web/API contract, statuses, result kinds, localStorage, RSS/Atom, and `.ics` rules.
@@ -49,29 +51,49 @@ The main unresolved choice is now the exact first web/API contract for city look
 - `docs/geocoding-research.md`: geocoding provider recommendation and city/location lookup privacy notes.
 - `docs/mvp-roadmap.md`: milestone plan and implementation order.
 - `prototypes/jvm-scoring/`: minimal Maven JVM scoring/ephemeris prototype with fixture tests.
-- `prototypes/spring-preview/`: thin Spring Boot HTTP contract harness for the preview request/response shape.
+- `backend/`: first Spring Boot backend module, currently fixture-backed through the scoring prototype.
 
 ## Engineering Guidelines
 
 - Keep early changes narrow and documentation-led.
 - Prefer explicit tradeoffs over premature abstractions.
+- State technical judgment directly. Agreement should include reasoning; disagreement should be plain and actionable.
 - Do not introduce mandatory accounts without documenting user value and recovery behavior.
 - Do not permanently store user locations server-side unless saved alerts require it and the privacy model is updated.
 - Design device identity recovery before relying on anonymous device-bound accounts.
 - Treat Android Auto Backup and Firebase Cloud Messaging as conveniences with platform assumptions, not universal guarantees.
-- After reading each user task, assess whether subagents would materially help. Say so when independent research, review, verification, or disjoint implementation slices could run in parallel; also say when the task is too small or tightly coupled to benefit. Do not spawn subagents unless the user explicitly authorizes subagent/delegated work for that task.
+- Treat user wording as intentional. If the user phrases a request as a
+  question or feasibility check, such as starting with "can you", "could you",
+  "is it possible", "should we", or ending with a question mark, answer the
+  question first and do not make code, documentation, GitHub, or other mutating
+  changes yet. Begin implementation only after the user gives a clear
+  imperative instruction, such as "do it", "go ahead", "implement", "update",
+  or "create". If the wording is ambiguous, ask what outcome is required before
+  changing files or external state.
+- Use GitHub issues as the source of truth for actionable implementation work, technical debt, follow-ups, and decision tasks. Product and architecture docs should capture strategy and decisions, but the next implementation step should come from an open issue unless the user explicitly asks for exploratory work first.
+- Use the existing `enhancement` and `documentation` labels for feature and docs work. Use `mvp`, `tech-debt`, `decision`, `blocked`, and `follow-up` labels when they clarify issue triage.
+- For issue-backed implementation work, use a branch name that mentions the issue number, preferably `issue-<number>-short-topic`, and update the issue to link to the branch where the work is being done.
+- Merge issue-backed implementation work through a pull request; do not merge implementation branches directly.
+- Pull requests must mention the issue or issues they address. Completed implementation issues should be closed through, or at least explicitly link to, the pull request that delivered the work.
+- Agent-authored pull requests should assign `rapucha` and request review from
+  `rapucha` when created. Use `gh pr create --assignee rapucha --reviewer
+  rapucha ...`; the repository workflow also applies this to non-draft PRs
+  opened by `moon-service-agent`.
+- Session handover files are transient working notes for context resets, laptop shutdowns, or other session-boundary handoffs. Do not commit them by default; commit one only when explicitly useful as durable project state. Prefer replacing or removing old handovers instead of accumulating them.
+- At the end of implementation tasks, stage all intended source, test, and documentation changes with `git add` so they are ready for commit. Leave unrelated, generated, IDE-only, or otherwise intentionally excluded files unstaged, and call them out in the final response.
 - In this environment, `git push` requires network access and sandboxed DNS has repeatedly failed. When the user asks to push any branch or remote, run the push with escalated permissions immediately instead of first attempting a sandboxed push.
 - Do not repeat a failing command, API request, or tool call unchanged unless the failure is plausibly transient, such as a timeout, network interruption, rate-limit retry hint, lock contention, or service restart. For deterministic errors, change the request based on a concrete hypothesis, reduce it to a minimal reproduction, inspect docs/help/output, or stop and explain the blocker. For plausibly transient errors, retry with exponential backoff and a small retry budget; once the next backoff delay would reach roughly 30 to 60 seconds, stop retrying and report the failure.
 
 ## Suggested Tooling Direction
 
-When implementation starts, the expected stack is:
+As implementation begins, the expected stack remains:
 
 - Backend: Java, Spring Boot, Postgres, Flyway or Liquibase.
 - Android: Kotlin, Jetpack Compose, Room or DataStore, WorkManager, local notifications.
 - Local infrastructure: Docker Compose for Postgres and integration dependencies.
 
-Do not add these tools until the next implementation step explicitly calls for them.
+Do not add Postgres, migrations, Android, or local infrastructure until the
+next implementation step explicitly calls for them.
 
 ## Verification
 
@@ -81,7 +103,7 @@ For documentation-only changes, verify with:
 git diff --check
 ```
 
-For future code changes, add focused build/test commands to this file once the project has actual backend or Android modules.
+For backend code changes, include the focused module tests below.
 
 For the current JVM ephemeris/scoring prototype, after fetching the documented
 jars into `/tmp`, verify with:
@@ -90,12 +112,21 @@ jars into `/tmp`, verify with:
 java -cp /tmp/astronomy-2.1.19.jar:/tmp/kotlin-stdlib-jdk8-1.6.10.jar:/tmp/kotlin-stdlib-jdk7-1.6.10.jar:/tmp/kotlin-stdlib-1.6.10.jar:/tmp/kotlin-stdlib-common-1.6.10.jar prototypes/jvm-ephemeris/MoonWindowPrototype.java --location prague-cz --start 2026-06-29 --days 7 --step-minutes 30 --min-score 50 --limit 5
 ```
 
-For the Maven-based JVM scoring prototype, verify with:
+For ordinary backend changes, verify with:
+
+```bash
+mvn test -pl backend -am
+```
+
+For the Maven-based JVM scoring prototype, verify scoring changes with:
 
 ```bash
 (cd prototypes/jvm-scoring && mvn test)
-(cd prototypes/jvm-scoring && mvn -q org.codehaus.mojo:exec-maven-plugin:3.3.0:java -Dexec.mainClass=dev.moonservice.scoringprototype.cli.MoonScoringPrototype -Dexec.args="--request fixtures/prague-preview-request.json")
+(cd prototypes/jvm-scoring && mvn -q test-compile org.codehaus.mojo:exec-maven-plugin:3.3.0:java -Dexec.classpathScope=test -Dexec.mainClass=dev.moonservice.scoringprototype.cli.MoonScoringPrototype -Dexec.args="--request fixtures/prague-preview-request.json")
+```
+
+Run prototype parity only when changing scoring/window generation, comparing migration behavior, or retiring a prototype:
+
+```bash
 python3 -B scripts/prototype_contract_parity.py
-(cd prototypes/jvm-scoring && mvn install)
-(cd prototypes/spring-preview && mvn test)
 ```

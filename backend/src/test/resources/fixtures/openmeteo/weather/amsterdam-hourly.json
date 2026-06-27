@@ -1,0 +1,31 @@
+{
+  "latitude": 52.36,
+  "longitude": 4.9,
+  "generationtime_ms": 0.087,
+  "utc_offset_seconds": 0,
+  "timezone": "UTC",
+  "timezone_abbreviation": "GMT",
+  "elevation": 13.0,
+  "hourly_units": {
+    "time": "unixtime",
+    "cloud_cover": "%",
+    "cloud_cover_low": "%",
+    "cloud_cover_mid": "%",
+    "cloud_cover_high": "%",
+    "precipitation_probability": "%",
+    "precipitation": "mm",
+    "weather_code": "wmo code",
+    "visibility": "m"
+  },
+  "hourly": {
+    "time": [1782691200, 1782694800],
+    "cloud_cover": [22, 82],
+    "cloud_cover_low": [6, 70],
+    "cloud_cover_mid": [18, 45],
+    "cloud_cover_high": [30, 20],
+    "precipitation_probability": [3, 35],
+    "precipitation": [0.0, 0.8],
+    "weather_code": [2, 61],
+    "visibility": [24000, 12000]
+  }
+}

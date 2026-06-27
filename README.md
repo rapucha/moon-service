@@ -2,10 +2,10 @@
 
 Moon Service is an early-stage discovery and alert tool for photographers. The goal is to identify upcoming Moon photography opportunities near a selected city or location, with emphasis on a low Moon, useful ambient light, and promising weather.
 
-The project is currently documentation-led with narrow prototypes under
-`prototypes/`. Production backend, Android, database, and deployment
-scaffolding should wait until the MVP contracts and prototype boundaries are
-proven.
+The project is moving from documentation-led prototypes into a thin real
+backend spine. The first backend module is intentionally small and
+fixture-backed; Android, database, deployment, accounts, and live provider
+integrations still wait until their boundaries are proven.
 
 ## MVP Direction
 
@@ -22,7 +22,7 @@ Email alerts, native Android, saved personal preferences, terrain horizon modeli
 
 ## Current Decisions
 
-- Web-first MVP with a small backend later.
+- Web-first MVP with a small backend, starting with a fixture-backed opportunity search endpoint.
 - Open-Meteo Geocoding as the first geocoding provider candidate.
 - Raw Unicode location input, with curated alias/transliteration fallback for known provider gaps.
 - Open-Meteo Weather as the first weather provider candidate.
@@ -32,6 +32,8 @@ Email alerts, native Android, saved personal preferences, terrain horizon modeli
 ## Repository Map
 
 - `AGENTS.md`: durable instructions for future coding-agent sessions.
+- `docs/README.md`: human-facing documentation hub.
+- `docs/ai-agent/README.md`: AI-agent operating guide, guardrails, context packs, and checklists.
 - `docs/product-notes.md`: product stance, MVP scope, privacy posture.
 - `docs/architecture.md`: architecture options and current web-first backend direction.
 - `docs/api-shape.md`: first web/API contract.
@@ -43,9 +45,12 @@ Email alerts, native Android, saved personal preferences, terrain horizon modeli
 - `scripts/geocoding_contract_spike.py`: retained Python spike for checking the v0 geocoding contract.
 - `scripts/scoring_contract_spike.py`: retained Python spike for checking the v0 scoring contract with fixture data.
 - `scripts/real_data_scoring_spike.py`: retained Python spike that combines live JPL Horizons ephemeris samples with live Open-Meteo weather.
+- `live-tests/`: pytest-based manual checks for external provider drift.
+- `backend/`: first Spring Boot backend module, currently exposing
+  fixture-backed query and direct opportunity-search endpoints outside
+  `prototypes/`.
 - `prototypes/jvm-ephemeris/`: source-file JVM prototype using Astronomy Engine for Moon/Sun samples, low-Moon candidate windows, and fixture-weather scoring.
 - `prototypes/jvm-scoring/`: minimal Maven JVM prototype with natural low-Moon windows, fixture weather scoring, and fixture tests.
-- `prototypes/spring-preview/`: thin Spring Boot HTTP contract harness around the Maven scoring prototype.
 
 ## Geocoding Contract Spike
 
@@ -125,22 +130,14 @@ cd prototypes/jvm-scoring
 mvn test
 ```
 
-Run the Maven prototype CLI:
+Run the Maven functional fixture harness:
 
 ```bash
 cd prototypes/jvm-scoring
-mvn -q org.codehaus.mojo:exec-maven-plugin:3.3.0:java \
+mvn -q test-compile org.codehaus.mojo:exec-maven-plugin:3.3.0:java \
+  -Dexec.classpathScope=test \
   -Dexec.mainClass=dev.moonservice.scoringprototype.cli.MoonScoringPrototype \
   -Dexec.args="--request fixtures/prague-preview-request.json"
-```
-
-The equivalent explicit-flag form is:
-
-```bash
-cd prototypes/jvm-scoring
-mvn -q org.codehaus.mojo:exec-maven-plugin:3.3.0:java \
-  -Dexec.mainClass=dev.moonservice.scoringprototype.cli.MoonScoringPrototype \
-  -Dexec.args="--location prague-cz --start 2026-06-29 --days 7 --max-altitude 12 --limit 5"
 ```
 
 The request fixture shape is:
@@ -159,11 +156,10 @@ This is still a prototype under `prototypes/`, not backend scaffolding. It uses
 Astronomy Engine via JitPack and fixed fixture weather only. The `start` value
 is interpreted as a local date in the fixture location timezone.
 
-## Prototype Contract Parity
+## Prototype Contract Parity Tool
 
-After running `mvn test` once so dependencies are available, compare the
-retained Python scoring spike, the source-file JVM prototype, and the Maven JVM
-prototype:
+Use the parity script only when changing scoring/window generation, comparing
+migration behavior, or retiring a prototype:
 
 ```bash
 python3 -B scripts/prototype_contract_parity.py
@@ -171,30 +167,60 @@ python3 -B scripts/prototype_contract_parity.py
 
 The Python spike and source-file JVM prototype are retained historical
 references, so exact opportunity times and scores differ intentionally. The
-Maven JVM prototype is the active natural-window contract target.
+Maven JVM prototype remains useful while the backend depends on it, but backend
+tests are the executable contract for backend behavior.
 
-## Spring Preview Prototype
+## Backend
 
-Run the Spring HTTP contract harness tests:
-
-```bash
-(cd prototypes/jvm-scoring && mvn install)
-(cd prototypes/spring-preview && mvn test)
-```
-
-Run the local prototype endpoint:
+Run the first real backend module tests:
 
 ```bash
-(cd prototypes/jvm-scoring && mvn install)
-(cd prototypes/spring-preview && mvn spring-boot:run)
+mvn test -pl backend -am
 ```
 
-The only endpoint is `POST /api/preview`, using the same request shape as
-`prototypes/jvm-scoring/fixtures/prague-preview-request.json`. This remains a
-prototype: no geocoding, live weather, persistence, accounts, feeds, calendar
-generation, Docker, or deployment config. The Spring harness depends on the
-`jvm-scoring-prototype` Maven artifact and calls its public
-`PreviewEvaluator` facade.
+Run the local backend:
+
+```bash
+mvn spring-boot:run -pl backend -am
+```
+
+The current backend endpoints are:
+
+```http
+GET /api/opportunities?q=Praha
+POST /api/opportunities/search
+```
+
+The query endpoint uses a fixture-backed `LocationResolver` provider seam that
+can represent resolved, ambiguous, and not-found location lookups. The direct
+POST endpoint keeps the same fixture request shape as the scoring prototype.
+This module is the place to replace fixture dependencies with geocoding,
+weather, caching, feeds, and calendar exports in later steps.
+
+## Live Provider Checks
+
+The live tests are manual drift checks for external providers. They are not
+part of normal backend validation and do not run from Maven. See
+`live-tests/README.md` for the rationale, including why these checks use pytest
+and when they should be run.
+
+Run the Open-Meteo geocoding drift check with a local virtual environment and
+self-contained HTML report:
+
+```bash
+live-tests/run_live_geocoding_tests.sh
+```
+
+The default report path is:
+
+```text
+live-tests/reports/openmeteo-geocoding.html
+```
+
+These tests call live Open-Meteo endpoints and intentionally check broad
+provider behavior such as expected Prague ambiguity and documented native-script
+misses. A failure means provider assumptions may have drifted and should be
+reviewed; it is not the normal backend unit-test contract.
 
 ## Verification
 
@@ -204,7 +230,13 @@ For documentation-only changes:
 git diff --check
 ```
 
-For the current Python spike:
+For ordinary backend changes:
+
+```bash
+mvn test -pl backend -am
+```
+
+For current spike/prototype work:
 
 ```bash
 python3 -B scripts/geocoding_contract_spike.py
@@ -215,8 +247,8 @@ python3 -B scripts/real_data_scoring_spike.py --forecast-days 2 --limit 3
 python3 -B -m py_compile scripts/real_data_scoring_spike.py
 java -cp /tmp/astronomy-2.1.19.jar:/tmp/kotlin-stdlib-jdk8-1.6.10.jar:/tmp/kotlin-stdlib-jdk7-1.6.10.jar:/tmp/kotlin-stdlib-1.6.10.jar:/tmp/kotlin-stdlib-common-1.6.10.jar prototypes/jvm-ephemeris/MoonWindowPrototype.java --location prague-cz --start 2026-06-29 --days 7 --step-minutes 30 --min-score 50 --limit 5
 (cd prototypes/jvm-scoring && mvn test)
-(cd prototypes/jvm-scoring && mvn -q org.codehaus.mojo:exec-maven-plugin:3.3.0:java -Dexec.mainClass=dev.moonservice.scoringprototype.cli.MoonScoringPrototype -Dexec.args="--request fixtures/prague-preview-request.json")
-python3 -B scripts/prototype_contract_parity.py
-(cd prototypes/jvm-scoring && mvn install)
-(cd prototypes/spring-preview && mvn test)
+(cd prototypes/jvm-scoring && mvn -q test-compile org.codehaus.mojo:exec-maven-plugin:3.3.0:java -Dexec.classpathScope=test -Dexec.mainClass=dev.moonservice.scoringprototype.cli.MoonScoringPrototype -Dexec.args="--request fixtures/prague-preview-request.json")
 ```
+
+Run `python3 -B scripts/prototype_contract_parity.py` only for
+scoring/window migration or prototype retirement work.

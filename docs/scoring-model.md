@@ -10,25 +10,27 @@ The core photographic problem is exposure balance. The Moon is much brighter tha
 
 ## Candidate Window
 
-V0 should generate natural low-Moon windows, not many small scored windows from
-fixed ephemeris samples.
+V0 should generate natural visible-Moon windows, not many small scored windows
+from fixed ephemeris samples. Low Moon remains the strongest default case, but
+the model should also surface context Moon opportunities when ambient light and
+conditions are promising.
 
 For each local calendar day and location, compute intervals where the apparent
-refracted Moon altitude is between the horizon and the configured low-Moon
+refracted Moon altitude is between the horizon and the configured visible-Moon
 ceiling, initially:
 
 ```text
-0 degrees <= Moon altitude <= 12 degrees
+0 degrees <= Moon altitude <= 90 degrees
 ```
 
 The interval boundaries are:
 
-- Local day start, `00:00`, when a low-Moon interval crossed midnight.
+- Local day start, `00:00`, when a visible-Moon interval crossed midnight.
 - Moonrise.
 - Moonset.
-- The Moon crossing upward through the low-Moon ceiling.
-- The Moon crossing downward through the low-Moon ceiling.
-- Local day end, `23:59:59`, when a low-Moon interval continues past midnight.
+- The Moon crossing upward through the configured visible-Moon ceiling when the ceiling is below zenith.
+- The Moon crossing downward through the configured visible-Moon ceiling when the ceiling is below zenith.
+- Local day end, `23:59:59`, when a visible-Moon interval continues past midnight.
 
 This usually produces zero, one, or two natural windows per day:
 
@@ -79,15 +81,24 @@ User preferences:
 - Optional preferred window type, such as low full Moon, crescent, twilight, or daylight Moon.
 - Optional weather tolerance or profile later, kept request-scoped until accounts exist.
 
+Future recurring event context:
+
+- Optional recurring subject or event pattern.
+- Days of week, recurrence rule, or known operating calendar.
+- Approximate local time or time range.
+- Early/late tolerance window.
+- Optional route, direction, azimuth, or subject position when known.
+- Source confidence and active date range.
+
 ## V0 Weather Assessment
 
 Assess weather by forecast change intervals, not by a fixed Moon/Sun sampling
 cadence.
 
-The base astronomy step should produce natural low-Moon windows. Weather then
-splits those windows only where the forecast state changes enough to affect the
-recommendation. Adjacent intervals with the same derived weather class should be
-merged back together.
+The base astronomy step should produce natural visible-Moon windows. Weather
+then splits those windows only where the forecast state changes enough to affect
+the recommendation. Adjacent intervals with the same derived weather class
+should be merged back together.
 
 Cloud cover is the most important weather input for Moon photography. Open-Meteo
 exposes total, low, mid, and high cloud-cover fields as hourly variables, not as
@@ -109,7 +120,7 @@ The first weather segmentation pipeline should be:
    provider value changes, not an arbitrary ephemeris sampling step.
 4. Merge adjacent intervals when the weather class and decision-relevant facts
    are equivalent.
-5. Intersect the merged weather intervals with the natural low-Moon windows.
+5. Intersect the merged weather intervals with the natural visible-Moon windows.
 
 Window or segment-level weather facts should include:
 
@@ -212,8 +223,10 @@ Sort candidate windows by:
 
 Moon altitude assessment:
 
-- The whole candidate window is already constrained to the low-Moon range.
-- Prefer portions near 1 to 6 degrees.
+- Prefer portions near 1 to 6 degrees for classic horizon compositions.
+- Treat 6 to 12 degrees as strong but slightly less ideal than the lowest clean horizon range.
+- Treat 12 to 40 degrees as context Moon territory: not a premium horizon shot, but still useful with the right ambient light, foreground, trees, aircraft, birds, or skyline elements.
+- Treat 40 to 90 degrees as weaker but not invalid. Good light, balanced illumination, and weather can still make a decent shot.
 - Treat extremely low altitudes cautiously because terrain, buildings, and trees are not modeled.
 
 Sun/light fit:
@@ -247,6 +260,49 @@ Forecast confidence:
 - Use confidence to reduce alert urgency.
 - If confidence is not available, expose a neutral confidence state rather than fabricating precision.
 
+## Future Recurring Event Context
+
+Some opportunities are valuable because a repeatable real-world subject may
+appear during a usable Moon window. Examples include an aircraft approach that
+usually crosses a view at about the same local time, a train or ferry on a
+regular schedule, a weekly public event, or another user-defined recurring
+pattern.
+
+This should be modeled as event context layered onto the existing astronomy,
+light, and weather score. Candidate generation should still begin with natural
+visible-Moon windows. The recurring event layer then builds expected event
+occurrence windows, expands them by the configured early/late tolerance, and
+intersects them with the Moon/weather windows.
+
+Event-aware score components should include:
+
+- Whether the event uncertainty window overlaps a useful Moon window.
+- How close the expected event time is to the best Moon/light/weather portion of
+  the window.
+- The amount of timing tolerance needed for the match.
+- Source reliability, cancellation risk, and schedule age.
+- Direction or azimuth fit when the event has a known route or subject position.
+- The base Moon, light, exposure-balance, and weather score.
+
+The output should explain uncertainty directly. Prefer wording such as:
+
+```text
+The Moon window is strong from 18:40 to 19:15. This recurring flight often
+passes between 18:50 and 19:05, but timing can shift by about 15 minutes.
+```
+
+Do not present event-aware opportunities as confirmed sightings unless a live
+provider is deliberately integrated. For flights and other transport examples,
+delays, early arrivals, route changes, cancellations, and provider gaps are part
+of the model and should reduce confidence or broaden the displayed time range.
+
+Subscriptions for recurring event-aware opportunities should generate a rolling
+set of future candidate occurrences, not a single static alert. Without accounts,
+the first version should be request-scoped, shareable by URL, or represented as
+a public feed/calendar link when the event pattern is nonpersonal. Personal
+saved event subscriptions require the privacy model to cover stored preferences,
+notification delivery, retention, and deletion.
+
 ## Future Scoring Profiles
 
 V0 should start with one default `photographer_balanced` scoring profile. The
@@ -259,20 +315,23 @@ score changes based on the photographer's goal.
 
 Possible profile presets:
 
-- `photographer_balanced`: default mix of low Moon, useful ambient light, and reasonable weather.
+- `photographer_balanced`: default mix of low or context Moon, useful ambient light, and reasonable weather.
 - `crescent_twilight`: favors thin or modest crescents near golden hour or civil twilight.
 - `full_moon_horizon`: favors high illumination when the Moon is low, especially near rise/set.
 - `daylight_moon`: allows and favors visible daylight Moon opportunities with enough contrast.
 - `night_silhouette`: accepts darker foreground conditions when silhouette or night-landscape intent is explicit.
+- `recurring_event_overlap`: favors Moon windows that overlap an approximate
+  recurring event pattern, with explicit timing uncertainty.
 
 Possible preference controls:
 
 - Light preference: daylight, golden hour, civil twilight, nautical twilight, night, or any.
 - Moon type: crescent, quarter, gibbous, full, or any.
 - Foreground goal: balanced exposure, silhouette, or night landscape.
-- Moon altitude range: very low, low, moderate, or any within the low-Moon limit.
+- Moon altitude range: very low, low, context, high context, or any visible Moon.
 - Weather tolerance: clear only, partial clouds welcome, or dramatic clouds allowed.
 - Travel or setup lead time.
+- Recurring event pattern, days, local time window, and early/late tolerance.
 
 Preferences should adjust weights and explanations, not hide the raw facts. For
 example, a daylight profile may score daylight higher than the v0 default, while
@@ -312,12 +371,22 @@ V0 ignores:
 - Shooting position versus subject position.
 - Lens focal length and field of view.
 - Forecast model disagreement unless the provider exposes it.
+- Recurring event delays, early arrivals, route changes, cancellations, or
+  schedule drift unless an event provider is integrated later.
 
 These are acceptable limitations for an alert-first MVP, but the UI should avoid claiming exact composition guidance.
 
 ## Research Needed
 
-- Validate the recommended ephemeris candidate in `docs/ephemeris-research.md` against JPL Horizons before using it in product scoring.
-- Validate the recommended weather provider in `docs/weather-provider-research.md` against local forecast examples and map its fields into the model.
-- Collect real sample days for known good and bad Moon photography conditions.
-- Tune thresholds from examples rather than preference alone.
+- Initial Astronomy Engine validation is recorded in
+  `docs/ephemeris-research.md`; the remaining build-policy decision is tracked
+  by [#17](https://github.com/rapucha/moon-service/issues/17).
+- Validate the recommended weather provider integration against local forecast
+  examples and map its fields into the model as part of
+  [#14](https://github.com/rapucha/moon-service/issues/14).
+- Collect real sample days for known good and bad Moon photography conditions
+  and tune thresholds from examples as part of
+  [#18](https://github.com/rapucha/moon-service/issues/18).
+- Collect real recurring-event examples and decide whether v1 should support
+  only user-entered patterns, curated public patterns, or live provider-backed
+  schedules as part of [#3](https://github.com/rapucha/moon-service/issues/3).

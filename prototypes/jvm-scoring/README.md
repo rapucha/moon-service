@@ -25,28 +25,22 @@ generation.
 mvn test
 ```
 
-## Run The Prototype
+## Run The Functional Fixture Harness
 
 ```bash
-mvn -q org.codehaus.mojo:exec-maven-plugin:3.3.0:java \
+mvn -q test-compile org.codehaus.mojo:exec-maven-plugin:3.3.0:java \
+  -Dexec.classpathScope=test \
   -Dexec.mainClass=dev.moonservice.scoringprototype.cli.MoonScoringPrototype \
   -Dexec.args="--request fixtures/prague-preview-request.json"
 ```
 
-The equivalent explicit-flag form is:
+The runner lives under `src/test` because it is a functional fixture harness,
+not a production command-line surface. The `start` date is interpreted as a
+local date in the fixture location's timezone. Maven resolves
+`io.github.cosinekitty:astronomy:2.1.19` from JitPack; do not vendor dependency
+jars into this repo.
 
-```bash
-mvn -q org.codehaus.mojo:exec-maven-plugin:3.3.0:java \
-  -Dexec.mainClass=dev.moonservice.scoringprototype.cli.MoonScoringPrototype \
-  -Dexec.args="--location prague-cz --start 2026-06-29 --days 7 --max-altitude 12 --limit 5"
-```
-
-Default behavior uses the Prague fixture and fixed partly-cloudy fixture
-weather. The `start` date is interpreted as a local date in the fixture
-location's timezone. Maven resolves `io.github.cosinekitty:astronomy:2.1.19`
-from JitPack; do not vendor dependency jars into this repo.
-
-The request fixture is intentionally small:
+The request fixture is intentionally explicit:
 
 ```json
 {

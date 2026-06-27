@@ -1,0 +1,11 @@
+.git
+.idea
+*.iml
+**/target
+**/__pycache__
+**/*.py[cod]
+docs/session-handover-*.md
+live-tests/.pytest_cache
+live-tests/.venv
+live-tests/reports
+prototypes/spring-preview

@@ -104,6 +104,39 @@ Exit criteria:
 - Alpha can run for a few users without manual daily intervention.
 - Known privacy and operational risks are documented.
 
+## Tracked MVP Backlog
+
+Near-term implementation and decision work is tracked in GitHub issues rather
+than only in this roadmap:
+
+- [#14](https://github.com/rapucha/moon-service/issues/14): integrate
+  Open-Meteo weather forecasts into opportunity scoring.
+- [#15](https://github.com/rapucha/moon-service/issues/15): build the first
+  web lookup flow and shareable result page.
+- [#16](https://github.com/rapucha/moon-service/issues/16): add public feeds
+  and iCalendar exports for real opportunities.
+- [#17](https://github.com/rapucha/moon-service/issues/17): decide whether
+  Astronomy Engine through JitPack is acceptable before real backend adoption.
+- [#18](https://github.com/rapucha/moon-service/issues/18): calibrate scoring
+  thresholds with real Moon photography examples.
+- [#19](https://github.com/rapucha/moon-service/issues/19): choose the alpha
+  hosting and backup boundary before deployment-specific work.
+- [#27](https://github.com/rapucha/moon-service/issues/27): add a
+  containerized backend live smoke test.
+
+Existing supporting follow-ups:
+
+- [#3](https://github.com/rapucha/moon-service/issues/3): extensible scoring
+  context for future interests and recurring events.
+- [#5](https://github.com/rapucha/moon-service/issues/5): decouple controller
+  tests from provider identity details.
+- [#7](https://github.com/rapucha/moon-service/issues/7): decide bot identity
+  policy for agent-created pull requests.
+- [#8](https://github.com/rapucha/moon-service/issues/8): add basic
+  provider-call scalability protections.
+- [#9](https://github.com/rapucha/moon-service/issues/9): add basic backend
+  observability.
+
 ## Deferred Features
 
 - Mandatory accounts.
@@ -112,6 +145,8 @@ Exit criteria:
 - Push notifications.
 - Email alerts.
 - Calendar integration.
+- Recurring event-aware scoring and subscriptions, including specific flights,
+  transport routes, public event patterns, or user-defined weekly schedules.
 - Automated Reddit posting.
 - Mastodon/Bluesky integration.
 - Map planning.
@@ -154,33 +189,43 @@ Contract parity as of this step:
 
 The Maven prototype also accepts a request-shaped JSON fixture at `prototypes/jvm-scoring/fixtures/prague-preview-request.json`. This proves the future web/API input boundary without adding HTTP routes, geocoding integration, live weather, feeds, calendar generation, or backend scaffolding.
 
-The first HTTP contract harness now exists as `prototypes/spring-preview/`. It
-uses Spring Boot only to exercise `POST /api/preview` with the same fixture
-request shape, reusing the Maven scoring prototype through the
-`jvm-scoring-prototype` Maven dependency and its public `PreviewEvaluator`
-facade. It is not
-production backend scaffolding: no persistence, geocoding integration, live
-weather calls, accounts, feeds, calendar generation, Docker, deployment, or
-admin surface are included. The Spring harness serves the same JSON formatter
-as the Maven CLI, keeping one response path for the HTTP preview and command
-line prototype.
+The first HTTP contract work has moved from the former Spring preview harness
+into the real `backend/` module. The current backend exposes
+`POST /api/opportunities/search` with the same fixture request shape, reusing
+the Maven scoring prototype through the `jvm-scoring-prototype` Maven
+dependency and its public `PreviewEvaluator` facade behind a backend-owned
+opportunity search seam.
 
-The Spring preview harness now locks down the first invalid-request behavior:
-malformed JSON, non-object JSON, unsupported fixture locations, invalid start
-dates, and out-of-range numeric controls return HTTP `400` with
+The query-shaped endpoint now uses resolved coordinates, elevation, timezone,
+and provider metadata for opportunity generation instead of requiring a
+prototype fixture location ID. The direct fixture endpoint remains Prague-only
+for deterministic scoring/prototype checks.
+
+The query-shaped endpoint also uses the backend Open-Meteo weather provider
+seam for normalized hourly forecast facts when `moon.weather.provider=open-meteo`
+is configured. Maven tests keep this network-free with provider fixtures and
+fake weather providers; direct live provider drift checks live under
+`live-tests/`.
+
+The backend now locks down the first invalid-request behavior: malformed JSON,
+non-object JSON, unsupported fixture locations, invalid start dates, and
+out-of-range numeric controls return HTTP `400` with
 `status: "invalid_request"`.
 
-Natural-window scoring refactor now implemented in `prototypes/jvm-scoring/` and
-the Spring preview harness:
+Natural-window scoring refactor now implemented in `prototypes/jvm-scoring/`
+and exercised through the backend:
 
-- Generate natural low-Moon windows per local day from Moonrise, Moonset,
-  crossings through the low-Moon altitude ceiling, and local day boundaries.
+- Generate natural visible-Moon windows per local day from Moonrise, Moonset,
+  crossings through the configured altitude ceiling, and local day boundaries.
+- Low Moon remains best, but context Moon and high-context Moon windows can now
+  rank when ambient light, illumination balance, and weather are favorable.
 - Use sampling only as a numerical aid if needed to bracket event crossings.
 - Removed public and fixture dependence on `stepMinutes` as an
   opportunity-shaping control.
 - Use hourly Open-Meteo weather fields for V0 because cloud cover is the key
   scoring input and cloud-cover layers are hourly.
-- The fixed weather fixture is represented as one stable hourly weather state;
-  real hourly forecast-change splitting remains a later live-weather step.
+- The resolved-location backend path can score with live hourly forecast facts;
+  deeper weather-change interval splitting and merging can be refined after the
+  first adapter is in place.
 - Returned windows are selected by top `limit`; request-level `minScore` was
   removed from the Maven and Spring prototype contract.

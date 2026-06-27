@@ -1,7 +1,6 @@
 package dev.moonservice.scoringprototype.input;
 
 import dev.moonservice.scoringprototype.fixture.Location;
-import dev.moonservice.scoringprototype.fixture.Locations;
 import dev.moonservice.scoringprototype.UsageException;
 
 import java.time.Instant;
@@ -16,9 +15,29 @@ public record PrototypeConfig(
         double maxMoonAltitudeDegrees,
         int limit
 ) {
-    static final int DEFAULT_DAYS = 7;
-    static final double DEFAULT_MAX_MOON_ALTITUDE = 12.0;
-    static final LocalDate DEFAULT_START_DATE = LocalDate.parse("2026-06-29");
+    static final int MIN_FORECAST_HORIZON_DAYS = 1;
+    static final int MAX_FORECAST_HORIZON_DAYS = 30;
+    static final double MIN_MAX_MOON_ALTITUDE_DEGREES = 0.0;
+    static final double MAX_MAX_MOON_ALTITUDE_DEGREES = 90.0;
+    static final int MIN_LIMIT = 1;
+    static final int MAX_LIMIT = 100;
+
+    public PrototypeConfig {
+        if (location == null) {
+            throw new UsageException("location is required in the prototype config.");
+        }
+        if (startDate == null) {
+            throw new UsageException("start is required in the prototype config.");
+        }
+        validateRange("forecastHorizonDays", days, MIN_FORECAST_HORIZON_DAYS, MAX_FORECAST_HORIZON_DAYS);
+        validateRange(
+                "maxMoonAltitudeDegrees",
+                maxMoonAltitudeDegrees,
+                MIN_MAX_MOON_ALTITUDE_DEGREES,
+                MAX_MAX_MOON_ALTITUDE_DEGREES
+        );
+        validateRange("limit", limit, MIN_LIMIT, MAX_LIMIT);
+    }
 
     public Instant start() {
         return startDate.atStartOfDay(location.zoneId()).toInstant();
@@ -26,52 +45,6 @@ public record PrototypeConfig(
 
     public Instant end() {
         return startDate.plusDays(days).atStartOfDay(location.zoneId()).toInstant();
-    }
-
-    public static PrototypeConfig defaults() {
-        return new PrototypeConfig(
-                Locations.PRAGUE,
-                DEFAULT_START_DATE,
-                DEFAULT_DAYS,
-                DEFAULT_MAX_MOON_ALTITUDE,
-                10
-        );
-    }
-
-    public static PrototypeConfig parse(String[] args) {
-        String locationSlug = Locations.PRAGUE.slug();
-        LocalDate startDate = DEFAULT_START_DATE;
-        int days = DEFAULT_DAYS;
-        double maxMoonAltitudeDegrees = DEFAULT_MAX_MOON_ALTITUDE;
-        int limit = 10;
-
-        for (int i = 0; i < args.length; i++) {
-            String arg = args[i];
-            String value = requireValue(args, ++i, arg);
-            switch (arg) {
-                case "--location" -> locationSlug = value;
-                case "--start" -> startDate = parseStartDate(value);
-                case "--days" -> days = parseInt(arg, value, 1, 30);
-                case "--max-altitude" -> maxMoonAltitudeDegrees = parseDouble(arg, value, 0.0, 45.0);
-                case "--limit" -> limit = parseInt(arg, value, 1, 100);
-                default -> throw new UsageException("Unknown option: " + arg);
-            }
-        }
-
-        return new PrototypeConfig(
-                Locations.requireFixture(locationSlug),
-                startDate,
-                days,
-                maxMoonAltitudeDegrees,
-                limit
-        );
-    }
-
-    private static String requireValue(String[] args, int index, String option) {
-        if (index >= args.length || args[index].startsWith("--")) {
-            throw new UsageException("Missing value for " + option);
-        }
-        return args[index];
     }
 
     static LocalDate parseStartDate(String value) {
@@ -85,27 +58,15 @@ public record PrototypeConfig(
         }
     }
 
-    private static int parseInt(String option, String value, int min, int max) {
-        try {
-            int parsed = Integer.parseInt(value);
-            if (parsed < min || parsed > max) {
-                throw new UsageException(option + " must be between " + min + " and " + max);
-            }
-            return parsed;
-        } catch (NumberFormatException ex) {
-            throw new UsageException(option + " must be an integer: " + value);
+    private static void validateRange(String field, int value, int min, int max) {
+        if (value < min || value > max) {
+            throw new UsageException(field + " must be between " + min + " and " + max + ".");
         }
     }
 
-    private static double parseDouble(String option, String value, double min, double max) {
-        try {
-            double parsed = Double.parseDouble(value);
-            if (!Double.isFinite(parsed) || parsed < min || parsed > max) {
-                throw new UsageException(option + " must be between " + min + " and " + max);
-            }
-            return parsed;
-        } catch (NumberFormatException ex) {
-            throw new UsageException(option + " must be numeric: " + value);
+    private static void validateRange(String field, double value, double min, double max) {
+        if (!Double.isFinite(value) || value < min || value > max) {
+            throw new UsageException(field + " must be between " + min + " and " + max + ".");
         }
     }
 }

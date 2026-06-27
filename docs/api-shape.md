@@ -22,10 +22,16 @@ Recommended first routes:
 /o/prague-cz-2026-06-29T1920Z.ics
 ```
 
-The web page can call a single preview endpoint:
+Implementation tracking:
+[#15](https://github.com/rapucha/moon-service/issues/15) for the web lookup and
+shareable result flow, and
+[#16](https://github.com/rapucha/moon-service/issues/16) for feeds and
+calendar exports.
+
+The web page can call a single opportunity search endpoint:
 
 ```http
-GET /api/preview?q=Praha&lang=cs
+GET /api/opportunities?q=Praha&lang=cs
 ```
 
 `lang` is optional. If absent, use `Accept-Language` as a display/ranking hint only.
@@ -113,7 +119,7 @@ The backend must protect both Moon Service and upstream providers.
 
 Application-level limits:
 
-- Rate limit `/api/preview` by IP or coarse anonymous client fingerprint if abuse becomes visible.
+- Rate limit `/api/opportunities` by IP or coarse anonymous client fingerprint if abuse becomes visible.
 - Keep limits generous enough for manual use and testing.
 - Return `status: "rate_limited"` with HTTP `429` when a client is limited.
 - Include a retry hint when possible.
@@ -211,7 +217,7 @@ features:
   feed_generation_enabled
 
 public_api:
-  preview_rate_limit
+  opportunity_search_rate_limit
 ```
 
 The status page should make quota risk visible before exhaustion. If known limits are configured, show warning states at roughly 50 percent, 80 percent, and 95 percent usage.
@@ -240,13 +246,15 @@ fictional_location
 
 ## Opportunity Window Contract
 
-Real opportunities should represent natural low-Moon windows, not artificial
-slices produced by ephemeris sampling.
+Real opportunities should represent natural visible-Moon windows, not artificial
+slices produced by ephemeris sampling. Low Moon remains the strongest default
+use case, but context Moon opportunities should not be excluded when light and
+weather are favorable.
 
 For each local day, the backend should find intervals where the apparent
-refracted Moon altitude is within the configured low-Moon range, initially
-0 to 12 degrees. These intervals are bounded by Moonrise, Moonset, crossings
-through the low-Moon ceiling, and local day boundaries.
+refracted Moon altitude is within the configured visible-Moon range, initially
+0 to 90 degrees. These intervals are bounded by Moonrise, Moonset, optional
+crossings through the configured altitude ceiling, and local day boundaries.
 
 Response rules:
 
@@ -258,12 +266,12 @@ Response rules:
 - Weather fields on an opportunity are aggregates over the merged weather
   interval. V0 uses hourly weather fields because cloud cover is the primary
   scoring input and Open-Meteo exposes cloud-cover layers hourly.
-- Split natural low-Moon windows at provider forecast change boundaries when
+- Split natural visible-Moon windows at provider forecast change boundaries when
   those changes affect the recommendation.
 - Merge adjacent intervals when the derived weather class and
   decision-relevant facts are equivalent.
-- A single opportunity may cover a broad interval when the Moon stays low and
-  the forecast state is stable.
+- A single opportunity may cover a broad interval when the Moon remains visible
+  and the forecast state is stable.
 - Avoid wording that implies minute-level weather certainty.
 
 ## Preview Response Examples
@@ -590,7 +598,54 @@ Example:
 ]
 ```
 
+## Future Event-Aware Search
+
+The first `/api/opportunities?q=...` contract is location-focused. Recurring
+event-aware search should be added later only after the base location, Moon,
+weather, feed, and calendar behavior works.
+
+A later event-aware request can either extend the lookup with an optional event
+context or use a separate endpoint. The event context should describe an
+approximate recurring pattern, not a guaranteed occurrence:
+
+```text
+event_kind
+display_name
+days_of_week or recurrence_rule
+local_time_window
+early_late_tolerance_minutes
+active_date_range
+optional route/direction/azimuth fields
+source and confidence fields
+```
+
+Event-aware responses should keep the base opportunity facts and add event
+match facts, for example:
+
+```text
+eventMatch:
+  expectedLocalWindow
+  uncertaintyWindow
+  overlapWindow
+  timingConfidence
+  source
+  caveat
+```
+
+Do not expose event-aware matches as exact minute-level predictions. Flights,
+transport schedules, and other recurring events can be delayed, early, rerouted,
+or cancelled. If the system does not use a live event provider, response copy
+must say that the event timing is approximate.
+
+Public RSS/Atom or `.ics` links may be acceptable for canonical, nonpersonal
+event patterns encoded in a URL. Personal saved event subscriptions require the
+privacy and storage model to cover stored preferences, notification delivery,
+retention, and deletion before implementation.
+
 ## Feed And Calendar Rules
+
+Implementation tracking:
+[#16](https://github.com/rapucha/moon-service/issues/16).
 
 RSS/Atom:
 
@@ -619,10 +674,10 @@ RSS/Atom:
 
 ## Internal Service Boundary
 
-Even with a single preview endpoint, keep internal responsibilities separate:
+Even with a single opportunity search endpoint, keep internal responsibilities separate:
 
 ```text
-preview
+opportunity_search
   -> geocoding
   -> fictional location lookup / optional LLM lore fallback
   -> ephemeris
@@ -631,4 +686,20 @@ preview
   -> feed/calendar link assembly
 ```
 
+The coordinate-backed opportunity engine was delivered through
+[#13](https://github.com/rapucha/moon-service/issues/13). The first Open-Meteo
+weather integration is tracked by
+[#14](https://github.com/rapucha/moon-service/issues/14).
+
 This keeps the public API simple without making the backend design hard to change.
+
+Recurring event-aware search can later add:
+
+```text
+  -> recurring event pattern validation
+  -> event occurrence window generation
+  -> event/Moon/weather overlap scoring
+```
+
+Keep this out of the v0 lookup until the simpler city opportunity contract is
+stable.

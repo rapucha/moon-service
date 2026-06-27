@@ -1,0 +1,13 @@
+{
+  "hourly": {
+    "time": [1782691200, 1782694800],
+    "cloud_cover": [22],
+    "cloud_cover_low": [6, 70],
+    "cloud_cover_mid": [18, 45],
+    "cloud_cover_high": [30, 20],
+    "precipitation_probability": [3, 35],
+    "precipitation": [0.0, 0.8],
+    "weather_code": [2, 61],
+    "visibility": [24000, 12000]
+  }
+}

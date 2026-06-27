@@ -16,23 +16,35 @@ import java.util.List;
 public final class OpportunityService {
     private final EphemerisSampler sampler;
     private final WindowGenerator windowGenerator;
-    private final WeatherFixture weather;
+    private final WindowWeatherProvider weatherProvider;
 
     public OpportunityService() {
-        this(new EphemerisSampler(), new WindowGenerator(), WeatherFixture.PRAGUE_PARTLY_CLOUDY);
+        this(
+                new EphemerisSampler(),
+                new WindowGenerator(),
+                WindowWeatherProvider.sameWeatherForEveryWindow(WeatherFixture.PRAGUE_PARTLY_CLOUDY));
     }
 
     OpportunityService(EphemerisSampler sampler, WindowGenerator windowGenerator, WeatherFixture weather) {
+        this(sampler, windowGenerator, WindowWeatherProvider.sameWeatherForEveryWindow(weather));
+    }
+
+    OpportunityService(EphemerisSampler sampler, WindowGenerator windowGenerator, WindowWeatherProvider weatherProvider) {
         this.sampler = sampler;
         this.windowGenerator = windowGenerator;
-        this.weather = weather;
+        this.weatherProvider = weatherProvider;
     }
 
     public PrototypeResult evaluate(PrototypeConfig config) {
+        return evaluate(config, weatherProvider);
+    }
+
+    public PrototypeResult evaluate(PrototypeConfig config, WindowWeatherProvider weatherProvider) {
         List<MoonWindow> windows = windowGenerator.findWindows(config, sampler);
         List<ScoredWindow> scored = new ArrayList<>();
 
         for (MoonWindow window : windows) {
+            WeatherFixture weather = weatherProvider.weatherFor(window);
             ComponentScores components = ScoringModel.scoreWindow(window, weather);
             scored.add(new ScoredWindow(window, weather, components));
         }

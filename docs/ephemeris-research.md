@@ -19,6 +19,7 @@ Rationale:
 Remaining caveat:
 
 - The Kotlin/JVM package is distributed through JitPack in the upstream README, not Maven Central. Before committing to it permanently, verify that this is acceptable for Android and backend builds, or vendor/fork only if there is a strong reason.
+  Tracked by [#17](https://github.com/rapucha/moon-service/issues/17).
 
 ## Candidate Comparison
 
@@ -38,7 +39,8 @@ Relevant capabilities:
 
 Tradeoffs:
 
-- JitPack dependency source needs build-policy review.
+- JitPack dependency source needs build-policy review, tracked by
+  [#17](https://github.com/rapucha/moon-service/issues/17).
 - API is astronomy-oriented rather than photography-oriented, so Moon Service still needs its own candidate-window and scoring layer.
 
 ### Time4J / Time4A
