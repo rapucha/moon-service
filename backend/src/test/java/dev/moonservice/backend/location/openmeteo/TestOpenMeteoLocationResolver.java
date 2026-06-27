@@ -56,9 +56,20 @@ public class TestOpenMeteoLocationResolver implements LocationResolver {
             "amsterdam", LocationResolution.resolved(AMSTERDAM),
             "springfield", LocationResolution.ambiguous(List.of(SPRINGFIELD_MISSOURI, SPRINGFIELD_ILLINOIS))
     );
+    private static final Map<String, LocationResolution> TEST_LOCATION_ID_RESULTS = Map.of(
+            "prague-cz", LocationResolution.resolved(PRAGUE),
+            "amsterdam-nl", LocationResolution.resolved(AMSTERDAM),
+            "springfield-mo-us", LocationResolution.resolved(SPRINGFIELD_MISSOURI),
+            "springfield-il-us", LocationResolution.resolved(SPRINGFIELD_ILLINOIS)
+    );
 
     @Override
     public LocationResolution resolve(LocationQuery query) {
         return TEST_RESULTS.getOrDefault(query.text().toLowerCase(Locale.ROOT), LocationResolution.notFound());
+    }
+
+    @Override
+    public LocationResolution resolveLocationId(String locationId) {
+        return TEST_LOCATION_ID_RESULTS.getOrDefault(locationId, LocationResolution.notFound());
     }
 }

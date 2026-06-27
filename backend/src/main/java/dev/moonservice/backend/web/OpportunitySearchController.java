@@ -21,8 +21,11 @@ class OpportunitySearchController {
     }
 
     @GetMapping("/api/opportunities")
-    ResponseEntity<OpportunityResponse> searchByQuery(@RequestParam(name = "q", required = false) String query) {
-        OpportunityResponse response = opportunitySearchService.searchByQuery(query);
+    ResponseEntity<OpportunityResponse> searchByQuery(
+            @RequestParam(name = "q", required = false) String query,
+            @RequestParam(name = "locationId", required = false) String locationId
+    ) {
+        OpportunityResponse response = opportunitySearchService.search(query, locationId);
         return ResponseEntity.status(httpStatusFor(response)).body(response);
     }
 

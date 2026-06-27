@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Moon Service</title>
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="/">Moon Service</a>
+    <span class="topbar-status">Moon photography lookup</span>
+  </header>
+
+  <main>
+    <section class="lookup-band" aria-labelledby="lookup-title">
+      <div class="lookup-content">
+        <div class="lookup-copy">
+          <h1 id="lookup-title">Find a Moon window near a city</h1>
+          <p>Enter a city or town. Exact home addresses are not needed.</p>
+        </div>
+
+        <form id="search-form" class="search-form" novalidate>
+          <label for="location-input">Location</label>
+          <div class="search-row">
+            <input
+              id="location-input"
+              name="q"
+              type="search"
+              autocomplete="off"
+              maxlength="100"
+              placeholder="Prague, Kyoto, Tromso"
+              required>
+            <button type="submit">Find</button>
+          </div>
+          <p id="form-feedback" class="form-feedback" role="status"></p>
+        </form>
+      </div>
+    </section>
+
+    <div class="content-grid">
+      <aside class="side-panel" aria-labelledby="recent-title">
+        <div class="panel-heading">
+          <h2 id="recent-title">Recent searches</h2>
+          <button id="clear-recent" type="button" class="text-button">Clear</button>
+        </div>
+        <div id="recent-list" class="recent-list"></div>
+        <p class="panel-note">Stored only in this browser. The lookup still works when browser storage is off.</p>
+      </aside>
+
+      <section id="results" class="results-region" aria-live="polite" aria-busy="false"></section>
+    </div>
+
+    <section class="caveats" aria-labelledby="privacy-title">
+      <h2 id="privacy-title">Privacy and caveats</h2>
+      <ul>
+        <li>No account, cookies, email, or server-side user profile is required for this page.</li>
+        <li>Searches are sent to the backend for geocoding, weather lookup, Moon geometry, and scoring.</li>
+        <li>Use city-level searches. This page does not store coordinates in localStorage.</li>
+        <li>Backend cache and provider calls should use coarse location and forecast boundaries, not a personal search history.</li>
+        <li>Operational logs are for service health; avoid entering exact home addresses.</li>
+        <li>Local hills, buildings, trees, and exact horizon obstructions are not modelled.</li>
+      </ul>
+    </section>
+  </main>
+
+  <script src="/app.js" defer></script>
+</body>
+</html>

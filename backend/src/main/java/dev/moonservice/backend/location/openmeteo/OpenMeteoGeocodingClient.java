@@ -22,18 +22,21 @@ import java.time.ZoneId;
 import java.time.zone.ZoneRulesException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 import java.util.OptionalDouble;
 
 public class OpenMeteoGeocodingClient implements LocationResolver {
     static final URI DEFAULT_ENDPOINT = URI.create("https://geocoding-api.open-meteo.com/v1/search");
+    static final URI DEFAULT_GET_ENDPOINT = URI.create("https://geocoding-api.open-meteo.com/v1/get");
     private static final Duration DEFAULT_TIMEOUT = Duration.ofSeconds(10);
     private static final int MAX_TRANSPORT_RETRIES = 1;
     private static final Duration MAX_RETRY_AFTER = Duration.ofSeconds(1);
     private static final int DEFAULT_RESULT_COUNT = 10;
     private static final String DEFAULT_LANGUAGE = "en";
-    private static final String BACKEND_LOCATION_ID_PREFIX = LocationProvider.OPEN_METEO.id() + "-";
+    private static final String BACKEND_LOCATION_ID_PREFIX = "moon-service-";
 
     private final URI endpoint;
+    private final URI getEndpoint;
     private final String language;
     private final int resultCount;
     private final OpenMeteoTransport transport;
@@ -42,6 +45,7 @@ public class OpenMeteoGeocodingClient implements LocationResolver {
     public OpenMeteoGeocodingClient() {
         this(
                 DEFAULT_ENDPOINT,
+                DEFAULT_GET_ENDPOINT,
                 DEFAULT_LANGUAGE,
                 DEFAULT_RESULT_COUNT,
                 new RetryingOpenMeteoTransport(
@@ -52,17 +56,19 @@ public class OpenMeteoGeocodingClient implements LocationResolver {
     }
 
     OpenMeteoGeocodingClient(OpenMeteoTransport transport) {
-        this(DEFAULT_ENDPOINT, DEFAULT_LANGUAGE, DEFAULT_RESULT_COUNT, transport, new ObjectMapper());
+        this(DEFAULT_ENDPOINT, DEFAULT_GET_ENDPOINT, DEFAULT_LANGUAGE, DEFAULT_RESULT_COUNT, transport, new ObjectMapper());
     }
 
     OpenMeteoGeocodingClient(
             URI endpoint,
+            URI getEndpoint,
             String language,
             int resultCount,
             OpenMeteoTransport transport,
             ObjectMapper objectMapper
     ) {
         this.endpoint = endpoint;
+        this.getEndpoint = getEndpoint;
         this.language = language;
         this.resultCount = resultCount;
         this.transport = transport;
@@ -92,6 +98,34 @@ public class OpenMeteoGeocodingClient implements LocationResolver {
         return toResolution(root);
     }
 
+    @Override
+    public LocationResolution resolveLocationId(String locationId) {
+        Optional<String> providerId = providerIdFromBackendLocationId(locationId);
+        if (providerId.isEmpty()) {
+            return LocationResolution.notFound();
+        }
+
+        String body;
+        try {
+            body = transport.get(locationIdRequestUri(providerId.get()));
+        } catch (OpenMeteoTransportException ex) {
+            return LocationResolution.temporarilyUnavailable();
+        }
+
+        if (body == null || body.isBlank()) {
+            return LocationResolution.temporarilyUnavailable();
+        }
+
+        JsonNode root;
+        try {
+            root = objectMapper.readTree(body);
+        } catch (JacksonException ex) {
+            return LocationResolution.temporarilyUnavailable();
+        }
+
+        return toSingleLocationResolution(root);
+    }
+
     URI requestUri(LocationQuery query) {
         return UriComponentsBuilder.fromUri(endpoint)
                 .queryParam("name", query.text())
@@ -101,6 +135,31 @@ public class OpenMeteoGeocodingClient implements LocationResolver {
                 .build()
                 .encode()
                 .toUri();
+    }
+
+    URI locationIdRequestUri(String providerId) {
+        return UriComponentsBuilder.fromUri(getEndpoint)
+                .queryParam("id", providerId)
+                .queryParam("language", language)
+                .queryParam("format", "json")
+                .build()
+                .encode()
+                .toUri();
+    }
+
+    private static Optional<String> providerIdFromBackendLocationId(String locationId) {
+        if (locationId == null) {
+            return Optional.empty();
+        }
+        String normalized = locationId.strip();
+        if (!normalized.startsWith(BACKEND_LOCATION_ID_PREFIX)) {
+            return Optional.empty();
+        }
+        String providerId = normalized.substring(BACKEND_LOCATION_ID_PREFIX.length());
+        if (providerId.isBlank() || providerId.codePoints().anyMatch(codePoint -> !Character.isDigit(codePoint))) {
+            return Optional.empty();
+        }
+        return Optional.of(providerId);
     }
 
     private static LocationResolution toResolution(JsonNode root) {
@@ -130,6 +189,12 @@ public class OpenMeteoGeocodingClient implements LocationResolver {
             return LocationResolution.resolved(candidates.getFirst());
         }
         return LocationResolution.ambiguous(candidates);
+    }
+
+    private static LocationResolution toSingleLocationResolution(JsonNode root) {
+        return toLocation(root)
+                .map(LocationResolution::resolved)
+                .orElseGet(LocationResolution::temporarilyUnavailable);
     }
 
     private static java.util.Optional<ResolvedLocation> toLocation(JsonNode result) {

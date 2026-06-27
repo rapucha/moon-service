@@ -20,7 +20,7 @@ class OpportunitySearchControllerUnitTest {
                         fail("Engine should not be called when location lookup is unavailable."), query ->
                         LocationResolution.temporarilyUnavailable(), new OpportunitySearchDefaults(Clock.systemUTC())));
 
-        ResponseEntity<OpportunityResponse> response = controller.searchByQuery("Praha");
+        ResponseEntity<OpportunityResponse> response = controller.searchByQuery("Praha", null);
 
         assertEquals(HttpStatus.SERVICE_UNAVAILABLE, response.getStatusCode());
         assertEquals("temporarily_unavailable", response.getBody().status());

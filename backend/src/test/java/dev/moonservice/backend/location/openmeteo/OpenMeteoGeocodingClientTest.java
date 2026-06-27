@@ -2,6 +2,7 @@ package dev.moonservice.backend.location.openmeteo;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.fail;
 
 import dev.moonservice.backend.location.LocationQuery;
 import dev.moonservice.backend.location.LocationResolution;
@@ -34,6 +35,36 @@ class OpenMeteoGeocodingClientTest {
     }
 
     @Test
+    void buildsOpenMeteoLocationIdRequestAndMapsSingleProviderResult() throws Exception {
+        String responseBody = fixture("prague-get.json");
+        AtomicReference<URI> capturedRequestUri = new AtomicReference<>();
+        OpenMeteoGeocodingClient client = new OpenMeteoGeocodingClient(requestUri -> {
+            capturedRequestUri.set(requestUri);
+            return responseBody;
+        });
+
+        LocationResolution resolution = client.resolveLocationId("moon-service-3067696");
+
+        assertEquals(LocationResolution.Status.RESOLVED, resolution.status());
+        assertEquals("moon-service-3067696", resolution.candidates().getFirst().locationId());
+        assertEquals("openmeteo:3067696", resolution.candidates().getFirst().providerLocationId().serialized());
+        assertEquals("Prague, Hlavni mesto Praha, Czechia", resolution.candidates().getFirst().displayName());
+        assertEquals(
+                "https://geocoding-api.open-meteo.com/v1/get?id=3067696&language=en&format=json",
+                capturedRequestUri.get().toString());
+    }
+
+    @Test
+    void mapsUnsupportedLocationIdToNotFoundWithoutProviderCall() {
+        OpenMeteoGeocodingClient client = new OpenMeteoGeocodingClient(requestUri ->
+                fail("Unsupported backend location IDs should not call Open-Meteo."));
+
+        LocationResolution resolution = client.resolveLocationId("springfield-mo-us");
+
+        assertEquals(LocationResolution.Status.NOT_FOUND, resolution.status());
+    }
+
+    @Test
     void sendsEncodedRequestAndMapsSingleProviderResultToResolvedLocation() throws Exception {
         String responseBody = fixture("praha-resolved.json");
         AtomicReference<URI> capturedRequestUri = new AtomicReference<>();
@@ -45,7 +76,7 @@ class OpenMeteoGeocodingClientTest {
         LocationResolution resolution = client.resolve(new LocationQuery("Praha"));
 
         assertEquals(LocationResolution.Status.RESOLVED, resolution.status());
-        assertEquals("openmeteo-3067696", resolution.candidates().getFirst().locationId());
+        assertEquals("moon-service-3067696", resolution.candidates().getFirst().locationId());
         assertEquals("openmeteo:3067696", resolution.candidates().getFirst().providerLocationId().serialized());
         assertEquals("Praha, Hlavni mesto Praha, Czechia", resolution.candidates().getFirst().displayName());
         assertEquals(50.08804, resolution.candidates().getFirst().latitude());
@@ -68,10 +99,10 @@ class OpenMeteoGeocodingClientTest {
 
         assertEquals(LocationResolution.Status.AMBIGUOUS, resolution.status());
         assertEquals(3, resolution.candidates().size());
-        assertEquals("openmeteo-3067696", resolution.candidates().get(0).locationId());
+        assertEquals("moon-service-3067696", resolution.candidates().get(0).locationId());
         assertEquals("openmeteo:3067696", resolution.candidates().get(0).providerLocationId().serialized());
         assertEquals("Prague, Hlavni mesto Praha, Czechia", resolution.candidates().get(0).displayName());
-        assertEquals("openmeteo-4548393", resolution.candidates().get(1).locationId());
+        assertEquals("moon-service-4548393", resolution.candidates().get(1).locationId());
         assertEquals("openmeteo:4548393", resolution.candidates().get(1).providerLocationId().serialized());
         assertEquals("Prague, Oklahoma, United States", resolution.candidates().get(1).displayName());
         assertEquals(35.48674, resolution.candidates().get(1).latitude());

@@ -57,11 +57,62 @@ class OpportunitySearchControllerTest {
                 .expectHeader().contentTypeCompatibleWith(MediaType.APPLICATION_JSON)
                 .expectBody()
                 .jsonPath("$.status").isEqualTo("ok")
-                .jsonPath("$.location.id").isEqualTo("openmeteo:3067696")
+                .jsonPath("$.location.id").isEqualTo("prague-cz")
                 .jsonPath("$.forecastHorizonDays").isEqualTo(7)
                 .jsonPath("$.startsAt").exists()
                 .jsonPath("$.maxMoonAltitudeDegrees").isEqualTo(90.0)
                 .jsonPath("$.opportunities[0].suggestedAt").exists();
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"/", "/search?q=Praha"})
+    void servesBrowserLookupPage(String path) {
+        webTestClient.get()
+                .uri(path)
+                .exchange()
+                .expectStatus().isOk()
+                .expectHeader().contentTypeCompatibleWith(MediaType.TEXT_HTML)
+                .expectBody(String.class)
+                .value(body -> {
+                    assertTrue(body.contains("id=\"search-form\""));
+                    assertTrue(body.contains("href=\"/favicon.svg\""));
+                    assertTrue(body.contains("Find a Moon window near a city"));
+                    assertTrue(body.contains("Privacy and caveats"));
+                });
+    }
+
+    @Test
+    void servesBrowserLookupAssets() {
+        webTestClient.get()
+                .uri("/app.js")
+                .exchange()
+                .expectStatus().isOk()
+                .expectHeader().contentTypeCompatibleWith("text/javascript")
+                .expectBody(String.class)
+                .value(body -> {
+                    assertTrue(body.contains("moonService.recentSearches.v1"));
+                    assertTrue(body.contains("/api/opportunities?q="));
+                    assertTrue(body.contains("/api/opportunities?locationId="));
+                });
+
+        webTestClient.get()
+                .uri("/styles.css")
+                .exchange()
+                .expectStatus().isOk()
+                .expectHeader().contentTypeCompatibleWith("text/css")
+                .expectBody(String.class)
+                .value(body -> assertTrue(body.contains(".opportunity-card")));
+
+        webTestClient.get()
+                .uri("/favicon.svg")
+                .exchange()
+                .expectStatus().isOk()
+                .expectHeader().contentTypeCompatibleWith("image/svg+xml")
+                .expectBody(String.class)
+                .value(body -> {
+                    assertTrue(body.contains("aria-label=\"Moon Service\""));
+                    assertTrue(body.contains("viewBox=\"0 0 64 64\""));
+                });
     }
 
     @Test
@@ -90,7 +141,7 @@ class OpportunitySearchControllerTest {
                 .expectHeader().contentTypeCompatibleWith(MediaType.APPLICATION_JSON)
                 .expectBody()
                 .jsonPath("$.status").isEqualTo("ok")
-                .jsonPath("$.location.id").isEqualTo("openmeteo:2759794")
+                .jsonPath("$.location.id").isEqualTo("amsterdam-nl")
                 .jsonPath("$.location.displayName").isEqualTo("Amsterdam, North Holland, Netherlands")
                 .jsonPath("$.location.timezone").isEqualTo("Europe/Amsterdam")
                 .jsonPath("$.forecastHorizonDays").isEqualTo(7)
@@ -116,6 +167,51 @@ class OpportunitySearchControllerTest {
                 .jsonPath("$.candidates[0].timezone").isEqualTo("America/Chicago")
                 .jsonPath("$.candidates[1].id").isEqualTo("springfield-il-us")
                 .jsonPath("$.opportunities").doesNotExist();
+    }
+
+    @Test
+    void returnsOpportunitySearchResponseForSelectedLocationId() {
+        webTestClient.get()
+                .uri(uriBuilder -> uriBuilder.path("/api/opportunities")
+                        .queryParam("locationId", "springfield-mo-us")
+                        .build())
+                .exchange()
+                .expectStatus().isOk()
+                .expectHeader().contentTypeCompatibleWith(MediaType.APPLICATION_JSON)
+                .expectBody()
+                .jsonPath("$.status").isEqualTo("ok")
+                .jsonPath("$.location.displayName").isEqualTo("Springfield, Missouri, United States")
+                .jsonPath("$.location.timezone").isEqualTo("America/Chicago")
+                .jsonPath("$.opportunities[0].suggestedAt").exists();
+    }
+
+    @Test
+    void returnsLocationNotFoundForUnknownLocationId() {
+        webTestClient.get()
+                .uri(uriBuilder -> uriBuilder.path("/api/opportunities")
+                        .queryParam("locationId", "unknown-location")
+                        .build())
+                .exchange()
+                .expectStatus().isOk()
+                .expectHeader().contentTypeCompatibleWith(MediaType.APPLICATION_JSON)
+                .expectBody()
+                .jsonPath("$.status").isEqualTo("location_not_found")
+                .jsonPath("$.message").isEqualTo("No matching location found.");
+    }
+
+    @Test
+    void mapsMixedQueryAndLocationIdToInvalidRequest() {
+        webTestClient.get()
+                .uri(uriBuilder -> uriBuilder.path("/api/opportunities")
+                        .queryParam("q", "Springfield")
+                        .queryParam("locationId", "springfield-mo-us")
+                        .build())
+                .exchange()
+                .expectStatus().isBadRequest()
+                .expectHeader().contentTypeCompatibleWith(MediaType.APPLICATION_JSON)
+                .expectBody()
+                .jsonPath("$.status").isEqualTo("invalid_request")
+                .jsonPath("$.message").isEqualTo("Use q or locationId, not both.");
     }
 
     @Test
