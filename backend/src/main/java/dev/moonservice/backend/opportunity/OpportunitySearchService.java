@@ -74,7 +74,10 @@ public class OpportunitySearchService {
 
     private OpportunityResponse searchResolvedLocation(ResolvedLocation location) {
         try {
-            return opportunitySearchEngine.search(location, opportunitySearchDefaults.requestFor(location));
+            return opportunitySearchEngine.search(
+                    location,
+                    opportunitySearchDefaults.requestFor(location),
+                    opportunitySearchDefaults.now());
         } catch (WeatherForecastUnavailableException ex) {
             return OpportunityStatusResponse.temporarilyUnavailable(
                     "Opportunity weather lookup is temporarily unavailable.");

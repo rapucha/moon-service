@@ -12,11 +12,17 @@ import dev.moonservice.scoringprototype.window.WindowGenerator;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Optional;
 
 public final class OpportunityService {
     private final EphemerisSampler sampler;
     private final WindowGenerator windowGenerator;
     private final WindowWeatherProvider weatherProvider;
+
+    @FunctionalInterface
+    public interface WindowAdjustment {
+        Optional<MoonWindow> adjust(MoonWindow window, WindowGenerator.SampleProvider samples);
+    }
 
     public OpportunityService() {
         this(
@@ -40,13 +46,25 @@ public final class OpportunityService {
     }
 
     public PrototypeResult evaluate(PrototypeConfig config, WindowWeatherProvider weatherProvider) {
-        List<MoonWindow> windows = windowGenerator.findWindows(config, sampler);
+        return evaluate(config, weatherProvider, (window, samples) -> Optional.of(window));
+    }
+
+    public PrototypeResult evaluate(
+            PrototypeConfig config,
+            WindowWeatherProvider weatherProvider,
+            WindowAdjustment windowAdjustment
+    ) {
+        WindowGenerator.SampleProvider samples = instant -> sampler.sampleAt(config.location(), instant);
+        List<MoonWindow> windows = windowGenerator.findWindows(config, samples);
         List<ScoredWindow> scored = new ArrayList<>();
 
         for (MoonWindow window : windows) {
-            WeatherFixture weather = weatherProvider.weatherFor(window);
-            ComponentScores components = ScoringModel.scoreWindow(window, weather);
-            scored.add(new ScoredWindow(window, weather, components));
+            Optional<MoonWindow> adjusted = windowAdjustment.adjust(window, samples);
+            if (adjusted.isPresent()) {
+                WeatherFixture weather = weatherProvider.weatherFor(adjusted.get());
+                ComponentScores components = ScoringModel.scoreWindow(adjusted.get(), weather);
+                scored.add(new ScoredWindow(adjusted.get(), weather, components));
+            }
         }
 
         scored.sort(Comparator.comparingInt((ScoredWindow item) -> item.components().total()).reversed()

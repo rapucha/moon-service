@@ -81,6 +81,37 @@ class JvmScoringOpportunitySearchEngineTest {
     }
 
     @Test
+    void liveSearchKeepsOngoingWindowAndScoresRemainingSuggestion() {
+        Instant notBefore = Instant.parse("2026-06-29T01:30:00Z");
+        WeatherForecastProvider provider = (location, startsAt, endsAt, forecastHorizonDays) -> instant -> {
+            if (instant.isBefore(notBefore)) {
+                return new HourlyWeather(instant, 100, 100, 100, 100, 90, 3.0, 8000, 61, 2.0);
+            }
+            return new HourlyWeather(instant, 20, 5, 10, 20, 0, 0.0, 25000, 0, 2.0);
+        };
+        JvmScoringOpportunitySearchEngine engine = new JvmScoringOpportunitySearchEngine(
+                new PreviewEvaluator(),
+                provider);
+
+        OpportunitySearchResponse response = engine.search(
+                prague(),
+                new OpportunitySearchRequest("prague-cz", "2026-06-29", 7, 12.0, 100),
+                notBefore);
+
+        assertTrue(response.opportunities().stream()
+                .noneMatch(opportunity -> Instant.parse(opportunity.suggestedAt()).isBefore(notBefore)));
+        OpportunitySearchResponse.Opportunity ongoing = response.opportunities().stream()
+                .filter(opportunity -> opportunity.startsAt().equals("2026-06-28T22:00:00Z"))
+                .findFirst()
+                .orElseThrow(() -> new AssertionError("Expected the ongoing local-day window to be retained."));
+        assertFalse(Instant.parse(ongoing.suggestedAt()).isBefore(notBefore));
+        assertEquals(0, ongoing.weather().weatherCode());
+        assertEquals("clear to mostly clear", ongoing.weather().summary());
+        assertEquals(22, ongoing.components().weatherFit());
+        assertTrue(ongoing.reason().contains("clear to mostly clear and 0 percent precipitation risk"));
+    }
+
+    @Test
     void translatesDirectPrototypeValidationFailuresToInvalidRequest() {
         JvmScoringOpportunitySearchEngine engine = engineWithUnusedWeather();
 
@@ -102,6 +133,18 @@ class JvmScoringOpportunitySearchEngineTest {
 
         assertEquals("Resolved opportunity scoring request was invalid.", exception.getMessage());
         assertNotNull(exception.getCause());
+    }
+
+    private static ResolvedLocation prague() {
+        return new ResolvedLocation(
+                "prague-cz",
+                new ProviderLocationId(LocationProvider.OPEN_METEO, "3067696"),
+                "Prague, Czechia",
+                50.08804,
+                14.42076,
+                202,
+                ZoneId.of("Europe/Prague"),
+                "CZ");
     }
 
     private static ResolvedLocation amsterdam() {

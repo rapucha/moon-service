@@ -4,6 +4,7 @@ import dev.moonservice.backend.location.ResolvedLocation;
 import dev.moonservice.backend.opportunity.search.OpportunitySearchRequest;
 
 import java.time.Clock;
+import java.time.Instant;
 import java.time.LocalDate;
 
 public class OpportunitySearchDefaults {
@@ -25,5 +26,9 @@ public class OpportunitySearchDefaults {
                 FORECAST_HORIZON_DAYS,
                 MAX_MOON_ALTITUDE_DEGREES,
                 LIMIT);
+    }
+
+    public Instant now() {
+        return clock.instant();
     }
 }

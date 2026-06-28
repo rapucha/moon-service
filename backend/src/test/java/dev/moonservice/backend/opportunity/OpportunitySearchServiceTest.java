@@ -93,6 +93,44 @@ class OpportunitySearchServiceTest {
     }
 
     @Test
+    void passesBackendClockInstantToLiveLookupEngine() {
+        Instant now = Instant.parse("2026-06-20T22:30:00Z");
+        OpportunitySearchDefaults fixedDefaults = new OpportunitySearchDefaults(Clock.fixed(now, ZoneId.of("UTC")));
+        ResolvedLocation prague = new ResolvedLocation(
+                "prague-cz",
+                providerLocationId("prague-cz"),
+                "Prague, Czechia",
+                50.08804,
+                14.42076,
+                202,
+                ZoneId.of("Europe/Prague"),
+                "CZ");
+        OpportunitySearchService opportunitySearchService = new OpportunitySearchService(new OpportunitySearchEngine() {
+            @Override
+            public OpportunitySearchResponse search(OpportunitySearchRequest request) {
+                fail("Query search should pass the resolved location to the engine.");
+                return okResponse();
+            }
+
+            @Override
+            public OpportunitySearchResponse search(
+                    ResolvedLocation location,
+                    OpportunitySearchRequest request,
+                    Instant notBefore
+            ) {
+                assertEquals(prague, location);
+                assertEquals("2026-06-21", request.start());
+                assertEquals(now, notBefore);
+                return okResponse();
+            }
+        }, query -> LocationResolution.resolved(prague), fixedDefaults);
+
+        OpportunityResponse response = opportunitySearchService.searchByQuery("Praha");
+
+        assertEquals("ok", response.status());
+    }
+
+    @Test
     void usesResolvedLocationTimezoneForDefaultStartDate() {
         OpportunitySearchService opportunitySearchService = new OpportunitySearchService(request -> {
             assertEquals("2026-06-20", request.start());
