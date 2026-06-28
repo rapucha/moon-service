@@ -19,11 +19,13 @@ import java.security.MessageDigest;
 public final class AdminAccessFilter extends OncePerRequestFilter {
     public static final String ADMIN_TOKEN_HEADER = "X-Moon-Admin-Token";
 
+    private final boolean adminRoutesEnabled;
     private final byte[] configuredToken;
 
     public AdminAccessFilter(@Value("${moon.admin.token:}") String rawToken) {
         String token = rawToken == null ? "" : rawToken.strip();
-        this.configuredToken = token.isEmpty() ? null : token.getBytes(StandardCharsets.UTF_8);
+        this.adminRoutesEnabled = !token.isEmpty();
+        this.configuredToken = token.getBytes(StandardCharsets.UTF_8);
     }
 
     @Override
@@ -37,7 +39,7 @@ public final class AdminAccessFilter extends OncePerRequestFilter {
             return;
         }
 
-        if (configuredToken == null) {
+        if (!adminRoutesEnabled) {
             reject(response, HttpServletResponse.SC_NOT_FOUND);
             return;
         }
