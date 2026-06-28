@@ -29,7 +29,7 @@ public class OpenMeteoGeocodingClient implements LocationResolver {
     static final URI DEFAULT_ENDPOINT = URI.create("https://geocoding-api.open-meteo.com/v1/search");
     static final URI DEFAULT_GET_ENDPOINT = URI.create("https://geocoding-api.open-meteo.com/v1/get");
     private static final double SAME_CITY_NOISE_DISTANCE_KM = 50.0;
-    private static final Duration DEFAULT_TIMEOUT = Duration.ofSeconds(10);
+    private static final Duration DEFAULT_TIMEOUT = Duration.ofSeconds(3);
     private static final int MAX_TRANSPORT_RETRIES = 1;
     private static final Duration MAX_RETRY_AFTER = Duration.ofSeconds(1);
     private static final int DEFAULT_RESULT_COUNT = 10;

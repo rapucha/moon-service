@@ -28,7 +28,7 @@ import java.util.Locale;
 
 public class OpenMeteoWeatherClient implements WeatherForecastProvider {
     static final URI DEFAULT_ENDPOINT = URI.create("https://api.open-meteo.com/v1/forecast");
-    private static final Duration DEFAULT_TIMEOUT = Duration.ofSeconds(10);
+    private static final Duration DEFAULT_TIMEOUT = Duration.ofSeconds(3);
     private static final int MAX_TRANSPORT_RETRIES = 1;
     private static final Duration MAX_RETRY_AFTER = Duration.ofSeconds(1);
     private static final double FORECAST_AGE_HOURS = 1.0;
