@@ -22,6 +22,8 @@ import tools.jackson.databind.node.ObjectNode;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Map;
+import java.util.Objects;
+import java.util.Optional;
 
 public class JvmScoringOpportunitySearchEngine implements OpportunitySearchEngine {
     private static final ObjectMapper MAPPER = new ObjectMapper();
@@ -58,6 +60,26 @@ public class JvmScoringOpportunitySearchEngine implements OpportunitySearchEngin
 
     @Override
     public OpportunitySearchResponse search(ResolvedLocation location, OpportunitySearchRequest request) {
+        return searchResolvedLocation(location, request, (window, samples) -> Optional.of(window));
+    }
+
+    @Override
+    public OpportunitySearchResponse search(
+            ResolvedLocation location,
+            OpportunitySearchRequest request,
+            Instant notBefore
+    ) {
+        return searchResolvedLocation(
+                location,
+                request,
+                new LiveOpportunityWindowSelector(Objects.requireNonNull(notBefore, "notBefore")));
+    }
+
+    private OpportunitySearchResponse searchResolvedLocation(
+            ResolvedLocation location,
+            OpportunitySearchRequest request,
+            OpportunityService.WindowAdjustment windowAdjustment
+    ) {
         try {
             PrototypeConfig config = new PrototypeConfig(
                     toPrototypeLocation(location),
@@ -72,7 +94,8 @@ public class JvmScoringOpportunitySearchEngine implements OpportunitySearchEngin
                     request.forecastHorizonDays());
             PrototypeResult result = opportunityService.evaluate(
                     config,
-                    window -> forecast.weatherAt(window.suggested().instant()).toWeatherFixture());
+                    window -> forecast.weatherAt(window.suggested().instant()).toWeatherFixture(),
+                    windowAdjustment);
             return toBackendResponse(responseFormatter.format(result));
         } catch (UsageException ex) {
             throw new IllegalStateException("Resolved opportunity scoring request was invalid.", ex);

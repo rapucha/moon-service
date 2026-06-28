@@ -49,6 +49,20 @@ public final class WindowGenerator {
         return windows;
     }
 
+    public static MoonWindow withSuggestedAtOrAfter(
+            MoonWindow window,
+            SampleProvider samples,
+            Instant notBefore
+    ) {
+        Instant suggestionStart = max(window.startsAt(), notBefore);
+        if (!suggestionStart.isBefore(window.endsAt())) {
+            throw new IllegalArgumentException("suggestion start must be before the window end.");
+        }
+        MoonSample suggested = suggestedSample(samples, suggestionStart, window.endsAt());
+        String kind = windowKind(samples, window.startsAt(), window.endsAt(), suggested);
+        return new MoonWindow(window.location(), kind, window.startsAt(), suggested, window.endsAt());
+    }
+
     private static void addLocalDayBoundaries(PrototypeConfig config, TreeSet<Instant> boundaries) {
         for (int day = 1; day < config.days(); day++) {
             LocalDate date = config.startDate().plusDays(day);
