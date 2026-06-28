@@ -56,7 +56,7 @@ public class OpenMeteoGeocodingClient implements LocationResolver {
                 new ObjectMapper());
     }
 
-    OpenMeteoGeocodingClient(OpenMeteoTransport transport) {
+    public OpenMeteoGeocodingClient(OpenMeteoTransport transport) {
         this(DEFAULT_ENDPOINT, DEFAULT_GET_ENDPOINT, DEFAULT_LANGUAGE, DEFAULT_RESULT_COUNT, transport, new ObjectMapper());
     }
 

@@ -8,6 +8,7 @@ import com.github.benmanes.caffeine.cache.Ticker;
 import dev.moonservice.backend.location.LocationProvider;
 import dev.moonservice.backend.location.ProviderLocationId;
 import dev.moonservice.backend.location.ResolvedLocation;
+import dev.moonservice.backend.observability.CacheMetricsSnapshot;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneId;
@@ -39,6 +40,25 @@ class CachingWeatherForecastProviderTest {
         assertEquals(20, first.weatherAt(STARTS_AT).cloudCoverPercent());
         assertEquals(20, second.weatherAt(SAME_START_HOUR).cloudCoverPercent());
         assertEquals(1, delegate.calls());
+    }
+
+    @Test
+    void exposesCacheMetrics() {
+        CountingProvider delegate = new CountingProvider(CLEAR_FORECAST);
+        CachingWeatherForecastProvider provider = provider(delegate, new FakeTicker());
+
+        assertEquals("weather", provider.cacheName());
+        assertEquals(0, provider.cacheMetrics().requestCount());
+
+        provider.forecastFor(amsterdam(), STARTS_AT, ENDS_AT, 7);
+        provider.forecastFor(amsterdam(), STARTS_AT, ENDS_AT, 7);
+
+        CacheMetricsSnapshot metrics = provider.cacheMetrics();
+        assertEquals(2, metrics.requestCount());
+        assertEquals(1, metrics.hitCount());
+        assertEquals(1, metrics.missCount());
+        assertEquals(0.5, metrics.hitRate(), 0.0001);
+        assertEquals(1, metrics.estimatedSize());
     }
 
     @Test
