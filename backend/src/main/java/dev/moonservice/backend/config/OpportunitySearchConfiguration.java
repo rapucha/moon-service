@@ -64,9 +64,10 @@ class OpportunitySearchConfiguration {
     ) {
         requireOpenMeteoProvider("moon.location.resolver", resolver);
         OpenMeteoObservability.ProviderMetrics geocodingMetrics = openMeteoObservability.geocoding();
-        return CachingLocationResolver.withDefaults(new ObservedLocationResolver(
-                new OpenMeteoGeocodingClient(openMeteoTransport(geocodingMetrics)),
-                geocodingMetrics));
+        OpenMeteoTransport transport = openMeteoTransport(geocodingMetrics);
+        LocationResolver openMeteoResolver = new OpenMeteoGeocodingClient(transport);
+        LocationResolver observedResolver = new ObservedLocationResolver(openMeteoResolver, geocodingMetrics);
+        return CachingLocationResolver.withDefaults(observedResolver);
     }
 
     @Bean
@@ -77,9 +78,10 @@ class OpportunitySearchConfiguration {
     ) {
         requireOpenMeteoProvider("moon.weather.provider", provider);
         OpenMeteoObservability.ProviderMetrics weatherMetrics = openMeteoObservability.weather();
-        return CachingWeatherForecastProvider.withDefaults(new ObservedWeatherForecastProvider(
-                new OpenMeteoWeatherClient(openMeteoTransport(weatherMetrics)),
-                weatherMetrics));
+        OpenMeteoTransport transport = openMeteoTransport(weatherMetrics);
+        WeatherForecastProvider openMeteoProvider = new OpenMeteoWeatherClient(transport);
+        WeatherForecastProvider observedProvider = new ObservedWeatherForecastProvider(openMeteoProvider, weatherMetrics);
+        return CachingWeatherForecastProvider.withDefaults(observedProvider);
     }
 
     @Bean

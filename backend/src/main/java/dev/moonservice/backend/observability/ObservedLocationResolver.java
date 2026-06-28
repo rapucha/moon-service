@@ -21,27 +21,17 @@ public final class ObservedLocationResolver implements LocationResolver {
     @Override
     public LocationResolution resolve(LocationQuery query) {
         long started = System.nanoTime();
-        try {
-            LocationResolution resolution = delegate.resolve(query);
-            metrics.recordLocationOutcome(resolution.status(), elapsedNanos(started));
-            return resolution;
-        } catch (RuntimeException ex) {
-            metrics.recordLocationOutcome(LocationResolution.Status.TEMPORARILY_UNAVAILABLE, elapsedNanos(started));
-            throw ex;
-        }
+        LocationResolution resolution = delegate.resolve(query);
+        metrics.recordLocationOutcome(resolution.status(), elapsedNanos(started));
+        return resolution;
     }
 
     @Override
     public LocationResolution resolveLocationId(String locationId) {
         long started = System.nanoTime();
-        try {
-            LocationResolution resolution = delegate.resolveLocationId(locationId);
-            metrics.recordLocationOutcome(resolution.status(), elapsedNanos(started));
-            return resolution;
-        } catch (RuntimeException ex) {
-            metrics.recordLocationOutcome(LocationResolution.Status.TEMPORARILY_UNAVAILABLE, elapsedNanos(started));
-            throw ex;
-        }
+        LocationResolution resolution = delegate.resolveLocationId(locationId);
+        metrics.recordLocationOutcome(resolution.status(), elapsedNanos(started));
+        return resolution;
     }
 
     private static long elapsedNanos(long started) {

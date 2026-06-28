@@ -203,6 +203,8 @@ shared across backend instances.
 The status endpoint currently exposes only aggregate operational data, but it
 is still intended for operator use. Do not expose it broadly from deployment
 infrastructure until the alpha hosting and access-control boundary is decided.
+Issue #40 tracks protecting `/admin/status` before any non-local alpha
+deployment or public tunnel exposes backend operator routes.
 
 ## Direct Fixture Endpoint
 
