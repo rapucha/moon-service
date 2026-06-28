@@ -208,7 +208,13 @@ public class OpenMeteoGeocodingClient implements LocationResolver {
         String name = stringFieldOrBlank(result, "name");
         String timezone = stringFieldOrBlank(result, "timezone");
         String countryCode = stringFieldOrBlank(result, "country_code");
+        // Open-Meteo passes through GeoNames feature codes. We use them only to
+        // identify provider granularity, for example city records (PPL/PPLC),
+        // city subsections (PPLX), and airports (AIRP).
         String featureCode = stringFieldOrBlank(result, "feature_code");
+        // Open-Meteo admin1 is the first administrative division for the place
+        // record, such as a state, province, region, or Prague's city-level
+        // administrative area. The ID is more stable than the localized name.
         String admin1Id = stringFieldOrBlank(result, "admin1_id");
         OptionalDouble latitude = finiteDoubleField(result, "latitude");
         OptionalDouble longitude = finiteDoubleField(result, "longitude");
@@ -257,6 +263,10 @@ public class OpenMeteoGeocodingClient implements LocationResolver {
             ProviderCandidate candidate,
             List<ProviderCandidate> candidates
     ) {
+        // Moon Service is city-level for v0. If Open-Meteo returns a district or
+        // airport close to a canonical city record in the same administrative
+        // area, asking the user to choose adds provider noise without improving
+        // the Moon/weather answer.
         if (!isCollapsibleProviderNoise(candidate)) {
             return false;
         }
@@ -297,11 +307,19 @@ public class OpenMeteoGeocodingClient implements LocationResolver {
         double rightLatitude = Math.toRadians(right.latitude());
         double latitudeDelta = rightLatitude - leftLatitude;
         double longitudeDelta = Math.toRadians(right.longitude() - left.longitude());
-        double a = Math.sin(latitudeDelta / 2.0) * Math.sin(latitudeDelta / 2.0)
+        // Haversine formula:
+        // a = sin^2(delta latitude / 2)
+        //     + cos(left latitude) * cos(right latitude) * sin^2(delta longitude / 2)
+        // distance = earth mean radius * 2 * atan2(sqrt(a), sqrt(1 - a))
+        double haversineTerm = Math.sin(latitudeDelta / 2.0) * Math.sin(latitudeDelta / 2.0)
                 + Math.cos(leftLatitude) * Math.cos(rightLatitude)
                 * Math.sin(longitudeDelta / 2.0) * Math.sin(longitudeDelta / 2.0);
-        a = Math.min(1.0, Math.max(0.0, a));
-        return 6371.0 * 2.0 * Math.atan2(Math.sqrt(a), Math.sqrt(1.0 - a));
+        double clampedHaversineTerm = Math.min(1.0, Math.max(0.0, haversineTerm));
+        double angularDistanceRadians = 2.0 * Math.atan2(
+                Math.sqrt(clampedHaversineTerm),
+                Math.sqrt(1.0 - clampedHaversineTerm));
+        double earthMeanRadiusKm = 6371.0;
+        return earthMeanRadiusKm * angularDistanceRadians;
     }
 
     private static String backendLocationId(String providerId) {
