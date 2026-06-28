@@ -11,6 +11,12 @@ import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.Objects;
 
+/**
+ * Process-local cache for provider-backed weather forecasts. Keys mirror the
+ * upstream request shape: rounded coordinates, elevation, UTC forecast hours,
+ * and forecast horizon; Caffeine coalesces concurrent identical misses into one
+ * upstream weather call.
+ */
 public final class CachingWeatherForecastProvider implements WeatherForecastProvider {
     private static final long DEFAULT_MAXIMUM_SIZE = 1_000;
     private static final Duration DEFAULT_AVAILABLE_TTL = Duration.ofHours(1);

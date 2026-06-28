@@ -8,6 +8,12 @@ import com.github.benmanes.caffeine.cache.Ticker;
 import java.time.Duration;
 import java.util.Objects;
 
+/**
+ * Process-local cache for provider-backed location resolution. Query lookups
+ * are keyed by normalized text, selected-location lookups by backend
+ * location ID, and Caffeine's per-key load path coalesces concurrent identical
+ * misses into one upstream resolver call.
+ */
 public final class CachingLocationResolver implements LocationResolver {
     private static final long DEFAULT_MAXIMUM_SIZE = 2_000;
     private static final Duration DEFAULT_RESOLVED_TTL = Duration.ofHours(24);
