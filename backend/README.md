@@ -48,7 +48,7 @@ GET /api/opportunities?q=Praha
 The location resolver and weather provider must be configured explicitly:
 
 ```bash
-mvn spring-boot:run -pl backend -am \
+mvn -pl backend -am spring-boot:run \
   -Dspring-boot.run.arguments="--moon.location.resolver=open-meteo --moon.weather.provider=open-meteo"
 ```
 
@@ -194,9 +194,15 @@ Example local run with an operator token:
 
 ```bash
 ADMIN_TOKEN="$(openssl rand -hex 32)"
-mvn spring-boot:run -pl backend -am \
+printf 'Admin token: %s\n' "$ADMIN_TOKEN"
+mvn -pl backend -am spring-boot:run \
   -Dspring-boot.run.arguments="--moon.location.resolver=open-meteo --moon.weather.provider=open-meteo --moon.admin.token=$ADMIN_TOKEN"
-curl -H "X-Moon-Admin-Token: $ADMIN_TOKEN" http://localhost:8080/admin/status
+```
+
+From another terminal, use the printed token:
+
+```bash
+curl -H "X-Moon-Admin-Token: <printed-admin-token>" http://localhost:8080/admin/status
 ```
 
 It returns process-local aggregate JSON:
@@ -275,7 +281,7 @@ network access, and live providers.
 ## Run Locally
 
 ```bash
-mvn spring-boot:run -pl backend -am \
+mvn -pl backend -am spring-boot:run \
   -Dspring-boot.run.arguments="--moon.location.resolver=open-meteo --moon.weather.provider=open-meteo"
 ```
 
