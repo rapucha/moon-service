@@ -15,6 +15,8 @@ feeds, and calendar exports deliberately out of scope.
   prototype fixture.
 - Runtime city/location resolution is Open-Meteo backed through the
   backend-owned `LocationResolver` seam.
+- Request-level logging, process-local Open-Meteo counters, cache stats, and a
+  minimal operator status endpoint are available for small test spikes.
 - Open-Meteo geocoding adapter code under `backend.location.openmeteo`, covered
   by saved provider JSON fixtures. It can be selected for live city/location
   lookup with `moon.location.resolver=open-meteo`.
@@ -164,6 +166,43 @@ are kept outside Maven:
 ```bash
 live-tests/run_live_weather_tests.sh
 ```
+
+## Observability
+
+The backend adds MVP-level observability for small public tests without storing
+or logging raw user location data by default.
+
+Every HTTP request receives an `X-Request-Id` response header. If the client
+sends a safe `X-Request-Id`, the backend reuses it; otherwise it generates one.
+The request log records method, path, status, duration, and request ID. It uses
+the route path only, not the raw query string, so location queries such as
+`q=...` are not written to application logs by this filter.
+
+The operator status endpoint is:
+
+```http
+GET /admin/status
+```
+
+It returns process-local aggregate JSON:
+
+- `app.status`
+- `providers.openMeteoGeocoding`: calls, resolved, ambiguous, not found,
+  temporarily unavailable, retries, timeouts, rate limits, and latency summary
+- `providers.openMeteoWeather`: calls, available, temporarily unavailable,
+  retries, timeouts, rate limits, and latency summary
+- `caches.geocoding` and `caches.weather`: request count, hits, misses, hit
+  rate, and estimated size when the runtime Open-Meteo cache beans are active
+
+During a small spike, inspect `/admin/status` before and after repeated searches
+for the same city. Cache hit rates should rise for repeated identical lookups,
+provider call counts should not rise on cache hits, and timeout/rate-limit
+counters should stay low. These counters reset on process restart and are not
+shared across backend instances.
+
+The status endpoint currently exposes only aggregate operational data, but it
+is still intended for operator use. Do not expose it broadly from deployment
+infrastructure until the alpha hosting and access-control boundary is decided.
 
 ## Direct Fixture Endpoint
 

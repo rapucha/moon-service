@@ -116,6 +116,20 @@ class OpportunitySearchControllerTest {
     }
 
     @Test
+    void returnsAdminStatus() {
+        webTestClient.get()
+                .uri("/admin/status")
+                .exchange()
+                .expectStatus().isOk()
+                .expectHeader().contentTypeCompatibleWith(MediaType.APPLICATION_JSON)
+                .expectBody()
+                .jsonPath("$.app.status").isEqualTo("ok")
+                .jsonPath("$.providers.openMeteoGeocoding.calls").isNumber()
+                .jsonPath("$.providers.openMeteoWeather.calls").isNumber()
+                .jsonPath("$.caches").exists();
+    }
+
+    @Test
     void returnsLocationNotFoundForUnknownTestOpenMeteoQuery() {
         webTestClient.get()
                 .uri(uriBuilder -> uriBuilder.path("/api/opportunities")

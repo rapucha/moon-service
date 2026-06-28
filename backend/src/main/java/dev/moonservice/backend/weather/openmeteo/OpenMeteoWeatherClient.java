@@ -59,7 +59,7 @@ public class OpenMeteoWeatherClient implements WeatherForecastProvider {
                 new ObjectMapper());
     }
 
-    OpenMeteoWeatherClient(OpenMeteoTransport transport) {
+    public OpenMeteoWeatherClient(OpenMeteoTransport transport) {
         this(DEFAULT_ENDPOINT, transport, new ObjectMapper());
     }
 

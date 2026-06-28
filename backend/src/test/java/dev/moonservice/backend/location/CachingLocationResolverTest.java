@@ -4,6 +4,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.github.benmanes.caffeine.cache.Ticker;
+import dev.moonservice.backend.observability.CacheMetricsSnapshot;
 import java.time.Duration;
 import java.time.ZoneId;
 import java.util.List;
@@ -63,6 +64,25 @@ class CachingLocationResolverTest {
         resolver.resolve(new LocationQuery("Praha Czechia"));
 
         assertEquals(1, delegate.queryCalls("Praha Czechia"));
+    }
+
+    @Test
+    void exposesCacheMetrics() {
+        CountingResolver delegate = new CountingResolver(Map.of("Praha", PRAGUE));
+        CachingLocationResolver resolver = resolver(delegate, new FakeTicker());
+
+        assertEquals("geocoding", resolver.cacheName());
+        assertEquals(0, resolver.cacheMetrics().requestCount());
+
+        resolver.resolve(new LocationQuery("Praha"));
+        resolver.resolve(new LocationQuery("Praha"));
+
+        CacheMetricsSnapshot metrics = resolver.cacheMetrics();
+        assertEquals(2, metrics.requestCount());
+        assertEquals(1, metrics.hitCount());
+        assertEquals(1, metrics.missCount());
+        assertEquals(0.5, metrics.hitRate(), 0.0001);
+        assertEquals(1, metrics.estimatedSize());
     }
 
     @Test

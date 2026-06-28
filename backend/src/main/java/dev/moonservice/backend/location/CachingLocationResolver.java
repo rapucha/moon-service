@@ -4,6 +4,8 @@ import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
 import com.github.benmanes.caffeine.cache.Expiry;
 import com.github.benmanes.caffeine.cache.Ticker;
+import dev.moonservice.backend.observability.CacheMetricsSnapshot;
+import dev.moonservice.backend.observability.CacheMetricsSource;
 
 import java.time.Duration;
 import java.util.Objects;
@@ -14,7 +16,7 @@ import java.util.Objects;
  * location ID, and Caffeine's per-key load path coalesces concurrent identical
  * misses into one upstream resolver call.
  */
-public final class CachingLocationResolver implements LocationResolver {
+public final class CachingLocationResolver implements LocationResolver, CacheMetricsSource {
     private static final long DEFAULT_MAXIMUM_SIZE = 2_000;
     private static final Duration DEFAULT_RESOLVED_TTL = Duration.ofHours(24);
     private static final Duration DEFAULT_AMBIGUOUS_TTL = Duration.ofHours(24);
@@ -47,6 +49,7 @@ public final class CachingLocationResolver implements LocationResolver {
         this.delegate = Objects.requireNonNull(delegate, "delegate");
         this.cache = Caffeine.newBuilder()
                 .maximumSize(requirePositive(maximumSize, "maximumSize"))
+                .recordStats()
                 .expireAfter(new StatusExpiry(
                         requirePositive(resolvedTtl, "resolvedTtl"),
                         requirePositive(ambiguousTtl, "ambiguousTtl"),
@@ -70,6 +73,16 @@ public final class CachingLocationResolver implements LocationResolver {
         }
         CacheKey key = CacheKey.locationId(locationId.strip());
         return cache.get(key, ignored -> delegate.resolveLocationId(key.value()));
+    }
+
+    @Override
+    public String cacheName() {
+        return "geocoding";
+    }
+
+    @Override
+    public CacheMetricsSnapshot cacheMetrics() {
+        return CacheMetricsSnapshot.from(cache);
     }
 
     private static String normalizedQuery(String query) {

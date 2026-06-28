@@ -6,6 +6,8 @@ import dev.moonservice.backend.location.CachingLocationResolver;
 import dev.moonservice.backend.location.LocationQuery;
 import dev.moonservice.backend.location.LocationResolution;
 import dev.moonservice.backend.location.LocationResolver;
+import dev.moonservice.backend.observability.CacheMetricsSource;
+import dev.moonservice.backend.observability.OpenMeteoObservability;
 import dev.moonservice.backend.weather.CachingWeatherForecastProvider;
 import dev.moonservice.backend.weather.TestWeatherForecastProvider;
 import dev.moonservice.backend.weather.WeatherForecastProvider;
@@ -45,6 +47,19 @@ class OpportunitySearchConfigurationTest {
                         "moon.weather.provider=open-meteo")
                 .run(context -> assertThat(context.getBean(WeatherForecastProvider.class))
                         .isInstanceOf(CachingWeatherForecastProvider.class));
+    }
+
+    @Test
+    void exposesOpenMeteoObservabilityAndRuntimeCacheMetricsSources() {
+        contextRunner
+                .withPropertyValues(
+                        "moon.location.resolver=open-meteo",
+                        "moon.weather.provider=open-meteo")
+                .run(context -> {
+                    assertThat(context).hasSingleBean(OpenMeteoObservability.class);
+                    assertThat(context.getBeansOfType(CacheMetricsSource.class))
+                            .containsKeys("locationResolver", "weatherForecastProvider");
+                });
     }
 
     @Test

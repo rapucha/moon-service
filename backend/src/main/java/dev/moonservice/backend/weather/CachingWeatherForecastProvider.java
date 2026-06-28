@@ -5,6 +5,8 @@ import com.github.benmanes.caffeine.cache.Caffeine;
 import com.github.benmanes.caffeine.cache.Expiry;
 import com.github.benmanes.caffeine.cache.Ticker;
 import dev.moonservice.backend.location.ResolvedLocation;
+import dev.moonservice.backend.observability.CacheMetricsSnapshot;
+import dev.moonservice.backend.observability.CacheMetricsSource;
 
 import java.time.Duration;
 import java.time.Instant;
@@ -17,7 +19,7 @@ import java.util.Objects;
  * and forecast horizon; Caffeine coalesces concurrent identical misses into one
  * upstream weather call.
  */
-public final class CachingWeatherForecastProvider implements WeatherForecastProvider {
+public final class CachingWeatherForecastProvider implements WeatherForecastProvider, CacheMetricsSource {
     private static final long DEFAULT_MAXIMUM_SIZE = 1_000;
     private static final Duration DEFAULT_AVAILABLE_TTL = Duration.ofHours(1);
     private static final Duration DEFAULT_UNAVAILABLE_TTL = Duration.ofSeconds(30);
@@ -44,6 +46,7 @@ public final class CachingWeatherForecastProvider implements WeatherForecastProv
         this.delegate = Objects.requireNonNull(delegate, "delegate");
         this.cache = Caffeine.newBuilder()
                 .maximumSize(requirePositive(maximumSize, "maximumSize"))
+                .recordStats()
                 .expireAfter(new ForecastLookupExpiry(
                         requirePositive(availableTtl, "availableTtl"),
                         requirePositive(unavailableTtl, "unavailableTtl")))
@@ -74,6 +77,16 @@ public final class CachingWeatherForecastProvider implements WeatherForecastProv
         } catch (WeatherForecastUnavailableException ex) {
             return ForecastLookup.unavailable(ex);
         }
+    }
+
+    @Override
+    public String cacheName() {
+        return "weather";
+    }
+
+    @Override
+    public CacheMetricsSnapshot cacheMetrics() {
+        return CacheMetricsSnapshot.from(cache);
     }
 
     private static long requirePositive(long value, String name) {
