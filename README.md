@@ -29,6 +29,20 @@ Email alerts, native Android, saved personal preferences, terrain horizon modeli
 - Astronomy Engine as the first ephemeris candidate for the thin scoring prototype.
 - Browser `localStorage` may hold recent searches; the backend should not permanently store user locations in v0.
 
+## Provider-Call Protections
+
+Runtime Open-Meteo geocoding and weather calls are wrapped in process-local
+Caffeine caches. Geocoding uses normalized query text or selected backend
+location ID as the key and caches resolved, ambiguous, not-found, and temporary
+unavailable outcomes with status-specific TTLs. Weather uses a request-shaped
+key built from rounded coordinates, elevation, UTC forecast hours, and forecast
+horizon; successful forecasts cache briefly, while temporary failures cache only
+long enough to dampen repeated retries.
+
+These caches are intentionally small MVP protections. They reduce duplicate
+provider calls for repeated or concurrent identical lookups in one backend
+process, but they are cleared on restart and are not shared across instances.
+
 ## Repository Map
 
 - `AGENTS.md`: durable instructions for future coding-agent sessions.

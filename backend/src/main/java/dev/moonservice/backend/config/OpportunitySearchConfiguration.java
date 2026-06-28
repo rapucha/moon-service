@@ -1,10 +1,12 @@
 package dev.moonservice.backend.config;
 
+import dev.moonservice.backend.location.CachingLocationResolver;
 import dev.moonservice.backend.location.LocationResolver;
 import dev.moonservice.backend.location.openmeteo.OpenMeteoGeocodingClient;
 import dev.moonservice.backend.opportunity.OpportunitySearchDefaults;
 import dev.moonservice.backend.opportunity.scoring.JvmScoringOpportunitySearchEngine;
 import dev.moonservice.backend.opportunity.search.OpportunitySearchEngine;
+import dev.moonservice.backend.weather.CachingWeatherForecastProvider;
 import dev.moonservice.backend.weather.WeatherForecastProvider;
 import dev.moonservice.backend.weather.openmeteo.OpenMeteoWeatherClient;
 import dev.moonservice.scoringprototype.PreviewEvaluator;
@@ -40,14 +42,14 @@ class OpportunitySearchConfiguration {
     @ConditionalOnMissingBean(LocationResolver.class)
     LocationResolver locationResolver(@Value("${moon.location.resolver:}") String resolver) {
         requireOpenMeteoProvider("moon.location.resolver", resolver);
-        return new OpenMeteoGeocodingClient();
+        return CachingLocationResolver.withDefaults(new OpenMeteoGeocodingClient());
     }
 
     @Bean
     @ConditionalOnMissingBean(WeatherForecastProvider.class)
     WeatherForecastProvider weatherForecastProvider(@Value("${moon.weather.provider:}") String provider) {
         requireOpenMeteoProvider("moon.weather.provider", provider);
-        return new OpenMeteoWeatherClient();
+        return CachingWeatherForecastProvider.withDefaults(new OpenMeteoWeatherClient());
     }
 
     @Bean

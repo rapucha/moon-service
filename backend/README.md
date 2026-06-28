@@ -1,8 +1,8 @@
 # Moon Service Backend
 
 This is the first real backend module for Moon Service. It promotes the tested
-Spring HTTP contract out of `prototypes/` while keeping caching, feeds, and
-calendar exports deliberately out of scope.
+Spring HTTP contract out of `prototypes/` while keeping durable/shared caches,
+feeds, and calendar exports deliberately out of scope.
 
 ## Current Scope
 
@@ -20,6 +20,9 @@ calendar exports deliberately out of scope.
   lookup with `moon.location.resolver=open-meteo`.
 - Shared Open-Meteo HTTP transport, retry, and failure classification code
   under `backend.openmeteo`.
+- In-memory provider-call protections for the Open-Meteo runtime path: repeated
+  and concurrent identical geocoding/weather lookups share one upstream call
+  inside a single backend process.
 - Coordinate-backed Moon/Sun window generation and scoring through the existing
   `jvm-scoring-prototype` Maven artifact.
 - Open-Meteo weather forecast adapter code under `backend.weather.openmeteo`,
@@ -28,8 +31,9 @@ calendar exports deliberately out of scope.
 - HTTP `400` error mapping for malformed JSON and invalid opportunity search
   requests.
 
-This module intentionally does not yet include persistence, weather caching,
-accounts, cookies, feeds, calendar generation, or deployment configuration.
+This module intentionally does not yet include persistence, durable/shared
+caches, accounts, cookies, feeds, calendar generation, or deployment
+configuration.
 Missing or unknown `moon.location.resolver` or `moon.weather.provider` values
 fail startup; the runtime backend does not include fixture provider modes.
 
@@ -101,11 +105,21 @@ provider exceptions. A shared retrying transport decorator uses Spring
 `429`, `502`, `503`, `504`, timeout, or IO failure. It avoids retries for
 non-retryable HTTP statuses, malformed provider payloads, blank response
 bodies, and valid empty results. Short `Retry-After` values are honored before
-retrying; long `Retry-After` delays fail fast.
+retrying; long `Retry-After` delays fail fast. The default Open-Meteo
+connect/read timeout is 3 seconds so dependency slowness becomes
+`temporarily_unavailable` instead of tying up request threads for a long wait.
 Resolved locations now carry a backend location ID, a structured provider
 location ID, latitude, longitude, elevation, timezone, and country code. The
 test suite still uses a test-only Open-Meteo resolver double that returns
 saved provider-shaped locations without calling the live provider.
+
+Runtime Open-Meteo geocoding is wrapped in an in-memory Caffeine cache. The
+cache key is the normalized query text, or the selected backend location ID for
+`locationId` lookups. Successful resolved and ambiguous responses are cached
+for 24 hours, not-found responses for 10 minutes, and
+temporarily-unavailable responses for 30 seconds. Caffeine's atomic per-key
+loads provide single-flight behavior, so concurrent identical cache misses
+share the same upstream geocoding call.
 
 Manual live drift checks are kept outside Maven:
 
@@ -126,7 +140,22 @@ instead of producing fake no-op opportunities.
 The weather client uses the same shared Open-Meteo `RestClient` transport and
 Spring `RetryTemplate` wrapper as geocoding: at most one retry on HTTP `429`,
 `502`, `503`, `504`, timeout, or IO failure. Short `Retry-After` values are
-honored before retrying; long retry delays fail fast.
+honored before retrying; long retry delays fail fast. The default Open-Meteo
+connect/read timeout is 3 seconds.
+
+Runtime Open-Meteo weather lookup is wrapped in an in-memory Caffeine cache.
+The cache key matches the provider request shape: coordinates rounded to 4
+decimal places, elevation, UTC start/end forecast hours, and forecast horizon.
+Successful forecasts are cached for 1 hour, and temporarily-unavailable weather
+lookups are cached for 30 seconds. Concurrent identical cache misses share one
+upstream weather call inside the process.
+
+These caches are deliberately small, process-local MVP protections. They reduce
+duplicate upstream calls during small spikes, such as several users searching
+the same city at once, and dampen brief provider slowness. They are cleared on
+restart and are not shared across multiple backend instances; Redis,
+distributed rate limiting, durable provider counters, and autoscaling remain
+out of scope for this module.
 
 The Maven test suite uses saved provider JSON fixtures and fake weather
 providers; it never calls the live weather API. Manual live weather drift checks

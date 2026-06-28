@@ -2,13 +2,13 @@ package dev.moonservice.backend.config;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import dev.moonservice.backend.location.CachingLocationResolver;
 import dev.moonservice.backend.location.LocationQuery;
 import dev.moonservice.backend.location.LocationResolution;
 import dev.moonservice.backend.location.LocationResolver;
-import dev.moonservice.backend.location.openmeteo.OpenMeteoGeocodingClient;
+import dev.moonservice.backend.weather.CachingWeatherForecastProvider;
 import dev.moonservice.backend.weather.TestWeatherForecastProvider;
 import dev.moonservice.backend.weather.WeatherForecastProvider;
-import dev.moonservice.backend.weather.openmeteo.OpenMeteoWeatherClient;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
 
@@ -28,23 +28,23 @@ class OpportunitySearchConfigurationTest {
     }
 
     @Test
-    void canSelectOpenMeteoLocationResolver() {
+    void canSelectOpenMeteoLocationResolverWithProviderCallProtections() {
         contextRunner
                 .withPropertyValues(
                         "moon.location.resolver=open-meteo",
                         "moon.weather.provider=open-meteo")
                 .run(context -> assertThat(context.getBean(LocationResolver.class))
-                        .isInstanceOf(OpenMeteoGeocodingClient.class));
+                        .isInstanceOf(CachingLocationResolver.class));
     }
 
     @Test
-    void canSelectOpenMeteoWeatherProvider() {
+    void canSelectOpenMeteoWeatherProviderWithProviderCallProtections() {
         contextRunner
                 .withPropertyValues(
                         "moon.location.resolver=open-meteo",
                         "moon.weather.provider=open-meteo")
                 .run(context -> assertThat(context.getBean(WeatherForecastProvider.class))
-                        .isInstanceOf(OpenMeteoWeatherClient.class));
+                        .isInstanceOf(CachingWeatherForecastProvider.class));
     }
 
     @Test
