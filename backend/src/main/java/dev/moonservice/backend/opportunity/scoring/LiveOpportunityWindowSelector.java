@@ -17,12 +17,9 @@ final class LiveOpportunityWindowSelector implements OpportunityService.WindowAd
 
     @Override
     public Optional<MoonWindow> adjust(MoonWindow window, WindowGenerator.SampleProvider samples) {
-        if (!window.endsAt().isAfter(notBefore)) {
-            return Optional.empty();
-        }
         if (window.startsAt().isAfter(notBefore)) {
             return Optional.of(window);
         }
-        return Optional.of(WindowGenerator.withSuggestedAtOrAfter(window, samples, notBefore));
+        return WindowGenerator.withSuggestedAtOrAfter(window, samples, notBefore);
     }
 }

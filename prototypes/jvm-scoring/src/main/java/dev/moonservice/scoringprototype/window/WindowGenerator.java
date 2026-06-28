@@ -12,6 +12,7 @@ import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Optional;
 import java.util.TreeSet;
 
 public final class WindowGenerator {
@@ -49,18 +50,18 @@ public final class WindowGenerator {
         return windows;
     }
 
-    public static MoonWindow withSuggestedAtOrAfter(
+    public static Optional<MoonWindow> withSuggestedAtOrAfter(
             MoonWindow window,
             SampleProvider samples,
             Instant notBefore
     ) {
-        Instant suggestionStart = max(window.startsAt(), notBefore);
-        if (!suggestionStart.isBefore(window.endsAt())) {
-            throw new IllegalArgumentException("suggestion start must be before the window end.");
+        if (!window.endsAt().isAfter(notBefore)) {
+            return Optional.empty();
         }
+        Instant suggestionStart = max(window.startsAt(), notBefore);
         MoonSample suggested = suggestedSample(samples, suggestionStart, window.endsAt());
         String kind = windowKind(samples, window.startsAt(), window.endsAt(), suggested);
-        return new MoonWindow(window.location(), kind, window.startsAt(), suggested, window.endsAt());
+        return Optional.of(new MoonWindow(window.location(), kind, window.startsAt(), suggested, window.endsAt()));
     }
 
     private static void addLocalDayBoundaries(PrototypeConfig config, TreeSet<Instant> boundaries) {
