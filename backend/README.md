@@ -87,8 +87,9 @@ Manual browser checks for frontend behavior:
 `OpenMeteoGeocodingClient` implements the backend `LocationResolver` seam and
 can be selected with `moon.location.resolver=open-meteo`. It builds encoded
 Open-Meteo Geocoding requests, parses provider-shaped JSON, maps single results
-to resolved locations, multiple results to ambiguous candidates, empty results
-to not found, and malformed/provider failure states to temporarily unavailable.
+to resolved locations, filters nearby same-city district/airport provider noise,
+maps remaining multiple results to ambiguous candidates, empty results to not
+found, and malformed/provider failure states to temporarily unavailable.
 Live no-match responses have also been observed as `generationtime_ms` with no
 `results` field; that provider-shaped response maps to not found, while an
 arbitrary empty object or malformed `results` shape still maps to temporarily
