@@ -21,6 +21,17 @@ Change Quality
 - [ ] Agreement or disagreement with user assumptions is reasoned, not
       appeasing.
 
+Observability
+- [ ] New external providers, caches, public endpoints, background jobs,
+      feed/export paths, or rate limits have an explicit operator-visibility
+      decision.
+- [ ] Useful aggregate metrics or request logging were added or updated for
+      boundaries that need operator visibility.
+- [ ] Metrics and logs avoid raw location queries, precise coordinates,
+      provider URLs containing queries, and user-identifying data by default.
+- [ ] New operator-visible fields are documented in `backend/README.md` or the
+      relevant module docs.
+
 Testing and Validation
 - [ ] Focused tests or build command ran.
 - [ ] Broader validation ran when touching shared contracts, scoring/window
