@@ -8,6 +8,7 @@ import dev.moonservice.backend.location.LocationResolution;
 import dev.moonservice.backend.location.LocationResolver;
 import dev.moonservice.backend.observability.CacheMetricsSource;
 import dev.moonservice.backend.observability.OpenMeteoObservability;
+import dev.moonservice.backend.observability.ProviderQuotaMonitor;
 import dev.moonservice.backend.weather.CachingWeatherForecastProvider;
 import dev.moonservice.backend.weather.TestWeatherForecastProvider;
 import dev.moonservice.backend.weather.WeatherForecastProvider;
@@ -59,7 +60,12 @@ class OpportunitySearchConfigurationTest {
                         "moon.location.resolver=open-meteo",
                         "moon.weather.provider=open-meteo")
                 .run(context -> {
+                    assertThat(context).hasSingleBean(ProviderQuotaMonitor.class);
                     assertThat(context).hasSingleBean(OpenMeteoObservability.class);
+                    assertThat(context.getBean(ProviderQuotaMonitor.class).snapshots())
+                            .containsKeys(
+                                    OpenMeteoObservability.GEOCODING_OPERATION.id(),
+                                    OpenMeteoObservability.WEATHER_OPERATION.id());
                     assertThat(context.getBeansOfType(CacheMetricsSource.class))
                             .containsKeys("locationResolver", "weatherForecastProvider");
                 });
@@ -126,6 +132,51 @@ class OpportunitySearchConfigurationTest {
                     assertThat(properties.getCache().getGeocoding().getNotFoundTtl()).isEqualTo(Duration.ofMinutes(5));
                     assertThat(properties.getCache().getWeather().getMaximumSize()).isEqualTo(456);
                     assertThat(properties.getCache().getWeather().getUnavailableTtl()).isEqualTo(Duration.ofSeconds(45));
+                });
+    }
+
+    @Test
+    void configuresProviderQuotaLimitsAndAdditionalOperations() {
+        contextRunner
+                .withBean(LocationResolver.class, () -> query -> LocationResolution.notFound())
+                .withBean(WeatherForecastProvider.class, TestWeatherForecastProvider::new)
+                .withPropertyValues(
+                        "moon.provider-quotas.operations.open-meteo-weather.hourly-limit=38",
+                        "moon.provider-quotas.operations.open-meteo-weather.daily-limit=23",
+                        "moon.provider-quotas.operations.open-meteo-weather.monthly-limit=20",
+                        "moon.provider-quotas.operations.fictional-location-llm.provider=example-llm",
+                        "moon.provider-quotas.operations.fictional-location-llm.operation=fictional-location-resolution",
+                        "moon.provider-quotas.operations.fictional-location-llm.daily-limit=100")
+                .run(context -> {
+                    ProviderQuotaMonitor monitor = context.getBean(ProviderQuotaMonitor.class);
+
+                    ProviderQuotaMonitor.ProviderQuotaSnapshot weather = monitor.snapshots()
+                            .get(OpenMeteoObservability.WEATHER_OPERATION.id());
+                    assertThat(weather.provider()).isEqualTo("open-meteo");
+                    assertThat(weather.operation()).isEqualTo("weather");
+                    assertThat(weather.usage().hourly().limit()).isEqualTo(38L);
+                    assertThat(weather.usage().daily().limit()).isEqualTo(23L);
+                    assertThat(weather.usage().monthly().limit()).isEqualTo(20L);
+
+                    ProviderQuotaMonitor.ProviderQuotaSnapshot fictionalLlm = monitor.snapshots()
+                            .get("fictional-location-llm");
+                    assertThat(fictionalLlm.provider()).isEqualTo("example-llm");
+                    assertThat(fictionalLlm.operation()).isEqualTo("fictional-location-resolution");
+                    assertThat(fictionalLlm.usage().hourly().knownLimit()).isFalse();
+                    assertThat(fictionalLlm.usage().daily().limit()).isEqualTo(100L);
+                });
+    }
+
+    @Test
+    void rejectsAdditionalProviderQuotaOperationWithoutProviderMetadata() {
+        contextRunner
+                .withBean(LocationResolver.class, () -> query -> LocationResolution.notFound())
+                .withBean(WeatherForecastProvider.class, TestWeatherForecastProvider::new)
+                .withPropertyValues("moon.provider-quotas.operations.fictional-location-llm.daily-limit=100")
+                .run(context -> {
+                    assertThat(context).hasFailed();
+                    assertThat(context.getStartupFailure())
+                            .hasMessageContaining("Provider operation provider must not be blank.");
                 });
     }
 

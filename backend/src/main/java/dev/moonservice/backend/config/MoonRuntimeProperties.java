@@ -4,6 +4,8 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 
 import java.net.URI;
 import java.time.Duration;
+import java.util.LinkedHashMap;
+import java.util.Map;
 import java.util.Objects;
 
 @ConfigurationProperties(prefix = "moon")
@@ -32,6 +34,7 @@ public final class MoonRuntimeProperties {
     private final Weather weather = new Weather();
     private final OpenMeteo openMeteo = new OpenMeteo();
     private final Cache cache = new Cache();
+    private final ProviderQuotas providerQuotas = new ProviderQuotas();
 
     public Location getLocation() {
         return location;
@@ -47,6 +50,10 @@ public final class MoonRuntimeProperties {
 
     public Cache getCache() {
         return cache;
+    }
+
+    public ProviderQuotas getProviderQuotas() {
+        return providerQuotas;
     }
 
     public static final class Location {
@@ -179,6 +186,68 @@ public final class MoonRuntimeProperties {
         }
     }
 
+    public static final class ProviderQuotas {
+        private final Map<String, ProviderOperationQuota> operations = new LinkedHashMap<>();
+
+        public Map<String, ProviderOperationQuota> getOperations() {
+            return operations;
+        }
+    }
+
+    public static final class ProviderOperationQuota {
+        private String provider = "";
+        private String operation = "";
+        private Long hourlyLimit;
+        private Long dailyLimit;
+        private Long monthlyLimit;
+
+        public String getProvider() {
+            return provider;
+        }
+
+        public void setProvider(String provider) {
+            this.provider = normalize(provider);
+        }
+
+        public String getOperation() {
+            return operation;
+        }
+
+        public void setOperation(String operation) {
+            this.operation = normalize(operation);
+        }
+
+        public Long getHourlyLimit() {
+            return hourlyLimit;
+        }
+
+        public void setHourlyLimit(Long hourlyLimit) {
+            this.hourlyLimit = requirePositiveOrNull(
+                    hourlyLimit,
+                    "moon.provider-quotas.operations.*.hourly-limit");
+        }
+
+        public Long getDailyLimit() {
+            return dailyLimit;
+        }
+
+        public void setDailyLimit(Long dailyLimit) {
+            this.dailyLimit = requirePositiveOrNull(
+                    dailyLimit,
+                    "moon.provider-quotas.operations.*.daily-limit");
+        }
+
+        public Long getMonthlyLimit() {
+            return monthlyLimit;
+        }
+
+        public void setMonthlyLimit(Long monthlyLimit) {
+            this.monthlyLimit = requirePositiveOrNull(
+                    monthlyLimit,
+                    "moon.provider-quotas.operations.*.monthly-limit");
+        }
+    }
+
     public static final class GeocodingCache {
         private long maximumSize = DEFAULT_GEOCODING_CACHE_MAXIMUM_SIZE;
         private Duration resolvedTtl = DEFAULT_GEOCODING_CACHE_RESOLVED_TTL;
@@ -284,6 +353,13 @@ public final class MoonRuntimeProperties {
 
     private static long requirePositive(long value, String name) {
         if (value <= 0) {
+            throw new IllegalArgumentException(name + " must be positive.");
+        }
+        return value;
+    }
+
+    private static Long requirePositiveOrNull(Long value, String name) {
+        if (value != null && value <= 0) {
             throw new IllegalArgumentException(name + " must be positive.");
         }
         return value;
