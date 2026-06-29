@@ -13,7 +13,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 class AdminAccessFilterTest {
     @Test
     void passesPublicRequestsWhenAdminTokenIsNotConfigured() throws Exception {
-        AdminAccessFilter filter = new AdminAccessFilter("");
+        AdminAccessFilter filter = filterWithConfiguredToken("");
         AtomicBoolean chainCalled = new AtomicBoolean(false);
         MockHttpServletResponse response = new MockHttpServletResponse();
 
@@ -25,7 +25,7 @@ class AdminAccessFilterTest {
 
     @Test
     void disablesAdminRoutesWhenAdminTokenIsNotConfigured() throws Exception {
-        AdminAccessFilter filter = new AdminAccessFilter("");
+        AdminAccessFilter filter = filterWithConfiguredToken("");
         AtomicBoolean chainCalled = new AtomicBoolean(false);
         MockHttpServletResponse response = new MockHttpServletResponse();
 
@@ -37,7 +37,7 @@ class AdminAccessFilterTest {
 
     @Test
     void rejectsAdminRequestWithoutTokenHeader() throws Exception {
-        AdminAccessFilter filter = new AdminAccessFilter("secret-token");
+        AdminAccessFilter filter = filterWithConfiguredToken("secret-token");
         AtomicBoolean chainCalled = new AtomicBoolean(false);
         MockHttpServletResponse response = new MockHttpServletResponse();
 
@@ -49,7 +49,7 @@ class AdminAccessFilterTest {
 
     @Test
     void rejectsAdminRequestWithWrongTokenHeader() throws Exception {
-        AdminAccessFilter filter = new AdminAccessFilter("secret-token");
+        AdminAccessFilter filter = filterWithConfiguredToken("secret-token");
         AtomicBoolean chainCalled = new AtomicBoolean(false);
         MockHttpServletRequest request = request("/admin/status");
         request.addHeader(AdminAccessFilter.ADMIN_TOKEN_HEADER, "wrong-token");
@@ -63,7 +63,7 @@ class AdminAccessFilterTest {
 
     @Test
     void allowsAdminRequestWithConfiguredTokenHeader() throws Exception {
-        AdminAccessFilter filter = new AdminAccessFilter("secret-token");
+        AdminAccessFilter filter = filterWithConfiguredToken("secret-token");
         AtomicBoolean chainCalled = new AtomicBoolean(false);
         MockHttpServletRequest request = request("/admin/status");
         request.addHeader(AdminAccessFilter.ADMIN_TOKEN_HEADER, "secret-token");
@@ -75,7 +75,46 @@ class AdminAccessFilterTest {
         assertEquals(200, response.getStatus());
     }
 
+    @Test
+    void allowsAdminRequestWithGeneratedTokenWhenEnabled() throws Exception {
+        AdminAccessFilter filter = new AdminAccessFilter("", true, () -> "generated-token");
+        AtomicBoolean chainCalled = new AtomicBoolean(false);
+        MockHttpServletRequest request = request("/admin/status");
+        request.addHeader(AdminAccessFilter.ADMIN_TOKEN_HEADER, "generated-token");
+        MockHttpServletResponse response = new MockHttpServletResponse();
+
+        filter.doFilter(request, response, (servletRequest, servletResponse) -> chainCalled.set(true));
+
+        assertTrue(chainCalled.get());
+        assertEquals(200, response.getStatus());
+    }
+
+    @Test
+    void usesConfiguredTokenWhenGenerationIsAlsoEnabled() throws Exception {
+        AtomicBoolean generatorCalled = new AtomicBoolean(false);
+        AdminAccessFilter filter = new AdminAccessFilter("secret-token", true, () -> {
+            generatorCalled.set(true);
+            return "generated-token";
+        });
+        AtomicBoolean chainCalled = new AtomicBoolean(false);
+        MockHttpServletRequest request = request("/admin/status");
+        request.addHeader(AdminAccessFilter.ADMIN_TOKEN_HEADER, "secret-token");
+        MockHttpServletResponse response = new MockHttpServletResponse();
+
+        filter.doFilter(request, response, (servletRequest, servletResponse) -> chainCalled.set(true));
+
+        assertTrue(chainCalled.get());
+        assertFalse(generatorCalled.get());
+        assertEquals(200, response.getStatus());
+    }
+
     private static MockHttpServletRequest request(String path) {
         return new MockHttpServletRequest("GET", path);
+    }
+
+    private static AdminAccessFilter filterWithConfiguredToken(String token) {
+        return new AdminAccessFilter(token, false, () -> {
+            throw new AssertionError("Generated token supplier must not be called");
+        });
     }
 }

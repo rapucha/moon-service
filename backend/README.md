@@ -184,11 +184,12 @@ The operator status endpoint is:
 GET /admin/status
 ```
 
-Admin routes are disabled unless `moon.admin.token` is configured. When the
-token is not configured, `/admin/**` returns `404`. When it is configured,
-admin requests must send the token in the `X-Moon-Admin-Token` header; missing
-or wrong tokens return `401`. This is the backend-owned MVP access boundary for
-operator routes and does not introduce public-user accounts.
+Admin routes are disabled unless `moon.admin.token` is configured or the
+explicit local-development generator is enabled. When neither is configured,
+`/admin/**` returns `404`. When admin routes are enabled, admin requests must
+send the token in the `X-Moon-Admin-Token` header; missing or wrong tokens
+return `401`. This is the backend-owned MVP access boundary for operator routes
+and does not introduce public-user accounts.
 
 Example local run with an operator token:
 
@@ -204,6 +205,20 @@ From another terminal, use the printed token:
 ```bash
 curl -H "X-Moon-Admin-Token: <printed-admin-token>" http://localhost:8080/admin/status
 ```
+
+For local development only, the app can generate and log a process-local token
+at startup:
+
+```bash
+mvn -pl backend -am spring-boot:run \
+  -Dspring-boot.run.arguments="--moon.location.resolver=open-meteo --moon.weather.provider=open-meteo --moon.admin.generate-token=true"
+```
+
+Copy the generated token from the startup log and pass it in the
+`X-Moon-Admin-Token` header. This mode is opt-in so hosted runs still fail
+closed unless an operator deliberately configures an admin boundary. If both
+`moon.admin.token` and `moon.admin.generate-token=true` are set, the configured
+token wins and no generated token is logged.
 
 It returns process-local aggregate JSON:
 
