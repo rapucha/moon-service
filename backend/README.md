@@ -71,6 +71,24 @@ Spring binds them from command-line arguments, environment variables, or an
 values accept Spring duration syntax such as `3s` or ISO-8601 values such as
 `PT3S`.
 
+For the current local app, configure these values the same way as the run
+commands in this README: pass command-line arguments through
+`spring-boot.run.arguments`. In IntelliJ, use the same `--moon...` values in
+the Spring Boot run configuration's program arguments, or set equivalent
+environment variables. For example:
+
+```bash
+MOON_LOCATION_RESOLVER=open-meteo
+MOON_WEATHER_PROVIDER=open-meteo
+MOON_ADMIN_GENERATE_TOKEN=true
+```
+
+For alpha hosting, prefer environment variables or the hosting platform's app
+configuration/secrets. The normal app configuration should only need provider
+selection and the admin access setting; Open-Meteo endpoint, timeout, retry,
+and cache values should stay on code defaults unless an operator has a concrete
+reason to tune them.
+
 | Property | Default | Purpose |
 | --- | --- | --- |
 | `moon.location.resolver` | unset | Must be `open-meteo` for runtime geocoding. |
