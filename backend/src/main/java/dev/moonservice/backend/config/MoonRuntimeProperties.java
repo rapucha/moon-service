@@ -8,6 +8,26 @@ import java.util.Objects;
 
 @ConfigurationProperties(prefix = "moon")
 public final class MoonRuntimeProperties {
+    private static final Duration DEFAULT_OPEN_METEO_TIMEOUT = Duration.ofSeconds(3);
+    private static final int DEFAULT_OPEN_METEO_MAX_TRANSPORT_RETRIES = 1;
+    private static final Duration DEFAULT_OPEN_METEO_MAX_RETRY_AFTER = Duration.ofSeconds(1);
+    private static final URI DEFAULT_OPEN_METEO_GEOCODING_ENDPOINT =
+            URI.create("https://geocoding-api.open-meteo.com/v1/search");
+    private static final URI DEFAULT_OPEN_METEO_GEOCODING_GET_ENDPOINT =
+            URI.create("https://geocoding-api.open-meteo.com/v1/get");
+    private static final int DEFAULT_OPEN_METEO_GEOCODING_RESULT_COUNT = 10;
+    private static final String DEFAULT_OPEN_METEO_GEOCODING_LANGUAGE = "en";
+    private static final URI DEFAULT_OPEN_METEO_FORECAST_ENDPOINT =
+            URI.create("https://api.open-meteo.com/v1/forecast");
+    private static final long DEFAULT_GEOCODING_CACHE_MAXIMUM_SIZE = 2_000;
+    private static final Duration DEFAULT_GEOCODING_CACHE_RESOLVED_TTL = Duration.ofHours(24);
+    private static final Duration DEFAULT_GEOCODING_CACHE_AMBIGUOUS_TTL = Duration.ofHours(24);
+    private static final Duration DEFAULT_GEOCODING_CACHE_NOT_FOUND_TTL = Duration.ofMinutes(10);
+    private static final Duration DEFAULT_GEOCODING_CACHE_TEMPORARILY_UNAVAILABLE_TTL = Duration.ofSeconds(30);
+    private static final long DEFAULT_WEATHER_CACHE_MAXIMUM_SIZE = 1_000;
+    private static final Duration DEFAULT_WEATHER_CACHE_AVAILABLE_TTL = Duration.ofHours(1);
+    private static final Duration DEFAULT_WEATHER_CACHE_UNAVAILABLE_TTL = Duration.ofSeconds(30);
+
     private final Location location = new Location();
     private final Weather weather = new Weather();
     private final OpenMeteo openMeteo = new OpenMeteo();
@@ -54,9 +74,9 @@ public final class MoonRuntimeProperties {
     }
 
     public static final class OpenMeteo {
-        private Duration timeout = Duration.ofSeconds(3);
-        private int maxTransportRetries = 1;
-        private Duration maxRetryAfter = Duration.ofSeconds(1);
+        private Duration timeout = DEFAULT_OPEN_METEO_TIMEOUT;
+        private int maxTransportRetries = DEFAULT_OPEN_METEO_MAX_TRANSPORT_RETRIES;
+        private Duration maxRetryAfter = DEFAULT_OPEN_METEO_MAX_RETRY_AFTER;
         private final Geocoding geocoding = new Geocoding();
         private final Forecast forecast = new Forecast();
 
@@ -96,10 +116,10 @@ public final class MoonRuntimeProperties {
     }
 
     public static final class Geocoding {
-        private URI endpoint = URI.create("https://geocoding-api.open-meteo.com/v1/search");
-        private URI getEndpoint = URI.create("https://geocoding-api.open-meteo.com/v1/get");
-        private int resultCount = 10;
-        private String language = "en";
+        private URI endpoint = DEFAULT_OPEN_METEO_GEOCODING_ENDPOINT;
+        private URI getEndpoint = DEFAULT_OPEN_METEO_GEOCODING_GET_ENDPOINT;
+        private int resultCount = DEFAULT_OPEN_METEO_GEOCODING_RESULT_COUNT;
+        private String language = DEFAULT_OPEN_METEO_GEOCODING_LANGUAGE;
 
         public URI getEndpoint() {
             return endpoint;
@@ -135,7 +155,7 @@ public final class MoonRuntimeProperties {
     }
 
     public static final class Forecast {
-        private URI endpoint = URI.create("https://api.open-meteo.com/v1/forecast");
+        private URI endpoint = DEFAULT_OPEN_METEO_FORECAST_ENDPOINT;
 
         public URI getEndpoint() {
             return endpoint;
@@ -160,11 +180,11 @@ public final class MoonRuntimeProperties {
     }
 
     public static final class GeocodingCache {
-        private long maximumSize = 2_000;
-        private Duration resolvedTtl = Duration.ofHours(24);
-        private Duration ambiguousTtl = Duration.ofHours(24);
-        private Duration notFoundTtl = Duration.ofMinutes(10);
-        private Duration temporarilyUnavailableTtl = Duration.ofSeconds(30);
+        private long maximumSize = DEFAULT_GEOCODING_CACHE_MAXIMUM_SIZE;
+        private Duration resolvedTtl = DEFAULT_GEOCODING_CACHE_RESOLVED_TTL;
+        private Duration ambiguousTtl = DEFAULT_GEOCODING_CACHE_AMBIGUOUS_TTL;
+        private Duration notFoundTtl = DEFAULT_GEOCODING_CACHE_NOT_FOUND_TTL;
+        private Duration temporarilyUnavailableTtl = DEFAULT_GEOCODING_CACHE_TEMPORARILY_UNAVAILABLE_TTL;
 
         public long getMaximumSize() {
             return maximumSize;
@@ -210,9 +230,9 @@ public final class MoonRuntimeProperties {
     }
 
     public static final class WeatherCache {
-        private long maximumSize = 1_000;
-        private Duration availableTtl = Duration.ofHours(1);
-        private Duration unavailableTtl = Duration.ofSeconds(30);
+        private long maximumSize = DEFAULT_WEATHER_CACHE_MAXIMUM_SIZE;
+        private Duration availableTtl = DEFAULT_WEATHER_CACHE_AVAILABLE_TTL;
+        private Duration unavailableTtl = DEFAULT_WEATHER_CACHE_UNAVAILABLE_TTL;
 
         public long getMaximumSize() {
             return maximumSize;
