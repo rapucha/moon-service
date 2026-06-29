@@ -54,6 +54,22 @@ class OpenMeteoWeatherClientTest {
     }
 
     @Test
+    void buildsConfiguredOpenMeteoWeatherRequest() {
+        OpenMeteoWeatherClient client = new OpenMeteoWeatherClient(
+                URI.create("https://example.test/forecast"),
+                requestUri -> "{}");
+
+        URI requestUri = client.requestUri(
+                amsterdam(),
+                Instant.parse("2026-06-29T00:12:00Z"),
+                Instant.parse("2026-06-30T00:00:00Z"));
+
+        assertEquals("https", requestUri.getScheme());
+        assertEquals("example.test", requestUri.getHost());
+        assertEquals("/forecast", requestUri.getPath());
+    }
+
+    @Test
     void mapsProviderHourlyForecastToNormalizedWeather() throws Exception {
         String responseBody = fixture("amsterdam-hourly.json");
         AtomicReference<URI> capturedRequestUri = new AtomicReference<>();

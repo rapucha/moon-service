@@ -35,6 +35,26 @@ class OpenMeteoGeocodingClientTest {
     }
 
     @Test
+    void buildsConfiguredOpenMeteoGeocodingRequest() {
+        OpenMeteoGeocodingClient client = new OpenMeteoGeocodingClient(
+                URI.create("https://example.test/geocoding/search"),
+                URI.create("https://example.test/geocoding/get"),
+                "cs",
+                4,
+                requestUri -> "{}");
+
+        URI requestUri = client.requestUri(new LocationQuery("Praha"));
+        URI locationIdRequestUri = client.locationIdRequestUri("3067696");
+
+        assertEquals(
+                "https://example.test/geocoding/search?name=Praha&count=4&language=cs&format=json",
+                requestUri.toString());
+        assertEquals(
+                "https://example.test/geocoding/get?id=3067696&language=cs&format=json",
+                locationIdRequestUri.toString());
+    }
+
+    @Test
     void buildsOpenMeteoLocationIdRequestAndMapsSingleProviderResult() throws Exception {
         String responseBody = fixture("prague-get.json");
         AtomicReference<URI> capturedRequestUri = new AtomicReference<>();

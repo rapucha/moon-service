@@ -27,13 +27,30 @@ public final class CachingLocationResolver implements LocationResolver, CacheMet
     private final Cache<CacheKey, LocationResolution> cache;
 
     public static CachingLocationResolver withDefaults(LocationResolver delegate) {
-        return new CachingLocationResolver(
+        return withSettings(
                 delegate,
                 DEFAULT_MAXIMUM_SIZE,
                 DEFAULT_RESOLVED_TTL,
                 DEFAULT_AMBIGUOUS_TTL,
                 DEFAULT_NOT_FOUND_TTL,
-                DEFAULT_TEMPORARILY_UNAVAILABLE_TTL,
+                DEFAULT_TEMPORARILY_UNAVAILABLE_TTL);
+    }
+
+    public static CachingLocationResolver withSettings(
+            LocationResolver delegate,
+            long maximumSize,
+            Duration resolvedTtl,
+            Duration ambiguousTtl,
+            Duration notFoundTtl,
+            Duration temporarilyUnavailableTtl
+    ) {
+        return new CachingLocationResolver(
+                delegate,
+                maximumSize,
+                resolvedTtl,
+                ambiguousTtl,
+                notFoundTtl,
+                temporarilyUnavailableTtl,
                 Ticker.systemTicker());
     }
 

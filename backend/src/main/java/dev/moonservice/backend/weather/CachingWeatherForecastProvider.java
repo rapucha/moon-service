@@ -28,11 +28,24 @@ public final class CachingWeatherForecastProvider implements WeatherForecastProv
     private final Cache<ForecastKey, ForecastLookup> cache;
 
     public static CachingWeatherForecastProvider withDefaults(WeatherForecastProvider delegate) {
-        return new CachingWeatherForecastProvider(
+        return withSettings(
                 delegate,
                 DEFAULT_MAXIMUM_SIZE,
                 DEFAULT_AVAILABLE_TTL,
-                DEFAULT_UNAVAILABLE_TTL,
+                DEFAULT_UNAVAILABLE_TTL);
+    }
+
+    public static CachingWeatherForecastProvider withSettings(
+            WeatherForecastProvider delegate,
+            long maximumSize,
+            Duration availableTtl,
+            Duration unavailableTtl
+    ) {
+        return new CachingWeatherForecastProvider(
+                delegate,
+                maximumSize,
+                availableTtl,
+                unavailableTtl,
                 Ticker.systemTicker());
     }
 
