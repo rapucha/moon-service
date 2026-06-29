@@ -25,7 +25,7 @@ import org.junit.jupiter.params.provider.ValueSource;
 class OpenMeteoGeocodingClientTest {
     @Test
     void buildsOpenMeteoGeocodingRequest() {
-        OpenMeteoGeocodingClient client = new OpenMeteoGeocodingClient(requestUri -> "{}");
+        OpenMeteoGeocodingClient client = client(requestUri -> "{}");
 
         URI requestUri = client.requestUri(new LocationQuery("Praha"));
 
@@ -58,7 +58,7 @@ class OpenMeteoGeocodingClientTest {
     void buildsOpenMeteoLocationIdRequestAndMapsSingleProviderResult() throws Exception {
         String responseBody = fixture("prague-get.json");
         AtomicReference<URI> capturedRequestUri = new AtomicReference<>();
-        OpenMeteoGeocodingClient client = new OpenMeteoGeocodingClient(requestUri -> {
+        OpenMeteoGeocodingClient client = client(requestUri -> {
             capturedRequestUri.set(requestUri);
             return responseBody;
         });
@@ -76,7 +76,7 @@ class OpenMeteoGeocodingClientTest {
 
     @Test
     void mapsUnsupportedLocationIdToNotFoundWithoutProviderCall() {
-        OpenMeteoGeocodingClient client = new OpenMeteoGeocodingClient(requestUri ->
+        OpenMeteoGeocodingClient client = client(requestUri ->
                 fail("Unsupported backend location IDs should not call Open-Meteo."));
 
         LocationResolution resolution = client.resolveLocationId("springfield-mo-us");
@@ -88,7 +88,7 @@ class OpenMeteoGeocodingClientTest {
     void sendsEncodedRequestAndMapsSingleProviderResultToResolvedLocation() throws Exception {
         String responseBody = fixture("praha-resolved.json");
         AtomicReference<URI> capturedRequestUri = new AtomicReference<>();
-        OpenMeteoGeocodingClient client = new OpenMeteoGeocodingClient(requestUri -> {
+        OpenMeteoGeocodingClient client = client(requestUri -> {
             capturedRequestUri.set(requestUri);
             return responseBody;
         });
@@ -112,7 +112,7 @@ class OpenMeteoGeocodingClientTest {
     @Test
     void mapsMultipleProviderResultsToAmbiguousLocation() throws Exception {
         String responseBody = fixture("prague-ambiguous.json");
-        OpenMeteoGeocodingClient client = new OpenMeteoGeocodingClient(requestUri ->
+        OpenMeteoGeocodingClient client = client(requestUri ->
                 responseBody);
 
         LocationResolution resolution = client.resolve(new LocationQuery("Prague"));
@@ -134,7 +134,7 @@ class OpenMeteoGeocodingClientTest {
     @Test
     void collapsesSameCityProviderNoiseToCanonicalLocation() throws Exception {
         String responseBody = fixture("prague-czechia-same-city-noise.json");
-        OpenMeteoGeocodingClient client = new OpenMeteoGeocodingClient(requestUri ->
+        OpenMeteoGeocodingClient client = client(requestUri ->
                 responseBody);
 
         LocationResolution resolution = client.resolve(new LocationQuery("prague, czechia"));
@@ -149,7 +149,7 @@ class OpenMeteoGeocodingClientTest {
     @Test
     void keepsDistinctSameNameCitiesAmbiguous() throws Exception {
         String responseBody = fixture("springfield-ambiguous.json");
-        OpenMeteoGeocodingClient client = new OpenMeteoGeocodingClient(requestUri ->
+        OpenMeteoGeocodingClient client = client(requestUri ->
                 responseBody);
 
         LocationResolution resolution = client.resolve(new LocationQuery("Springfield"));
@@ -167,7 +167,7 @@ class OpenMeteoGeocodingClientTest {
     @Test
     void mapsValidEmptyProviderResultsToLocationNotFound() throws Exception {
         ScriptedTransport transport = new ScriptedTransport(ResponseStep.success(fixture("tokyo-native-script-miss.json")));
-        OpenMeteoGeocodingClient client = new OpenMeteoGeocodingClient(transport);
+        OpenMeteoGeocodingClient client = client(transport);
 
         LocationResolution resolution = client.resolve(new LocationQuery("東京"));
 
@@ -178,7 +178,7 @@ class OpenMeteoGeocodingClientTest {
     @Test
     void mapsMissingProviderResultsFieldToLocationNotFound() throws Exception {
         ScriptedTransport transport = new ScriptedTransport(ResponseStep.success(fixture("no-results-field.json")));
-        OpenMeteoGeocodingClient client = new OpenMeteoGeocodingClient(transport);
+        OpenMeteoGeocodingClient client = client(transport);
 
         LocationResolution resolution = client.resolve(new LocationQuery("MoonServiceDefinitelyNotAPlace"));
 
@@ -190,7 +190,7 @@ class OpenMeteoGeocodingClientTest {
     @ValueSource(strings = {"empty-response.json", "malformed-results.json"})
     void mapsMalformedOrEmptyProviderShapeToTemporarilyUnavailable(String fixtureName) throws Exception {
         String responseBody = fixture(fixtureName);
-        OpenMeteoGeocodingClient client = new OpenMeteoGeocodingClient(requestUri ->
+        OpenMeteoGeocodingClient client = client(requestUri ->
                 responseBody);
 
         LocationResolution resolution = client.resolve(new LocationQuery("Praha"));
@@ -201,7 +201,7 @@ class OpenMeteoGeocodingClientTest {
     @Test
     void mapsInvalidJsonToTemporarilyUnavailable() {
         ScriptedTransport transport = new ScriptedTransport(ResponseStep.success("{"));
-        OpenMeteoGeocodingClient client = new OpenMeteoGeocodingClient(transport);
+        OpenMeteoGeocodingClient client = client(transport);
 
         LocationResolution resolution = client.resolve(new LocationQuery("Praha"));
 
@@ -211,7 +211,7 @@ class OpenMeteoGeocodingClientTest {
 
     @Test
     void mapsTransportFailureToTemporarilyUnavailable() {
-        OpenMeteoGeocodingClient client = new OpenMeteoGeocodingClient(requestUri ->
+        OpenMeteoGeocodingClient client = client(requestUri ->
                 throwFailure(OpenMeteoTransportException.ioFailure(null)));
 
         LocationResolution resolution = client.resolve(new LocationQuery("Praha"));
@@ -224,7 +224,7 @@ class OpenMeteoGeocodingClientTest {
         ScriptedTransport transport = new ScriptedTransport(
                 ResponseStep.failure(OpenMeteoTransportException.transientHttp(503, Optional.empty())),
                 ResponseStep.success(fixture("praha-resolved.json")));
-        OpenMeteoGeocodingClient client = new OpenMeteoGeocodingClient(retrying(transport));
+        OpenMeteoGeocodingClient client = client(retrying(transport));
 
         LocationResolution resolution = client.resolve(new LocationQuery("Praha"));
 
@@ -239,7 +239,7 @@ class OpenMeteoGeocodingClientTest {
                         429,
                         Optional.of(Duration.ZERO))),
                 ResponseStep.success(fixture("praha-resolved.json")));
-        OpenMeteoGeocodingClient client = new OpenMeteoGeocodingClient(retrying(transport));
+        OpenMeteoGeocodingClient client = client(retrying(transport));
 
         LocationResolution resolution = client.resolve(new LocationQuery("Praha"));
 
@@ -252,7 +252,7 @@ class OpenMeteoGeocodingClientTest {
         ScriptedTransport transport = new ScriptedTransport(
                 ResponseStep.failure(OpenMeteoTransportException.ioFailure(null)),
                 ResponseStep.success(fixture("praha-resolved.json")));
-        OpenMeteoGeocodingClient client = new OpenMeteoGeocodingClient(retrying(transport));
+        OpenMeteoGeocodingClient client = client(retrying(transport));
 
         LocationResolution resolution = client.resolve(new LocationQuery("Praha"));
 
@@ -266,7 +266,7 @@ class OpenMeteoGeocodingClientTest {
                 OpenMeteoTransportException.rateLimited(
                         429,
                         Optional.of(Duration.ofSeconds(60)))));
-        OpenMeteoGeocodingClient client = new OpenMeteoGeocodingClient(retrying(transport));
+        OpenMeteoGeocodingClient client = client(retrying(transport));
 
         LocationResolution resolution = client.resolve(new LocationQuery("Praha"));
 
@@ -278,7 +278,7 @@ class OpenMeteoGeocodingClientTest {
     void doesNotRetryNonRetryableHttpFailure() {
         ScriptedTransport transport = new ScriptedTransport(ResponseStep.failure(
                 OpenMeteoTransportException.nonRetryableHttp(404, Optional.empty())));
-        OpenMeteoGeocodingClient client = new OpenMeteoGeocodingClient(retrying(transport));
+        OpenMeteoGeocodingClient client = client(retrying(transport));
 
         LocationResolution resolution = client.resolve(new LocationQuery("Praha"));
 
@@ -292,6 +292,15 @@ class OpenMeteoGeocodingClientTest {
             assertNotNull(inputStream, "Missing test fixture: " + path);
             return new String(inputStream.readAllBytes(), StandardCharsets.UTF_8);
         }
+    }
+
+    private static OpenMeteoGeocodingClient client(OpenMeteoTransport transport) {
+        return new OpenMeteoGeocodingClient(
+                URI.create("https://geocoding-api.open-meteo.com/v1/search"),
+                URI.create("https://geocoding-api.open-meteo.com/v1/get"),
+                "en",
+                10,
+                transport);
     }
 
     private static OpenMeteoTransport retrying(OpenMeteoTransport transport) {

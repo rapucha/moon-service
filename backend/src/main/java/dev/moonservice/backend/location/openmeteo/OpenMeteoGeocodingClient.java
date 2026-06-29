@@ -8,16 +8,12 @@ import dev.moonservice.backend.location.ProviderLocationId;
 import dev.moonservice.backend.location.ResolvedLocation;
 import dev.moonservice.backend.openmeteo.OpenMeteoTransport;
 import dev.moonservice.backend.openmeteo.OpenMeteoTransportException;
-import dev.moonservice.backend.openmeteo.RestClientOpenMeteoTransport;
-import dev.moonservice.backend.openmeteo.RetryingOpenMeteoTransport;
-import org.springframework.web.client.RestClient;
 import org.springframework.web.util.UriComponentsBuilder;
 import tools.jackson.core.JacksonException;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 
 import java.net.URI;
-import java.time.Duration;
 import java.time.ZoneId;
 import java.time.zone.ZoneRulesException;
 import java.util.ArrayList;
@@ -26,14 +22,7 @@ import java.util.Optional;
 import java.util.OptionalDouble;
 
 public class OpenMeteoGeocodingClient implements LocationResolver {
-    static final URI DEFAULT_ENDPOINT = URI.create("https://geocoding-api.open-meteo.com/v1/search");
-    static final URI DEFAULT_GET_ENDPOINT = URI.create("https://geocoding-api.open-meteo.com/v1/get");
     private static final double SAME_CITY_NOISE_DISTANCE_KM = 50.0;
-    private static final Duration DEFAULT_TIMEOUT = Duration.ofSeconds(3);
-    private static final int MAX_TRANSPORT_RETRIES = 1;
-    private static final Duration MAX_RETRY_AFTER = Duration.ofSeconds(1);
-    private static final int DEFAULT_RESULT_COUNT = 10;
-    private static final String DEFAULT_LANGUAGE = "en";
     private static final String BACKEND_LOCATION_ID_PREFIX = "moon-service-";
 
     private final URI endpoint;
@@ -42,23 +31,6 @@ public class OpenMeteoGeocodingClient implements LocationResolver {
     private final int resultCount;
     private final OpenMeteoTransport transport;
     private final ObjectMapper objectMapper;
-
-    public OpenMeteoGeocodingClient() {
-        this(
-                DEFAULT_ENDPOINT,
-                DEFAULT_GET_ENDPOINT,
-                DEFAULT_LANGUAGE,
-                DEFAULT_RESULT_COUNT,
-                new RetryingOpenMeteoTransport(
-                        new RestClientOpenMeteoTransport(RestClient.builder(), DEFAULT_TIMEOUT),
-                        MAX_TRANSPORT_RETRIES,
-                        MAX_RETRY_AFTER),
-                new ObjectMapper());
-    }
-
-    public OpenMeteoGeocodingClient(OpenMeteoTransport transport) {
-        this(DEFAULT_ENDPOINT, DEFAULT_GET_ENDPOINT, DEFAULT_LANGUAGE, DEFAULT_RESULT_COUNT, transport, new ObjectMapper());
-    }
 
     public OpenMeteoGeocodingClient(
             URI endpoint,

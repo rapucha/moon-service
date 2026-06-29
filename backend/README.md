@@ -65,8 +65,11 @@ Provider selection remains explicit. Missing or unsupported
 runtime backend currently supports only `open-meteo` for both. The settings
 below tune that Open-Meteo runtime path and keep their defaults in code, so
 local runs work without an external config file after provider selection is
-set. Duration values accept Spring duration syntax such as `3s` or ISO-8601
-values such as `PT3S`.
+set. No checked-in `.properties` file is required for these typed settings;
+Spring binds them from command-line arguments, environment variables, or an
+`application.properties`/`application.yml` file if one is added later. Duration
+values accept Spring duration syntax such as `3s` or ISO-8601 values such as
+`PT3S`.
 
 | Property | Default | Purpose |
 | --- | --- | --- |
