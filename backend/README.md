@@ -16,7 +16,7 @@ feeds, and calendar exports deliberately out of scope.
 - Runtime city/location resolution is Open-Meteo backed through the
   backend-owned `LocationResolver` seam.
 - Request-level logging, process-local Open-Meteo counters, cache stats, and a
-  minimal operator status endpoint are available for small test spikes.
+  protected operator status endpoint are available for small test spikes.
 - Open-Meteo geocoding adapter code under `backend.location.openmeteo`, covered
   by saved provider JSON fixtures. It can be selected for live city/location
   lookup with `moon.location.resolver=open-meteo`.
@@ -48,7 +48,7 @@ GET /api/opportunities?q=Praha
 The location resolver and weather provider must be configured explicitly:
 
 ```bash
-mvn spring-boot:run -pl backend -am \
+mvn -pl backend -am spring-boot:run \
   -Dspring-boot.run.arguments="--moon.location.resolver=open-meteo --moon.weather.provider=open-meteo"
 ```
 
@@ -184,6 +184,42 @@ The operator status endpoint is:
 GET /admin/status
 ```
 
+Admin routes are disabled unless `moon.admin.token` is configured or the
+explicit local-development generator is enabled. When neither is configured,
+`/admin/**` returns `404`. When admin routes are enabled, admin requests must
+send the token in the `X-Moon-Admin-Token` header; missing or wrong tokens
+return `401`. This is the backend-owned MVP access boundary for operator routes
+and does not introduce public-user accounts.
+
+Example local run with an operator token:
+
+```bash
+ADMIN_TOKEN="$(openssl rand -hex 32)"
+printf 'Admin token: %s\n' "$ADMIN_TOKEN"
+mvn -pl backend -am spring-boot:run \
+  -Dspring-boot.run.arguments="--moon.location.resolver=open-meteo --moon.weather.provider=open-meteo --moon.admin.token=$ADMIN_TOKEN"
+```
+
+From another terminal, use the printed token:
+
+```bash
+curl -H "X-Moon-Admin-Token: <printed-admin-token>" http://localhost:8080/admin/status
+```
+
+For local development only, the app can generate and log a process-local token
+at startup:
+
+```bash
+mvn -pl backend -am spring-boot:run \
+  -Dspring-boot.run.arguments="--moon.location.resolver=open-meteo --moon.weather.provider=open-meteo --moon.admin.generate-token=true"
+```
+
+Copy the generated token from the startup log and pass it in the
+`X-Moon-Admin-Token` header. This mode is opt-in so hosted runs still fail
+closed unless an operator deliberately configures an admin boundary. If both
+`moon.admin.token` and `moon.admin.generate-token=true` are set, the configured
+token wins and no generated token is logged.
+
 It returns process-local aggregate JSON:
 
 - `app.status`
@@ -201,10 +237,10 @@ counters should stay low. These counters reset on process restart and are not
 shared across backend instances.
 
 The status endpoint currently exposes only aggregate operational data, but it
-is still intended for operator use. Do not expose it broadly from deployment
-infrastructure until the alpha hosting and access-control boundary is decided.
-Issue #40 tracks protecting `/admin/status` before any non-local alpha
-deployment or public tunnel exposes backend operator routes.
+is still intended for operator use. Do not put the admin token in a query
+string or browser URL. If a reverse proxy, public tunnel, or hosting provider
+also exposes `/admin/**`, keep an operator access rule there too; the backend
+header token is the minimum app-level boundary.
 
 ## Direct Fixture Endpoint
 
@@ -260,7 +296,7 @@ network access, and live providers.
 ## Run Locally
 
 ```bash
-mvn spring-boot:run -pl backend -am \
+mvn -pl backend -am spring-boot:run \
   -Dspring-boot.run.arguments="--moon.location.resolver=open-meteo --moon.weather.provider=open-meteo"
 ```
 

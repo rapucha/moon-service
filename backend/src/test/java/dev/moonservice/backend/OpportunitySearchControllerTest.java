@@ -4,6 +4,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import dev.moonservice.backend.location.LocationResolver;
 import dev.moonservice.backend.location.openmeteo.TestOpenMeteoLocationResolver;
+import dev.moonservice.backend.observability.RequestLoggingFilter;
 import dev.moonservice.backend.weather.TestWeatherForecastProvider;
 import dev.moonservice.backend.weather.WeatherForecastProvider;
 import org.junit.jupiter.api.Test;
@@ -23,7 +24,8 @@ import org.springframework.test.web.reactive.server.WebTestClient;
         webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
         properties = {
                 "moon.location.resolver=open-meteo",
-                "moon.weather.provider=open-meteo"
+                "moon.weather.provider=open-meteo",
+                "moon.admin.token=test-admin-token"
         })
 @AutoConfigureWebTestClient
 class OpportunitySearchControllerTest {
@@ -116,9 +118,19 @@ class OpportunitySearchControllerTest {
     }
 
     @Test
+    void rejectsAdminStatusWithoutAdminToken() {
+        webTestClient.get()
+                .uri("/admin/status")
+                .exchange()
+                .expectStatus().isUnauthorized()
+                .expectHeader().exists(RequestLoggingFilter.REQUEST_ID_HEADER);
+    }
+
+    @Test
     void returnsAdminStatus() {
         webTestClient.get()
                 .uri("/admin/status")
+                .header("X-Moon-Admin-Token", "test-admin-token")
                 .exchange()
                 .expectStatus().isOk()
                 .expectHeader().contentTypeCompatibleWith(MediaType.APPLICATION_JSON)

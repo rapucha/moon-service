@@ -46,6 +46,13 @@
         <artifactId>exec-maven-plugin</artifactId>
         <version>3.3.0</version>
       </plugin>
+      <plugin>
+        <groupId>org.springframework.boot</groupId>
+        <artifactId>spring-boot-maven-plugin</artifactId>
+        <configuration>
+          <skip>true</skip>
+        </configuration>
+      </plugin>
     </plugins>
   </build>
 </project>

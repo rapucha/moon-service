@@ -195,7 +195,7 @@ mvn test -pl backend -am
 Run the local backend:
 
 ```bash
-mvn spring-boot:run -pl backend -am
+mvn -pl backend -am spring-boot:run
 ```
 
 The current backend endpoints are:
