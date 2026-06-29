@@ -57,6 +57,10 @@ The main unresolved choice is now the exact first web/API contract for city look
 
 - Keep early changes narrow and documentation-led.
 - Prefer explicit tradeoffs over premature abstractions.
+- Avoid adding public production constructors, factories, or methods only to
+  make tests shorter. Keep production API surface aligned with real runtime
+  use. Put test-only construction convenience in test helpers or builders
+  unless there is a concrete production caller or established local pattern.
 - State technical judgment directly. Agreement should include reasoning; disagreement should be plain and actionable.
 - Do not introduce mandatory accounts without documenting user value and recovery behavior.
 - Do not permanently store user locations server-side unless saved alerts require it and the privacy model is updated.
