@@ -58,6 +58,58 @@ temporarily unavailable location states from the provider path. A resolved city
 uses its backend location ID, provider ID, coordinates, elevation, timezone, and
 country code for opportunity generation and hourly weather lookup.
 
+## Runtime Configuration
+
+Provider selection remains explicit. Missing or unsupported
+`moon.location.resolver` or `moon.weather.provider` values fail startup; the
+runtime backend currently supports only `open-meteo` for both. The settings
+below tune that Open-Meteo runtime path and keep their defaults in code, so
+local runs work without an external config file after provider selection is
+set. No checked-in `.properties` file is required for these typed settings;
+Spring binds them from command-line arguments, environment variables, or an
+`application.properties`/`application.yml` file if one is added later. Duration
+values accept Spring duration syntax such as `3s` or ISO-8601 values such as
+`PT3S`.
+
+For the current local app, configure these values the same way as the run
+commands in this README: pass command-line arguments through
+`spring-boot.run.arguments`. In IntelliJ, use the same `--moon...` values in
+the Spring Boot run configuration's program arguments, or set equivalent
+environment variables. For example:
+
+```bash
+MOON_LOCATION_RESOLVER=open-meteo
+MOON_WEATHER_PROVIDER=open-meteo
+MOON_ADMIN_GENERATE_TOKEN=true
+```
+
+For alpha hosting, prefer environment variables or the hosting platform's app
+configuration/secrets. The normal app configuration should only need provider
+selection and the admin access setting; Open-Meteo endpoint, timeout, retry,
+and cache values should stay on code defaults unless an operator has a concrete
+reason to tune them.
+
+| Property | Default | Purpose |
+| --- | --- | --- |
+| `moon.location.resolver` | unset | Must be `open-meteo` for runtime geocoding. |
+| `moon.weather.provider` | unset | Must be `open-meteo` for runtime weather. |
+| `moon.open-meteo.timeout` | `3s` | Open-Meteo connect and read timeout. |
+| `moon.open-meteo.max-transport-retries` | `1` | Maximum retries after the first Open-Meteo attempt. |
+| `moon.open-meteo.max-retry-after` | `1s` | Largest provider `Retry-After` delay accepted for retry. |
+| `moon.open-meteo.geocoding.endpoint` | `https://geocoding-api.open-meteo.com/v1/search` | Geocoding search endpoint. |
+| `moon.open-meteo.geocoding.get-endpoint` | `https://geocoding-api.open-meteo.com/v1/get` | Geocoding lookup-by-ID endpoint. |
+| `moon.open-meteo.geocoding.result-count` | `10` | Maximum geocoding candidates requested. |
+| `moon.open-meteo.geocoding.language` | `en` | Open-Meteo geocoding response language. |
+| `moon.open-meteo.forecast.endpoint` | `https://api.open-meteo.com/v1/forecast` | Forecast endpoint. |
+| `moon.cache.geocoding.maximum-size` | `2000` | Process-local geocoding cache maximum entries. |
+| `moon.cache.geocoding.resolved-ttl` | `24h` | TTL for resolved geocoding results. |
+| `moon.cache.geocoding.ambiguous-ttl` | `24h` | TTL for ambiguous geocoding results. |
+| `moon.cache.geocoding.not-found-ttl` | `10m` | TTL for not-found geocoding results. |
+| `moon.cache.geocoding.temporarily-unavailable-ttl` | `30s` | TTL for temporarily unavailable geocoding results. |
+| `moon.cache.weather.maximum-size` | `1000` | Process-local weather cache maximum entries. |
+| `moon.cache.weather.available-ttl` | `1h` | TTL for successful weather forecasts. |
+| `moon.cache.weather.unavailable-ttl` | `30s` | TTL for temporarily unavailable weather lookups. |
+
 ## Browser Lookup Page
 
 ```http

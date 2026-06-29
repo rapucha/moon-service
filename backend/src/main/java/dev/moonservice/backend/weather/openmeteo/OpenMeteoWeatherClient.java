@@ -8,16 +8,12 @@ import dev.moonservice.backend.weather.WeatherForecastProvider;
 import dev.moonservice.backend.weather.WeatherForecastUnavailableException;
 import dev.moonservice.backend.openmeteo.OpenMeteoTransport;
 import dev.moonservice.backend.openmeteo.OpenMeteoTransportException;
-import dev.moonservice.backend.openmeteo.RestClientOpenMeteoTransport;
-import dev.moonservice.backend.openmeteo.RetryingOpenMeteoTransport;
-import org.springframework.web.client.RestClient;
 import org.springframework.web.util.UriComponentsBuilder;
 import tools.jackson.core.JacksonException;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 
 import java.net.URI;
-import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
@@ -27,10 +23,6 @@ import java.util.List;
 import java.util.Locale;
 
 public class OpenMeteoWeatherClient implements WeatherForecastProvider {
-    static final URI DEFAULT_ENDPOINT = URI.create("https://api.open-meteo.com/v1/forecast");
-    private static final Duration DEFAULT_TIMEOUT = Duration.ofSeconds(3);
-    private static final int MAX_TRANSPORT_RETRIES = 1;
-    private static final Duration MAX_RETRY_AFTER = Duration.ofSeconds(1);
     private static final double FORECAST_AGE_HOURS = 1.0;
     private static final String HOURLY_VARIABLES = String.join(
             ",",
@@ -49,18 +41,11 @@ public class OpenMeteoWeatherClient implements WeatherForecastProvider {
     private final OpenMeteoTransport transport;
     private final ObjectMapper objectMapper;
 
-    public OpenMeteoWeatherClient() {
-        this(
-                DEFAULT_ENDPOINT,
-                new RetryingOpenMeteoTransport(
-                        new RestClientOpenMeteoTransport(RestClient.builder(), DEFAULT_TIMEOUT),
-                        MAX_TRANSPORT_RETRIES,
-                        MAX_RETRY_AFTER),
-                new ObjectMapper());
-    }
-
-    public OpenMeteoWeatherClient(OpenMeteoTransport transport) {
-        this(DEFAULT_ENDPOINT, transport, new ObjectMapper());
+    public OpenMeteoWeatherClient(
+            URI endpoint,
+            OpenMeteoTransport transport
+    ) {
+        this(endpoint, transport, new ObjectMapper());
     }
 
     OpenMeteoWeatherClient(

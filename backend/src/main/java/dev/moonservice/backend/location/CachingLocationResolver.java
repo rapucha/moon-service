@@ -17,23 +17,24 @@ import java.util.Objects;
  * misses into one upstream resolver call.
  */
 public final class CachingLocationResolver implements LocationResolver, CacheMetricsSource {
-    private static final long DEFAULT_MAXIMUM_SIZE = 2_000;
-    private static final Duration DEFAULT_RESOLVED_TTL = Duration.ofHours(24);
-    private static final Duration DEFAULT_AMBIGUOUS_TTL = Duration.ofHours(24);
-    private static final Duration DEFAULT_NOT_FOUND_TTL = Duration.ofMinutes(10);
-    private static final Duration DEFAULT_TEMPORARILY_UNAVAILABLE_TTL = Duration.ofSeconds(30);
-
     private final LocationResolver delegate;
     private final Cache<CacheKey, LocationResolution> cache;
 
-    public static CachingLocationResolver withDefaults(LocationResolver delegate) {
+    public static CachingLocationResolver withSettings(
+            LocationResolver delegate,
+            long maximumSize,
+            Duration resolvedTtl,
+            Duration ambiguousTtl,
+            Duration notFoundTtl,
+            Duration temporarilyUnavailableTtl
+    ) {
         return new CachingLocationResolver(
                 delegate,
-                DEFAULT_MAXIMUM_SIZE,
-                DEFAULT_RESOLVED_TTL,
-                DEFAULT_AMBIGUOUS_TTL,
-                DEFAULT_NOT_FOUND_TTL,
-                DEFAULT_TEMPORARILY_UNAVAILABLE_TTL,
+                maximumSize,
+                resolvedTtl,
+                ambiguousTtl,
+                notFoundTtl,
+                temporarilyUnavailableTtl,
                 Ticker.systemTicker());
     }
 

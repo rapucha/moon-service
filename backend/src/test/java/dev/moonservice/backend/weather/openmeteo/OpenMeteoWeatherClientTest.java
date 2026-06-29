@@ -32,7 +32,7 @@ import java.util.concurrent.atomic.AtomicReference;
 class OpenMeteoWeatherClientTest {
     @Test
     void buildsOpenMeteoWeatherRequest() {
-        OpenMeteoWeatherClient client = new OpenMeteoWeatherClient(requestUri -> "{}");
+        OpenMeteoWeatherClient client = client(requestUri -> "{}");
 
         URI requestUri = client.requestUri(
                 amsterdam(),
@@ -54,10 +54,26 @@ class OpenMeteoWeatherClientTest {
     }
 
     @Test
+    void buildsConfiguredOpenMeteoWeatherRequest() {
+        OpenMeteoWeatherClient client = new OpenMeteoWeatherClient(
+                URI.create("https://example.test/forecast"),
+                requestUri -> "{}");
+
+        URI requestUri = client.requestUri(
+                amsterdam(),
+                Instant.parse("2026-06-29T00:12:00Z"),
+                Instant.parse("2026-06-30T00:00:00Z"));
+
+        assertEquals("https", requestUri.getScheme());
+        assertEquals("example.test", requestUri.getHost());
+        assertEquals("/forecast", requestUri.getPath());
+    }
+
+    @Test
     void mapsProviderHourlyForecastToNormalizedWeather() throws Exception {
         String responseBody = fixture("amsterdam-hourly.json");
         AtomicReference<URI> capturedRequestUri = new AtomicReference<>();
-        OpenMeteoWeatherClient client = new OpenMeteoWeatherClient(requestUri -> {
+        OpenMeteoWeatherClient client = client(requestUri -> {
             capturedRequestUri.set(requestUri);
             return responseBody;
         });
@@ -89,7 +105,7 @@ class OpenMeteoWeatherClientTest {
     @ValueSource(strings = {"missing-hourly.json", "malformed-hourly-length.json"})
     void mapsMalformedProviderShapeToUnavailable(String fixtureName) throws Exception {
         String responseBody = fixture(fixtureName);
-        OpenMeteoWeatherClient client = new OpenMeteoWeatherClient(requestUri ->
+        OpenMeteoWeatherClient client = client(requestUri ->
                 responseBody);
 
         assertThrows(
@@ -103,7 +119,7 @@ class OpenMeteoWeatherClientTest {
 
     @Test
     void mapsInvalidHourlyValuesToUnavailable() {
-        OpenMeteoWeatherClient client = new OpenMeteoWeatherClient(requestUri -> """
+        OpenMeteoWeatherClient client = client(requestUri -> """
                 {
                   "hourly": {
                     "time": [1782691200],
@@ -130,7 +146,7 @@ class OpenMeteoWeatherClientTest {
 
     @Test
     void mapsInvalidJsonToUnavailable() {
-        OpenMeteoWeatherClient client = new OpenMeteoWeatherClient(requestUri -> "{");
+        OpenMeteoWeatherClient client = client(requestUri -> "{");
 
         assertThrows(
                 WeatherForecastUnavailableException.class,
@@ -143,7 +159,7 @@ class OpenMeteoWeatherClientTest {
 
     @Test
     void mapsTransportFailureToUnavailable() {
-        OpenMeteoWeatherClient client = new OpenMeteoWeatherClient(requestUri ->
+        OpenMeteoWeatherClient client = client(requestUri ->
                 throwFailure(OpenMeteoTransportException.ioFailure(null)));
 
         assertThrows(
@@ -160,7 +176,7 @@ class OpenMeteoWeatherClientTest {
         ScriptedTransport transport = new ScriptedTransport(
                 ResponseStep.failure(OpenMeteoTransportException.transientHttp(503, Optional.empty())),
                 ResponseStep.success(fixture("amsterdam-hourly.json")));
-        OpenMeteoWeatherClient client = new OpenMeteoWeatherClient(retrying(transport));
+        OpenMeteoWeatherClient client = client(retrying(transport));
 
         WeatherForecast forecast = client.forecastFor(
                 amsterdam(),
@@ -179,7 +195,7 @@ class OpenMeteoWeatherClientTest {
                         429,
                         Optional.of(Duration.ZERO))),
                 ResponseStep.success(fixture("amsterdam-hourly.json")));
-        OpenMeteoWeatherClient client = new OpenMeteoWeatherClient(retrying(transport));
+        OpenMeteoWeatherClient client = client(retrying(transport));
 
         WeatherForecast forecast = client.forecastFor(
                 amsterdam(),
@@ -197,7 +213,7 @@ class OpenMeteoWeatherClientTest {
                 OpenMeteoTransportException.rateLimited(
                         429,
                         Optional.of(Duration.ofSeconds(60)))));
-        OpenMeteoWeatherClient client = new OpenMeteoWeatherClient(retrying(transport));
+        OpenMeteoWeatherClient client = client(retrying(transport));
 
         assertThrows(
                 WeatherForecastUnavailableException.class,
@@ -213,7 +229,7 @@ class OpenMeteoWeatherClientTest {
     void doesNotRetryNonRetryableHttpFailure() {
         ScriptedTransport transport = new ScriptedTransport(ResponseStep.failure(
                 OpenMeteoTransportException.nonRetryableHttp(404, Optional.empty())));
-        OpenMeteoWeatherClient client = new OpenMeteoWeatherClient(retrying(transport));
+        OpenMeteoWeatherClient client = client(retrying(transport));
 
         assertThrows(
                 WeatherForecastUnavailableException.class,
@@ -243,6 +259,12 @@ class OpenMeteoWeatherClientTest {
             assertNotNull(inputStream, "Missing test fixture: " + path);
             return new String(inputStream.readAllBytes(), StandardCharsets.UTF_8);
         }
+    }
+
+    private static OpenMeteoWeatherClient client(OpenMeteoTransport transport) {
+        return new OpenMeteoWeatherClient(
+                URI.create("https://api.open-meteo.com/v1/forecast"),
+                transport);
     }
 
     private static OpenMeteoTransport retrying(OpenMeteoTransport transport) {

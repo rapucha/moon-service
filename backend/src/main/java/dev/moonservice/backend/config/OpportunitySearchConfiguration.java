@@ -17,22 +17,18 @@ import dev.moonservice.backend.weather.CachingWeatherForecastProvider;
 import dev.moonservice.backend.weather.WeatherForecastProvider;
 import dev.moonservice.backend.weather.openmeteo.OpenMeteoWeatherClient;
 import dev.moonservice.scoringprototype.PreviewEvaluator;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
+import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.web.client.RestClient;
 
 import java.time.Clock;
-import java.time.Duration;
 import java.util.Locale;
 
 @Configuration
+@EnableConfigurationProperties(MoonRuntimeProperties.class)
 class OpportunitySearchConfiguration {
-    private static final Duration OPEN_METEO_TIMEOUT = Duration.ofSeconds(3);
-    private static final int OPEN_METEO_MAX_TRANSPORT_RETRIES = 1;
-    private static final Duration OPEN_METEO_MAX_RETRY_AFTER = Duration.ofSeconds(1);
-
     @Bean
     Clock clock() {
         return Clock.systemUTC();
@@ -59,29 +55,51 @@ class OpportunitySearchConfiguration {
     @Bean
     @ConditionalOnMissingBean(LocationResolver.class)
     CachingLocationResolver locationResolver(
-            @Value("${moon.location.resolver:}") String resolver,
+            MoonRuntimeProperties properties,
             OpenMeteoObservability openMeteoObservability
     ) {
-        requireOpenMeteoProvider("moon.location.resolver", resolver);
+        requireOpenMeteoProvider("moon.location.resolver", properties.getLocation().getResolver());
+        MoonRuntimeProperties.OpenMeteo openMeteo = properties.getOpenMeteo();
+        MoonRuntimeProperties.Geocoding geocoding = openMeteo.getGeocoding();
+        MoonRuntimeProperties.GeocodingCache cache = properties.getCache().getGeocoding();
         OpenMeteoObservability.ProviderMetrics geocodingMetrics = openMeteoObservability.geocoding();
-        OpenMeteoTransport transport = openMeteoTransport(geocodingMetrics);
-        LocationResolver openMeteoResolver = new OpenMeteoGeocodingClient(transport);
+        OpenMeteoTransport transport = openMeteoTransport(geocodingMetrics, openMeteo);
+        LocationResolver openMeteoResolver = new OpenMeteoGeocodingClient(
+                geocoding.getEndpoint(),
+                geocoding.getGetEndpoint(),
+                geocoding.getLanguage(),
+                geocoding.getResultCount(),
+                transport);
         LocationResolver observedResolver = new ObservedLocationResolver(openMeteoResolver, geocodingMetrics);
-        return CachingLocationResolver.withDefaults(observedResolver);
+        return CachingLocationResolver.withSettings(
+                observedResolver,
+                cache.getMaximumSize(),
+                cache.getResolvedTtl(),
+                cache.getAmbiguousTtl(),
+                cache.getNotFoundTtl(),
+                cache.getTemporarilyUnavailableTtl());
     }
 
     @Bean
     @ConditionalOnMissingBean(WeatherForecastProvider.class)
     CachingWeatherForecastProvider weatherForecastProvider(
-            @Value("${moon.weather.provider:}") String provider,
+            MoonRuntimeProperties properties,
             OpenMeteoObservability openMeteoObservability
     ) {
-        requireOpenMeteoProvider("moon.weather.provider", provider);
+        requireOpenMeteoProvider("moon.weather.provider", properties.getWeather().getProvider());
+        MoonRuntimeProperties.OpenMeteo openMeteo = properties.getOpenMeteo();
+        MoonRuntimeProperties.WeatherCache cache = properties.getCache().getWeather();
         OpenMeteoObservability.ProviderMetrics weatherMetrics = openMeteoObservability.weather();
-        OpenMeteoTransport transport = openMeteoTransport(weatherMetrics);
-        WeatherForecastProvider openMeteoProvider = new OpenMeteoWeatherClient(transport);
+        OpenMeteoTransport transport = openMeteoTransport(weatherMetrics, openMeteo);
+        WeatherForecastProvider openMeteoProvider = new OpenMeteoWeatherClient(
+                openMeteo.getForecast().getEndpoint(),
+                transport);
         WeatherForecastProvider observedProvider = new ObservedWeatherForecastProvider(openMeteoProvider, weatherMetrics);
-        return CachingWeatherForecastProvider.withDefaults(observedProvider);
+        return CachingWeatherForecastProvider.withSettings(
+                observedProvider,
+                cache.getMaximumSize(),
+                cache.getAvailableTtl(),
+                cache.getUnavailableTtl());
     }
 
     @Bean
@@ -89,13 +107,16 @@ class OpportunitySearchConfiguration {
         return new OpportunitySearchDefaults(clock);
     }
 
-    private static OpenMeteoTransport openMeteoTransport(OpenMeteoObservability.ProviderMetrics metrics) {
+    private static OpenMeteoTransport openMeteoTransport(
+            OpenMeteoObservability.ProviderMetrics metrics,
+            MoonRuntimeProperties.OpenMeteo properties
+    ) {
         return new RetryingOpenMeteoTransport(
                 new ObservingOpenMeteoTransport(
-                        new RestClientOpenMeteoTransport(RestClient.builder(), OPEN_METEO_TIMEOUT),
+                        new RestClientOpenMeteoTransport(RestClient.builder(), properties.getTimeout()),
                         metrics),
-                OPEN_METEO_MAX_TRANSPORT_RETRIES,
-                OPEN_METEO_MAX_RETRY_AFTER,
+                properties.getMaxTransportRetries(),
+                properties.getMaxRetryAfter(),
                 metrics::recordRetry);
     }
 

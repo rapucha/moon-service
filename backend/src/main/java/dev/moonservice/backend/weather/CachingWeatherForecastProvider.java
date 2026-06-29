@@ -20,19 +20,20 @@ import java.util.Objects;
  * upstream weather call.
  */
 public final class CachingWeatherForecastProvider implements WeatherForecastProvider, CacheMetricsSource {
-    private static final long DEFAULT_MAXIMUM_SIZE = 1_000;
-    private static final Duration DEFAULT_AVAILABLE_TTL = Duration.ofHours(1);
-    private static final Duration DEFAULT_UNAVAILABLE_TTL = Duration.ofSeconds(30);
-
     private final WeatherForecastProvider delegate;
     private final Cache<ForecastKey, ForecastLookup> cache;
 
-    public static CachingWeatherForecastProvider withDefaults(WeatherForecastProvider delegate) {
+    public static CachingWeatherForecastProvider withSettings(
+            WeatherForecastProvider delegate,
+            long maximumSize,
+            Duration availableTtl,
+            Duration unavailableTtl
+    ) {
         return new CachingWeatherForecastProvider(
                 delegate,
-                DEFAULT_MAXIMUM_SIZE,
-                DEFAULT_AVAILABLE_TTL,
-                DEFAULT_UNAVAILABLE_TTL,
+                maximumSize,
+                availableTtl,
+                unavailableTtl,
                 Ticker.systemTicker());
     }
 

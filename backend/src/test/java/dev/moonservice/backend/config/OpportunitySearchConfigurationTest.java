@@ -14,6 +14,9 @@ import dev.moonservice.backend.weather.WeatherForecastProvider;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
 
+import java.net.URI;
+import java.time.Duration;
+
 class OpportunitySearchConfigurationTest {
     private final ApplicationContextRunner contextRunner = new ApplicationContextRunner()
             .withUserConfiguration(OpportunitySearchConfiguration.class);
@@ -59,6 +62,70 @@ class OpportunitySearchConfigurationTest {
                     assertThat(context).hasSingleBean(OpenMeteoObservability.class);
                     assertThat(context.getBeansOfType(CacheMetricsSource.class))
                             .containsKeys("locationResolver", "weatherForecastProvider");
+                });
+    }
+
+    @Test
+    void exposesTypedRuntimePropertiesWithDefaults() {
+        contextRunner
+                .withBean(LocationResolver.class, () -> query -> LocationResolution.notFound())
+                .withBean(WeatherForecastProvider.class, TestWeatherForecastProvider::new)
+                .run(context -> {
+                    MoonRuntimeProperties properties = context.getBean(MoonRuntimeProperties.class);
+
+                    assertThat(properties.getOpenMeteo().getTimeout()).isEqualTo(Duration.ofSeconds(3));
+                    assertThat(properties.getOpenMeteo().getMaxTransportRetries()).isEqualTo(1);
+                    assertThat(properties.getOpenMeteo().getMaxRetryAfter()).isEqualTo(Duration.ofSeconds(1));
+                    assertThat(properties.getOpenMeteo().getGeocoding().getEndpoint())
+                            .isEqualTo(URI.create("https://geocoding-api.open-meteo.com/v1/search"));
+                    assertThat(properties.getOpenMeteo().getGeocoding().getResultCount()).isEqualTo(10);
+                    assertThat(properties.getOpenMeteo().getForecast().getEndpoint())
+                            .isEqualTo(URI.create("https://api.open-meteo.com/v1/forecast"));
+                    assertThat(properties.getCache().getGeocoding().getMaximumSize()).isEqualTo(2_000);
+                    assertThat(properties.getCache().getGeocoding().getResolvedTtl())
+                            .isEqualTo(Duration.ofHours(24));
+                    assertThat(properties.getCache().getWeather().getMaximumSize()).isEqualTo(1_000);
+                    assertThat(properties.getCache().getWeather().getAvailableTtl())
+                            .isEqualTo(Duration.ofHours(1));
+                });
+    }
+
+    @Test
+    void bindsTypedRuntimePropertyOverrides() {
+        contextRunner
+                .withBean(LocationResolver.class, () -> query -> LocationResolution.notFound())
+                .withBean(WeatherForecastProvider.class, TestWeatherForecastProvider::new)
+                .withPropertyValues(
+                        "moon.open-meteo.timeout=PT2S",
+                        "moon.open-meteo.max-transport-retries=3",
+                        "moon.open-meteo.max-retry-after=PT0S",
+                        "moon.open-meteo.geocoding.endpoint=https://example.test/geocoding/search",
+                        "moon.open-meteo.geocoding.get-endpoint=https://example.test/geocoding/get",
+                        "moon.open-meteo.geocoding.result-count=4",
+                        "moon.open-meteo.geocoding.language=cs",
+                        "moon.open-meteo.forecast.endpoint=https://example.test/forecast",
+                        "moon.cache.geocoding.maximum-size=123",
+                        "moon.cache.geocoding.not-found-ttl=PT5M",
+                        "moon.cache.weather.maximum-size=456",
+                        "moon.cache.weather.unavailable-ttl=PT45S")
+                .run(context -> {
+                    MoonRuntimeProperties properties = context.getBean(MoonRuntimeProperties.class);
+
+                    assertThat(properties.getOpenMeteo().getTimeout()).isEqualTo(Duration.ofSeconds(2));
+                    assertThat(properties.getOpenMeteo().getMaxTransportRetries()).isEqualTo(3);
+                    assertThat(properties.getOpenMeteo().getMaxRetryAfter()).isEqualTo(Duration.ZERO);
+                    assertThat(properties.getOpenMeteo().getGeocoding().getEndpoint())
+                            .isEqualTo(URI.create("https://example.test/geocoding/search"));
+                    assertThat(properties.getOpenMeteo().getGeocoding().getGetEndpoint())
+                            .isEqualTo(URI.create("https://example.test/geocoding/get"));
+                    assertThat(properties.getOpenMeteo().getGeocoding().getResultCount()).isEqualTo(4);
+                    assertThat(properties.getOpenMeteo().getGeocoding().getLanguage()).isEqualTo("cs");
+                    assertThat(properties.getOpenMeteo().getForecast().getEndpoint())
+                            .isEqualTo(URI.create("https://example.test/forecast"));
+                    assertThat(properties.getCache().getGeocoding().getMaximumSize()).isEqualTo(123);
+                    assertThat(properties.getCache().getGeocoding().getNotFoundTtl()).isEqualTo(Duration.ofMinutes(5));
+                    assertThat(properties.getCache().getWeather().getMaximumSize()).isEqualTo(456);
+                    assertThat(properties.getCache().getWeather().getUnavailableTtl()).isEqualTo(Duration.ofSeconds(45));
                 });
     }
 
