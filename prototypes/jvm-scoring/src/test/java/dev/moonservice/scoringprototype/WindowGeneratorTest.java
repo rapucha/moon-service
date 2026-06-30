@@ -41,6 +41,12 @@ class WindowGeneratorTest {
         assertTrue(!window.suggested().instant().isAfter(window.endsAt()));
         assertTrue(window.suggested().moonAltitudeDegrees() >= 1.0);
         assertTrue(window.suggested().moonAltitudeDegrees() <= 6.0);
+        assertEquals(window.startsAt(), window.start().instant());
+        assertEquals(window.endsAt(), window.end().instant());
+        assertTrue(window.pathSamples().stream().anyMatch(sample -> sample.instant().equals(window.startsAt())));
+        assertTrue(window.pathSamples().stream().anyMatch(sample -> sample.instant().equals(window.suggested().instant())));
+        assertTrue(window.pathSamples().stream().anyMatch(sample -> sample.instant().equals(window.endsAt())));
+        assertTrue(window.pathSamples().size() >= 5);
     }
 
     @Test
@@ -109,7 +115,40 @@ class WindowGeneratorTest {
         assertEquals("moonrise_high_context", windows.getFirst().kind());
     }
 
+    @Test
+    void addsLightBucketBoundarySamplesToPath() {
+        PrototypeConfig config = new PrototypeConfig(
+                Locations.PRAGUE,
+                LocalDate.parse("2026-06-29"),
+                1,
+                12.0,
+                10
+        );
+        Instant start = config.start();
+
+        List<MoonWindow> windows = new WindowGenerator().findWindows(config, instant -> {
+            double hours = Duration.between(start, instant).toSeconds() / 3600.0;
+            return new MoonSample(
+                    instant,
+                    4.0,
+                    120.0,
+                    90.0,
+                    180.0,
+                    -15.0 + hours * 2.0);
+        });
+
+        MoonWindow window = windows.getFirst();
+        assertTrue(window.pathSamples().stream()
+                .anyMatch(sample -> Math.abs(sample.sunAltitudeDegrees() - -12.0) < 0.01));
+        assertTrue(window.pathSamples().stream()
+                .anyMatch(sample -> Math.abs(sample.sunAltitudeDegrees() - -6.0) < 0.01));
+        assertTrue(window.pathSamples().stream()
+                .anyMatch(sample -> Math.abs(sample.sunAltitudeDegrees() - -0.833) < 0.01));
+        assertTrue(window.pathSamples().stream()
+                .anyMatch(sample -> Math.abs(sample.sunAltitudeDegrees() - 6.0) < 0.01));
+    }
+
     private static MoonSample sample(Instant instant, double moonAltitude, double sunAltitude) {
-        return new MoonSample(instant, moonAltitude, 120.0, 90.0, sunAltitude);
+        return new MoonSample(instant, moonAltitude, 120.0, 90.0, 180.0, sunAltitude);
     }
 }

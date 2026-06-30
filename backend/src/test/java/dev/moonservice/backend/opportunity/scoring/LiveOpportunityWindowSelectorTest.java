@@ -10,6 +10,7 @@ import dev.moonservice.scoringprototype.window.MoonWindow;
 import org.junit.jupiter.api.Test;
 
 import java.time.Instant;
+import java.util.List;
 import java.util.Optional;
 
 class LiveOpportunityWindowSelectorTest {
@@ -70,17 +71,23 @@ class LiveOpportunityWindowSelectorTest {
 
     private MoonSample sampleAt(Instant instant) {
         if (instant.equals(Instant.parse("2026-06-20T21:10:00Z"))) {
-            return new MoonSample(instant, 4.0, 120.0, 80.0, -2.0);
+            return new MoonSample(instant, 4.0, 120.0, 80.0, 120.0, -2.0);
         }
-        return new MoonSample(instant, 50.0, 120.0, 80.0, -20.0);
+        return new MoonSample(instant, 50.0, 120.0, 80.0, 120.0, -20.0);
     }
 
     private static MoonWindow window(String startsAt, String suggestedAt, String endsAt) {
+        MoonSample start = new MoonSample(Instant.parse(startsAt), 3.0, 116.0, 80.0, 120.0, -2.0);
+        MoonSample suggested = new MoonSample(Instant.parse(suggestedAt), 4.0, 120.0, 80.0, 120.0, -2.0);
+        MoonSample end = new MoonSample(Instant.parse(endsAt), 5.0, 124.0, 80.0, 120.0, -2.0);
         return new MoonWindow(
                 LOCATION,
                 "moonrise_low",
-                Instant.parse(startsAt),
-                new MoonSample(Instant.parse(suggestedAt), 4.0, 120.0, 80.0, -2.0),
-                Instant.parse(endsAt));
+                start.instant(),
+                start,
+                suggested,
+                end,
+                end.instant(),
+                List.of(start, suggested, end));
     }
 }

@@ -56,6 +56,10 @@ class PragueContractTest {
         assertFalse(first.path("confidence").asString().isBlank());
         assertTrue(first.has("components"));
         assertTrue(first.has("moon"));
+        assertFalse(first.path("moon").path("phaseName").asString().isBlank());
+        assertTrue(first.path("moon").path("phaseAngleDegrees").asDouble() >= 0.0);
+        assertTrue(first.path("moon").path("phaseAngleDegrees").asDouble() < 360.0);
+        assertMoonPathMatchesWindow(first);
         assertTrue(first.has("sun"));
         assertTrue(first.has("weather"));
         assertTrue(first.has("exposureBalance"));
@@ -81,5 +85,22 @@ class PragueContractTest {
 
         assertFalse(suggestedAt.isBefore(startsAt));
         assertFalse(suggestedAt.isAfter(endsAt));
+    }
+
+    private static void assertMoonPathMatchesWindow(JsonNode opportunity) {
+        JsonNode path = opportunity.path("moonPath");
+        assertEquals(opportunity.path("startsAt").asString(), path.path("start").path("at").asString());
+        assertEquals(opportunity.path("suggestedAt").asString(), path.path("suggested").path("at").asString());
+        assertEquals(opportunity.path("endsAt").asString(), path.path("end").path("at").asString());
+        assertEquals("start", path.path("start").path("role").asString());
+        assertEquals("suggested", path.path("suggested").path("role").asString());
+        assertEquals("end", path.path("end").path("role").asString());
+        assertFalse(path.path("start").path("lightBucket").asString().isBlank());
+        assertFalse(path.path("suggested").path("lightBucket").asString().isBlank());
+        assertFalse(path.path("end").path("lightBucket").asString().isBlank());
+        assertTrue(path.path("suggested").has("sunAltitudeDegrees"));
+        assertTrue(path.path("samples").isArray());
+        assertTrue(path.path("samples").size() >= 5);
+        assertFalse(path.path("samples").get(0).path("lightBucket").asString().isBlank());
     }
 }

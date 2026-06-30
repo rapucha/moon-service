@@ -165,6 +165,7 @@ public class JvmScoringOpportunitySearchEngine implements OpportunitySearchEngin
                     text(node, "confidence"),
                     componentScores(node.path("components")),
                     moon(node.path("moon")),
+                    moonPath(node.path("moonPath")),
                     sun(node.path("sun")),
                     weather(node.path("weather")),
                     exposureBalance(node.path("exposureBalance")),
@@ -189,8 +190,38 @@ public class JvmScoringOpportunitySearchEngine implements OpportunitySearchEngin
         return new OpportunitySearchResponse.Moon(
                 doubleValue(node, "altitudeDegrees"),
                 doubleValue(node, "azimuthDegrees"),
-                doubleValue(node, "illuminationPercent")
+                doubleValue(node, "illuminationPercent"),
+                doubleValue(node, "phaseAngleDegrees"),
+                text(node, "phaseName")
         );
+    }
+
+    private static OpportunitySearchResponse.MoonPath moonPath(JsonNode node) {
+        return new OpportunitySearchResponse.MoonPath(
+                moonPathPoint(node.path("start")),
+                moonPathPoint(node.path("suggested")),
+                moonPathPoint(node.path("end")),
+                moonPathSamples(node.path("samples"))
+        );
+    }
+
+    private static OpportunitySearchResponse.MoonPathPoint moonPathPoint(JsonNode node) {
+        return new OpportunitySearchResponse.MoonPathPoint(
+                text(node, "at"),
+                doubleValue(node, "altitudeDegrees"),
+                doubleValue(node, "azimuthDegrees"),
+                doubleValue(node, "sunAltitudeDegrees"),
+                text(node, "lightBucket"),
+                text(node, "role")
+        );
+    }
+
+    private static ArrayList<OpportunitySearchResponse.MoonPathPoint> moonPathSamples(JsonNode nodes) {
+        ArrayList<OpportunitySearchResponse.MoonPathPoint> samples = new ArrayList<>();
+        for (JsonNode node : nodes) {
+            samples.add(moonPathPoint(node));
+        }
+        return samples;
     }
 
     private static OpportunitySearchResponse.Sun sun(JsonNode node) {

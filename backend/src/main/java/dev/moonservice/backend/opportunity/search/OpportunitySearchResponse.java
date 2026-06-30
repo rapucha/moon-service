@@ -39,6 +39,7 @@ public record OpportunitySearchResponse(
             String confidence,
             ComponentScores components,
             Moon moon,
+            MoonPath moonPath,
             Sun sun,
             Weather weather,
             ExposureBalance exposureBalance,
@@ -59,7 +60,27 @@ public record OpportunitySearchResponse(
     public record Moon(
             double altitudeDegrees,
             double azimuthDegrees,
-            double illuminationPercent
+            double illuminationPercent,
+            double phaseAngleDegrees,
+            String phaseName
+    ) {
+    }
+
+    public record MoonPath(
+            MoonPathPoint start,
+            MoonPathPoint suggested,
+            MoonPathPoint end,
+            List<MoonPathPoint> samples
+    ) {
+    }
+
+    public record MoonPathPoint(
+            String at,
+            double altitudeDegrees,
+            double azimuthDegrees,
+            double sunAltitudeDegrees,
+            String lightBucket,
+            String role
     ) {
     }
 

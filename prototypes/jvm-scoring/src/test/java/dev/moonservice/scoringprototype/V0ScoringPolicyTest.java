@@ -10,6 +10,7 @@ import org.junit.jupiter.api.Test;
 
 import java.time.Duration;
 import java.time.Instant;
+import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -89,14 +90,34 @@ class V0ScoringPolicyTest {
                 moonAltitudeDegrees,
                 120.0,
                 moonIlluminationPercent,
+                180.0,
+                sunAltitudeDegrees
+        );
+        MoonSample start = new MoonSample(
+                SUGGESTED_AT.minus(Duration.ofMinutes(30)),
+                moonAltitudeDegrees,
+                116.0,
+                moonIlluminationPercent,
+                180.0,
+                sunAltitudeDegrees
+        );
+        MoonSample end = new MoonSample(
+                SUGGESTED_AT.plus(Duration.ofMinutes(30)),
+                moonAltitudeDegrees,
+                124.0,
+                moonIlluminationPercent,
+                180.0,
                 sunAltitudeDegrees
         );
         MoonWindow window = new MoonWindow(
                 Locations.PRAGUE,
                 "policy_case",
-                SUGGESTED_AT.minus(Duration.ofMinutes(30)),
+                start.instant(),
+                start,
                 suggested,
-                SUGGESTED_AT.plus(Duration.ofMinutes(30))
+                end,
+                end.instant(),
+                List.of(start, suggested, end)
         );
         return new ScoredWindow(window, weather, ScoringModel.scoreWindow(window, weather));
     }
