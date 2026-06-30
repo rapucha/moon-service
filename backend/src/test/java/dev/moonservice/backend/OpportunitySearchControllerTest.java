@@ -78,7 +78,7 @@ class OpportunitySearchControllerTest {
                 .value(body -> {
                     assertTrue(body.contains("id=\"search-form\""));
                     assertTrue(body.contains("href=\"/favicon.svg\""));
-                    assertTrue(body.contains("Find a Moon window near a city"));
+                    assertTrue(body.contains("Moon windows near a city"));
                     assertTrue(body.contains("Privacy and caveats"));
                 });
     }

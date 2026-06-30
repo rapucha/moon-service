@@ -148,7 +148,8 @@ GET /search?q=Praha
 The browser page is the first anonymous MVP lookup flow. It serves static
 HTML/CSS/JavaScript from the backend, calls `GET /api/opportunities?q=...` only
 after an explicit form submit or a shared `/search?q=...` page load, and renders
-the documented product states without exposing provider internals.
+the documented product states without exposing provider internals. The current
+page is intentionally plain JavaScript with no frontend build step.
 Ambiguous-location choices call the same endpoint with a selected backend
 location ID, for example `GET /api/opportunities?locationId=moon-service-3067696`,
 and are shareable as `/search?locationId=moon-service-3067696`.
@@ -161,12 +162,16 @@ not create accounts, cookies, email subscriptions, or server-side user profiles.
 Manual browser checks for frontend behavior:
 
 - Open `/search`, submit `Praha`, and confirm opportunities render with Moon,
-  Sun/light, weather, score, and caveat details.
+  Sun/light, weather, score, share action, and caveat details.
 - Open `/search?q=Praha` directly and confirm the page is shareable without an
   account.
 - Search `Springfield` and confirm the ambiguous-location state presents
   actionable choices that resolve through `locationId`.
 - Search an unknown place and confirm the not-found state is actionable.
+- Submit an empty location and confirm the validation state stays on the page.
+- Narrow the browser to a mobile viewport and confirm the search form, recent
+  searches, opportunity facts, and score display do not overlap or truncate
+  important text.
 - Clear recent searches and confirm only browser-local entries are removed.
 
 ## Open-Meteo Geocoding Adapter

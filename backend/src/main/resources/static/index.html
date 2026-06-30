@@ -9,20 +9,24 @@
 </head>
 <body>
   <header class="topbar">
-    <a class="brand" href="/">Moon Service</a>
-    <span class="topbar-status">Moon photography lookup</span>
+    <a class="brand" href="/">
+      <img src="/favicon.svg" alt="" width="32" height="32">
+      <span>Moon Service</span>
+    </a>
+    <span class="topbar-status">Anonymous city lookup</span>
   </header>
 
   <main>
     <section class="lookup-band" aria-labelledby="lookup-title">
       <div class="lookup-content">
         <div class="lookup-copy">
-          <h1 id="lookup-title">Find a Moon window near a city</h1>
-          <p>Enter a city or town. Exact home addresses are not needed.</p>
+          <p class="eyebrow">Moon photography forecast</p>
+          <h1 id="lookup-title">Moon windows near a city</h1>
+          <p>Use a city or town. Exact home addresses are not needed.</p>
         </div>
 
         <form id="search-form" class="search-form" novalidate>
-          <label for="location-input">Location</label>
+          <label for="location-input">City or town</label>
           <div class="search-row">
             <input
               id="location-input"
@@ -40,29 +44,41 @@
     </section>
 
     <div class="content-grid">
-      <aside class="side-panel" aria-labelledby="recent-title">
-        <div class="panel-heading">
-          <h2 id="recent-title">Recent searches</h2>
-          <button id="clear-recent" type="button" class="text-button">Clear</button>
-        </div>
-        <div id="recent-list" class="recent-list"></div>
-        <p class="panel-note">Stored only in this browser. The lookup still works when browser storage is off.</p>
+      <aside class="side-column" aria-label="Lookup context">
+        <section class="side-panel" aria-labelledby="recent-title">
+          <div class="panel-heading">
+            <h2 id="recent-title">Recent searches</h2>
+            <button id="clear-recent" type="button" class="text-button">Clear</button>
+          </div>
+          <div id="recent-list" class="recent-list"></div>
+          <p class="panel-note">Stored only in this browser.</p>
+        </section>
+
+        <section class="side-panel compact-note" aria-labelledby="privacy-title">
+          <h2 id="privacy-title">Privacy and caveats</h2>
+          <ul>
+            <li>No account, cookies, email, or server-side user profile is required.</li>
+            <li>Searches are sent to the backend for geocoding, weather, Moon geometry, and scoring.</li>
+            <li>Local hills, buildings, trees, and exact horizon obstructions are not modelled.</li>
+          </ul>
+        </section>
       </aside>
 
-      <section id="results" class="results-region" aria-live="polite" aria-busy="false"></section>
+      <section class="workspace" aria-labelledby="workspace-title">
+        <div class="workspace-heading">
+          <div>
+            <p class="eyebrow">Lookup result</p>
+            <h2 id="workspace-title">Opportunity review</h2>
+          </div>
+          <div class="workspace-meta" aria-label="Lookup boundaries">
+            <span>City level</span>
+            <span>Weather aware</span>
+            <span>Shareable</span>
+          </div>
+        </div>
+        <div id="results" class="results-region" aria-live="polite" aria-busy="false"></div>
+      </section>
     </div>
-
-    <section class="caveats" aria-labelledby="privacy-title">
-      <h2 id="privacy-title">Privacy and caveats</h2>
-      <ul>
-        <li>No account, cookies, email, or server-side user profile is required for this page.</li>
-        <li>Searches are sent to the backend for geocoding, weather lookup, Moon geometry, and scoring.</li>
-        <li>Use city-level searches. This page does not store coordinates in localStorage.</li>
-        <li>Backend cache and provider calls should use coarse location and forecast boundaries, not a personal search history.</li>
-        <li>Operational logs are for service health; avoid entering exact home addresses.</li>
-        <li>Local hills, buildings, trees, and exact horizon obstructions are not modelled.</li>
-      </ul>
-    </section>
   </main>
 
   <script src="/app.js" defer></script>

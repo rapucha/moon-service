@@ -11,6 +11,7 @@
   var results = document.getElementById("results");
   var recentList = document.getElementById("recent-list");
   var clearRecent = document.getElementById("clear-recent");
+  var submitButton = form.querySelector("button[type='submit']");
   var activeRequest = null;
 
   form.addEventListener("submit", function (event) {
@@ -134,6 +135,8 @@
     }
 
     activeRequest = new AbortController();
+    var requestController = activeRequest;
+    setSearchBusy(true);
     results.setAttribute("aria-busy", "true");
     renderLoading(request.label);
 
@@ -141,7 +144,7 @@
       headers: {
         "Accept": "application/json"
       },
-      signal: activeRequest.signal
+      signal: requestController.signal
     })
       .then(function (response) {
         return response.json()
@@ -161,8 +164,11 @@
         }
       })
       .finally(function () {
-        results.setAttribute("aria-busy", "false");
-        activeRequest = null;
+        if (activeRequest === requestController) {
+          results.setAttribute("aria-busy", "false");
+          setSearchBusy(false);
+          activeRequest = null;
+        }
       });
   }
 
@@ -219,17 +225,27 @@
 
   function renderIntro() {
     replaceResults(
-      element("div", { className: "empty-state" },
-        element("h2", {}, "Search a city or town"),
-        element("p", {}, "Results will show ranked Moon windows with light, weather, score, and caveat details."))
+      element("section", { className: "state-panel intro-state" },
+        element("div", { className: "state-header" },
+          element("p", { className: "eyebrow" }, "Ready"),
+          element("h3", {}, "Search a city or town"),
+          element("p", {}, "Ranked windows will appear here with Moon position, ambient light, weather, and caveats.")),
+        element("dl", { className: "intro-grid" },
+          fact("Location", "City or town"),
+          fact("Storage", "Browser recent list only"),
+          fact("Output", "Shareable result page")))
     );
   }
 
   function renderLoading(query) {
     replaceResults(
-      element("div", { className: "empty-state" },
-        element("h2", {}, "Looking up " + query),
-        element("p", {}, "Resolving the location, checking Moon windows, and reading the forecast."))
+      element("section", { className: "state-panel loading-state" },
+        element("div", { className: "state-header" },
+          element("p", { className: "eyebrow" }, "Working"),
+          element("h3", {}, "Looking up " + query),
+          element("p", {}, "Resolving the location, checking Moon windows, and reading the forecast.")),
+        element("div", { className: "loading-bar", ariaLabel: "Loading" },
+          element("span", {})))
     );
   }
 
@@ -280,20 +296,21 @@
       ? payload.candidateWindowsEvaluated + " windows evaluated"
       : "Ranked opportunities";
 
-    return element("section", { className: "result-panel", ariaLabelledby: "result-title" },
-      element("div", { className: "result-header" },
+    return element("section", { className: "result-panel result-summary", ariaLabelledby: "result-title" },
+      element("div", { className: "summary-topline" },
         element("div", {},
-          element("h2", { id: "result-title" }, location.displayName || "Resolved location"),
-          element("p", {}, opportunityCount === 1 ? "1 ranked Moon opportunity" : opportunityCount + " ranked Moon opportunities"),
-          element("div", { className: "result-meta" },
-            element("span", { className: "pill" }, forecastText),
-            element("span", { className: "pill" }, evaluatedText),
-            element("span", { className: "pill" }, location.timezone || "Timezone unavailable"))
-        ),
+          element("p", { className: "eyebrow" }, "Resolved location"),
+          element("h3", { id: "result-title" }, location.displayName || "Resolved location"),
+          element("p", { className: "summary-count" }, opportunityCount === 1 ? "1 ranked Moon opportunity" : opportunityCount + " ranked Moon opportunities")),
         element("div", { className: "share-tools" },
           element("button", { type: "button", className: "copy-button", "data-share-url": shareUrl }, "Copy link"),
-          element("a", { href: shareUrl }, sharePath))
-      )
+          element("a", { href: sharePath }, "Open share link"))
+      ),
+      element("dl", { className: "summary-grid" },
+        fact("Forecast", forecastText),
+        fact("Evaluated", evaluatedText),
+        fact("Timezone", location.timezone || "Unavailable"),
+        fact("Lookup", request.locationId ? "Selected location" : "Search query"))
     );
   }
 
@@ -309,7 +326,8 @@
       ? payload.emptyReason.text
       : "No useful Moon window passed the current scoring threshold in this forecast period.";
     return element("section", { className: "status-panel warning" },
-      element("h2", {}, "No ranked windows"),
+      element("p", { className: "eyebrow" }, "No match"),
+      element("h3", {}, "No ranked windows"),
       element("p", {}, reason));
   }
 
@@ -320,28 +338,68 @@
     var exposureBalance = opportunity.exposureBalance || {};
     var components = opportunity.components || {};
 
-    return element("article", { className: "opportunity-card" },
-      element("header", {},
-        element("div", {},
-          element("h3", {}, "Window " + (index + 1) + ": " + formatWindow(opportunity, timezone)),
+    return element("article", { className: "opportunity-card" + (index === 0 ? " is-primary" : "") },
+      element("header", { className: "opportunity-header" },
+        element("div", { className: "opportunity-title" },
+          element("p", { className: "rank-label" }, index === 0 ? "Best match" : "Option " + (index + 1)),
+          element("h3", {}, formatWindow(opportunity, timezone)),
           element("p", { className: "reason" }, opportunity.reason || "Ranked Moon opportunity.")),
-        element("span", { className: "pill score" }, scoreText(opportunity.score))
+        scoreBlock(opportunity.score)
       ),
-      element("dl", { className: "fact-grid" },
+      element("dl", { className: "fact-grid key-facts" },
         fact("Suggested", formatDateTime(opportunity.suggestedAt, timezone)),
-        fact("Moon", degrees(moon.altitudeDegrees) + " alt, " + degrees(moon.azimuthDegrees) + " az"),
-        fact("Illumination", percent(moon.illuminationPercent)),
-        fact("Light", readableToken(sun.lightBucket) + " at " + degrees(sun.altitudeDegrees)),
-        fact("Weather", weather.summary || readableToken(weather.segmentKind) || "Forecast unavailable"),
-        fact("Cloud", cloudText(weather)),
-        fact("Precip", precipitationText(weather)),
-        fact("Visibility", visibilityText(weather))
+        fact("Duration", durationText(opportunity.startsAt, opportunity.endsAt)),
+        fact("Moon altitude", degrees(moon.altitudeDegrees)),
+        fact("Moon azimuth", degrees(moon.azimuthDegrees))
+      ),
+      element("div", { className: "metric-columns" },
+        metricGroup("Light", [
+          fact("Bucket", readableToken(sun.lightBucket) || "Unavailable"),
+          fact("Sun altitude", degrees(sun.altitudeDegrees)),
+          fact("Illumination", percent(moon.illuminationPercent))
+        ]),
+        metricGroup("Weather", [
+          fact("Summary", weather.summary || readableToken(weather.segmentKind) || "Forecast unavailable"),
+          fact("Cloud", cloudText(weather)),
+          fact("Precip", precipitationText(weather)),
+          fact("Visibility", visibilityText(weather))
+        ])
       ),
       exposureBalance.text
         ? element("p", { className: "exposure" }, exposureBalance.label ? readableToken(exposureBalance.label) + ": " + exposureBalance.text : exposureBalance.text)
         : null,
+      opportunityActions(opportunity),
       scoreDetails(components)
     );
+  }
+
+  function scoreBlock(score) {
+    var value = Number.isFinite(score) ? Math.max(0, Math.min(100, score)) : 0;
+    return element("div", { className: "score-block", ariaLabel: "Opportunity score" },
+      element("span", { className: "score-value" }, Number.isFinite(score) ? String(score) : "--"),
+      element("span", { className: "score-label" }, "score"),
+      element("span", { className: "score-meter" },
+        element("span", { style: "width: " + value + "%" })));
+  }
+
+  function metricGroup(title, facts) {
+    return element("section", { className: "metric-group" },
+      element("h4", {}, title),
+      element("dl", { className: "fact-grid compact" }, facts));
+  }
+
+  function opportunityActions(opportunity) {
+    var links = opportunity.links || {};
+    var actions = [];
+
+    if (links.ics && links.icsReady === true) {
+      actions.push(element("a", { className: "secondary-action", href: links.ics }, "Download calendar event"));
+    }
+
+    if (actions.length === 0) {
+      return null;
+    }
+    return element("div", { className: "opportunity-actions" }, actions);
   }
 
   function fact(label, value) {
@@ -365,7 +423,7 @@
       return null;
     }
 
-    return element("details", {},
+    return element("details", { className: "score-details" },
       element("summary", {}, "Score details"),
       element("dl", { className: "detail-grid" },
         entries.map(function (entry) {
@@ -378,8 +436,9 @@
   function renderAmbiguous(payload, query) {
     var candidates = Array.isArray(payload.candidates) ? payload.candidates : [];
     replaceResults(
-      element("section", { className: "status-panel" },
-        element("h2", {}, "Choose a location"),
+      element("section", { className: "status-panel action-state" },
+        element("p", { className: "eyebrow" }, "Ambiguous match"),
+        element("h3", {}, "Choose a location"),
         element("p", {}, "Several places matched " + query + ". Pick one to search that place."),
         element("div", { className: "candidate-list" },
           candidates.map(function (candidate) {
@@ -401,7 +460,8 @@
     var items = Array.isArray(suggestions) ? suggestions : [];
     replaceResults(
       element("section", { className: "status-panel " + (tone || "") },
-        element("h2", {}, title),
+        element("p", { className: "eyebrow" }, tone === "error" ? "Needs attention" : "Status"),
+        element("h3", {}, title),
         element("p", {}, message),
         items.length > 0
           ? element("ul", { className: "suggestions" }, items.map(function (item) {
@@ -428,15 +488,17 @@
   }
 
   function messagesList(messages) {
-    return element("ul", { className: "messages" },
+    return element("section", { className: "message-panel" },
+      element("h3", {}, "Lookup notes"),
+      element("ul", { className: "messages" },
       messages.map(function (message) {
         return element("li", {}, message.text || message.code || "Additional lookup note.");
-      })
+      }))
     );
   }
 
   function rejectedDetails(rejected, timezone) {
-    return element("details", {},
+    return element("details", { className: "rejected-details" },
       element("summary", {}, "Rejected windows"),
       element("ul", { className: "messages" },
         rejected.slice(0, 5).map(function (window) {
@@ -525,11 +587,11 @@
   }
 
   document.addEventListener("click", function (event) {
-    if (!event.target.matches("[data-share-url]")) {
+    var button = event.target.closest("[data-share-url]");
+    if (!button) {
       return;
     }
 
-    var button = event.target;
     var shareUrl = button.getAttribute("data-share-url");
     copyText(shareUrl).then(function () {
       var original = button.textContent;
@@ -573,6 +635,8 @@
         node.htmlFor = value;
       } else if (name === "ariaLabelledby") {
         node.setAttribute("aria-labelledby", value);
+      } else if (name === "ariaLabel") {
+        node.setAttribute("aria-label", value);
       } else {
         node.setAttribute(name, value);
       }
@@ -628,6 +692,24 @@
     }
   }
 
+  function durationText(startsAt, endsAt) {
+    if (!startsAt || !endsAt) {
+      return "Unavailable";
+    }
+    var started = new Date(startsAt).getTime();
+    var ended = new Date(endsAt).getTime();
+    if (!Number.isFinite(started) || !Number.isFinite(ended) || ended <= started) {
+      return "Unavailable";
+    }
+    var minutes = Math.round((ended - started) / 60000);
+    if (minutes < 60) {
+      return minutes + " min";
+    }
+    var hours = Math.floor(minutes / 60);
+    var remainder = minutes % 60;
+    return remainder ? hours + " hr " + remainder + " min" : hours + " hr";
+  }
+
   function degrees(value) {
     return Number.isFinite(value) ? value.toFixed(1) + " deg" : "unavailable";
   }
@@ -641,7 +723,8 @@
   }
 
   function readableToken(value) {
-    return String(value || "").replace(/_/g, " ");
+    var text = String(value || "").replace(/_/g, " ").trim();
+    return text ? text.charAt(0).toUpperCase() + text.slice(1) : "";
   }
 
   function cloudText(weather) {
@@ -686,5 +769,12 @@
       parts.push(candidate.timezone);
     }
     return parts.join(" | ");
+  }
+
+  function setSearchBusy(isBusy) {
+    if (submitButton) {
+      submitButton.disabled = isBusy;
+      submitButton.textContent = isBusy ? "Finding" : "Find";
+    }
   }
 }());
