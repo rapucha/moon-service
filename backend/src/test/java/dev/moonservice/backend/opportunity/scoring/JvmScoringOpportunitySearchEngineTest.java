@@ -36,8 +36,19 @@ class JvmScoringOpportunitySearchEngineTest {
         assertEquals("Amsterdam, North Holland, Netherlands", response.location().displayName());
         assertEquals("Europe/Amsterdam", response.location().timezone());
         assertFalse(response.opportunities().isEmpty());
-        assertTrue(response.opportunities().getFirst().id().startsWith("amsterdam-nl-"));
-        assertTrue(response.opportunities().getFirst().links().get("ics").startsWith("/o/amsterdam-nl-"));
+        OpportunitySearchResponse.Opportunity first = response.opportunities().getFirst();
+        assertTrue(first.id().startsWith("amsterdam-nl-"));
+        assertTrue(first.links().get("ics").startsWith("/o/amsterdam-nl-"));
+        assertFalse(first.moon().phaseName().isBlank());
+        assertTrue(first.moon().phaseAngleDegrees() >= 0.0);
+        assertTrue(first.moon().phaseAngleDegrees() < 360.0);
+        assertEquals(first.startsAt(), first.moonPath().start().at());
+        assertEquals(first.suggestedAt(), first.moonPath().suggested().at());
+        assertEquals(first.endsAt(), first.moonPath().end().at());
+        assertFalse(first.moonPath().suggested().lightBucket().isBlank());
+        assertTrue(Double.isFinite(first.moonPath().suggested().sunAltitudeDegrees()));
+        assertTrue(first.moonPath().samples().size() >= 5);
+        assertFalse(first.moonPath().samples().getFirst().lightBucket().isBlank());
     }
 
     @Test

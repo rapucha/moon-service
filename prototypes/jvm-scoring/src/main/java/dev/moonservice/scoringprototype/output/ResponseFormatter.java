@@ -85,6 +85,10 @@ public final class ResponseFormatter {
         moon.put("altitudeDegrees", round3(window.suggested().moonAltitudeDegrees()));
         moon.put("azimuthDegrees", round3(window.suggested().moonAzimuthDegrees()));
         moon.put("illuminationPercent", round3(window.suggested().moonIlluminationPercent()));
+        moon.put("phaseAngleDegrees", round3(window.suggested().moonPhaseAngleDegrees()));
+        moon.put("phaseName", phaseName(window.suggested()));
+
+        writeMoonPath(opportunity, window);
 
         ObjectNode sun = opportunity.putObject("sun");
         sun.put("altitudeDegrees", round3(window.suggested().sunAltitudeDegrees()));
@@ -114,6 +118,27 @@ public final class ResponseFormatter {
         links.put("ics", "/o/" + id + ".ics");
     }
 
+    private static void writeMoonPath(ObjectNode opportunity, MoonWindow window) {
+        ObjectNode moonPath = opportunity.putObject("moonPath");
+        writeMoonPathPoint(moonPath.putObject("start"), window.start(), "start");
+        writeMoonPathPoint(moonPath.putObject("suggested"), window.suggested(), "suggested");
+        writeMoonPathPoint(moonPath.putObject("end"), window.end(), "end");
+
+        ArrayNode samples = moonPath.putArray("samples");
+        for (MoonSample sample : window.pathSamples()) {
+            writeMoonPathPoint(samples.addObject(), sample, roleFor(window, sample));
+        }
+    }
+
+    private static void writeMoonPathPoint(ObjectNode node, MoonSample sample, String role) {
+        node.put("at", sample.instant().toString());
+        node.put("altitudeDegrees", round3(sample.moonAltitudeDegrees()));
+        node.put("azimuthDegrees", round3(sample.moonAzimuthDegrees()));
+        node.put("sunAltitudeDegrees", round3(sample.sunAltitudeDegrees()));
+        node.put("lightBucket", ScoringModel.lightBucket(sample.sunAltitudeDegrees()));
+        node.put("role", role);
+    }
+
     private static String reasonText(MoonSample sample, WeatherFixture weather) {
         return String.format(
                 Locale.ROOT,
@@ -139,6 +164,50 @@ public final class ResponseFormatter {
             return "precipitation_risk";
         }
         return "mixed";
+    }
+
+    private static String phaseName(MoonSample sample) {
+        double angle = normalizeDegrees(sample.moonPhaseAngleDegrees());
+        if (angle < 22.5 || angle >= 337.5) {
+            return "new_moon";
+        }
+        if (angle < 67.5) {
+            return "waxing_crescent";
+        }
+        if (angle < 112.5) {
+            return "first_quarter";
+        }
+        if (angle < 157.5) {
+            return "waxing_gibbous";
+        }
+        if (angle < 202.5) {
+            return "full_moon";
+        }
+        if (angle < 247.5) {
+            return "waning_gibbous";
+        }
+        if (angle < 292.5) {
+            return "last_quarter";
+        }
+        return "waning_crescent";
+    }
+
+    private static String roleFor(MoonWindow window, MoonSample sample) {
+        if (sample.instant().equals(window.suggested().instant())) {
+            return "suggested";
+        }
+        if (sample.instant().equals(window.startsAt())) {
+            return "start";
+        }
+        if (sample.instant().equals(window.endsAt())) {
+            return "end";
+        }
+        return "path";
+    }
+
+    private static double normalizeDegrees(double value) {
+        double normalized = value % 360.0;
+        return normalized < 0.0 ? normalized + 360.0 : normalized;
     }
 
     private static void writeRejected(ObjectNode parent) {

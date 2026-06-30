@@ -2,6 +2,7 @@ package dev.moonservice.scoringprototype.window;
 
 import dev.moonservice.scoringprototype.ephemeris.EphemerisSampler;
 import dev.moonservice.scoringprototype.ephemeris.MoonSample;
+import dev.moonservice.scoringprototype.fixture.Location;
 import dev.moonservice.scoringprototype.input.PrototypeConfig;
 import dev.moonservice.scoringprototype.scoring.ScoringModel;
 
@@ -14,12 +15,14 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.Optional;
 import java.util.TreeSet;
+import java.util.function.ToDoubleFunction;
 
 public final class WindowGenerator {
     private static final Duration BRACKET_STEP = Duration.ofHours(1);
     private static final Duration SUGGESTION_STEP = Duration.ofMinutes(5);
     private static final Duration REFINEMENT_TOLERANCE = Duration.ofSeconds(1);
     private static final Duration KIND_SAMPLE_OFFSET = Duration.ofMinutes(1);
+    private static final double[] LIGHT_BUCKET_THRESHOLDS = {-12.0, -6.0, -0.833, 6.0};
 
     @FunctionalInterface
     public interface SampleProvider {
@@ -61,7 +64,7 @@ public final class WindowGenerator {
         Instant suggestionStart = max(window.startsAt(), notBefore);
         MoonSample suggested = suggestedSample(samples, suggestionStart, window.endsAt());
         String kind = windowKind(samples, window.startsAt(), window.endsAt(), suggested);
-        return Optional.of(new MoonWindow(window.location(), kind, window.startsAt(), suggested, window.endsAt()));
+        return Optional.of(moonWindow(window.location(), kind, window.startsAt(), suggested, window.endsAt(), samples));
     }
 
     private static void addLocalDayBoundaries(PrototypeConfig config, TreeSet<Instant> boundaries) {
@@ -81,8 +84,14 @@ public final class WindowGenerator {
         while (cursor.isBefore(config.end())) {
             Instant nextInstant = min(cursor.plus(BRACKET_STEP), config.end());
             MoonSample next = samples.sampleAt(nextInstant);
-            addThresholdCrossing(samples, boundaries, previous, next, 0.0);
-            addThresholdCrossing(samples, boundaries, previous, next, config.maxMoonAltitudeDegrees());
+            addThresholdCrossing(samples, boundaries, previous, next, 0.0, MoonSample::moonAltitudeDegrees);
+            addThresholdCrossing(
+                    samples,
+                    boundaries,
+                    previous,
+                    next,
+                    config.maxMoonAltitudeDegrees(),
+                    MoonSample::moonAltitudeDegrees);
             cursor = nextInstant;
             previous = next;
         }
@@ -93,10 +102,11 @@ public final class WindowGenerator {
             TreeSet<Instant> boundaries,
             MoonSample previous,
             MoonSample next,
-            double threshold
+            double threshold,
+            ToDoubleFunction<MoonSample> measurement
     ) {
-        double previousDelta = previous.moonAltitudeDegrees() - threshold;
-        double nextDelta = next.moonAltitudeDegrees() - threshold;
+        double previousDelta = measurement.applyAsDouble(previous) - threshold;
+        double nextDelta = measurement.applyAsDouble(next) - threshold;
         if (previousDelta == 0.0) {
             boundaries.add(previous.instant());
             return;
@@ -106,7 +116,7 @@ public final class WindowGenerator {
             return;
         }
         if ((previousDelta < 0.0 && nextDelta > 0.0) || (previousDelta > 0.0 && nextDelta < 0.0)) {
-            boundaries.add(refineCrossing(samples, previous, next, threshold));
+            boundaries.add(refineCrossing(samples, previous, next, threshold, measurement));
         }
     }
 
@@ -114,15 +124,16 @@ public final class WindowGenerator {
             SampleProvider samples,
             MoonSample start,
             MoonSample end,
-            double threshold
+            double threshold,
+            ToDoubleFunction<MoonSample> measurement
     ) {
         Instant lower = start.instant();
         Instant upper = end.instant();
-        double lowerDelta = start.moonAltitudeDegrees() - threshold;
+        double lowerDelta = measurement.applyAsDouble(start) - threshold;
 
         while (Duration.between(lower, upper).compareTo(REFINEMENT_TOLERANCE) > 0) {
             Instant middle = midpoint(lower, upper);
-            double middleDelta = samples.sampleAt(middle).moonAltitudeDegrees() - threshold;
+            double middleDelta = measurement.applyAsDouble(samples.sampleAt(middle)) - threshold;
             if (sameSign(lowerDelta, middleDelta)) {
                 lower = middle;
                 lowerDelta = middleDelta;
@@ -156,7 +167,68 @@ public final class WindowGenerator {
 
         MoonSample suggested = suggestedSample(samples, startsAt, endsAt);
         String kind = windowKind(samples, startsAt, endsAt, suggested);
-        windows.add(new MoonWindow(config.location(), kind, startsAt, suggested, endsAt));
+        windows.add(moonWindow(config.location(), kind, startsAt, suggested, endsAt, samples));
+    }
+
+    private static MoonWindow moonWindow(
+            Location location,
+            String kind,
+            Instant startsAt,
+            MoonSample suggested,
+            Instant endsAt,
+            SampleProvider samples
+    ) {
+        return new MoonWindow(
+                location,
+                kind,
+                startsAt,
+                samples.sampleAt(startsAt),
+                suggested,
+                samples.sampleAt(endsAt),
+                endsAt,
+                pathSamples(samples, startsAt, suggested.instant(), endsAt)
+        );
+    }
+
+    private static List<MoonSample> pathSamples(
+            SampleProvider samples,
+            Instant startsAt,
+            Instant suggestedAt,
+            Instant endsAt
+    ) {
+        TreeSet<Instant> instants = new TreeSet<>();
+        instants.add(startsAt);
+        instants.add(suggestedAt);
+        instants.add(endsAt);
+
+        Duration duration = Duration.between(startsAt, endsAt);
+        for (int section = 1; section < 4; section++) {
+            instants.add(startsAt.plus(duration.multipliedBy(section).dividedBy(4)));
+        }
+        addSunAltitudeCrossings(samples, instants, startsAt, endsAt);
+
+        return instants.stream()
+                .map(samples::sampleAt)
+                .toList();
+    }
+
+    private static void addSunAltitudeCrossings(
+            SampleProvider samples,
+            TreeSet<Instant> instants,
+            Instant startsAt,
+            Instant endsAt
+    ) {
+        Instant cursor = startsAt;
+        MoonSample previous = samples.sampleAt(cursor);
+        while (cursor.isBefore(endsAt)) {
+            Instant nextInstant = min(cursor.plus(BRACKET_STEP), endsAt);
+            MoonSample next = samples.sampleAt(nextInstant);
+            for (double threshold : LIGHT_BUCKET_THRESHOLDS) {
+                addThresholdCrossing(samples, instants, previous, next, threshold, MoonSample::sunAltitudeDegrees);
+            }
+            cursor = nextInstant;
+            previous = next;
+        }
     }
 
     private static MoonSample suggestedSample(SampleProvider samples, Instant startsAt, Instant endsAt) {

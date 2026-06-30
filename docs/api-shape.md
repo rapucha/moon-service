@@ -289,6 +289,16 @@ Response rules:
 - `startsAt` and `endsAt` define the useful opportunity window.
 - `suggestedAt` is optional and only identifies a representative time inside
   the window for sorting, links, or display.
+- `moon` describes the Moon at `suggestedAt`; keep this field as the compact
+  suggested-time summary for compatibility.
+- `moon.phaseAngleDegrees` uses the astronomical lunar phase angle: `0` is new
+  Moon, `90` is first quarter, `180` is full Moon, and `270` is last quarter.
+- `moonPath` describes Moon movement across the window. It must include direct
+  `start`, `suggested`, and `end` points plus a small `samples` array suitable
+  for compact UI charts.
+- `moonPath` points include `lightBucket` derived from Sun altitude so clients
+  can show daylight, golden hour, twilight, and night changes across the same
+  Moon path without treating weather precision as minute-level.
 - Do not expose ephemeris sampling cadence such as `stepMinutes` in the public
   API.
 - Weather fields on an opportunity are aggregates over the merged weather
@@ -336,7 +346,77 @@ Response rules:
       "moon": {
         "altitudeDegrees": 4.2,
         "azimuthDegrees": 126.5,
-        "illuminationPercent": 96
+        "illuminationPercent": 96,
+        "phaseAngleDegrees": 157.1,
+        "phaseName": "waxing_gibbous"
+      },
+      "moonPath": {
+        "start": {
+          "at": "2026-06-29T18:48:00Z",
+          "altitudeDegrees": 0.1,
+          "azimuthDegrees": 119.4,
+          "sunAltitudeDegrees": -1.2,
+          "lightBucket": "civil_twilight",
+          "role": "start"
+        },
+        "suggested": {
+          "at": "2026-06-29T19:20:00Z",
+          "altitudeDegrees": 4.2,
+          "azimuthDegrees": 126.5,
+          "sunAltitudeDegrees": -4.8,
+          "lightBucket": "civil_twilight",
+          "role": "suggested"
+        },
+        "end": {
+          "at": "2026-06-29T20:04:00Z",
+          "altitudeDegrees": 11.8,
+          "azimuthDegrees": 138.2,
+          "sunAltitudeDegrees": -9.1,
+          "lightBucket": "nautical_twilight",
+          "role": "end"
+        },
+        "samples": [
+          {
+            "at": "2026-06-29T18:48:00Z",
+            "altitudeDegrees": 0.1,
+            "azimuthDegrees": 119.4,
+            "sunAltitudeDegrees": -1.2,
+            "lightBucket": "civil_twilight",
+            "role": "start"
+          },
+          {
+            "at": "2026-06-29T19:07:00Z",
+            "altitudeDegrees": 2.5,
+            "azimuthDegrees": 123.6,
+            "sunAltitudeDegrees": -3.2,
+            "lightBucket": "civil_twilight",
+            "role": "path"
+          },
+          {
+            "at": "2026-06-29T19:20:00Z",
+            "altitudeDegrees": 4.2,
+            "azimuthDegrees": 126.5,
+            "sunAltitudeDegrees": -4.8,
+            "lightBucket": "civil_twilight",
+            "role": "suggested"
+          },
+          {
+            "at": "2026-06-29T19:42:00Z",
+            "altitudeDegrees": 7.1,
+            "azimuthDegrees": 131.8,
+            "sunAltitudeDegrees": -6.8,
+            "lightBucket": "nautical_twilight",
+            "role": "path"
+          },
+          {
+            "at": "2026-06-29T20:04:00Z",
+            "altitudeDegrees": 11.8,
+            "azimuthDegrees": 138.2,
+            "sunAltitudeDegrees": -9.1,
+            "lightBucket": "nautical_twilight",
+            "role": "end"
+          }
+        ]
       },
       "sun": {
         "altitudeDegrees": -4.8,

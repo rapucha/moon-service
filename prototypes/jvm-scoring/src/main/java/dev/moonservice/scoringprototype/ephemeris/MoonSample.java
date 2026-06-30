@@ -7,6 +7,7 @@ public record MoonSample(
         double moonAltitudeDegrees,
         double moonAzimuthDegrees,
         double moonIlluminationPercent,
+        double moonPhaseAngleDegrees,
         double sunAltitudeDegrees
 ) {
 }

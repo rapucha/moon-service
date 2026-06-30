@@ -3,6 +3,7 @@
 
   var RECENT_KEY = "moonService.recentSearches.v1";
   var MAX_RECENT = 5;
+  var SVG_NS = "http://www.w3.org/2000/svg";
   var CONTROL_CHARACTER_PATTERN = /[\u0000-\u001F\u007F-\u009F\u061C\u200E\u200F\u202A-\u202E\u2066-\u2069]/u;
   var TERM_DESCRIPTIONS = {
     "Location": "The kind of place this lookup accepts.",
@@ -18,12 +19,12 @@
     "Moon azimuth": "Compass direction of the Moon, in degrees.",
     "Bucket": "The ambient-light category around the window, such as golden hour or twilight.",
     "Sun altitude": "Sun height relative to the horizon. Negative values mean the Sun is below the horizon.",
-    "Illumination": "How much of the Moon disk is lit.",
+    "Moon phase": "How much of the visible Moon disk is lit at the suggested time, including waxing or waning shape.",
     "Summary": "A compact weather description for the candidate window.",
     "Cloud": "Mean and maximum cloud cover across the candidate window.",
     "Precip": "Precipitation risk and expected amount across the candidate window.",
     "Visibility": "Forecast surface visibility near the location.",
-    "Moon phase": "How well the Moon illumination fits the scoring model.",
+    "Phase score": "How well the Moon illumination fits the scoring model.",
     "Sun light": "How well the ambient light fits the scoring model.",
     "Weather": "How well forecast conditions fit the scoring model.",
     "Confidence": "How much confidence the scoring model has in the forecast inputs."
@@ -280,6 +281,7 @@
   function renderOk(payload, request) {
     var location = payload.location || {};
     var timezone = location.timezone || "UTC";
+    var countryCode = location.countryCode || "";
     var opportunities = Array.isArray(payload.opportunities) ? payload.opportunities : [];
     var children = [
       resultSummary(payload, request, opportunities.length)
@@ -295,7 +297,7 @@
     } else {
       children.push(element("div", { className: "opportunity-list" },
         opportunities.map(function (opportunity, index) {
-          return opportunityCard(opportunity, index, timezone);
+          return opportunityCard(opportunity, index, timezone, countryCode);
         })
       ));
     }
@@ -305,7 +307,7 @@
     }
 
     if (Array.isArray(payload.rejected) && payload.rejected.length > 0) {
-      children.push(rejectedDetails(payload.rejected, timezone));
+      children.push(rejectedDetails(payload.rejected, timezone, countryCode));
     }
 
     replaceResults(children);
@@ -359,7 +361,7 @@
       element("p", {}, reason));
   }
 
-  function opportunityCard(opportunity, index, timezone) {
+  function opportunityCard(opportunity, index, timezone, countryCode) {
     var moon = opportunity.moon || {};
     var sun = opportunity.sun || {};
     var weather = opportunity.weather || {};
@@ -370,21 +372,22 @@
       element("header", { className: "opportunity-header" },
         element("div", { className: "opportunity-title" },
           element("p", { className: "rank-label" }, index === 0 ? "Best match" : "Option " + (index + 1)),
-          element("h3", {}, formatWindow(opportunity, timezone)),
+          element("h3", {}, formatWindow(opportunity, timezone, countryCode)),
           element("p", { className: "reason" }, opportunity.reason || "Ranked Moon opportunity.")),
         scoreBlock(opportunity.score)
       ),
       element("dl", { className: "fact-grid key-facts" },
-        fact("Suggested", formatDateTime(opportunity.suggestedAt, timezone)),
+        fact("Suggested", formatDateTime(opportunity.suggestedAt, timezone, countryCode)),
         fact("Duration", durationText(opportunity.startsAt, opportunity.endsAt)),
         fact("Moon altitude", degrees(moon.altitudeDegrees)),
         fact("Moon azimuth", degrees(moon.azimuthDegrees))
       ),
+      moonPathPanel(opportunity, timezone, countryCode),
       element("div", { className: "metric-columns" },
         metricGroup("Light", [
           fact("Bucket", readableToken(sun.lightBucket) || "Unavailable"),
           fact("Sun altitude", degrees(sun.altitudeDegrees)),
-          fact("Illumination", percent(moon.illuminationPercent))
+          fact("Moon phase", moonPhaseSummary(moon))
         ]),
         metricGroup("Weather", [
           fact("Summary", weather.summary || readableToken(weather.segmentKind) || "Forecast unavailable"),
@@ -418,6 +421,491 @@
     return element("section", { className: "metric-group" },
       element("h4", {}, title),
       element("dl", { className: "fact-grid compact" }, facts));
+  }
+
+  function moonPhaseSummary(moon) {
+    if (!Number.isFinite(moon.illuminationPercent) && !moon.phaseName) {
+      return "Unavailable";
+    }
+
+    var phaseName = readableToken(moon.phaseName) || "Moon phase";
+    var canvas = element("canvas", {
+      className: "moon-phase-canvas",
+      width: 48,
+      height: 48,
+      ariaLabel: phaseName,
+      title: phaseName + ", " + percent(moon.illuminationPercent) + " lit"
+    });
+    drawMoonPhase(canvas, moon.phaseAngleDegrees);
+
+    return element("span", { className: "phase-summary" },
+      canvas,
+      element("span", {},
+        element("strong", {}, phaseName),
+        element("span", {}, percent(moon.illuminationPercent) + " lit")));
+  }
+
+  function drawMoonPhase(canvas, phaseAngleDegrees) {
+    var context = canvas.getContext && canvas.getContext("2d");
+    if (!context) {
+      return;
+    }
+
+    var size = canvas.width;
+    var center = size / 2;
+    var radius = size * 0.43;
+    var image = context.createImageData(size, size);
+    var phase = Number.isFinite(phaseAngleDegrees) ? normalizeDegrees(phaseAngleDegrees) : 180;
+    var radians = phase * Math.PI / 180;
+    var sunX = Math.sin(radians);
+    var sunZ = -Math.cos(radians);
+
+    for (var y = 0; y < size; y += 1) {
+      for (var x = 0; x < size; x += 1) {
+        var dx = (x + 0.5 - center) / radius;
+        var dy = (y + 0.5 - center) / radius;
+        var distanceSquared = dx * dx + dy * dy;
+        var index = (y * size + x) * 4;
+        if (distanceSquared > 1) {
+          image.data[index + 3] = 0;
+          continue;
+        }
+
+        var z = Math.sqrt(1 - distanceSquared);
+        var lit = dx * sunX + z * sunZ > 0;
+        var shade = 0.72 + 0.28 * z;
+        var color = lit ? [244, 238, 206] : [42, 47, 52];
+        image.data[index] = Math.round(color[0] * shade);
+        image.data[index + 1] = Math.round(color[1] * shade);
+        image.data[index + 2] = Math.round(color[2] * shade);
+        image.data[index + 3] = 255;
+      }
+    }
+
+    context.putImageData(image, 0, 0);
+    context.beginPath();
+    context.arc(center, center, radius, 0, Math.PI * 2);
+    context.strokeStyle = "#d8e0df";
+    context.lineWidth = 1.5;
+    context.stroke();
+  }
+
+  function moonPathPanel(opportunity, timezone, countryCode) {
+    var path = opportunity.moonPath || {};
+    var samples = moonPathSamples(path);
+    if (samples.length < 2) {
+      return null;
+    }
+
+    return element("section", { className: "moon-path-panel" },
+      element("div", { className: "moon-path-header" },
+        element("h4", {}, "Moon path"),
+        element("p", {}, "Start, suggested, and end positions across the window")),
+      element("div", { className: "moon-path-summary" },
+        moonPathPoint("Start", path.start, timezone, countryCode),
+        moonPathPoint("Suggested", path.suggested, timezone, countryCode),
+        moonPathPoint("End", path.end, timezone, countryCode)),
+      element("div", { className: "moon-path-charts" },
+        chartBlock("Altitude", altitudeChart(samples, timezone, countryCode)),
+        chartBlock("Azimuth", azimuthChart(samples))));
+  }
+
+  function moonPathPoint(label, point, timezone, countryCode) {
+    if (!hasPosition(point)) {
+      return null;
+    }
+    return element("div", { className: "moon-path-point" },
+      element("span", { className: "moon-path-label" }, label),
+      element("span", { className: "moon-path-time" }, formatTime(point.at, timezone, countryCode)),
+      element("span", { className: "moon-path-position" },
+        element("span", {}, "Alt " + degrees(point.altitudeDegrees)),
+        element("span", {}, "Az " + degrees(point.azimuthDegrees))));
+  }
+
+  function chartBlock(label, chart) {
+    if (!chart) {
+      return null;
+    }
+    return element("div", { className: "moon-chart" },
+      element("span", { className: "moon-chart-label" }, label),
+      chart);
+  }
+
+  function altitudeChart(samples, timezone, countryCode) {
+    var points = chartSamples(samples);
+    if (points.length < 2) {
+      return null;
+    }
+
+    var width = 400;
+    var height = 130;
+    var left = 34;
+    var right = 14;
+    var top = 18;
+    var bottom = 94;
+    var firstTime = points[0].time;
+    var lastTime = points[points.length - 1].time;
+    var timeSpan = Math.max(1, lastTime - firstTime);
+    var maxAltitude = points.reduce(function (max, point) {
+      return Math.max(max, point.altitudeDegrees);
+    }, 0);
+    var ceiling = Math.min(90, Math.max(12, Math.ceil((maxAltitude + 1) / 5) * 5));
+    var chartWidth = width - left - right;
+    var chartHeight = bottom - top;
+
+    points.forEach(function (point) {
+      point.x = left + ((point.time - firstTime) / timeSpan) * chartWidth;
+      point.y = bottom - (clamp(point.altitudeDegrees, 0, ceiling) / ceiling) * chartHeight;
+    });
+
+    var bands = lightBandSegments(points);
+    var timeTicks = altitudeHourTicks(points, timezone);
+    var line = altitudeArcPath(points);
+
+    return svgElement("svg", {
+      className: "altitude-chart",
+      viewBox: "0 0 " + width + " " + height,
+      role: "img",
+      ariaLabel: "Moon altitude across the opportunity window"
+    },
+      bands.map(function (band) {
+        return svgElement("rect", {
+          className: "light-band is-" + roleClass(band.lightBucket),
+          x: round1(band.x),
+          y: top,
+          width: round1(band.width),
+          height: chartHeight
+        },
+          svgElement("title", {}, lightBandTitle(band, timezone, countryCode)));
+      }),
+      svgElement("line", { className: "chart-gridline", x1: left, y1: bottom, x2: width - right, y2: bottom }),
+      svgElement("line", { className: "chart-gridline", x1: left, y1: top, x2: width - right, y2: top }),
+      svgElement("text", { className: "chart-axis-label", x: 4, y: bottom + 4 }, "0 deg"),
+      svgElement("text", { className: "chart-axis-label", x: 4, y: top + 4 }, ceiling + " deg"),
+      timeTicks.map(function (tick) {
+        return svgElement("line", {
+          className: "chart-tick",
+          x1: round1(tick.x),
+          y1: bottom,
+          x2: round1(tick.x),
+          y2: bottom + 5
+        });
+      }),
+      timeTicks.map(function (tick) {
+        return svgElement("text", {
+          className: "chart-time-label is-" + tick.role,
+          x: round1(tick.x),
+          y: tick.y,
+          textAnchor: tick.anchor
+        }, formatHourTick(tick.at, timezone, countryCode));
+      }),
+      svgElement("path", { className: "chart-path", d: line }),
+      keyPathMarkers(points).map(function (point) {
+        return svgElement("circle", {
+          className: "chart-dot is-" + roleClass(point.role),
+          cx: round1(point.x),
+          cy: round1(point.y),
+          r: point.role === "suggested" ? 4.5 : 3.4
+        });
+      })
+    );
+  }
+
+  function azimuthChart(samples) {
+    var points = chartSamples(samples);
+    if (points.length < 2) {
+      return null;
+    }
+
+    var width = 190;
+    var height = 150;
+    var centerX = 95;
+    var centerY = 72;
+    var radius = 48;
+    var ringPoints = points.map(function (point) {
+      var plotted = polarPoint(point.azimuthDegrees, centerX, centerY, radius);
+      plotted.role = point.role;
+      return plotted;
+    });
+    var sector = "M " + centerX + " " + centerY + " L " + ringPoints.map(function (point) {
+      return round1(point.x) + " " + round1(point.y);
+    }).join(" L ") + " Z";
+    var sweep = ringPoints.map(function (point, index) {
+      return (index === 0 ? "M " : "L ") + round1(point.x) + " " + round1(point.y);
+    }).join(" ");
+
+    return svgElement("svg", {
+      className: "azimuth-chart",
+      viewBox: "0 0 " + width + " " + height,
+      role: "img",
+      ariaLabel: "Moon azimuth sweep across cardinal directions"
+    },
+      svgElement("title", {}, "Moon direction sweep across the opportunity window"),
+      svgElement("circle", { className: "compass-ring", cx: centerX, cy: centerY, r: radius }),
+      svgElement("line", { className: "compass-axis", x1: centerX, y1: centerY - radius, x2: centerX, y2: centerY + radius }),
+      svgElement("line", { className: "compass-axis", x1: centerX - radius, y1: centerY, x2: centerX + radius, y2: centerY }),
+      svgElement("text", { className: "compass-label", x: centerX, y: 16, textAnchor: "middle" }, "N"),
+      svgElement("text", { className: "compass-label", x: centerX + radius + 18, y: centerY + 4, textAnchor: "middle" }, "E"),
+      svgElement("text", { className: "compass-label", x: centerX, y: centerY + radius + 24, textAnchor: "middle" }, "S"),
+      svgElement("text", { className: "compass-label", x: centerX - radius - 18, y: centerY + 4, textAnchor: "middle" }, "W"),
+      svgElement("path", { className: "compass-sector", d: sector }),
+      svgElement("path", { className: "chart-path", d: sweep }),
+      keyPathMarkers(ringPoints).map(function (point) {
+        return svgElement("circle", {
+          className: "chart-dot is-" + roleClass(point.role),
+          cx: round1(point.x),
+          cy: round1(point.y),
+          r: point.role === "suggested" ? 4.5 : 3.4
+        });
+      })
+    );
+  }
+
+  function moonPathSamples(path) {
+    var samples = Array.isArray(path.samples) ? path.samples : [path.start, path.suggested, path.end];
+    return samples.filter(hasPosition).slice().sort(function (a, b) {
+      return new Date(a.at).getTime() - new Date(b.at).getTime();
+      });
+  }
+
+  function keyPathMarkers(points) {
+    return points.filter(function (point) {
+      return point.role === "start" || point.role === "suggested" || point.role === "end";
+    });
+  }
+
+  function lightBandSegments(points) {
+    return points.slice(0, -1).reduce(function (bands, point, index) {
+      var next = points[index + 1];
+      var bucket = point.lightBucket || next.lightBucket || "unknown";
+      var segment = {
+        x: point.x,
+        endX: next.x,
+        width: Math.max(0, next.x - point.x),
+        startsAt: point.at,
+        endsAt: next.at,
+        lightBucket: bucket
+      };
+      if (segment.width <= 0) {
+        return bands;
+      }
+
+      var previous = bands[bands.length - 1];
+      if (previous && previous.lightBucket === bucket) {
+        previous.endX = segment.endX;
+        previous.width = Math.max(0, previous.endX - previous.x);
+        previous.endsAt = segment.endsAt;
+      } else {
+        bands.push(segment);
+      }
+      return bands;
+    }, []);
+  }
+
+  function altitudeHourTicks(points, timezone) {
+    var first = points[0];
+    var last = points[points.length - 1];
+    var span = Math.max(1, last.time - first.time);
+    var chartWidth = Math.max(1, last.x - first.x);
+    var minimumGap = 46;
+    var cursor = firstLocalHourAtOrAfter(first.time, timezone);
+    var ticks = [];
+
+    while (cursor <= last.time) {
+      var x = first.x + ((cursor - first.time) / span) * chartWidth;
+      if (ticks.length === 0 || x - ticks[ticks.length - 1].x >= minimumGap) {
+        ticks.push({
+          at: new Date(cursor).toISOString(),
+          x: x,
+          anchor: "middle",
+          role: "hour",
+          y: 123
+        });
+      }
+      cursor += 60 * 60 * 1000;
+    }
+
+    return ticks;
+  }
+
+  function firstLocalHourAtOrAfter(time, timezone) {
+    var minuteMillis = 60 * 1000;
+    var cursor = Math.ceil(time / minuteMillis) * minuteMillis;
+    var searchLimit = cursor + (60 * minuteMillis);
+
+    while (cursor <= searchLimit) {
+      if (localMinuteOfHour(cursor, timezone) === 0) {
+        return cursor;
+      }
+      cursor += minuteMillis;
+    }
+
+    return Math.ceil(time / (60 * minuteMillis)) * 60 * minuteMillis;
+  }
+
+  function localMinuteOfHour(time, timezone) {
+    try {
+      var parts = new Intl.DateTimeFormat("en-US", {
+        minute: "numeric",
+        timeZone: timezone || "UTC"
+      }).formatToParts(new Date(time));
+      var minute = parts.find(function (part) {
+        return part.type === "minute";
+      });
+      return minute ? Number(minute.value) : new Date(time).getUTCMinutes();
+    } catch (error) {
+      return new Date(time).getUTCMinutes();
+    }
+  }
+
+  function altitudeArcPath(points) {
+    if (points.length === 0) {
+      return "";
+    }
+    if (points.length === 1) {
+      return "M " + round1(points[0].x) + " " + round1(points[0].y);
+    }
+    if (points.length === 2) {
+      return linearPath(points);
+    }
+
+    var start = points[0];
+    var anchor = arcAnchor(points);
+    var end = points[points.length - 1];
+    var circle = circleThrough(start, anchor, end);
+    if (!circle) {
+      return quadraticArcPath(start, anchor, end);
+    }
+
+    var startAngle = Math.atan2(start.y - circle.y, start.x - circle.x);
+    var anchorAngle = Math.atan2(anchor.y - circle.y, anchor.x - circle.x);
+    var endAngle = Math.atan2(end.y - circle.y, end.x - circle.x);
+    var forwardTotal = positiveAngleDelta(startAngle, endAngle);
+    var forwardAnchor = positiveAngleDelta(startAngle, anchorAngle);
+    var forward = forwardAnchor <= forwardTotal;
+
+    return "M " + round1(start.x) + " " + round1(start.y)
+      + arcCommand(circle.radius, startAngle, anchorAngle, forward, anchor)
+      + arcCommand(circle.radius, anchorAngle, endAngle, forward, end);
+  }
+
+  function linearPath(points) {
+    return points.map(function (point, index) {
+      return (index === 0 ? "M " : "L ") + round1(point.x) + " " + round1(point.y);
+    }).join(" ");
+  }
+
+  function arcAnchor(points) {
+    var start = points[0];
+    var end = points[points.length - 1];
+    var dx = end.x - start.x;
+    var dy = end.y - start.y;
+    var length = Math.sqrt(dx * dx + dy * dy);
+    var fallback = points[Math.floor(points.length / 2)];
+    if (length === 0) {
+      return fallback;
+    }
+
+    return points.slice(1, -1).reduce(function (best, point) {
+      var distance = Math.abs(dy * point.x - dx * point.y + end.x * start.y - end.y * start.x) / length;
+      return distance > best.distance ? { point: point, distance: distance } : best;
+    }, { point: fallback, distance: -1 }).point;
+  }
+
+  function circleThrough(first, second, third) {
+    var determinant = 2 * (first.x * (second.y - third.y)
+      + second.x * (third.y - first.y)
+      + third.x * (first.y - second.y));
+    if (Math.abs(determinant) < 0.001) {
+      return null;
+    }
+
+    var firstSquared = first.x * first.x + first.y * first.y;
+    var secondSquared = second.x * second.x + second.y * second.y;
+    var thirdSquared = third.x * third.x + third.y * third.y;
+    var x = (firstSquared * (second.y - third.y)
+      + secondSquared * (third.y - first.y)
+      + thirdSquared * (first.y - second.y)) / determinant;
+    var y = (firstSquared * (third.x - second.x)
+      + secondSquared * (first.x - third.x)
+      + thirdSquared * (second.x - first.x)) / determinant;
+    var radius = Math.sqrt((first.x - x) * (first.x - x) + (first.y - y) * (first.y - y));
+
+    if (!Number.isFinite(radius) || radius > 10000) {
+      return null;
+    }
+    return { x: x, y: y, radius: radius };
+  }
+
+  function arcCommand(radius, fromAngle, toAngle, forward, point) {
+    var delta = forward ? positiveAngleDelta(fromAngle, toAngle) : positiveAngleDelta(toAngle, fromAngle);
+    var largeArc = delta > Math.PI ? 1 : 0;
+    var sweep = forward ? 1 : 0;
+    return " A " + round1(radius) + " " + round1(radius) + " 0 "
+      + largeArc + " " + sweep + " "
+      + round1(point.x) + " " + round1(point.y);
+  }
+
+  function positiveAngleDelta(from, to) {
+    var delta = (to - from) % (Math.PI * 2);
+    return delta < 0 ? delta + Math.PI * 2 : delta;
+  }
+
+  function quadraticArcPath(start, anchor, end) {
+    var t = clamp((anchor.x - start.x) / Math.max(1, end.x - start.x), 0.1, 0.9);
+    var inverse = 1 - t;
+    var denominator = 2 * inverse * t;
+    var controlX = (anchor.x - inverse * inverse * start.x - t * t * end.x) / denominator;
+    var controlY = (anchor.y - inverse * inverse * start.y - t * t * end.y) / denominator;
+
+    return "M " + round1(start.x) + " " + round1(start.y)
+      + " Q " + round1(controlX) + " " + round1(controlY)
+      + " " + round1(end.x) + " " + round1(end.y);
+  }
+
+  function lightBandTitle(band, timezone, countryCode) {
+    return (readableToken(band.lightBucket) || "Light bucket")
+      + ", "
+      + formatTime(band.startsAt, timezone, countryCode)
+      + " to "
+      + formatTime(band.endsAt, timezone, countryCode);
+  }
+
+  function chartSamples(samples) {
+    return samples.map(function (sample) {
+      return {
+        at: sample.at,
+        time: new Date(sample.at).getTime(),
+        altitudeDegrees: sample.altitudeDegrees,
+        azimuthDegrees: sample.azimuthDegrees,
+        sunAltitudeDegrees: sample.sunAltitudeDegrees,
+        lightBucket: sample.lightBucket,
+        role: sample.role || "path"
+      };
+    }).filter(function (sample) {
+      return Number.isFinite(sample.time)
+        && Number.isFinite(sample.altitudeDegrees)
+        && Number.isFinite(sample.azimuthDegrees);
+    });
+  }
+
+  function hasPosition(point) {
+    return point
+      && point.at
+      && Number.isFinite(point.altitudeDegrees)
+      && Number.isFinite(point.azimuthDegrees);
+  }
+
+  function roleClass(role) {
+    return String(role || "path").replace(/[^a-z0-9_-]/gi, "").toLowerCase() || "path";
+  }
+
+  function polarPoint(azimuthDegrees, centerX, centerY, radius) {
+    var radians = normalizeDegrees(azimuthDegrees) * Math.PI / 180;
+    return {
+      x: centerX + Math.sin(radians) * radius,
+      y: centerY - Math.cos(radians) * radius
+    };
   }
 
   function opportunityActions(opportunity) {
@@ -456,7 +944,7 @@
     var entries = [
       ["Moon altitude", components.moonAltitudeFit],
       ["Sun light", components.sunLightFit],
-      ["Moon phase", components.moonIlluminationFit],
+      ["Phase score", components.moonIlluminationFit],
       ["Weather", components.weatherFit],
       ["Confidence", components.forecastConfidence]
     ].filter(function (entry) {
@@ -541,13 +1029,17 @@
     );
   }
 
-  function rejectedDetails(rejected, timezone) {
+  function rejectedDetails(rejected, timezone, countryCode) {
     return element("details", { className: "rejected-details" },
       element("summary", {}, "Rejected windows"),
       element("ul", { className: "messages" },
         rejected.slice(0, 5).map(function (window) {
           return element("li", {},
-            formatDateTime(window.startsAt, timezone) + " - " + formatDateTime(window.endsAt, timezone) + ": " + (window.reason || "Rejected by scoring filters."))
+            formatDateTime(window.startsAt, timezone, countryCode)
+              + " - "
+              + formatDateTime(window.endsAt, timezone, countryCode)
+              + ": "
+              + (window.reason || "Rejected by scoring filters."))
         })
       )
     );
@@ -690,6 +1182,33 @@
     return node;
   }
 
+  function svgElement(tagName, attributes) {
+    var node = document.createElementNS(SVG_NS, tagName);
+    var children = Array.prototype.slice.call(arguments, 2);
+    attributes = attributes || {};
+
+    Object.keys(attributes).forEach(function (name) {
+      var value = attributes[name];
+      if (value === null || value === undefined) {
+        return;
+      }
+      if (name === "className") {
+        node.setAttribute("class", value);
+      } else if (name === "textContent") {
+        node.textContent = value;
+      } else if (name === "ariaLabel") {
+        node.setAttribute("aria-label", value);
+      } else if (name === "textAnchor") {
+        node.setAttribute("text-anchor", value);
+      } else {
+        node.setAttribute(name, value);
+      }
+    });
+
+    appendChildren(node, children);
+    return node;
+  }
+
   function appendChildren(node, children) {
     children.flat().forEach(function (child) {
       if (child === null || child === undefined) {
@@ -703,16 +1222,18 @@
     });
   }
 
-  function formatWindow(opportunity, timezone) {
-    return formatDateTime(opportunity.startsAt, timezone) + " to " + formatTime(opportunity.endsAt, timezone);
+  function formatWindow(opportunity, timezone, countryCode) {
+    return formatDateTime(opportunity.startsAt, timezone, countryCode)
+      + " to "
+      + formatTime(opportunity.endsAt, timezone, countryCode);
   }
 
-  function formatDateTime(value, timezone) {
+  function formatDateTime(value, timezone, countryCode) {
     if (!value) {
       return "Unavailable";
     }
     try {
-      return new Intl.DateTimeFormat(undefined, {
+      return new Intl.DateTimeFormat(localeForCountry(countryCode), {
         dateStyle: "medium",
         timeStyle: "short",
         timeZone: timezone || "UTC"
@@ -722,18 +1243,79 @@
     }
   }
 
-  function formatTime(value, timezone) {
+  function formatTime(value, timezone, countryCode) {
     if (!value) {
       return "Unavailable";
     }
     try {
-      return new Intl.DateTimeFormat(undefined, {
+      return new Intl.DateTimeFormat(localeForCountry(countryCode), {
         timeStyle: "short",
         timeZone: timezone || "UTC"
       }).format(new Date(value));
     } catch (error) {
       return value;
     }
+  }
+
+  function formatHourTick(value, timezone, countryCode) {
+    if (!value) {
+      return "";
+    }
+    try {
+      var options = usesTwentyFourHourClock(countryCode)
+        ? {
+          hour: "2-digit",
+          minute: "2-digit",
+          hourCycle: "h23",
+          timeZone: timezone || "UTC"
+        }
+        : {
+          hour: "numeric",
+          timeZone: timezone || "UTC"
+        };
+      return new Intl.DateTimeFormat(localeForCountry(countryCode), options).format(new Date(value));
+    } catch (error) {
+      return formatTime(value, timezone, countryCode);
+    }
+  }
+
+  function usesTwentyFourHourClock(countryCode) {
+    try {
+      var hourCycle = new Intl.DateTimeFormat(localeForCountry(countryCode), {
+        hour: "numeric"
+      }).resolvedOptions().hourCycle;
+      return hourCycle === "h23" || hourCycle === "h24";
+    } catch (error) {
+      return false;
+    }
+  }
+
+  function localeForCountry(countryCode) {
+    var code = String(countryCode || "").trim().toUpperCase();
+    if (!/^[A-Z]{2}$/.test(code)) {
+      return undefined;
+    }
+
+    var language = browserLanguage();
+    var regionalLocale = language + "-" + code;
+    if (Intl.DateTimeFormat.supportedLocalesOf([regionalLocale]).length > 0) {
+      return regionalLocale;
+    }
+
+    var regionOnlyLocale = "und-" + code;
+    if (Intl.DateTimeFormat.supportedLocalesOf([regionOnlyLocale]).length > 0) {
+      return regionOnlyLocale;
+    }
+
+    return undefined;
+  }
+
+  function browserLanguage() {
+    var locale = navigator.languages && navigator.languages.length > 0
+      ? navigator.languages[0]
+      : navigator.language;
+    var match = String(locale || "en").match(/^[a-z]{2,3}/i);
+    return match ? match[0].toLowerCase() : "en";
   }
 
   function durationText(startsAt, endsAt) {
@@ -756,6 +1338,19 @@
 
   function degrees(value) {
     return Number.isFinite(value) ? value.toFixed(1) + " deg" : "unavailable";
+  }
+
+  function round1(value) {
+    return Math.round(value * 10) / 10;
+  }
+
+  function clamp(value, min, max) {
+    return Math.max(min, Math.min(max, value));
+  }
+
+  function normalizeDegrees(value) {
+    var normalized = value % 360;
+    return normalized < 0 ? normalized + 360 : normalized;
   }
 
   function percent(value) {
