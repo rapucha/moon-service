@@ -3,6 +3,7 @@ package dev.moonservice.backend.web;
 import dev.moonservice.backend.observability.CacheMetricsSnapshot;
 import dev.moonservice.backend.observability.CacheMetricsSource;
 import dev.moonservice.backend.observability.OpenMeteoObservability;
+import dev.moonservice.backend.observability.quota.ProviderQuotaMonitor;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -14,13 +15,16 @@ import java.util.Map;
 @RestController
 class AdminStatusController {
     private final OpenMeteoObservability openMeteoObservability;
+    private final ProviderQuotaMonitor providerQuotaMonitor;
     private final List<CacheMetricsSource> cacheMetricsSources;
 
     AdminStatusController(
             OpenMeteoObservability openMeteoObservability,
+            ProviderQuotaMonitor providerQuotaMonitor,
             List<CacheMetricsSource> cacheMetricsSources
     ) {
         this.openMeteoObservability = openMeteoObservability;
+        this.providerQuotaMonitor = providerQuotaMonitor;
         this.cacheMetricsSources = List.copyOf(cacheMetricsSources);
     }
 
@@ -30,7 +34,8 @@ class AdminStatusController {
                 new AppStatus("ok"),
                 new ProviderStatus(
                         openMeteoObservability.geocodingSnapshot(),
-                        openMeteoObservability.weatherSnapshot()),
+                        openMeteoObservability.weatherSnapshot(),
+                        providerQuotaMonitor.snapshots()),
                 cacheMetrics());
     }
 
@@ -54,7 +59,8 @@ class AdminStatusController {
 
     record ProviderStatus(
             OpenMeteoObservability.GeocodingSnapshot openMeteoGeocoding,
-            OpenMeteoObservability.WeatherSnapshot openMeteoWeather
+            OpenMeteoObservability.WeatherSnapshot openMeteoWeather,
+            Map<String, ProviderQuotaMonitor.ProviderQuotaSnapshot> operations
     ) {
     }
 }

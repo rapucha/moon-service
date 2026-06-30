@@ -192,20 +192,43 @@ app:
   environment
 
 providers:
+  operations:
+    open-meteo-weather:
+      provider
+      operation
+      usage:
+        hourly:
+          windowStartedAt
+          used
+          limit
+          knownLimit
+          percentUsed
+          warningState
+        daily:
+          windowStartedAt
+          used
+          limit
+          knownLimit
+          percentUsed
+          warningState
+        monthly:
+          windowStartedAt
+          used
+          limit
+          knownLimit
+          percentUsed
+          warningState
+    open-meteo-geocoding:
+      provider
+      operation
+      usage:
+        hourly
+        daily
+        monthly
   open_meteo_weather:
-    calls_current_hour
-    calls_today
-    calls_this_month
-    known_limits
-    percent_used
-    recent_errors
+    aggregate outcome counters and latency summary
   open_meteo_geocoding:
-    calls_current_hour
-    calls_today
-    calls_this_month
-    known_limits
-    percent_used
-    recent_errors
+    aggregate outcome counters and latency summary
 
 caches:
   geocoding_hit_rate
@@ -220,7 +243,12 @@ public_api:
   opportunity_search_rate_limit
 ```
 
-The status page should make quota risk visible before exhaustion. If known limits are configured, show warning states at roughly 50 percent, 80 percent, and 95 percent usage.
+The status page should make quota risk visible before exhaustion. If known
+limits are configured, show warning states at roughly 50 percent, 80 percent,
+and 95 percent usage. Unknown limits must stay explicit instead of returning a
+fake percent. Provider operations should stay generic enough for later
+geocoding, weather, email, calendar, ephemeris, map, or LLM-backed fictional
+location providers.
 
 ## Candidate Kinds
 

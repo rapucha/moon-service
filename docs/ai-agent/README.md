@@ -32,6 +32,7 @@ Use These Docs
    - `checklists/change-review.md`
    - `checklists/api-contract-change.md`
    - `checklists/module-addition.md`
+   - `checklists/provider-observability.md`
 8. For multi-session or complex work, use `state/task-template.md`.
 
 Canonical Context

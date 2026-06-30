@@ -12,13 +12,17 @@ import dev.moonservice.backend.openmeteo.OpenMeteoFailureKind;
 import dev.moonservice.backend.openmeteo.OpenMeteoTransport;
 import dev.moonservice.backend.openmeteo.OpenMeteoTransportException;
 import dev.moonservice.backend.openmeteo.RetryingOpenMeteoTransport;
+import dev.moonservice.backend.observability.quota.ProviderQuotaMonitor;
 import dev.moonservice.backend.weather.HourlyWeather;
 import dev.moonservice.backend.weather.WeatherForecastUnavailableException;
 
 import java.net.URI;
+import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
+import java.time.ZoneOffset;
 import java.time.ZoneId;
+import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -27,7 +31,7 @@ import org.junit.jupiter.api.Test;
 class OpenMeteoObservabilityTest {
     @Test
     void recordsLocationOutcomes() {
-        OpenMeteoObservability observability = new OpenMeteoObservability();
+        OpenMeteoObservability observability = openMeteoObservability();
         ObservedLocationResolver resolver = new ObservedLocationResolver(
                 query -> LocationResolution.resolved(location()),
                 observability.geocoding());
@@ -44,7 +48,7 @@ class OpenMeteoObservabilityTest {
 
     @Test
     void recordsWeatherOutcomes() {
-        OpenMeteoObservability observability = new OpenMeteoObservability();
+        OpenMeteoObservability observability = openMeteoObservability();
         ObservedWeatherForecastProvider availableProvider = new ObservedWeatherForecastProvider(
                 (location, startsAt, endsAt, forecastHorizonDays) -> instant -> weather(instant),
                 observability.weather());
@@ -67,7 +71,7 @@ class OpenMeteoObservabilityTest {
 
     @Test
     void recordsTransportFailureKindsAndRetries() {
-        OpenMeteoObservability observability = new OpenMeteoObservability();
+        OpenMeteoObservability observability = openMeteoObservability();
         assertThrows(
                 OpenMeteoTransportException.class,
                 () -> new ObservingOpenMeteoTransport(
@@ -104,6 +108,33 @@ class OpenMeteoObservabilityTest {
         assertEquals(1, snapshot.rateLimited());
         assertEquals(1, snapshot.timeouts());
         assertEquals(1, snapshot.retries());
+    }
+
+    @Test
+    void recordsOutboundTransportCallsForQuotaUsage() {
+        ProviderQuotaMonitor quotaMonitor = openMeteoQuotaMonitor();
+        OpenMeteoObservability observability = new OpenMeteoObservability(quotaMonitor);
+        OpenMeteoTransport transport = new ObservingOpenMeteoTransport(
+                requestUri -> "{}",
+                observability.weather());
+
+        assertEquals("{}", transport.get(URI.create("https://example.test/forecast")));
+
+        ProviderQuotaMonitor.ProviderQuotaWindowSnapshot hourly = quotaMonitor.snapshots()
+                .get(OpenMeteoObservability.WEATHER_OPERATION.id())
+                .usage()
+                .hourly();
+        assertEquals(1, hourly.used());
+    }
+
+    private static OpenMeteoObservability openMeteoObservability() {
+        return new OpenMeteoObservability(openMeteoQuotaMonitor());
+    }
+
+    private static ProviderQuotaMonitor openMeteoQuotaMonitor() {
+        return new ProviderQuotaMonitor(
+                Clock.fixed(Instant.parse("2026-06-29T12:34:56Z"), ZoneOffset.UTC),
+                List.of(OpenMeteoObservability.GEOCODING_OPERATION, OpenMeteoObservability.WEATHER_OPERATION));
     }
 
     private static ResolvedLocation location() {

@@ -102,6 +102,28 @@ Account Switching Guardrail
   workflow defaults to the agent account as soon as the approved action is
   complete.
 
+GitHub CLI Auth Troubleshooting
+- If `gh auth status` reports an invalid token from Codex, do not immediately
+  assume the GitHub token is bad. In this environment, sandboxed network access
+  can make `gh` report a valid token as invalid.
+- Retry the auth check with network access before asking the user to rotate a
+  token:
+  - `gh auth status`
+  - `gh api user --jq .login`
+- If the user's normal terminal reports a valid account but Codex still cannot
+  authenticate, check whether the terminal is using keyring-backed auth while
+  Codex can only see `~/.config/gh/hosts.yml`.
+- Do not print token values while inspecting GitHub CLI config. Redact
+  `oauth_token` values if showing `hosts.yml` contents.
+- If Codex must use `gh` and cannot access the keyring, the user may choose to
+  run `gh auth login -h github.com --with-token --insecure-storage` so GitHub
+  CLI writes a plaintext token entry that the Codex process can read. Call out
+  the plaintext-storage risk and recommend a short-lived token or later
+  rotation.
+- Prefer confirming the active account with `gh api user --jq .login` before
+  creating PRs or issue comments. Do not switch to the owner account unless the
+  user explicitly approves that exact identity switch.
+
 Setup Checklist
 1. Create or choose the dedicated GitHub user account that will act as the
    agent account.

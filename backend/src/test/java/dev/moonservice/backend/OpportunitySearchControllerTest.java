@@ -138,6 +138,13 @@ class OpportunitySearchControllerTest {
                 .jsonPath("$.app.status").isEqualTo("ok")
                 .jsonPath("$.providers.openMeteoGeocoding.calls").isNumber()
                 .jsonPath("$.providers.openMeteoWeather.calls").isNumber()
+                .jsonPath("$.providers.operations['open-meteo-geocoding'].provider").isEqualTo("open-meteo")
+                .jsonPath("$.providers.operations['open-meteo-geocoding'].operation").isEqualTo("geocoding")
+                .jsonPath("$.providers.operations['open-meteo-geocoding'].usage.hourly.used").isNumber()
+                .jsonPath("$.providers.operations['open-meteo-geocoding'].usage.hourly.knownLimit").isBoolean()
+                .jsonPath("$.providers.operations['open-meteo-geocoding'].usage.hourly.warningState")
+                .value(String.class, value -> assertTrue(!value.isBlank()))
+                .jsonPath("$.providers.operations['open-meteo-weather'].provider").isEqualTo("open-meteo")
                 .jsonPath("$.caches").exists();
     }
 

@@ -20,6 +20,7 @@ public final class ObservingOpenMeteoTransport implements OpenMeteoTransport {
 
     @Override
     public String get(URI requestUri) throws OpenMeteoTransportException {
+        metrics.recordProviderCall();
         try {
             return delegate.get(requestUri);
         } catch (OpenMeteoTransportException ex) {

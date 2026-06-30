@@ -2,14 +2,34 @@ package dev.moonservice.backend.observability;
 
 import dev.moonservice.backend.location.LocationResolution;
 import dev.moonservice.backend.openmeteo.OpenMeteoFailureKind;
+import dev.moonservice.backend.observability.quota.ProviderOperationDefinition;
+import dev.moonservice.backend.observability.quota.ProviderQuotaLimits;
+import dev.moonservice.backend.observability.quota.ProviderQuotaMonitor;
 
 import java.util.Objects;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.LongAdder;
 
 public final class OpenMeteoObservability {
-    private final ProviderMetrics geocoding = new ProviderMetrics();
-    private final ProviderMetrics weather = new ProviderMetrics();
+    public static final ProviderOperationDefinition GEOCODING_OPERATION = new ProviderOperationDefinition(
+            "open-meteo-geocoding",
+            "open-meteo",
+            "geocoding",
+            ProviderQuotaLimits.unknown());
+    public static final ProviderOperationDefinition WEATHER_OPERATION = new ProviderOperationDefinition(
+            "open-meteo-weather",
+            "open-meteo",
+            "weather",
+            ProviderQuotaLimits.unknown());
+
+    private final ProviderMetrics geocoding;
+    private final ProviderMetrics weather;
+
+    public OpenMeteoObservability(ProviderQuotaMonitor quotaMonitor) {
+        Objects.requireNonNull(quotaMonitor, "quotaMonitor");
+        this.geocoding = new ProviderMetrics(quotaMonitor.operation(GEOCODING_OPERATION.id()));
+        this.weather = new ProviderMetrics(quotaMonitor.operation(WEATHER_OPERATION.id()));
+    }
 
     public ProviderMetrics geocoding() {
         return geocoding;
@@ -48,6 +68,7 @@ public final class OpenMeteoObservability {
     }
 
     public static final class ProviderMetrics {
+        private final ProviderQuotaMonitor.ProviderQuotaCounter quotaCounter;
         private final LongAdder calls = new LongAdder();
         private final LongAdder resolved = new LongAdder();
         private final LongAdder ambiguous = new LongAdder();
@@ -59,6 +80,14 @@ public final class OpenMeteoObservability {
         private final LongAdder rateLimited = new LongAdder();
         private final LongAdder totalLatencyNanos = new LongAdder();
         private final AtomicLong maxLatencyNanos = new AtomicLong();
+
+        private ProviderMetrics(ProviderQuotaMonitor.ProviderQuotaCounter quotaCounter) {
+            this.quotaCounter = Objects.requireNonNull(quotaCounter, "quotaCounter");
+        }
+
+        public void recordProviderCall() {
+            quotaCounter.recordCall();
+        }
 
         public void recordLocationOutcome(LocationResolution.Status status, long durationNanos) {
             recordCall(durationNanos);

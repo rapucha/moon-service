@@ -15,8 +15,9 @@ feeds, and calendar exports deliberately out of scope.
   prototype fixture.
 - Runtime city/location resolution is Open-Meteo backed through the
   backend-owned `LocationResolver` seam.
-- Request-level logging, process-local Open-Meteo counters, cache stats, and a
-  protected operator status endpoint are available for small test spikes.
+- Request-level logging, process-local provider counters, quota windows, cache
+  stats, and a protected operator status endpoint are available for small test
+  spikes.
 - Open-Meteo geocoding adapter code under `backend.location.openmeteo`, covered
   by saved provider JSON fixtures. It can be selected for live city/location
   lookup with `moon.location.resolver=open-meteo`.
@@ -109,6 +110,34 @@ reason to tune them.
 | `moon.cache.weather.maximum-size` | `1000` | Process-local weather cache maximum entries. |
 | `moon.cache.weather.available-ttl` | `1h` | TTL for successful weather forecasts. |
 | `moon.cache.weather.unavailable-ttl` | `30s` | TTL for temporarily unavailable weather lookups. |
+| `moon.provider-quotas.operations.<id>.provider` | default for built-in operations, otherwise unset | Provider name for an operation tracked in `/admin/status`, for example `open-meteo` or a future LLM provider. |
+| `moon.provider-quotas.operations.<id>.operation` | default for built-in operations, otherwise unset | Operation name, for example `geocoding`, `weather`, or `fictional-location-resolution`. |
+| `moon.provider-quotas.operations.<id>.hourly-limit` | unknown | Optional known hourly call limit. |
+| `moon.provider-quotas.operations.<id>.daily-limit` | unknown | Optional known daily call limit. |
+| `moon.provider-quotas.operations.<id>.monthly-limit` | unknown | Optional known monthly call limit. |
+
+Quota limits are configuration, not code constants, so operators can switch
+provider plans without rebuilding. The backend always registers
+`open-meteo-geocoding` and `open-meteo-weather` with unknown limits unless
+limits are configured. Extra operations can be added to the status surface
+before their provider integration is wired, as long as both provider and
+operation names are configured.
+
+Example local Open-Meteo free-tier limits:
+
+```bash
+mvn -pl backend -am spring-boot:run \
+  -Dspring-boot.run.arguments="--moon.location.resolver=open-meteo --moon.weather.provider=open-meteo --moon.admin.token=$ADMIN_TOKEN --moon.provider-quotas.operations.open-meteo-geocoding.hourly-limit=5000 --moon.provider-quotas.operations.open-meteo-geocoding.daily-limit=10000 --moon.provider-quotas.operations.open-meteo-weather.hourly-limit=5000 --moon.provider-quotas.operations.open-meteo-weather.daily-limit=10000"
+```
+
+Example placeholder for a later LLM-backed fictional-location fallback:
+
+```bash
+--moon.provider-quotas.operations.fictional-location-llm.provider=example-llm
+--moon.provider-quotas.operations.fictional-location-llm.operation=fictional-location-resolution
+--moon.provider-quotas.operations.fictional-location-llm.daily-limit=100
+--moon.provider-quotas.operations.fictional-location-llm.monthly-limit=1000
+```
 
 ## Browser Lookup Page
 
@@ -275,6 +304,9 @@ token wins and no generated token is logged.
 It returns process-local aggregate JSON:
 
 - `app.status`
+- `providers.operations.<id>`: provider name, operation name, hourly/daily/
+  monthly usage windows, configured limits, percent used when a limit is known,
+  and warning state
 - `providers.openMeteoGeocoding`: calls, resolved, ambiguous, not found,
   temporarily unavailable, retries, timeouts, rate limits, and latency summary
 - `providers.openMeteoWeather`: calls, available, temporarily unavailable,
@@ -282,11 +314,31 @@ It returns process-local aggregate JSON:
 - `caches.geocoding` and `caches.weather`: request count, hits, misses, hit
   rate, and estimated size when the runtime Open-Meteo cache beans are active
 
+Known-limit warning states are `ok` below 50 percent, `watch` at 50 percent,
+`warning` at 80 percent, `critical` at 95 percent, and `exhausted` at 100
+percent or higher. Unknown limits are explicit: `knownLimit=false`,
+`limit=null`, `percentUsed=null`, and `warningState=unknown_limit`.
+
 During a small spike, inspect `/admin/status` before and after repeated searches
 for the same city. Cache hit rates should rise for repeated identical lookups,
-provider call counts should not rise on cache hits, and timeout/rate-limit
-counters should stay low. These counters reset on process restart and are not
-shared across backend instances.
+provider quota usage should not rise on cache hits, and timeout/rate-limit
+counters should stay low. Quota usage is counted at the outbound provider
+transport level, so retries count as additional provider calls. These counters
+use calendar-aligned UTC hourly, daily, and monthly windows.
+
+The quota counters are deliberately process-local MVP state. They reset on
+process restart and are not shared across backend instances. That is acceptable
+for a single-process private alpha because it makes quota risk visible without
+storing raw queries or user identifiers, but it understates usage after restarts
+and across multiple instances. Before multi-instance hosting or larger public
+traffic, move provider quota counters to a durable/shared store or accept the
+operator risk explicitly.
+
+When adding a new provider or provider-backed operation, use
+`docs/ai-agent/checklists/provider-observability.md` before merging the
+integration. A later LLM-backed fictional-location fallback should be tracked as
+its own provider operation, with a kill switch and configured cost/quota limits,
+not folded into real geocoding.
 
 The status endpoint currently exposes only aggregate operational data, but it
 is still intended for operator use. Do not put the admin token in a query
