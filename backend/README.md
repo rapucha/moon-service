@@ -162,7 +162,9 @@ not create accounts, cookies, email subscriptions, or server-side user profiles.
 Manual browser checks for frontend behavior:
 
 - Open `/search`, submit `Praha`, and confirm opportunities render with Moon,
-  Sun/light, weather, score, share action, and caveat details.
+  Sun/light, weather, score, share action, tooltips, and caveat details.
+- Open `/about` and confirm the short service intro, purpose, and current
+  boundaries are visible.
 - Open `/search?q=Praha` directly and confirm the page is shareable without an
   account.
 - Search `Springfield` and confirm the ambiguous-location state presents

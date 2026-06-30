@@ -79,7 +79,23 @@ class OpportunitySearchControllerTest {
                     assertTrue(body.contains("id=\"search-form\""));
                     assertTrue(body.contains("href=\"/favicon.svg\""));
                     assertTrue(body.contains("Moon windows near a city"));
+                    assertTrue(body.contains("href=\"/about\""));
                     assertTrue(body.contains("Privacy and caveats"));
+                });
+    }
+
+    @Test
+    void servesAboutPage() {
+        webTestClient.get()
+                .uri("/about")
+                .exchange()
+                .expectStatus().isOk()
+                .expectHeader().contentTypeCompatibleWith(MediaType.TEXT_HTML)
+                .expectBody(String.class)
+                .value(body -> {
+                    assertTrue(body.contains("About Moon Service"));
+                    assertTrue(body.contains("Why It Exists"));
+                    assertTrue(body.contains("Search opportunities"));
                 });
     }
 

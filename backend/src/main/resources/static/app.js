@@ -4,6 +4,30 @@
   var RECENT_KEY = "moonService.recentSearches.v1";
   var MAX_RECENT = 5;
   var CONTROL_CHARACTER_PATTERN = /[\u0000-\u001F\u007F-\u009F\u061C\u200E\u200F\u202A-\u202E\u2066-\u2069]/u;
+  var TERM_DESCRIPTIONS = {
+    "Location": "The kind of place this lookup accepts.",
+    "Storage": "Where recent searches are kept.",
+    "Output": "What this page produces after a lookup.",
+    "Forecast": "How many days of forecast data were considered.",
+    "Evaluated": "How many candidate Moon windows were checked before ranking.",
+    "Timezone": "The local timezone used for displayed times.",
+    "Lookup": "Whether this result came from a typed query or a selected location.",
+    "Suggested": "The best instant inside the displayed Moon window.",
+    "Duration": "How long the candidate window lasts.",
+    "Moon altitude": "Moon height above the horizon. Lower values are usually more useful for landscape composition.",
+    "Moon azimuth": "Compass direction of the Moon, in degrees.",
+    "Bucket": "The ambient-light category around the window, such as golden hour or twilight.",
+    "Sun altitude": "Sun height relative to the horizon. Negative values mean the Sun is below the horizon.",
+    "Illumination": "How much of the Moon disk is lit.",
+    "Summary": "A compact weather description for the candidate window.",
+    "Cloud": "Mean and maximum cloud cover across the candidate window.",
+    "Precip": "Precipitation risk and expected amount across the candidate window.",
+    "Visibility": "Forecast surface visibility near the location.",
+    "Moon phase": "How well the Moon illumination fits the scoring model.",
+    "Sun light": "How well the ambient light fits the scoring model.",
+    "Weather": "How well forecast conditions fit the scoring model.",
+    "Confidence": "How much confidence the scoring model has in the forecast inputs."
+  };
 
   var form = document.getElementById("search-form");
   var input = document.getElementById("location-input");
@@ -326,7 +350,11 @@
       ? payload.emptyReason.text
       : "No useful Moon window passed the current scoring threshold in this forecast period.";
     return element("section", { className: "status-panel warning" },
-      element("p", { className: "eyebrow" }, "No match"),
+      element("p", {
+        className: "eyebrow tooltip",
+        title: "No candidate window met the current scoring threshold.",
+        "data-tooltip": "No candidate window met the current scoring threshold."
+      }, "No match"),
       element("h3", {}, "No ranked windows"),
       element("p", {}, reason));
   }
@@ -377,7 +405,11 @@
     var value = Number.isFinite(score) ? Math.max(0, Math.min(100, score)) : 0;
     return element("div", { className: "score-block", ariaLabel: "Opportunity score" },
       element("span", { className: "score-value" }, Number.isFinite(score) ? String(score) : "--"),
-      element("span", { className: "score-label" }, "score"),
+      element("span", {
+        className: "score-label tooltip",
+        title: "Overall fit score from 0 to 100, combining Moon position, light, phase, weather, and confidence.",
+        "data-tooltip": "Overall fit score from 0 to 100, combining Moon position, light, phase, weather, and confidence."
+      }, "score"),
       element("span", { className: "score-meter" },
         element("span", { style: "width: " + value + "%" })));
   }
@@ -404,8 +436,20 @@
 
   function fact(label, value) {
     return element("div", {},
-      element("dt", {}, label),
+      element("dt", {}, term(label)),
       element("dd", {}, value || "Unavailable"));
+  }
+
+  function term(label) {
+    var description = TERM_DESCRIPTIONS[label];
+    if (!description) {
+      return label;
+    }
+    return element("span", {
+      className: "tooltip",
+      title: description,
+      "data-tooltip": description
+    }, label);
   }
 
   function scoreDetails(components) {
@@ -716,10 +760,6 @@
 
   function percent(value) {
     return Number.isFinite(value) ? Math.round(value) + "%" : "unavailable";
-  }
-
-  function scoreText(value) {
-    return Number.isFinite(value) ? value + "/100" : "Score";
   }
 
   function readableToken(value) {

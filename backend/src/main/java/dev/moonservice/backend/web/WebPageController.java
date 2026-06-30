@@ -9,4 +9,9 @@ class WebPageController {
     String searchPage() {
         return "forward:/index.html";
     }
+
+    @GetMapping("/about")
+    String aboutPage() {
+        return "forward:/about.html";
+    }
 }

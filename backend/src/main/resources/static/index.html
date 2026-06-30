@@ -13,7 +13,10 @@
       <img src="/favicon.svg" alt="" width="32" height="32">
       <span>Moon Service</span>
     </a>
-    <span class="topbar-status">Anonymous city lookup</span>
+    <nav class="topbar-nav" aria-label="Main">
+      <a href="/search" aria-current="page">Search</a>
+      <a href="/about">About</a>
+    </nav>
   </header>
 
   <main>
@@ -71,9 +74,9 @@
             <h2 id="workspace-title">Opportunity review</h2>
           </div>
           <div class="workspace-meta" aria-label="Lookup boundaries">
-            <span>City level</span>
-            <span>Weather aware</span>
-            <span>Shareable</span>
+            <span class="tooltip" title="Searches work best with a city or town, not an exact address." data-tooltip="Searches work best with a city or town, not an exact address.">City or town</span>
+            <span class="tooltip" title="Weather is included in the ranking when forecast data is available." data-tooltip="Weather is included in the ranking when forecast data is available.">Weather checked</span>
+            <span class="tooltip" title="Result pages can be opened again or sent to someone else." data-tooltip="Result pages can be opened again or sent to someone else.">Share link</span>
           </div>
         </div>
         <div id="results" class="results-region" aria-live="polite" aria-busy="false"></div>
