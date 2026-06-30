@@ -1,4 +1,4 @@
-package dev.moonservice.backend.observability;
+package dev.moonservice.backend.observability.quota;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;

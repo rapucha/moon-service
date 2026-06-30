@@ -59,7 +59,9 @@ LLM-Backed Fictional Locations
       geocoding result.
 - [ ] The operation has a kill switch before public exposure.
 - [ ] The operation has configured cost/quota limits before alpha traffic.
-- [ ] Accepted fictional mappings are cached or reviewed so repeated queries do
-      not create uncontrolled provider spend.
+- [ ] Accepted fictional classifications, mappings, prompts, or templates are
+      cached or reviewed so repeated queries do not create uncontrolled
+      provider spend. Creative response text may vary when that is an explicit
+      product choice.
 - [ ] Output is clearly labeled entertainment and avoids raw copyrighted prose,
       character voices, or long franchise-specific text.

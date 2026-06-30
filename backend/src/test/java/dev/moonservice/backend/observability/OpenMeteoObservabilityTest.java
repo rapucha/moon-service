@@ -12,6 +12,7 @@ import dev.moonservice.backend.openmeteo.OpenMeteoFailureKind;
 import dev.moonservice.backend.openmeteo.OpenMeteoTransport;
 import dev.moonservice.backend.openmeteo.OpenMeteoTransportException;
 import dev.moonservice.backend.openmeteo.RetryingOpenMeteoTransport;
+import dev.moonservice.backend.observability.quota.ProviderQuotaMonitor;
 import dev.moonservice.backend.weather.HourlyWeather;
 import dev.moonservice.backend.weather.WeatherForecastUnavailableException;
 

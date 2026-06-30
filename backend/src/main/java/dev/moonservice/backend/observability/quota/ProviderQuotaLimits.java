@@ -1,4 +1,4 @@
-package dev.moonservice.backend.observability;
+package dev.moonservice.backend.observability.quota;
 
 public record ProviderQuotaLimits(
         Long hourly,

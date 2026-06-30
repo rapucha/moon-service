@@ -3,7 +3,7 @@ package dev.moonservice.backend.web;
 import dev.moonservice.backend.observability.CacheMetricsSnapshot;
 import dev.moonservice.backend.observability.CacheMetricsSource;
 import dev.moonservice.backend.observability.OpenMeteoObservability;
-import dev.moonservice.backend.observability.ProviderQuotaMonitor;
+import dev.moonservice.backend.observability.quota.ProviderQuotaMonitor;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RestController;
 

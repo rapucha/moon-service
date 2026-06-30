@@ -1,4 +1,4 @@
-package dev.moonservice.backend.observability;
+package dev.moonservice.backend.observability.quota;
 
 import java.util.Objects;
 

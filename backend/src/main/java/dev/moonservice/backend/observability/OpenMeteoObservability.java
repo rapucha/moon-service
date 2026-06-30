@@ -2,6 +2,9 @@ package dev.moonservice.backend.observability;
 
 import dev.moonservice.backend.location.LocationResolution;
 import dev.moonservice.backend.openmeteo.OpenMeteoFailureKind;
+import dev.moonservice.backend.observability.quota.ProviderOperationDefinition;
+import dev.moonservice.backend.observability.quota.ProviderQuotaLimits;
+import dev.moonservice.backend.observability.quota.ProviderQuotaMonitor;
 
 import java.util.Objects;
 import java.util.concurrent.atomic.AtomicLong;

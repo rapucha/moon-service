@@ -6,7 +6,7 @@ import dev.moonservice.backend.location.LocationResolution;
 import dev.moonservice.backend.observability.CacheMetricsSnapshot;
 import dev.moonservice.backend.observability.CacheMetricsSource;
 import dev.moonservice.backend.observability.OpenMeteoObservability;
-import dev.moonservice.backend.observability.ProviderQuotaMonitor;
+import dev.moonservice.backend.observability.quota.ProviderQuotaMonitor;
 
 import java.time.Clock;
 import java.time.Instant;

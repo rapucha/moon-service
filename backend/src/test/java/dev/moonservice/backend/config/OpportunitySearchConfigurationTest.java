@@ -8,7 +8,7 @@ import dev.moonservice.backend.location.LocationResolution;
 import dev.moonservice.backend.location.LocationResolver;
 import dev.moonservice.backend.observability.CacheMetricsSource;
 import dev.moonservice.backend.observability.OpenMeteoObservability;
-import dev.moonservice.backend.observability.ProviderQuotaMonitor;
+import dev.moonservice.backend.observability.quota.ProviderQuotaMonitor;
 import dev.moonservice.backend.weather.CachingWeatherForecastProvider;
 import dev.moonservice.backend.weather.TestWeatherForecastProvider;
 import dev.moonservice.backend.weather.WeatherForecastProvider;

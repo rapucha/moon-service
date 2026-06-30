@@ -10,6 +10,7 @@ import java.util.Objects;
 
 @ConfigurationProperties(prefix = "moon")
 public final class MoonRuntimeProperties {
+    // Spring Boot binds nested configuration through JavaBean accessors used reflectively.
     private static final Duration DEFAULT_OPEN_METEO_TIMEOUT = Duration.ofSeconds(3);
     private static final int DEFAULT_OPEN_METEO_MAX_TRANSPORT_RETRIES = 1;
     private static final Duration DEFAULT_OPEN_METEO_MAX_RETRY_AFTER = Duration.ofSeconds(1);
