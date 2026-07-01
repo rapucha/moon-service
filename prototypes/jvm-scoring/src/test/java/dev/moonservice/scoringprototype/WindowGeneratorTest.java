@@ -148,6 +148,28 @@ class WindowGeneratorTest {
                 .anyMatch(sample -> Math.abs(sample.sunAltitudeDegrees() - 6.0) < 0.01));
     }
 
+    @Test
+    void addsRegularPathSamplesForChartShape() {
+        PrototypeConfig config = new PrototypeConfig(
+                Locations.PRAGUE,
+                LocalDate.parse("2026-06-29"),
+                1,
+                12.0,
+                10
+        );
+        Instant start = config.start();
+
+        List<MoonWindow> windows = new WindowGenerator().findWindows(
+                config,
+                instant -> sample(instant, 4.0, -4.0)
+        );
+
+        MoonWindow window = windows.getFirst();
+        assertTrue(window.pathSamples().stream().anyMatch(sample -> sample.instant().equals(start.plus(Duration.ofMinutes(30)))));
+        assertTrue(window.pathSamples().stream().anyMatch(sample -> sample.instant().equals(start.plus(Duration.ofMinutes(60)))));
+        assertTrue(window.pathSamples().size() >= 49);
+    }
+
     private static MoonSample sample(Instant instant, double moonAltitude, double sunAltitude) {
         return new MoonSample(instant, moonAltitude, 120.0, 90.0, 180.0, sunAltitude);
     }

@@ -20,6 +20,7 @@ import java.util.function.ToDoubleFunction;
 public final class WindowGenerator {
     private static final Duration BRACKET_STEP = Duration.ofHours(1);
     private static final Duration SUGGESTION_STEP = Duration.ofMinutes(5);
+    private static final Duration PATH_SAMPLE_STEP = Duration.ofMinutes(30);
     private static final Duration REFINEMENT_TOLERANCE = Duration.ofSeconds(1);
     private static final Duration KIND_SAMPLE_OFFSET = Duration.ofMinutes(1);
     private static final double[] LIGHT_BUCKET_THRESHOLDS = {-12.0, -6.0, -0.833, 6.0};
@@ -205,11 +206,20 @@ public final class WindowGenerator {
         for (int section = 1; section < 4; section++) {
             instants.add(startsAt.plus(duration.multipliedBy(section).dividedBy(4)));
         }
+        addRegularPathSamples(instants, startsAt, endsAt);
         addSunAltitudeCrossings(samples, instants, startsAt, endsAt);
 
         return instants.stream()
                 .map(samples::sampleAt)
                 .toList();
+    }
+
+    private static void addRegularPathSamples(TreeSet<Instant> instants, Instant startsAt, Instant endsAt) {
+        Instant cursor = startsAt.plus(PATH_SAMPLE_STEP);
+        while (cursor.isBefore(endsAt)) {
+            instants.add(cursor);
+            cursor = cursor.plus(PATH_SAMPLE_STEP);
+        }
     }
 
     private static void addSunAltitudeCrossings(

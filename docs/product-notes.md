@@ -4,7 +4,7 @@
 
 Moon Service helps photographers catch photogenic Moon opportunities near locations they care about. The core value is a timely alert that says, in effect: the Moon will be low, visible, and the weather may be worth trying.
 
-The MVP should be lightweight and easy to try. The favored first surface is now a web discovery flow: enter a city or location, see the next good Moon opportunity, and optionally use RSS/Atom or `.ics` export. It should not attempt to clone full planning tools such as The Photographer's Ephemeris. Advanced composition planning can come later.
+The MVP should be lightweight and easy to try. The favored first surface is now a web discovery flow: enter a city or location, see the next good Moon opportunity, and optionally use RSS/Atom or `.ics` export.
 
 ## Target User
 

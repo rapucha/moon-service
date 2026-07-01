@@ -81,6 +81,7 @@ class OpportunitySearchControllerTest {
                     assertTrue(body.contains("Moon windows near a city"));
                     assertTrue(body.contains("href=\"/about\""));
                     assertTrue(body.contains("Privacy and caveats"));
+                    assertTrue(body.contains("type=\"module\" src=\"/app.js\""));
                 });
     }
 
@@ -108,10 +109,28 @@ class OpportunitySearchControllerTest {
                 .expectHeader().contentTypeCompatibleWith("text/javascript")
                 .expectBody(String.class)
                 .value(body -> {
-                    assertTrue(body.contains("moonService.recentSearches.v1"));
+                    assertTrue(body.contains("from \"./api.js\""));
+                    assertTrue(body.contains("from \"./responseView.js\""));
+                });
+
+        webTestClient.get()
+                .uri("/api.js")
+                .exchange()
+                .expectStatus().isOk()
+                .expectHeader().contentTypeCompatibleWith("text/javascript")
+                .expectBody(String.class)
+                .value(body -> {
                     assertTrue(body.contains("/api/opportunities?q="));
                     assertTrue(body.contains("/api/opportunities?locationId="));
                 });
+
+        webTestClient.get()
+                .uri("/recentSearches.js")
+                .exchange()
+                .expectStatus().isOk()
+                .expectHeader().contentTypeCompatibleWith("text/javascript")
+                .expectBody(String.class)
+                .value(body -> assertTrue(body.contains("moonService.recentSearches.v1")));
 
         webTestClient.get()
                 .uri("/styles.css")
