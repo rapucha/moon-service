@@ -14,7 +14,7 @@ import dev.moonservice.backend.openmeteo.OpenMeteoTransport;
 import dev.moonservice.backend.openmeteo.RestClientOpenMeteoTransport;
 import dev.moonservice.backend.openmeteo.RetryingOpenMeteoTransport;
 import dev.moonservice.backend.opportunity.OpportunitySearchDefaults;
-import dev.moonservice.backend.opportunity.scoring.JvmScoringOpportunitySearchEngine;
+import dev.moonservice.backend.opportunity.scoring.ScoringOpportunitySearchEngine;
 import dev.moonservice.backend.opportunity.search.OpportunitySearchEngine;
 import dev.moonservice.backend.weather.CachingWeatherForecastProvider;
 import dev.moonservice.backend.weather.WeatherForecastProvider;
@@ -61,7 +61,7 @@ class OpportunitySearchConfiguration {
             PreviewEvaluator previewEvaluator,
             WeatherForecastProvider weatherForecastProvider
     ) {
-        return new JvmScoringOpportunitySearchEngine(previewEvaluator, weatherForecastProvider);
+        return new ScoringOpportunitySearchEngine(previewEvaluator, weatherForecastProvider);
     }
 
     @Bean

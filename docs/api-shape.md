@@ -294,8 +294,10 @@ Response rules:
 - `moon.phaseAngleDegrees` uses the astronomical lunar phase angle: `0` is new
   Moon, `90` is first quarter, `180` is full Moon, and `270` is last quarter.
 - `moonPath` describes Moon movement across the window. It must include direct
-  `start`, `suggested`, and `end` points plus a small `samples` array suitable
-  for compact UI charts.
+  `start`, `suggested`, and `end` points plus a bounded `samples` array
+  suitable for compact UI charts. V0 samples the path at regular 30-minute
+  intervals, with additional samples at suggested time, window boundaries, and
+  light-bucket crossings.
 - `moonPath` points include `lightBucket` derived from Sun altitude so clients
   can show daylight, golden hour, twilight, and night changes across the same
   Moon path without treating weather precision as minute-level.

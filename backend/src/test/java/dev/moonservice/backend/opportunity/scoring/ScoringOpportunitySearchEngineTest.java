@@ -22,10 +22,10 @@ import java.time.Instant;
 import java.time.ZoneId;
 import java.util.concurrent.atomic.AtomicReference;
 
-class JvmScoringOpportunitySearchEngineTest {
+class ScoringOpportunitySearchEngineTest {
     @Test
     void scoresResolvedLocationCoordinatesWithoutFixtureLocationId() {
-        JvmScoringOpportunitySearchEngine engine = engineWithPartlyCloudyWeather();
+        ScoringOpportunitySearchEngine engine = engineWithPartlyCloudyWeather();
 
         OpportunitySearchResponse response = engine.search(
                 amsterdam(),
@@ -49,6 +49,10 @@ class JvmScoringOpportunitySearchEngineTest {
         assertTrue(Double.isFinite(first.moonPath().suggested().sunAltitudeDegrees()));
         assertTrue(first.moonPath().samples().size() >= 5);
         assertFalse(first.moonPath().samples().getFirst().lightBucket().isBlank());
+        assertTrue(response.messages().stream()
+                .noneMatch(message -> message.code().equals("fixture_weather")));
+        assertTrue(response.messages().stream()
+                .anyMatch(message -> message.code().equals("local_horizon_not_modelled")));
     }
 
     @Test
@@ -71,7 +75,7 @@ class JvmScoringOpportunitySearchEngineTest {
                     2.0);
             return instant -> weather;
         };
-        JvmScoringOpportunitySearchEngine engine = new JvmScoringOpportunitySearchEngine(
+        ScoringOpportunitySearchEngine engine = new ScoringOpportunitySearchEngine(
                 new PreviewEvaluator(),
                 provider);
 
@@ -100,7 +104,7 @@ class JvmScoringOpportunitySearchEngineTest {
             }
             return new HourlyWeather(instant, 20, 5, 10, 20, 0, 0.0, 25000, 0, 2.0);
         };
-        JvmScoringOpportunitySearchEngine engine = new JvmScoringOpportunitySearchEngine(
+        ScoringOpportunitySearchEngine engine = new ScoringOpportunitySearchEngine(
                 new PreviewEvaluator(),
                 provider);
 
@@ -124,7 +128,7 @@ class JvmScoringOpportunitySearchEngineTest {
 
     @Test
     void translatesDirectPrototypeValidationFailuresToInvalidRequest() {
-        JvmScoringOpportunitySearchEngine engine = engineWithUnusedWeather();
+        ScoringOpportunitySearchEngine engine = engineWithUnusedWeather();
 
         InvalidOpportunitySearchRequestException exception = assertThrows(
                 InvalidOpportunitySearchRequestException.class,
@@ -136,7 +140,7 @@ class JvmScoringOpportunitySearchEngineTest {
 
     @Test
     void treatsResolvedPrototypeValidationFailuresAsInternalInvariants() {
-        JvmScoringOpportunitySearchEngine engine = engineWithUnusedWeather();
+        ScoringOpportunitySearchEngine engine = engineWithUnusedWeather();
 
         IllegalStateException exception = assertThrows(
                 IllegalStateException.class,
@@ -170,15 +174,15 @@ class JvmScoringOpportunitySearchEngineTest {
                 "NL");
     }
 
-    private static JvmScoringOpportunitySearchEngine engineWithPartlyCloudyWeather() {
-        return new JvmScoringOpportunitySearchEngine(new PreviewEvaluator(), (location, startsAt, endsAt, days) -> {
+    private static ScoringOpportunitySearchEngine engineWithPartlyCloudyWeather() {
+        return new ScoringOpportunitySearchEngine(new PreviewEvaluator(), (location, startsAt, endsAt, days) -> {
             HourlyWeather weather = toHourlyWeather(startsAt, WeatherFixture.PRAGUE_PARTLY_CLOUDY);
             return instant -> weather;
         });
     }
 
-    private static JvmScoringOpportunitySearchEngine engineWithUnusedWeather() {
-        return new JvmScoringOpportunitySearchEngine(new PreviewEvaluator(), (location, startsAt, endsAt, days) -> {
+    private static ScoringOpportunitySearchEngine engineWithUnusedWeather() {
+        return new ScoringOpportunitySearchEngine(new PreviewEvaluator(), (location, startsAt, endsAt, days) -> {
             throw new AssertionError("Weather provider should not be called by this test.");
         });
     }

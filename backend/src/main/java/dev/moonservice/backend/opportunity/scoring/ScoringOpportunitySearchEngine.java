@@ -25,7 +25,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 
-public class JvmScoringOpportunitySearchEngine implements OpportunitySearchEngine {
+public class ScoringOpportunitySearchEngine implements OpportunitySearchEngine {
     private static final ObjectMapper MAPPER = new ObjectMapper();
 
     private final PreviewEvaluator previewEvaluator;
@@ -33,7 +33,7 @@ public class JvmScoringOpportunitySearchEngine implements OpportunitySearchEngin
     private final ResponseFormatter responseFormatter;
     private final WeatherForecastProvider weatherForecastProvider;
 
-    public JvmScoringOpportunitySearchEngine(
+    public ScoringOpportunitySearchEngine(
             PreviewEvaluator previewEvaluator,
             WeatherForecastProvider weatherForecastProvider
     ) {
@@ -270,6 +270,9 @@ public class JvmScoringOpportunitySearchEngine implements OpportunitySearchEngin
     private static ArrayList<OpportunitySearchResponse.Message> messages(JsonNode nodes) {
         ArrayList<OpportunitySearchResponse.Message> messages = new ArrayList<>();
         for (JsonNode node : nodes) {
+            if ("fixture_weather".equals(text(node, "code"))) {
+                continue;
+            }
             messages.add(new OpportunitySearchResponse.Message(
                     text(node, "level"),
                     text(node, "code"),

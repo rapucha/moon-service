@@ -751,12 +751,31 @@ dd {
   margin-bottom: 4px;
 }
 
+.moon-chart-scroll {
+  max-width: 100%;
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding-bottom: 2px;
+  scrollbar-gutter: stable;
+}
+
 .altitude-chart,
 .azimuth-chart {
   display: block;
-  width: 100%;
   height: auto;
   overflow: visible;
+}
+
+.azimuth-chart {
+  width: 100%;
+}
+
+.altitude-chart {
+  max-width: none;
+}
+
+.altitude-chart-mobile {
+  display: none;
 }
 
 .chart-gridline,
@@ -832,6 +851,22 @@ dd {
 .chart-dot.is-end {
   fill: var(--blue-soft);
   stroke: var(--blue);
+}
+
+.moon-marker-halo {
+  fill: rgba(255, 217, 138, 0.34);
+  stroke: rgba(91, 66, 22, 0.22);
+  stroke-width: 1;
+}
+
+.moon-marker-image {
+  filter: drop-shadow(0 2px 3px rgba(16, 31, 36, 0.24));
+}
+
+.moon-marker-ring {
+  fill: none;
+  stroke: #5b4216;
+  stroke-width: 1.8;
 }
 
 .chart-axis-label,
@@ -1103,6 +1138,21 @@ summary {
   .moon-path-header {
     display: grid;
     gap: 3px;
+  }
+
+  .moon-chart-scroll {
+    overflow-x: visible;
+    padding-bottom: 0;
+    scrollbar-gutter: auto;
+  }
+
+  .altitude-chart-desktop {
+    display: none;
+  }
+
+  .altitude-chart-mobile {
+    display: block;
+    width: 100%;
   }
 
   .search-row button {
