@@ -1,0 +1,998 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Moon Pass Card Mockups</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --bg: #f4f6f7;
+      --surface: #ffffff;
+      --surface-subtle: #f8faf9;
+      --surface-muted: #eef3f1;
+      --ink: #202426;
+      --muted: #5e686d;
+      --line: #d8e0df;
+      --line-strong: #b9c7c4;
+      --accent: #216f68;
+      --accent-strong: #154f4a;
+      --blue: #315f92;
+      --blue-soft: #eaf2fb;
+      --amber: #8b641f;
+      --amber-soft: #fff5de;
+      --shadow: 0 14px 34px rgba(27, 37, 42, 0.08);
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--ink);
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      line-height: 1.5;
+    }
+
+    main {
+      width: min(1040px, calc(100% - 32px));
+      margin: 0 auto;
+      padding: 28px 0 44px;
+    }
+
+    .mockup-intro {
+      margin: 0 0 18px;
+      padding-bottom: 16px;
+      border-bottom: 1px solid var(--line);
+    }
+
+    .mockup-intro h1 {
+      margin: 0 0 6px;
+      font-size: 1.45rem;
+      letter-spacing: 0;
+    }
+
+    .mockup-intro p {
+      max-width: 760px;
+      margin: 0;
+      color: var(--muted);
+    }
+
+    .mockup-stack {
+      display: grid;
+      gap: 22px;
+    }
+
+    .mockup-label {
+      margin: 0 0 8px;
+      color: var(--blue);
+      font-size: 0.78rem;
+      font-weight: 800;
+      letter-spacing: 0;
+      text-transform: uppercase;
+    }
+
+    .opportunity-card {
+      padding: 18px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--surface);
+      box-shadow: var(--shadow);
+    }
+
+    .opportunity-card.is-primary {
+      border-color: var(--accent);
+    }
+
+    .opportunity-header {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      gap: 16px;
+      align-items: start;
+      margin-bottom: 14px;
+    }
+
+    .rank-label,
+    .eyebrow {
+      margin: 0 0 4px;
+      color: var(--blue);
+      font-size: 0.76rem;
+      font-weight: 800;
+      text-transform: uppercase;
+    }
+
+    h2,
+    h3,
+    h4 {
+      letter-spacing: 0;
+    }
+
+    .opportunity-title h2 {
+      margin: 0;
+      font-size: 1.12rem;
+      line-height: 1.25;
+    }
+
+    .pass-note {
+      margin: 5px 0 0;
+      color: var(--muted);
+      font-size: 0.93rem;
+    }
+
+    .score-block {
+      display: grid;
+      justify-items: end;
+      gap: 2px;
+      min-width: 72px;
+    }
+
+    .score-value {
+      color: var(--amber);
+      font-size: 1.45rem;
+      font-weight: 820;
+      line-height: 1;
+    }
+
+    .score-label {
+      color: var(--muted);
+      font-size: 0.76rem;
+      font-weight: 760;
+      text-transform: uppercase;
+    }
+
+    .badge-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 7px;
+      margin-top: 10px;
+    }
+
+    .pill,
+    .best-badge,
+    .alt-badge,
+    .quiet-badge,
+    .light-bucket {
+      display: inline-flex;
+      align-items: center;
+      min-height: 26px;
+      padding: 3px 8px;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      background: var(--surface-muted);
+      color: var(--ink);
+      font-size: 0.8rem;
+      font-weight: 740;
+      white-space: nowrap;
+    }
+
+    .best-badge {
+      border-color: rgba(139, 100, 31, 0.38);
+      background: var(--amber-soft);
+      color: #5b4216;
+    }
+
+    .alt-badge {
+      border-color: #7f8b88;
+      background: #cfd8d5;
+      color: var(--ink);
+    }
+
+    .quiet-badge {
+      color: var(--muted);
+      font-weight: 700;
+    }
+
+    .light-bucket {
+      border-color: #6cb8c7;
+      background: #d5f3f6;
+      color: #1f5964;
+    }
+
+    .light-bucket.is-nautical {
+      border-color: #7685bd;
+      background: #c1caed;
+      color: #26345f;
+    }
+
+    .light-bucket.is-night {
+      border-color: #4f5965;
+      background: #798593;
+      color: #fff;
+    }
+
+    .recommendation-list {
+      display: grid;
+      gap: 10px;
+      padding: 14px 0;
+      border-top: 1px solid var(--line);
+      border-bottom: 1px solid var(--line);
+    }
+
+    .recommendation-row {
+      display: grid;
+      gap: 10px;
+      padding: 12px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--surface-subtle);
+    }
+
+    .recommendation-row.is-best {
+      border-color: rgba(33, 111, 104, 0.52);
+      background: #f1f7f5;
+    }
+
+    .recommendation-heading {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: 12px;
+    }
+
+    .recommendation-title {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 8px;
+      min-width: 0;
+    }
+
+    .recommendation-title strong {
+      font-size: 1rem;
+      line-height: 1.25;
+    }
+
+    .row-score {
+      color: var(--amber);
+      font-size: 0.82rem;
+      font-weight: 820;
+      white-space: nowrap;
+    }
+
+    .metric-columns {
+      display: grid;
+      grid-template-columns: repeat(5, minmax(0, 1fr));
+      gap: 12px;
+      margin: 0;
+    }
+
+    .metric-columns.is-four {
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+    }
+
+    .metric {
+      min-width: 0;
+      padding-top: 8px;
+      border-top: 1px solid var(--line);
+    }
+
+    .metric dt {
+      margin: 0 0 4px;
+      color: var(--muted);
+      font-size: 0.72rem;
+      font-weight: 780;
+      text-transform: uppercase;
+    }
+
+    .metric dd {
+      margin: 0;
+      font-weight: 740;
+      overflow-wrap: anywhere;
+    }
+
+    .photo-hint {
+      display: grid;
+      grid-template-columns: 92px minmax(0, 1fr);
+      gap: 10px;
+      align-items: start;
+      margin: 0;
+      padding-top: 8px;
+      border-top: 1px solid var(--line);
+    }
+
+    .photo-hint dt {
+      margin: 0;
+      color: var(--muted);
+      font-size: 0.72rem;
+      font-weight: 780;
+      text-transform: uppercase;
+    }
+
+    .photo-hint dd {
+      margin: 0;
+      font-weight: 720;
+    }
+
+    .inline-options {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 10px;
+      padding: 14px 0;
+      border-top: 1px solid var(--line);
+      border-bottom: 1px solid var(--line);
+    }
+
+    .inline-option {
+      display: grid;
+      gap: 10px;
+      padding: 12px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--surface-subtle);
+    }
+
+    .inline-option.is-best {
+      border-color: var(--accent);
+      background: #f1f7f5;
+    }
+
+    .inline-option .metric-columns {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .inline-option header {
+      display: flex;
+      justify-content: space-between;
+      gap: 10px;
+      align-items: start;
+    }
+
+    .inline-option h3 {
+      margin: 0;
+      font-size: 1rem;
+    }
+
+    .timeline-list {
+      display: grid;
+      gap: 0;
+      padding: 14px 0;
+      border-top: 1px solid var(--line);
+      border-bottom: 1px solid var(--line);
+    }
+
+    .timeline-row {
+      position: relative;
+      display: grid;
+      grid-template-columns: 132px minmax(0, 1fr);
+      gap: 14px;
+      padding: 12px 0 12px 18px;
+      border-left: 2px solid var(--line);
+    }
+
+    .timeline-row::before {
+      position: absolute;
+      left: -6px;
+      top: 18px;
+      width: 10px;
+      height: 10px;
+      border: 2px solid var(--accent);
+      border-radius: 50%;
+      background: var(--surface);
+      content: "";
+    }
+
+    .timeline-row.is-best::before {
+      border-color: #5b4216;
+      background: var(--amber);
+    }
+
+    .timeline-time {
+      display: grid;
+      align-content: start;
+      gap: 4px;
+    }
+
+    .timeline-time strong {
+      font-size: 1rem;
+    }
+
+    .moon-path-panel {
+      display: grid;
+      gap: 12px;
+      padding: 14px 0 2px;
+      border-bottom: 1px solid var(--line);
+    }
+
+    .moon-path-header {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: 14px;
+    }
+
+    .moon-path-header h3 {
+      margin: 0;
+      font-size: 0.96rem;
+    }
+
+    .moon-path-header p {
+      margin: 0;
+      color: var(--muted);
+      font-size: 0.84rem;
+    }
+
+    .moon-path-charts {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 12px;
+    }
+
+    .moon-chart {
+      min-width: 0;
+    }
+
+    .moon-chart-azimuth {
+      width: min(240px, 100%);
+    }
+
+    .moon-chart-label {
+      display: block;
+      margin-bottom: 4px;
+      color: var(--muted);
+      font-size: 0.74rem;
+      font-weight: 780;
+      text-transform: uppercase;
+    }
+
+    .chart-frame {
+      min-height: 126px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--surface-subtle);
+      overflow: hidden;
+    }
+
+    .altitude-frame,
+    .azimuth-frame {
+      min-height: 0;
+    }
+
+    .chart-frame svg {
+      display: block;
+      width: 100%;
+      height: auto;
+    }
+
+    .light-band {
+      opacity: 0.78;
+    }
+
+    .light-band.is-civil_twilight {
+      fill: #b7edf3;
+    }
+
+    .light-band.is-nautical_twilight {
+      fill: #a8b4e0;
+    }
+
+    .light-band.is-night {
+      fill: #798593;
+    }
+
+    .chart-gridline {
+      fill: none;
+      stroke: var(--line);
+      stroke-width: 1;
+    }
+
+    .chart-tick {
+      stroke: var(--line-strong);
+      stroke-width: 1;
+    }
+
+    .chart-path {
+      fill: none;
+      stroke: var(--accent);
+      stroke-linecap: round;
+      stroke-width: 3;
+    }
+
+    .chart-dot {
+      fill: var(--surface);
+      stroke: var(--accent);
+      stroke-width: 2;
+    }
+
+    .chart-dot.is-best {
+      fill: var(--amber);
+      stroke: #5b4216;
+    }
+
+    .chart-dot.is-start,
+    .chart-dot.is-end {
+      fill: var(--blue-soft);
+      stroke: var(--blue);
+    }
+
+    .compass-ring,
+    .compass-axis {
+      fill: none;
+      stroke: var(--line);
+      stroke-width: 1;
+    }
+
+    .compass-axis {
+      stroke-dasharray: 3 4;
+    }
+
+    .compass-sector {
+      fill: rgba(33, 111, 104, 0.12);
+      stroke: none;
+    }
+
+    .compass-light-sector {
+      opacity: 0.8;
+      stroke: rgba(32, 36, 38, 0.18);
+      stroke-width: 1;
+    }
+
+    .compass-light-sector.is-civil_twilight {
+      fill: #b7edf3;
+    }
+
+    .compass-light-sector.is-nautical_twilight {
+      fill: #a8b4e0;
+    }
+
+    .compass-light-sector.is-night {
+      fill: #798593;
+    }
+
+    .chart-axis-label,
+    .chart-time-label,
+    .compass-label,
+    .chart-label {
+      fill: var(--muted);
+      font-size: 12px;
+      font-weight: 720;
+    }
+
+    .chart-time-label.is-suggested {
+      fill: var(--amber);
+      font-weight: 820;
+    }
+
+    .details-line {
+      margin-top: 14px;
+    }
+
+    .details-line summary {
+      color: var(--accent-strong);
+      cursor: pointer;
+      font-weight: 760;
+    }
+
+    @media (max-width: 820px) {
+      .metric-columns,
+      .metric-columns.is-four,
+      .inline-options {
+        grid-template-columns: 1fr;
+      }
+
+      .timeline-row {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    @media (max-width: 620px) {
+      main {
+        width: min(100% - 24px, 760px);
+      }
+
+      .opportunity-header,
+      .recommendation-heading,
+      .moon-path-header {
+        display: grid;
+      }
+
+      .score-block {
+        justify-items: start;
+      }
+
+      .photo-hint {
+        grid-template-columns: 1fr;
+        gap: 2px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <section class="mockup-intro" aria-labelledby="mockup-title">
+      <h1 id="mockup-title">Moon pass card mockups</h1>
+      <p>Discussion mockups only. Each version removes repeated prose summaries and keeps compact recommendation facts plus a photo hint.</p>
+    </section>
+
+    <div class="mockup-stack">
+      <section aria-labelledby="option-a">
+        <p class="mockup-label">Option A: stacked compact rows</p>
+        <article class="opportunity-card is-primary">
+          <header class="opportunity-header">
+            <div class="opportunity-title">
+              <p class="rank-label">Best match</p>
+              <h2 id="option-a">Moon pass: Thu 20:58 to Fri 05:09</h2>
+              <p class="pass-note">Two useful low-Moon windows in this pass.</p>
+              <div class="badge-row" aria-label="Pass summary">
+                <span class="pill">Pass duration 8 hr 11 min</span>
+                <span class="pill">Low Moon throughout</span>
+              </div>
+            </div>
+            <div class="score-block" aria-label="Score 82">
+              <span class="score-value">82</span>
+              <span class="score-label">Score</span>
+            </div>
+          </header>
+
+          <section class="recommendation-list" aria-label="Recommendations in this Moon pass">
+            <article class="recommendation-row is-best">
+              <header class="recommendation-heading">
+                <div class="recommendation-title">
+                  <span class="best-badge">Best</span>
+                  <strong>Thu 22:51, moonrise side</strong>
+                </div>
+                <span class="row-score">82 score</span>
+              </header>
+              <dl class="metric-columns">
+                <div class="metric">
+                  <dt>Moon</dt>
+                  <dd>3.2&deg; WSW</dd>
+                </div>
+                <div class="metric">
+                  <dt>Window</dt>
+                  <dd>54 min</dd>
+                </div>
+                <div class="metric">
+                  <dt>Light</dt>
+                  <dd>Civil twilight</dd>
+                </div>
+                <div class="metric">
+                  <dt>Weather</dt>
+                  <dd>Clear, 12% cloud</dd>
+                </div>
+                <div class="metric">
+                  <dt>Visibility</dt>
+                  <dd>24 km</dd>
+                </div>
+              </dl>
+              <dl class="photo-hint">
+                <dt>Photo hint</dt>
+                <dd>Balanced twilight. Good for foreground detail without losing the crescent.</dd>
+              </dl>
+            </article>
+
+            <article class="recommendation-row">
+              <header class="recommendation-heading">
+                <div class="recommendation-title">
+                  <span class="quiet-badge">Alternative</span>
+                  <strong>Fri 04:42, moonset side</strong>
+                </div>
+                <span class="row-score">79 score</span>
+              </header>
+              <dl class="metric-columns">
+                <div class="metric">
+                  <dt>Moon</dt>
+                  <dd>2.8&deg; ENE</dd>
+                </div>
+                <div class="metric">
+                  <dt>Window</dt>
+                  <dd>48 min</dd>
+                </div>
+                <div class="metric">
+                  <dt>Light</dt>
+                  <dd>Nautical twilight</dd>
+                </div>
+                <div class="metric">
+                  <dt>Weather</dt>
+                  <dd>Mostly clear, 18% cloud</dd>
+                </div>
+                <div class="metric">
+                  <dt>Visibility</dt>
+                  <dd>22 km</dd>
+                </div>
+              </dl>
+              <dl class="photo-hint">
+                <dt>Photo hint</dt>
+                <dd>Darker sky. Use a tripod and expect less foreground color.</dd>
+              </dl>
+            </article>
+          </section>
+
+          <section class="moon-path-panel" aria-label="Moon pass path">
+            <div class="moon-path-header">
+              <h3>Moon pass path</h3>
+              <p>Start, recommendations, and end positions</p>
+            </div>
+            <div class="chart-frame" aria-hidden="true">
+              <svg viewBox="0 0 760 126" role="img">
+                <line class="chart-gridline" x1="40" y1="95" x2="720" y2="95"></line>
+                <line class="chart-gridline" x1="40" y1="54" x2="720" y2="54"></line>
+                <path class="chart-path" d="M54 102 C170 64 270 38 378 42 C492 48 610 72 706 104"></path>
+                <circle class="chart-dot" cx="54" cy="102" r="5"></circle>
+                <circle class="chart-dot is-best" cx="218" cy="51" r="7"></circle>
+                <circle class="chart-dot" cx="612" cy="76" r="6"></circle>
+                <circle class="chart-dot" cx="706" cy="104" r="5"></circle>
+                <text class="chart-label" x="198" y="28">Best</text>
+                <text class="chart-label" x="584" y="58">Alt</text>
+              </svg>
+            </div>
+          </section>
+
+          <details class="details-line">
+            <summary>Scoring details</summary>
+          </details>
+        </article>
+      </section>
+
+      <section aria-labelledby="option-b">
+        <p class="mockup-label">Option B: side-by-side decision cards, revised with current-style charts</p>
+        <article class="opportunity-card is-primary">
+          <header class="opportunity-header">
+            <div class="opportunity-title">
+              <p class="rank-label">Best match</p>
+              <h2 id="option-b">Moon pass: Thu 20:58 to Fri 05:09</h2>
+            </div>
+            <div class="score-block" aria-label="Score 82">
+              <span class="score-value">82</span>
+              <span class="score-label">Score</span>
+            </div>
+          </header>
+
+          <section class="inline-options" aria-label="Recommendations in this Moon pass">
+            <article class="inline-option is-best">
+              <header>
+                <div>
+                  <span class="best-badge">Best</span>
+                  <h3>Thu 22:51</h3>
+                </div>
+                <span class="row-score">Moonrise side</span>
+              </header>
+              <dl class="metric-columns">
+                <div class="metric">
+                  <dt>Moon altitude</dt>
+                  <dd>3.2&deg; WSW</dd>
+                </div>
+                <div class="metric">
+                  <dt>Window</dt>
+                  <dd>54 min</dd>
+                </div>
+                <div class="metric">
+                  <dt>Light bucket</dt>
+                  <dd><span class="light-bucket">Civil twilight</span></dd>
+                </div>
+                <div class="metric">
+                  <dt>Sun altitude</dt>
+                  <dd>-5.1&deg;</dd>
+                </div>
+                <div class="metric">
+                  <dt>Weather</dt>
+                  <dd>Clear</dd>
+                </div>
+                <div class="metric">
+                  <dt>Cloud</dt>
+                  <dd>12%</dd>
+                </div>
+              </dl>
+              <dl class="photo-hint">
+                <dt>Photo hint</dt>
+                <dd>Best balance of Moon detail and foreground light.</dd>
+              </dl>
+            </article>
+
+            <article class="inline-option">
+              <header>
+                <div>
+                  <span class="alt-badge">Alternative</span>
+                  <h3>Fri 04:42</h3>
+                </div>
+                <span class="row-score">Moonset side</span>
+              </header>
+              <dl class="metric-columns">
+                <div class="metric">
+                  <dt>Moon altitude</dt>
+                  <dd>2.8&deg; ENE</dd>
+                </div>
+                <div class="metric">
+                  <dt>Window</dt>
+                  <dd>48 min</dd>
+                </div>
+                <div class="metric">
+                  <dt>Light bucket</dt>
+                  <dd><span class="light-bucket is-nautical">Nautical twilight</span></dd>
+                </div>
+                <div class="metric">
+                  <dt>Sun altitude</dt>
+                  <dd>-8.4&deg;</dd>
+                </div>
+                <div class="metric">
+                  <dt>Weather</dt>
+                  <dd>Mostly clear</dd>
+                </div>
+                <div class="metric">
+                  <dt>Cloud</dt>
+                  <dd>18%</dd>
+                </div>
+              </dl>
+              <dl class="photo-hint">
+                <dt>Photo hint</dt>
+                <dd>Darker scene. More useful for silhouettes and city lights.</dd>
+              </dl>
+            </article>
+          </section>
+
+          <section class="moon-path-panel" aria-label="Moon pass path">
+            <div class="moon-path-header">
+              <h3>Moon pass path</h3>
+              <p>Altitude buckets and azimuth sweep across the same pass</p>
+            </div>
+            <div class="moon-path-charts">
+              <div class="moon-chart">
+                <span class="moon-chart-label">Altitude</span>
+                <div class="chart-frame altitude-frame" aria-hidden="true">
+                  <svg viewBox="0 0 760 220" role="img">
+                    <rect class="light-band is-night" x="46" y="24" width="120" height="150"></rect>
+                    <rect class="light-band is-nautical_twilight" x="166" y="24" width="210" height="150"></rect>
+                    <rect class="light-band is-civil_twilight" x="376" y="24" width="180" height="150"></rect>
+                    <rect class="light-band is-nautical_twilight" x="556" y="24" width="158" height="150"></rect>
+                    <line class="chart-gridline" x1="46" y1="174" x2="714" y2="174"></line>
+                    <line class="chart-gridline" x1="46" y1="99" x2="714" y2="99"></line>
+                    <line class="chart-gridline" x1="46" y1="24" x2="714" y2="24"></line>
+                    <text class="chart-axis-label" x="10" y="178">0&deg;</text>
+                    <text class="chart-axis-label" x="10" y="103">+5&deg;</text>
+                    <text class="chart-axis-label" x="6" y="28">+10&deg;</text>
+                    <line class="chart-tick" x1="92" y1="174" x2="92" y2="180"></line>
+                    <line class="chart-tick" x1="224" y1="174" x2="224" y2="180"></line>
+                    <line class="chart-tick" x1="356" y1="174" x2="356" y2="180"></line>
+                    <line class="chart-tick" x1="488" y1="174" x2="488" y2="180"></line>
+                    <line class="chart-tick" x1="620" y1="174" x2="620" y2="180"></line>
+                    <text class="chart-time-label" x="92" y="203" text-anchor="middle">21:00</text>
+                    <text class="chart-time-label is-suggested" x="224" y="203" text-anchor="middle">23:00</text>
+                    <text class="chart-time-label" x="356" y="203" text-anchor="middle">01:00</text>
+                    <text class="chart-time-label" x="488" y="203" text-anchor="middle">03:00</text>
+                    <text class="chart-time-label is-suggested" x="620" y="203" text-anchor="middle">05:00</text>
+                    <path class="chart-path" d="M54 174 C126 122 198 82 270 69 C364 51 478 72 566 116 C640 152 688 169 706 174"></path>
+                    <circle class="chart-dot is-start" cx="54" cy="174" r="4.5"></circle>
+                    <circle class="chart-dot is-best" cx="224" cy="78" r="7"></circle>
+                    <circle class="chart-dot" cx="620" cy="129" r="6"></circle>
+                    <circle class="chart-dot is-end" cx="706" cy="174" r="4.5"></circle>
+                    <text class="chart-label" x="204" y="55">Best</text>
+                    <text class="chart-label" x="594" y="109">Alt</text>
+                  </svg>
+                </div>
+              </div>
+              <div class="moon-chart moon-chart-azimuth">
+                <span class="moon-chart-label">Azimuth</span>
+                <div class="chart-frame azimuth-frame" aria-hidden="true">
+                  <svg viewBox="0 0 220 160" role="img">
+                    <circle class="compass-ring" cx="110" cy="78" r="52"></circle>
+                    <line class="compass-axis" x1="110" y1="26" x2="110" y2="130"></line>
+                    <line class="compass-axis" x1="58" y1="78" x2="162" y2="78"></line>
+                    <text class="compass-label" x="110" y="18" text-anchor="middle">N</text>
+                    <text class="compass-label" x="180" y="82" text-anchor="middle">E</text>
+                    <text class="compass-label" x="110" y="150" text-anchor="middle">S</text>
+                    <text class="compass-label" x="40" y="82" text-anchor="middle">W</text>
+                    <path class="compass-light-sector is-night" d="M 110 78 L 64 102 L 76 116 Z"></path>
+                    <path class="compass-light-sector is-nautical_twilight" d="M 110 78 L 76 116 L 86 126 L 110 130 Z"></path>
+                    <path class="compass-light-sector is-civil_twilight" d="M 110 78 L 110 130 L 132 128 L 148 116 Z"></path>
+                    <path class="compass-light-sector is-nautical_twilight" d="M 110 78 L 148 116 L 158 104 Z"></path>
+                    <path class="compass-sector" d="M 110 78 L 64 102 L 86 126 L 132 128 L 158 104 Z"></path>
+                    <path class="chart-path" d="M64 102 L86 126 L132 128 L158 104"></path>
+                    <circle class="chart-dot is-start" cx="64" cy="102" r="3.8"></circle>
+                    <circle class="chart-dot is-best" cx="86" cy="126" r="4.8"></circle>
+                    <circle class="chart-dot" cx="132" cy="128" r="4.2"></circle>
+                    <circle class="chart-dot is-end" cx="158" cy="104" r="3.8"></circle>
+                  </svg>
+                </div>
+              </div>
+            </div>
+          </section>
+        </article>
+      </section>
+
+      <section aria-labelledby="option-c">
+        <p class="mockup-label">Option C: pass timeline rows</p>
+        <article class="opportunity-card is-primary">
+          <header class="opportunity-header">
+            <div class="opportunity-title">
+              <p class="rank-label">Best match</p>
+              <h2 id="option-c">Moon pass: Thu 20:58 to Fri 05:09</h2>
+              <p class="pass-note">Ranked by the strongest recommendation in the pass.</p>
+            </div>
+            <div class="score-block" aria-label="Score 82">
+              <span class="score-value">82</span>
+              <span class="score-label">Score</span>
+            </div>
+          </header>
+
+          <section class="timeline-list" aria-label="Recommendations in this Moon pass">
+            <article class="timeline-row is-best">
+              <div class="timeline-time">
+                <span class="best-badge">Best</span>
+                <strong>Thu 22:51</strong>
+                <span class="quiet-badge">Moonrise side</span>
+              </div>
+              <div>
+                <dl class="metric-columns">
+                  <div class="metric">
+                    <dt>Moon</dt>
+                    <dd>3.2&deg; WSW</dd>
+                  </div>
+                  <div class="metric">
+                    <dt>Window</dt>
+                    <dd>54 min</dd>
+                  </div>
+                  <div class="metric">
+                    <dt>Light</dt>
+                    <dd>Civil twilight</dd>
+                  </div>
+                  <div class="metric">
+                    <dt>Weather</dt>
+                    <dd>Clear, 12% cloud</dd>
+                  </div>
+                  <div class="metric">
+                    <dt>Hint</dt>
+                    <dd>Balanced twilight</dd>
+                  </div>
+                </dl>
+              </div>
+            </article>
+
+            <article class="timeline-row">
+              <div class="timeline-time">
+                <span class="quiet-badge">Alternative</span>
+                <strong>Fri 04:42</strong>
+                <span class="quiet-badge">Moonset side</span>
+              </div>
+              <div>
+                <dl class="metric-columns">
+                  <div class="metric">
+                    <dt>Moon</dt>
+                    <dd>2.8&deg; ENE</dd>
+                  </div>
+                  <div class="metric">
+                    <dt>Window</dt>
+                    <dd>48 min</dd>
+                  </div>
+                  <div class="metric">
+                    <dt>Light</dt>
+                    <dd>Nautical twilight</dd>
+                  </div>
+                  <div class="metric">
+                    <dt>Weather</dt>
+                    <dd>Mostly clear</dd>
+                  </div>
+                  <div class="metric">
+                    <dt>Hint</dt>
+                    <dd>Darker sky</dd>
+                  </div>
+                </dl>
+              </div>
+            </article>
+          </section>
+
+          <section class="moon-path-panel" aria-label="Moon pass path">
+            <div class="moon-path-header">
+              <h3>Moon pass path</h3>
+              <p>Start, two recommendations, end</p>
+            </div>
+            <div class="chart-frame" aria-hidden="true">
+              <svg viewBox="0 0 760 126" role="img">
+                <line class="chart-gridline" x1="40" y1="95" x2="720" y2="95"></line>
+                <line class="chart-gridline" x1="40" y1="54" x2="720" y2="54"></line>
+                <path class="chart-path" d="M54 102 C170 64 270 38 378 42 C492 48 610 72 706 104"></path>
+                <circle class="chart-dot" cx="54" cy="102" r="5"></circle>
+                <circle class="chart-dot is-best" cx="218" cy="51" r="7"></circle>
+                <circle class="chart-dot" cx="612" cy="76" r="6"></circle>
+                <circle class="chart-dot" cx="706" cy="104" r="5"></circle>
+                <text class="chart-label" x="198" y="28">Best</text>
+                <text class="chart-label" x="584" y="58">Alt</text>
+              </svg>
+            </div>
+          </section>
+        </article>
+      </section>
+    </div>
+  </main>
+</body>
+</html>
