@@ -1,0 +1,498 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Azimuth Diagram Shape Mockups</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --bg: #f4f6f7;
+      --surface: #ffffff;
+      --surface-subtle: #f8faf9;
+      --surface-muted: #eef3f1;
+      --ink: #202426;
+      --muted: #5e686d;
+      --line: #d8e0df;
+      --line-strong: #b9c7c4;
+      --accent: #216f68;
+      --accent-strong: #154f4a;
+      --blue: #315f92;
+      --blue-soft: #eaf2fb;
+      --amber: #8b641f;
+      --amber-soft: #fff5de;
+      --night: #798593;
+      --nautical: #a8b4e0;
+      --civil: #b7edf3;
+      --shadow: 0 14px 34px rgba(27, 37, 42, 0.08);
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--ink);
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      line-height: 1.5;
+    }
+
+    main {
+      width: min(1180px, calc(100% - 32px));
+      margin: 0 auto;
+      padding: 28px 0 44px;
+    }
+
+    .intro {
+      margin-bottom: 18px;
+      padding-bottom: 16px;
+      border-bottom: 1px solid var(--line);
+    }
+
+    .eyebrow {
+      margin: 0 0 6px;
+      color: var(--blue);
+      font-size: 0.76rem;
+      font-weight: 800;
+      text-transform: uppercase;
+    }
+
+    h1 {
+      margin: 0 0 8px;
+      font-size: 1.55rem;
+      letter-spacing: 0;
+      line-height: 1.16;
+    }
+
+    .intro p {
+      max-width: 840px;
+      margin: 0;
+      color: var(--muted);
+    }
+
+    .legend {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 14px;
+    }
+
+    .legend span,
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      min-height: 26px;
+      padding: 3px 8px;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      color: var(--ink);
+      font-size: 0.8rem;
+      font-weight: 740;
+      white-space: nowrap;
+    }
+
+    .legend .is-night {
+      border-color: #4f5965;
+      background: var(--night);
+      color: #fff;
+    }
+
+    .legend .is-nautical {
+      border-color: #7685bd;
+      background: var(--nautical);
+      color: #26345f;
+    }
+
+    .legend .is-civil {
+      border-color: #6cb8c7;
+      background: var(--civil);
+      color: #1f5964;
+    }
+
+    .badge.is-best {
+      border-color: rgba(139, 100, 31, 0.38);
+      background: var(--amber-soft);
+      color: #5b4216;
+    }
+
+    .badge.is-alt {
+      border-color: #7f8b88;
+      background: #cfd8d5;
+      color: var(--ink);
+    }
+
+    .mockup-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 18px;
+    }
+
+    .mockup-card {
+      display: grid;
+      gap: 12px;
+      min-width: 0;
+      padding: 16px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--surface);
+      box-shadow: var(--shadow);
+    }
+
+    .mockup-card h2 {
+      margin: 0;
+      font-size: 1.03rem;
+      letter-spacing: 0;
+    }
+
+    .mockup-card p {
+      margin: 0;
+      color: var(--muted);
+      font-size: 0.9rem;
+    }
+
+    .mockup-meta {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 7px;
+    }
+
+    .diagram-frame {
+      min-width: 0;
+      overflow: hidden;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--surface-subtle);
+    }
+
+    svg {
+      display: block;
+      width: 100%;
+      height: auto;
+    }
+
+    .ring,
+    .axis,
+    .grid-line,
+    .rose-line {
+      fill: none;
+      stroke: var(--line-strong);
+      stroke-width: 1;
+    }
+
+    .axis,
+    .grid-line {
+      stroke-dasharray: 3 4;
+    }
+
+    .label,
+    .tick-label {
+      fill: var(--muted);
+      font-size: 12px;
+      font-weight: 760;
+    }
+
+    .label.is-cardinal {
+      fill: var(--ink);
+      font-size: 13px;
+      font-weight: 820;
+    }
+
+    .bucket {
+      opacity: 0.82;
+      stroke: rgba(32, 36, 38, 0.18);
+      stroke-width: 1;
+    }
+
+    .bucket.is-night {
+      fill: var(--night);
+    }
+
+    .bucket.is-nautical {
+      fill: var(--nautical);
+    }
+
+    .bucket.is-civil {
+      fill: var(--civil);
+    }
+
+    .sweep-area {
+      fill: rgba(33, 111, 104, 0.12);
+      stroke: none;
+    }
+
+    .sweep-line {
+      fill: none;
+      stroke: var(--accent);
+      stroke-linecap: round;
+      stroke-linejoin: round;
+      stroke-width: 3;
+    }
+
+    .dot {
+      fill: var(--surface);
+      stroke: var(--accent);
+      stroke-width: 2;
+    }
+
+    .dot.is-start,
+    .dot.is-end {
+      fill: var(--blue-soft);
+      stroke: var(--blue);
+    }
+
+    .dot.is-best {
+      fill: var(--amber);
+      stroke: #5b4216;
+      stroke-width: 2.2;
+    }
+
+    .marker-label {
+      fill: var(--ink);
+      font-size: 11px;
+      font-weight: 800;
+    }
+
+    .rose-fill {
+      fill: #f9f3e7;
+      stroke: #a48652;
+      stroke-width: 1;
+    }
+
+    .rose-fill-alt {
+      fill: #e8d9b8;
+      stroke: #a48652;
+      stroke-width: 1;
+    }
+
+    .rose-center {
+      fill: #fff8e8;
+      stroke: #8a6c34;
+      stroke-width: 1.2;
+    }
+
+    .strip-track {
+      fill: #fff;
+      stroke: var(--line-strong);
+      stroke-width: 1;
+    }
+
+    @media (max-width: 920px) {
+      .mockup-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    @media (max-width: 560px) {
+      main {
+        width: min(100% - 24px, 760px);
+      }
+
+      .mockup-card {
+        padding: 14px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <section class="intro" aria-labelledby="page-title">
+      <p class="eyebrow">Design iteration</p>
+      <h1 id="page-title">Azimuth diagram shape mockups</h1>
+      <p>Same pass sample in each diagram: Moon rises from the west-southwest side, reaches the strongest recommendation near southwest, then continues toward the southeast-side alternative. The colors show light buckets.</p>
+      <div class="legend" aria-label="Light bucket legend">
+        <span class="is-night">Night</span>
+        <span class="is-nautical">Nautical twilight</span>
+        <span class="is-civil">Civil twilight</span>
+        <span class="badge is-best">Best marker</span>
+        <span class="badge is-alt">Alternative marker</span>
+      </div>
+    </section>
+
+    <div class="mockup-grid">
+      <article class="mockup-card">
+        <div>
+          <p class="eyebrow">Variant A</p>
+          <h2>Compact compass sweep</h2>
+          <p>Closest to the current implementation, with stronger bucket sectors.</p>
+        </div>
+        <div class="mockup-meta">
+          <span class="badge is-best">Best</span>
+          <span class="badge is-alt">Alternative</span>
+        </div>
+        <div class="diagram-frame">
+          <svg viewBox="0 0 360 260" role="img" aria-label="Compact compass azimuth sweep">
+            <circle class="ring" cx="180" cy="124" r="78"></circle>
+            <line class="axis" x1="180" y1="46" x2="180" y2="202"></line>
+            <line class="axis" x1="102" y1="124" x2="258" y2="124"></line>
+            <text class="label is-cardinal" x="180" y="28" text-anchor="middle">N</text>
+            <text class="label is-cardinal" x="284" y="128" text-anchor="middle">E</text>
+            <text class="label is-cardinal" x="180" y="230" text-anchor="middle">S</text>
+            <text class="label is-cardinal" x="76" y="128" text-anchor="middle">W</text>
+            <path class="bucket is-night" d="M 180 124 L 111 160 L 128 182 Z"></path>
+            <path class="bucket is-nautical" d="M 180 124 L 128 182 L 164 202 L 181 203 Z"></path>
+            <path class="bucket is-civil" d="M 180 124 L 181 203 L 214 198 L 239 164 Z"></path>
+            <path class="bucket is-nautical" d="M 180 124 L 239 164 L 249 145 Z"></path>
+            <path class="sweep-area" d="M 180 124 L 111 160 L 128 182 L 164 202 L 214 198 L 249 145 Z"></path>
+            <path class="sweep-line" d="M111 160 L128 182 L164 202 L214 198 L249 145"></path>
+            <circle class="dot is-start" cx="111" cy="160" r="5"></circle>
+            <circle class="dot is-best" cx="128" cy="182" r="7"></circle>
+            <circle class="dot" cx="214" cy="198" r="6"></circle>
+            <circle class="dot is-end" cx="249" cy="145" r="5"></circle>
+            <text class="marker-label" x="109" y="208">Best</text>
+            <text class="marker-label" x="201" y="225">Alt</text>
+          </svg>
+        </div>
+      </article>
+
+      <article class="mockup-card">
+        <div>
+          <p class="eyebrow">Variant B</p>
+          <h2>Old compass rose</h2>
+          <p>Iconic and recognizable; more evocative, but visually busier.</p>
+        </div>
+        <div class="mockup-meta">
+          <span class="badge is-best">Best</span>
+          <span class="badge is-alt">Alternative</span>
+        </div>
+        <div class="diagram-frame">
+          <svg viewBox="0 0 360 260" role="img" aria-label="Old compass rose azimuth sweep">
+            <circle class="ring" cx="180" cy="126" r="88"></circle>
+            <path class="rose-fill" d="M180 26 L194 110 L180 126 L166 110 Z"></path>
+            <path class="rose-fill" d="M280 126 L196 140 L180 126 L196 112 Z"></path>
+            <path class="rose-fill" d="M180 226 L166 142 L180 126 L194 142 Z"></path>
+            <path class="rose-fill" d="M80 126 L164 112 L180 126 L164 140 Z"></path>
+            <path class="rose-fill-alt" d="M251 55 L205 117 L180 126 L189 101 Z"></path>
+            <path class="rose-fill-alt" d="M251 197 L189 151 L180 126 L205 135 Z"></path>
+            <path class="rose-fill-alt" d="M109 197 L155 135 L180 126 L171 151 Z"></path>
+            <path class="rose-fill-alt" d="M109 55 L171 101 L180 126 L155 117 Z"></path>
+            <circle class="rose-center" cx="180" cy="126" r="18"></circle>
+            <text class="label is-cardinal" x="180" y="21" text-anchor="middle">N</text>
+            <text class="label is-cardinal" x="293" y="131" text-anchor="middle">E</text>
+            <text class="label is-cardinal" x="180" y="244" text-anchor="middle">S</text>
+            <text class="label is-cardinal" x="67" y="131" text-anchor="middle">W</text>
+            <path class="bucket is-night" d="M 180 126 L 102 168 L 121 194 Z"></path>
+            <path class="bucket is-nautical" d="M 180 126 L 121 194 L 169 214 L 182 214 Z"></path>
+            <path class="bucket is-civil" d="M 180 126 L 182 214 L 221 209 L 261 171 Z"></path>
+            <path class="bucket is-nautical" d="M 180 126 L 261 171 L 269 150 Z"></path>
+            <path class="sweep-line" d="M102 168 L121 194 L169 214 L221 209 L269 150"></path>
+            <circle class="dot is-start" cx="102" cy="168" r="5"></circle>
+            <circle class="dot is-best" cx="121" cy="194" r="7"></circle>
+            <circle class="dot" cx="221" cy="209" r="6"></circle>
+            <circle class="dot is-end" cx="269" cy="150" r="5"></circle>
+            <text class="marker-label" x="98" y="220">Best</text>
+            <text class="marker-label" x="209" y="236">Alt</text>
+          </svg>
+        </div>
+      </article>
+
+      <article class="mockup-card">
+        <div>
+          <p class="eyebrow">Variant C</p>
+          <h2>Horizon fan</h2>
+          <p>Feels like standing in place and looking along the horizon.</p>
+        </div>
+        <div class="mockup-meta">
+          <span class="badge is-best">Best</span>
+          <span class="badge is-alt">Alternative</span>
+        </div>
+        <div class="diagram-frame">
+          <svg viewBox="0 0 360 260" role="img" aria-label="Horizon fan azimuth sweep">
+            <path class="grid-line" d="M56 204 A124 124 0 0 1 304 204"></path>
+            <path class="grid-line" d="M104 204 A76 76 0 0 1 256 204"></path>
+            <line class="grid-line" x1="180" y1="204" x2="180" y2="42"></line>
+            <line class="grid-line" x1="180" y1="204" x2="82" y2="94"></line>
+            <line class="grid-line" x1="180" y1="204" x2="278" y2="94"></line>
+            <path class="bucket is-night" d="M56 204 A124 124 0 0 1 101 110 L180 204 Z"></path>
+            <path class="bucket is-nautical" d="M101 110 A124 124 0 0 1 176 80 L180 204 Z"></path>
+            <path class="bucket is-civil" d="M176 80 A124 124 0 0 1 247 112 L180 204 Z"></path>
+            <path class="bucket is-nautical" d="M247 112 A124 124 0 0 1 304 204 L180 204 Z"></path>
+            <path class="sweep-line" d="M73 175 C104 201 139 215 180 218 C226 220 265 199 293 160"></path>
+            <circle class="dot is-start" cx="73" cy="175" r="5"></circle>
+            <circle class="dot is-best" cx="104" cy="201" r="7"></circle>
+            <circle class="dot" cx="234" cy="207" r="6"></circle>
+            <circle class="dot is-end" cx="293" cy="160" r="5"></circle>
+            <text class="label is-cardinal" x="180" y="32" text-anchor="middle">S</text>
+            <text class="label is-cardinal" x="46" y="218" text-anchor="middle">W</text>
+            <text class="label is-cardinal" x="314" y="218" text-anchor="middle">E</text>
+            <text class="tick-label" x="104" y="229" text-anchor="middle">Best</text>
+            <text class="tick-label" x="234" y="234" text-anchor="middle">Alt</text>
+          </svg>
+        </div>
+      </article>
+
+      <article class="mockup-card">
+        <div>
+          <p class="eyebrow">Variant D</p>
+          <h2>Azimuth strip</h2>
+          <p>Most compact and easiest to compare with the altitude chart.</p>
+        </div>
+        <div class="mockup-meta">
+          <span class="badge is-best">Best</span>
+          <span class="badge is-alt">Alternative</span>
+        </div>
+        <div class="diagram-frame">
+          <svg viewBox="0 0 360 260" role="img" aria-label="Linear azimuth strip">
+            <rect class="strip-track" x="34" y="92" width="292" height="54" rx="8"></rect>
+            <rect class="bucket is-night" x="34" y="92" width="62" height="54" rx="8"></rect>
+            <rect class="bucket is-nautical" x="96" y="92" width="78" height="54"></rect>
+            <rect class="bucket is-civil" x="174" y="92" width="92" height="54"></rect>
+            <rect class="bucket is-nautical" x="266" y="92" width="60" height="54" rx="8"></rect>
+            <line class="grid-line" x1="107" y1="84" x2="107" y2="154"></line>
+            <line class="grid-line" x1="180" y1="84" x2="180" y2="154"></line>
+            <line class="grid-line" x1="253" y1="84" x2="253" y2="154"></line>
+            <text class="label is-cardinal" x="34" y="74" text-anchor="middle">W</text>
+            <text class="label" x="107" y="74" text-anchor="middle">SW</text>
+            <text class="label is-cardinal" x="180" y="74" text-anchor="middle">S</text>
+            <text class="label" x="253" y="74" text-anchor="middle">SE</text>
+            <text class="label is-cardinal" x="326" y="74" text-anchor="middle">E</text>
+            <path class="sweep-line" d="M62 119 C105 132 133 140 168 138 C222 137 266 121 306 102"></path>
+            <circle class="dot is-start" cx="62" cy="119" r="5"></circle>
+            <circle class="dot is-best" cx="118" cy="136" r="7"></circle>
+            <circle class="dot" cx="246" cy="126" r="6"></circle>
+            <circle class="dot is-end" cx="306" cy="102" r="5"></circle>
+            <text class="marker-label" x="99" y="176">Best</text>
+            <text class="marker-label" x="232" y="176">Alt</text>
+          </svg>
+        </div>
+      </article>
+
+      <article class="mockup-card">
+        <div>
+          <p class="eyebrow">Variant E</p>
+          <h2>Compass ring</h2>
+          <p>More compact than the full compass, while still preserving direction.</p>
+        </div>
+        <div class="mockup-meta">
+          <span class="badge is-best">Best</span>
+          <span class="badge is-alt">Alternative</span>
+        </div>
+        <div class="diagram-frame">
+          <svg viewBox="0 0 360 260" role="img" aria-label="Compass ring azimuth sweep">
+            <circle class="ring" cx="180" cy="126" r="88"></circle>
+            <circle class="ring" cx="180" cy="126" r="54"></circle>
+            <path class="bucket is-night" d="M 101 167 A88 88 0 0 1 122 192 L146 166 A54 54 0 0 0 132 151 Z"></path>
+            <path class="bucket is-nautical" d="M 122 192 A88 88 0 0 1 181 214 L181 180 A54 54 0 0 0 146 166 Z"></path>
+            <path class="bucket is-civil" d="M 181 214 A88 88 0 0 1 238 191 L214 166 A54 54 0 0 0 181 180 Z"></path>
+            <path class="bucket is-nautical" d="M 238 191 A88 88 0 0 1 259 167 L228 151 A54 54 0 0 0 214 166 Z"></path>
+            <line class="axis" x1="180" y1="38" x2="180" y2="214"></line>
+            <line class="axis" x1="92" y1="126" x2="268" y2="126"></line>
+            <text class="label is-cardinal" x="180" y="28" text-anchor="middle">N</text>
+            <text class="label is-cardinal" x="288" y="130" text-anchor="middle">E</text>
+            <text class="label is-cardinal" x="180" y="240" text-anchor="middle">S</text>
+            <text class="label is-cardinal" x="72" y="130" text-anchor="middle">W</text>
+            <path class="sweep-line" d="M101 167 L122 192 L181 214 L238 191 L259 167"></path>
+            <circle class="dot is-start" cx="101" cy="167" r="5"></circle>
+            <circle class="dot is-best" cx="122" cy="192" r="7"></circle>
+            <circle class="dot" cx="238" cy="191" r="6"></circle>
+            <circle class="dot is-end" cx="259" cy="167" r="5"></circle>
+            <text class="marker-label" x="101" y="222">Best</text>
+            <text class="marker-label" x="225" y="220">Alt</text>
+          </svg>
+        </div>
+      </article>
+    </div>
+  </main>
+</body>
+</html>

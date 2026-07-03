@@ -10,6 +10,13 @@ Moon Pass Card
   Moon pass card options, with revised Option B as the preferred direction.
 - `docs/design/moon-pass-card-mobile-mockups.html`: mobile mockups for the same
   compact Moon pass card direction.
+- `docs/design/azimuth-diagram-shape-mockups.html`: azimuth diagram shape
+  variants, including a compact compass, an old compass rose, a horizon fan, an
+  azimuth strip, and a compass ring.
+- `docs/design/combined-altitude-azimuth-mockups.html`: combined chart variants
+  that put azimuth on the altitude chart's time axis.
+- `docs/design/final-moon-pass-card-mockup.html`: current final mockup combining
+  compact Moon pass cards with the selected top azimuth rail chart.
 
 Current Direction
 - Use compact recommendation rows instead of repeated prose summaries.
@@ -17,5 +24,5 @@ Current Direction
   same-pass window as `Alternative`.
 - Keep window length, Moon altitude/direction, light bucket, Sun altitude,
   weather, cloud, and a short photo hint visible.
-- Keep shared pass-level altitude and azimuth diagrams, with light buckets shown
-  in both diagrams.
+- Use one shared pass-level Moon path chart where altitude, light buckets, and a
+  top azimuth rail share the same time axis.
