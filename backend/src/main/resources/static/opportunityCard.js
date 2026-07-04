@@ -184,7 +184,8 @@ function passSummaryText(count) {
 }
 
 function metricFact(label, value) {
-  return element("div", { className: "pass-metric" },
+  var className = "pass-metric" + (label === "Sky" ? " is-sky" : "");
+  return element("div", { className: className },
     element("dt", {}, label),
     element("dd", {}, value || "Unavailable"));
 }
