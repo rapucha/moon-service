@@ -146,11 +146,11 @@ function passRecommendations(entries, timezone, countryCode) {
   var className = "pass-choices" + (entries.length === 1 ? " is-single" : "");
   return element("section", { className: className, ariaLabel: "Recommendations in this Moon pass" },
     entries.map(function (entry, index) {
-      return passRecommendation(entry.opportunity, index === 0, timezone, countryCode);
+      return passRecommendation(entry.opportunity, index === 0, entries.length === 1, timezone, countryCode);
     }));
 }
 
-function passRecommendation(opportunity, isBest, timezone, countryCode) {
+function passRecommendation(opportunity, isBest, isSingleRecommendation, timezone, countryCode) {
   var moon = opportunity.moon || {};
   var sun = opportunity.sun || {};
   var weather = opportunity.weather || {};
@@ -167,7 +167,8 @@ function passRecommendation(opportunity, isBest, timezone, countryCode) {
       metricFact("Window", durationText(opportunity.startsAt, opportunity.endsAt)),
       metricFact("Light bucket", lightBucketBadge(sun.lightBucket)),
       metricFact("Sun altitude", degrees(sun.altitudeDegrees)),
-      metricFact("Sky", weather.summary || readableToken(weather.segmentKind) || "Forecast unavailable")),
+      metricFact("Sky", weather.summary || readableToken(weather.segmentKind) || "Forecast unavailable"),
+      isSingleRecommendation ? null : metricSpacer()),
     exposureBalance.text
       ? element("dl", { className: "pass-photo-hint" },
         element("dt", {}, "Photo hint"),
@@ -177,6 +178,10 @@ function passRecommendation(opportunity, isBest, timezone, countryCode) {
       : null);
 }
 
+function metricSpacer() {
+  return element("div", { className: "pass-metric is-spacer", "aria-hidden": "true" });
+}
+
 function passSummaryText(count) {
   return count === 1
     ? "One useful low-Moon window in this pass."
@@ -184,8 +189,7 @@ function passSummaryText(count) {
 }
 
 function metricFact(label, value) {
-  var className = "pass-metric" + (label === "Sky" ? " is-sky" : "");
-  return element("div", { className: className },
+  return element("div", { className: "pass-metric" },
     element("dt", {}, label),
     element("dd", {}, value || "Unavailable"));
 }

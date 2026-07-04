@@ -734,8 +734,9 @@ dd {
   border-top: 1px solid var(--line);
 }
 
-.pass-choices:not(.is-single) .pass-metric.is-sky {
-  grid-column: 1 / -1;
+.pass-metric.is-spacer {
+  min-height: 1px;
+  padding-top: 0;
 }
 
 .pass-metric dt,
