@@ -49,6 +49,10 @@ class PragueContractTest {
         JsonNode first = opportunities.get(0);
         assertTrue(first.path("id").asString().startsWith("prague-cz-"));
         assertTrue(first.has("windowKind"));
+        assertTrue(first.path("moonPass").path("id").asString().startsWith("prague-cz-pass-"));
+        assertFalse(first.path("moonPass").path("startsAt").asString().isBlank());
+        assertFalse(first.path("moonPass").path("endsAt").asString().isBlank());
+        assertMoonPassPathMatchesPass(first);
         assertTrue(first.has("suggestedAt"));
         assertFalse(first.has("peaksAt"));
         assertSuggestedInsideWindow(first);
@@ -99,6 +103,18 @@ class PragueContractTest {
         assertFalse(path.path("suggested").path("lightBucket").asString().isBlank());
         assertFalse(path.path("end").path("lightBucket").asString().isBlank());
         assertTrue(path.path("suggested").has("sunAltitudeDegrees"));
+        assertTrue(path.path("samples").isArray());
+        assertTrue(path.path("samples").size() >= 5);
+        assertFalse(path.path("samples").get(0).path("lightBucket").asString().isBlank());
+    }
+
+    private static void assertMoonPassPathMatchesPass(JsonNode opportunity) {
+        JsonNode pass = opportunity.path("moonPass");
+        JsonNode path = pass.path("path");
+        assertEquals(pass.path("startsAt").asString(), path.path("start").path("at").asString());
+        assertEquals(pass.path("endsAt").asString(), path.path("end").path("at").asString());
+        assertEquals("start", path.path("start").path("role").asString());
+        assertEquals("end", path.path("end").path("role").asString());
         assertTrue(path.path("samples").isArray());
         assertTrue(path.path("samples").size() >= 5);
         assertFalse(path.path("samples").get(0).path("lightBucket").asString().isBlank());

@@ -38,6 +38,13 @@ class ScoringOpportunitySearchEngineTest {
         assertFalse(response.opportunities().isEmpty());
         OpportunitySearchResponse.Opportunity first = response.opportunities().getFirst();
         assertTrue(first.id().startsWith("amsterdam-nl-"));
+        assertTrue(first.moonPass().id().startsWith("amsterdam-nl-pass-"));
+        assertFalse(first.moonPass().startsAt().isBlank());
+        assertFalse(first.moonPass().endsAt().isBlank());
+        assertEquals(first.moonPass().startsAt(), first.moonPass().path().start().at());
+        assertEquals(first.moonPass().endsAt(), first.moonPass().path().end().at());
+        assertTrue(first.moonPass().path().samples().size() >= 5);
+        assertFalse(first.moonPass().path().samples().getFirst().lightBucket().isBlank());
         assertTrue(first.links().get("ics").startsWith("/o/amsterdam-nl-"));
         assertFalse(first.moon().phaseName().isBlank());
         assertTrue(first.moon().phaseAngleDegrees() >= 0.0);
@@ -96,7 +103,7 @@ class ScoringOpportunitySearchEngineTest {
     }
 
     @Test
-    void liveSearchKeepsOngoingWindowAndScoresRemainingSuggestion() {
+    void liveSearchKeepsOngoingMoonPassWindowAndScoresRemainingSuggestion() {
         Instant notBefore = Instant.parse("2026-06-29T01:30:00Z");
         WeatherForecastProvider provider = (location, startsAt, endsAt, forecastHorizonDays) -> instant -> {
             if (instant.isBefore(notBefore)) {
@@ -116,14 +123,17 @@ class ScoringOpportunitySearchEngineTest {
         assertTrue(response.opportunities().stream()
                 .noneMatch(opportunity -> Instant.parse(opportunity.suggestedAt()).isBefore(notBefore)));
         OpportunitySearchResponse.Opportunity ongoing = response.opportunities().stream()
-                .filter(opportunity -> opportunity.startsAt().equals("2026-06-28T22:00:00Z"))
+                .filter(opportunity -> opportunity.moonPass().startsAt().equals("2026-06-28T22:00:00Z"))
                 .findFirst()
-                .orElseThrow(() -> new AssertionError("Expected the ongoing local-day window to be retained."));
+                .orElseThrow(() -> new AssertionError("Expected the ongoing Moon pass window to be retained."));
+        assertEquals("moonset_low", ongoing.windowKind());
+        assertEquals("2026-06-28T22:15:00Z", ongoing.startsAt());
+        assertEquals("2026-06-29T01:40:24Z", ongoing.moonPass().endsAt());
         assertFalse(Instant.parse(ongoing.suggestedAt()).isBefore(notBefore));
         assertEquals(0, ongoing.weather().weatherCode());
-        assertEquals("clear to mostly clear", ongoing.weather().summary());
+        assertEquals("mostly clear", ongoing.weather().summary());
         assertEquals(22, ongoing.components().weatherFit());
-        assertTrue(ongoing.reason().contains("clear to mostly clear and 0 percent precipitation risk"));
+        assertTrue(ongoing.reason().contains("mostly clear and 0 percent precipitation risk"));
     }
 
     @Test

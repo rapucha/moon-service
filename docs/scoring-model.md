@@ -15,9 +15,11 @@ from fixed ephemeris samples. Low Moon remains the strongest default case, but
 the model should also surface context Moon opportunities when ambient light and
 conditions are promising.
 
-For each local calendar day and location, compute intervals where the apparent
-refracted Moon altitude is between the horizon and the configured visible-Moon
-ceiling, initially:
+For each location and search horizon, compute physical Moon passes and the
+useful recommendation windows inside them. A pass is a continuous interval
+where the apparent refracted Moon altitude is above the horizon. A
+recommendation window is the portion of that pass where the Moon altitude is
+between the horizon and the configured visible-Moon ceiling, initially:
 
 ```text
 0 degrees <= Moon altitude <= 90 degrees
@@ -25,19 +27,24 @@ ceiling, initially:
 
 The interval boundaries are:
 
-- Local day start, `00:00`, when a visible-Moon interval crossed midnight.
 - Moonrise.
 - Moonset.
 - The Moon crossing upward through the configured visible-Moon ceiling when the ceiling is below zenith.
 - The Moon crossing downward through the configured visible-Moon ceiling when the ceiling is below zenith.
-- Local day end, `23:59:59`, when a visible-Moon interval continues past midnight.
+- Search horizon start and end when a physical Moon pass is already in
+  progress or still continuing at the edge of the request.
 
-This usually produces zero, one, or two natural windows per day:
+Local midnight is not an interval boundary. The model should preserve a
+continuous Moonrise-to-Moonset pass even when it crosses from one civil date to
+the next.
 
-- A set-side window, usually from the downward ceiling crossing or local day
-  start to Moonset or local day end.
-- A rise-side window, usually from Moonrise or local day start to the upward
-  ceiling crossing or local day end.
+This usually produces zero, one, or two natural recommendation windows per
+Moon pass:
+
+- A rise-side window, usually from Moonrise or the search horizon edge to the
+  upward ceiling crossing or pass peak.
+- A set-side window, usually from the pass peak or downward ceiling crossing
+  to Moonset or the search horizon edge.
 
 The implementation may use coarse samples to bracket crossings before solving
 for event times, but sampling cadence is not part of the product contract and
@@ -149,7 +156,9 @@ The weather label should be intentionally coarse, for example:
 
 ```text
 clear
+mostly_clear
 partly_cloudy
+mostly_cloudy
 mixed
 overcast
 precipitation_risk

@@ -10,7 +10,8 @@ import {
 } from "./format.js";
 import { moonPhaseImageDataUrl } from "./moonPhaseView.js";
 
-var ALTITUDE_PIXELS_PER_MINUTE = 1.16;
+var DESKTOP_ALTITUDE_WIDTH = 730;
+var DESKTOP_PLOT_WIDTH = 672;
 var MOBILE_ALTITUDE_WIDTH = 320;
 var MOBILE_PLOT_WIDTH = 272;
 
@@ -20,18 +21,30 @@ export function moonPathPanel(opportunity, timezone, countryCode, chartContext) 
   if (samples.length < 2) {
     return null;
   }
+  var summaryPoints = Array.isArray(path.summary)
+    ? path.summary.flat().filter(Boolean)
+    : [
+      { label: "Start", point: path.start },
+      { label: "Suggested", point: path.suggested },
+      { label: "End", point: path.end }
+    ];
+  var summaryClass = "moon-path-summary" + (path.summaryClass ? " " + path.summaryClass : "");
+  var description = path.description || "Start, suggested, and end positions across the window";
+  var chartSubject = path.chartSubject || "opportunity window";
+  var summary = path.hideSummary || summaryPoints.length === 0
+    ? null
+    : element("div", { className: summaryClass },
+      summaryPoints.map(function (item) {
+        return moonPathPoint(item.label, item.point, timezone, countryCode);
+      }));
 
   return element("section", { className: "moon-path-panel" },
     element("div", { className: "moon-path-header" },
       element("h4", {}, "Moon path"),
-      element("p", {}, "Start, suggested, and end positions across the window")),
-    element("div", { className: "moon-path-summary" },
-      moonPathPoint("Start", path.start, timezone, countryCode),
-      moonPathPoint("Suggested", path.suggested, timezone, countryCode),
-      moonPathPoint("End", path.end, timezone, countryCode)),
+      element("p", {}, description)),
+    summary,
     element("div", { className: "moon-path-charts" },
-      chartBlock("Altitude", altitudeChart(samples, timezone, countryCode, chartContext, opportunity.moon || {})),
-      chartBlock("Azimuth", azimuthChart(samples))));
+      chartBlock("Altitude", altitudeChart(samples, timezone, countryCode, chartContext, opportunity.moon || {}, chartSubject))));
 }
 
 function moonPathPoint(label, point, timezone, countryCode) {
@@ -50,27 +63,28 @@ function chartBlock(label, chart) {
   if (!chart) {
     return null;
   }
-  return element("div", { className: "moon-chart" },
+  return element("div", { className: "moon-chart moon-chart-" + roleClass(label) },
     element("span", { className: "moon-chart-label" }, label),
     chart);
 }
 
-function altitudeChart(samples, timezone, countryCode, chartContext, moon) {
+function altitudeChart(samples, timezone, countryCode, chartContext, moon, chartSubject) {
   var points = chartSamples(samples);
   if (points.length < 2) {
     return null;
   }
 
   return element("div", { className: "moon-chart-scroll" },
-    altitudeChartSvg(points, timezone, countryCode, "desktop", chartContext, moon),
-    altitudeChartSvg(points, timezone, countryCode, "mobile", chartContext, moon));
+    altitudeChartSvg(points, timezone, countryCode, "desktop", chartContext, moon, chartSubject),
+    altitudeChartSvg(points, timezone, countryCode, "mobile", chartContext, moon, chartSubject));
 }
 
-function altitudeChartSvg(sourcePoints, timezone, countryCode, mode, chartContext, moon) {
+function altitudeChartSvg(sourcePoints, timezone, countryCode, mode, chartContext, moon, chartSubject) {
   var height = 390;
   var left = 34;
-  var right = 14;
-  var top = 26;
+  var railTop = 20;
+  var railHeight = 32;
+  var top = 70;
   var bottom = 326;
   var firstTime = sourcePoints[0].time;
   var lastTime = sourcePoints[sourcePoints.length - 1].time;
@@ -82,11 +96,10 @@ function altitudeChartSvg(sourcePoints, timezone, countryCode, mode, chartContex
   var mobileReferenceDurationMs = chartContext && Number.isFinite(chartContext.mobileReferenceDurationMs)
     ? Math.max(timeSpan, chartContext.mobileReferenceDurationMs)
     : timeSpan;
-  var arcChartWidth = Math.max(1, (timeSpan / 60000) * ALTITUDE_PIXELS_PER_MINUTE);
   var chartWidth = mode === "mobile"
     ? Math.max(1, (timeSpan / mobileReferenceDurationMs) * MOBILE_PLOT_WIDTH)
-    : arcChartWidth;
-  var width = mode === "mobile" ? MOBILE_ALTITUDE_WIDTH : Math.ceil(left + chartWidth + right);
+    : DESKTOP_PLOT_WIDTH;
+  var width = mode === "mobile" ? MOBILE_ALTITUDE_WIDTH : DESKTOP_ALTITUDE_WIDTH;
   var plotEndX = left + chartWidth;
   var chartHeight = bottom - top;
   var points = sourcePoints.map(function (sourcePoint) {
@@ -99,16 +112,35 @@ function altitudeChartSvg(sourcePoints, timezone, countryCode, mode, chartContex
   var bands = lightBandSegments(points);
   var timeTicks = altitudeHourTicks(points, timezone, bottom + 29);
   var path = smoothAltitudePath(points);
+  var azimuthLabels = azimuthRailLabels(points, left, chartWidth, mode);
+  var suggestedGuides = points.filter(function (point) {
+    return point.role === "suggested";
+  });
 
   return svgElement("svg", {
     className: "altitude-chart altitude-chart-" + mode,
     viewBox: "0 0 " + width + " " + height,
     role: "img",
     ariaLabel: mode === "mobile"
-      ? "Moon altitude across the opportunity window; chart fits the card width"
-      : "Moon altitude across the opportunity window; chart width follows window duration",
-    style: mode === "desktop" ? "width: " + width + "px" : null
+      ? "Moon altitude and azimuth across the " + chartSubject + "; chart fits the card width"
+      : "Moon altitude and azimuth across the " + chartSubject + "; chart fills the card width"
   },
+    svgElement("rect", {
+      className: "azimuth-rail-bg",
+      x: left,
+      y: railTop,
+      width: round1(chartWidth),
+      height: railHeight,
+      rx: 6
+    }),
+    azimuthLabels.map(function (label) {
+      return svgElement("text", {
+        className: "azimuth-rail-label",
+        x: round1(label.x),
+        y: railTop + 21,
+        textAnchor: label.anchor
+      }, label.text);
+    }),
     bands.map(function (band) {
       return svgElement("rect", {
         className: "light-band is-" + roleClass(band.lightBucket),
@@ -122,7 +154,16 @@ function altitudeChartSvg(sourcePoints, timezone, countryCode, mode, chartContex
     svgElement("line", { className: "chart-gridline", x1: left, y1: bottom, x2: round1(plotEndX), y2: bottom }),
     svgElement("line", { className: "chart-gridline", x1: left, y1: top, x2: round1(plotEndX), y2: top }),
     svgElement("text", { className: "chart-axis-label", x: 4, y: bottom + 4 }, "0°"),
-    svgElement("text", { className: "chart-axis-label", x: 4, y: top + 4 }, ceiling + "°"),
+    svgElement("text", { className: "chart-axis-label", x: 4, y: top + 4 }, signedDegrees(ceiling)),
+    suggestedGuides.map(function (point) {
+      return svgElement("line", {
+        className: "chart-tick is-suggested",
+        x1: round1(point.x),
+        y1: railTop,
+        x2: round1(point.x),
+        y2: bottom + 5
+      });
+    }),
     timeTicks.map(function (tick) {
       return svgElement("line", {
         className: "chart-tick",
@@ -143,56 +184,6 @@ function altitudeChartSvg(sourcePoints, timezone, countryCode, mode, chartContex
     svgElement("path", { className: "chart-path", d: path.d }),
     keyPathMarkers(points).map(function (point) {
       return altitudeMarker(point, moon);
-    })
-  );
-}
-
-function azimuthChart(samples) {
-  var points = chartSamples(samples);
-  if (points.length < 2) {
-    return null;
-  }
-
-  var width = 190;
-  var height = 150;
-  var centerX = 95;
-  var centerY = 72;
-  var radius = 48;
-  var ringPoints = points.map(function (point) {
-    var plotted = polarPoint(point.azimuthDegrees, centerX, centerY, radius);
-    plotted.role = point.role;
-    return plotted;
-  });
-  var sector = "M " + centerX + " " + centerY + " L " + ringPoints.map(function (point) {
-    return round1(point.x) + " " + round1(point.y);
-  }).join(" L ") + " Z";
-  var sweep = ringPoints.map(function (point, index) {
-    return (index === 0 ? "M " : "L ") + round1(point.x) + " " + round1(point.y);
-  }).join(" ");
-
-  return svgElement("svg", {
-    className: "azimuth-chart",
-    viewBox: "0 0 " + width + " " + height,
-    role: "img",
-    ariaLabel: "Moon azimuth sweep across cardinal directions"
-  },
-    svgElement("title", {}, "Moon direction sweep across the opportunity window"),
-    svgElement("circle", { className: "compass-ring", cx: centerX, cy: centerY, r: radius }),
-    svgElement("line", { className: "compass-axis", x1: centerX, y1: centerY - radius, x2: centerX, y2: centerY + radius }),
-    svgElement("line", { className: "compass-axis", x1: centerX - radius, y1: centerY, x2: centerX + radius, y2: centerY }),
-    svgElement("text", { className: "compass-label", x: centerX, y: 16, textAnchor: "middle" }, "N"),
-    svgElement("text", { className: "compass-label", x: centerX + radius + 18, y: centerY + 4, textAnchor: "middle" }, "E"),
-    svgElement("text", { className: "compass-label", x: centerX, y: centerY + radius + 24, textAnchor: "middle" }, "S"),
-    svgElement("text", { className: "compass-label", x: centerX - radius - 18, y: centerY + 4, textAnchor: "middle" }, "W"),
-    svgElement("path", { className: "compass-sector", d: sector }),
-    svgElement("path", { className: "chart-path", d: sweep }),
-    keyPathMarkers(ringPoints).map(function (point) {
-      return svgElement("circle", {
-        className: "chart-dot is-" + roleClass(point.role),
-        cx: round1(point.x),
-        cy: round1(point.y),
-        r: point.role === "suggested" ? 4.5 : 3.4
-      });
     })
   );
 }
@@ -262,6 +253,54 @@ function altitudeHourTicks(points, timezone, labelY) {
   }
 
   return ticks;
+}
+
+function azimuthRailLabels(points, left, chartWidth, mode) {
+  var first = points[0];
+  var last = points[points.length - 1];
+  var span = Math.max(1, last.time - first.time);
+  var count = mode === "mobile" ? 4 : 5;
+  var labels = [];
+  var previousText = "";
+
+  for (var index = 0; index < count; index += 1) {
+    var ratio = count === 1 ? 0 : index / (count - 1);
+    var time = first.time + span * ratio;
+    var text = compassDirection(interpolatedAzimuth(points, time));
+    if (!text || (text === previousText && index > 0 && index < count - 1)) {
+      continue;
+    }
+    var x = left + chartWidth * ratio;
+    labels.push({
+      text: text,
+      x: x,
+      anchor: tickTextAnchor(x, left, left + chartWidth)
+    });
+    previousText = text;
+  }
+
+  return labels;
+}
+
+function interpolatedAzimuth(points, time) {
+  if (time <= points[0].time) {
+    return points[0].azimuthDegrees;
+  }
+  for (var index = 0; index < points.length - 1; index += 1) {
+    var current = points[index];
+    var next = points[index + 1];
+    if (time <= next.time) {
+      var span = Math.max(1, next.time - current.time);
+      var ratio = clamp((time - current.time) / span, 0, 1);
+      return interpolateAngle(current.azimuthDegrees, next.azimuthDegrees, ratio);
+    }
+  }
+  return points[points.length - 1].azimuthDegrees;
+}
+
+function interpolateAngle(start, end, ratio) {
+  var delta = normalizeDegrees(end - start + 180) - 180;
+  return normalizeDegrees(start + delta * ratio);
 }
 
 function firstLocalHourAtOrAfter(time, timezone) {
@@ -408,6 +447,9 @@ function altitudeMarker(point, moon) {
     transform: "translate(" + round1(point.x) + " " + round1(point.y) + ")"
   },
     svgElement("title", {}, "Suggested Moon position, " + degrees(point.altitudeDegrees) + " altitude"),
+    point.markerLabel
+      ? svgElement("text", { className: "moon-marker-label", x: 0, y: -24, textAnchor: "middle" }, point.markerLabel)
+      : null,
     svgElement("circle", { className: "moon-marker-halo", cx: 0, cy: 0, r: 17 }),
     imageUrl
       ? svgElement("image", {
@@ -432,6 +474,21 @@ function lightBandTitle(band, timezone, countryCode) {
     + formatTime(band.endsAt, timezone, countryCode);
 }
 
+function signedDegrees(value) {
+  if (!Number.isFinite(value)) {
+    return "unavailable";
+  }
+  return (value > 0 ? "+" : "") + value + "°";
+}
+
+function compassDirection(value) {
+  if (!Number.isFinite(value)) {
+    return "";
+  }
+  var directions = ["N", "NNE", "NE", "ENE", "E", "ESE", "SE", "SSE", "S", "SSW", "SW", "WSW", "W", "WNW", "NW", "NNW"];
+  return directions[Math.round(normalizeDegrees(value) / 22.5) % directions.length];
+}
+
 function chartSamples(samples) {
   return samples.map(function (sample) {
     return {
@@ -441,7 +498,8 @@ function chartSamples(samples) {
       azimuthDegrees: sample.azimuthDegrees,
       sunAltitudeDegrees: sample.sunAltitudeDegrees,
       lightBucket: sample.lightBucket,
-      role: sample.role || "path"
+      role: sample.role || "path",
+      markerLabel: sample.markerLabel
     };
   }).filter(function (sample) {
     return Number.isFinite(sample.time)
@@ -459,12 +517,4 @@ function hasPosition(point) {
 
 function roleClass(role) {
   return String(role || "path").replace(/[^a-z0-9_-]/gi, "").toLowerCase() || "path";
-}
-
-function polarPoint(azimuthDegrees, centerX, centerY, radius) {
-  var radians = normalizeDegrees(azimuthDegrees) * Math.PI / 180;
-  return {
-    x: centerX + Math.sin(radians) * radius,
-    y: centerY - Math.cos(radians) * radius
-  };
 }

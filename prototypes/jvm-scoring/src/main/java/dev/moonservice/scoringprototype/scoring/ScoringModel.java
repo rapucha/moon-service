@@ -107,16 +107,42 @@ public final class ScoringModel {
     }
 
     public static String weatherSummary(WeatherFixture weather) {
-        if (weather.weatherCode() == 0 || weather.weatherCode() == 1) {
-            return "clear to mostly clear";
+        return switch (weatherSegmentKind(weather)) {
+            case "clear" -> "clear";
+            case "mostly_clear" -> "mostly clear";
+            case "partly_cloudy" -> "partly cloudy";
+            case "mostly_cloudy" -> "mostly cloudy";
+            case "overcast" -> "overcast";
+            case "precipitation_risk" -> "rain likely";
+            case "poor_visibility" -> "fog or low visibility";
+            default -> "mixed conditions";
+        };
+    }
+
+    public static String weatherSegmentKind(WeatherFixture weather) {
+        int weatherCode = weather.weatherCode();
+        if (weatherCode >= 50) {
+            return "precipitation_risk";
         }
-        if (weather.weatherCode() == 2 || weather.weatherCode() == 3) {
-            return "partly cloudy";
+        if (weatherCode == 45 || weatherCode == 48 || weather.visibilityMeters() < 5000) {
+            return "poor_visibility";
         }
-        if (weather.weatherCode() >= 50) {
-            return "rain likely";
+        if (weatherCode == 3 || weather.cloudCoverPercent() >= 85) {
+            return "overcast";
         }
-        return "mixed conditions";
+        if (weather.cloudCoverPercent() >= 65) {
+            return "mostly_cloudy";
+        }
+        if (weatherCode == 2 || weather.cloudCoverPercent() >= 25) {
+            return "partly_cloudy";
+        }
+        if (weatherCode == 1 || weather.cloudCoverPercent() >= 10) {
+            return "mostly_clear";
+        }
+        if (weatherCode == 0) {
+            return "clear";
+        }
+        return "mixed";
     }
 
     public static String lightBucket(double sunAltitude) {

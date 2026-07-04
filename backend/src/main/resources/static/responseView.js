@@ -1,7 +1,7 @@
 import { sharePathFor } from "./api.js";
 import { element } from "./dom.js";
 import { candidateMeta, formatDateTime } from "./format.js";
-import { opportunityCard } from "./opportunityCard.js";
+import { moonPassCard } from "./opportunityCard.js";
 import { fact } from "./terms.js";
 
 export function createResponseView(results, callbacks) {
@@ -74,8 +74,9 @@ export function createResponseView(results, callbacks) {
     var timezone = location.timezone || "UTC";
     var countryCode = location.countryCode || "";
     var opportunities = Array.isArray(payload.opportunities) ? payload.opportunities : [];
+    var groups = opportunityGroups(opportunities);
     var children = [
-      resultSummary(payload, request, opportunities.length)
+      resultSummary(payload, request, groups.length)
     ];
 
     if (location.kind === "real_location" && location.displayName && callbacks.onResolvedLocation) {
@@ -89,8 +90,8 @@ export function createResponseView(results, callbacks) {
         mobileReferenceDurationMs: maxOpportunityDurationMs(opportunities)
       };
       children.push(element("div", { className: "opportunity-list" },
-        opportunities.map(function (opportunity, index) {
-          return opportunityCard(opportunity, index, timezone, countryCode, chartContext);
+        groups.map(function (group, index) {
+          return opportunityGroup(group, index, timezone, countryCode, chartContext);
         })
       ));
     }
@@ -106,6 +107,33 @@ export function createResponseView(results, callbacks) {
     replaceResults(children);
   }
 
+  function opportunityGroups(opportunities) {
+    var groupsByPass = new Map();
+    var groups = [];
+    opportunities.forEach(function (opportunity, index) {
+      var pass = opportunity.moonPass || {};
+      var key = pass.id || opportunity.id || String(index);
+      var group = groupsByPass.get(key);
+      if (!group) {
+        group = {
+          pass: pass,
+          entries: []
+        };
+        groupsByPass.set(key, group);
+        groups.push(group);
+      }
+      group.entries.push({
+        opportunity: opportunity,
+        index: index
+      });
+    });
+    return groups;
+  }
+
+  function opportunityGroup(group, index, timezone, countryCode, chartContext) {
+    return moonPassCard(group.pass, group.entries, index, timezone, countryCode, chartContext);
+  }
+
   function maxOpportunityDurationMs(opportunities) {
     return opportunities.reduce(function (maxDuration, opportunity) {
       var started = new Date(opportunity.startsAt).getTime();
@@ -117,7 +145,7 @@ export function createResponseView(results, callbacks) {
     }, 0);
   }
 
-  function resultSummary(payload, request, opportunityCount) {
+  function resultSummary(payload, request, passCount) {
     var location = payload.location || {};
     var sharePath = sharePathFor(request);
     var shareUrl = window.location.origin + sharePath;
@@ -131,7 +159,7 @@ export function createResponseView(results, callbacks) {
         element("div", {},
           element("p", { className: "eyebrow" }, "Resolved location"),
           element("h3", { id: "result-title" }, location.displayName || "Resolved location"),
-          element("p", { className: "summary-count" }, opportunityCount === 1 ? "1 ranked Moon opportunity" : opportunityCount + " ranked Moon opportunities")),
+          element("p", { className: "summary-count" }, passCount === 1 ? "1 ranked Moon pass" : passCount + " ranked Moon passes")),
         element("div", { className: "share-tools" },
           element("button", { type: "button", className: "copy-button", "data-share-url": shareUrl }, "Copy link"),
           element("a", { href: sharePath }, "Open share link"))

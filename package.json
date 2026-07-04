@@ -1,0 +1,24 @@
+{
+  "name": "moon-service-frontend-tooling",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "js:check": "tsc -p tsconfig.frontend.json",
+    "js:lint": "eslint backend/src/main/resources/static/*.js tests/ui/**/*.js playwright.config.js eslint.config.js",
+    "js:docs": "jsdoc -c jsdoc.json",
+    "ui:smoke": "playwright test",
+    "frontend:check": "tsc -p tsconfig.frontend.json && eslint backend/src/main/resources/static/*.js tests/ui/**/*.js playwright.config.js eslint.config.js && playwright test"
+  },
+  "engines": {
+    "node": ">=18.19"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.39.4",
+    "@playwright/test": "^1.61.1",
+    "@types/node": "^18.19.130",
+    "eslint": "^9.39.4",
+    "globals": "^17.7.0",
+    "jsdoc": "^4.0.5",
+    "typescript": "^6.0.3"
+  }
+}

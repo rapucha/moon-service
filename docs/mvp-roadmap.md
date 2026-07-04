@@ -215,8 +215,9 @@ out-of-range numeric controls return HTTP `400` with
 Natural-window scoring refactor now implemented in `prototypes/jvm-scoring/`
 and exercised through the backend:
 
-- Generate natural visible-Moon windows per local day from Moonrise, Moonset,
-  crossings through the configured altitude ceiling, and local day boundaries.
+- Generate natural visible-Moon recommendation windows inside
+  Moonrise-to-Moonset passes, using crossings through the configured altitude
+  ceiling and pass peak while preserving passes across local midnight.
 - Low Moon remains best, but context Moon and high-context Moon windows can now
   rank when ambient light, illumination balance, and weather are favorable.
 - Use sampling only as a numerical aid if needed to bracket event crossings.

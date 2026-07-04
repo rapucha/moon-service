@@ -84,10 +84,13 @@ class LiveOpportunityWindowSelectorTest {
                 LOCATION,
                 "moonrise_low",
                 start.instant(),
+                end.instant(),
+                start.instant(),
                 start,
                 suggested,
                 end,
                 end.instant(),
+                List.of(start, suggested, end),
                 List.of(start, suggested, end));
     }
 }

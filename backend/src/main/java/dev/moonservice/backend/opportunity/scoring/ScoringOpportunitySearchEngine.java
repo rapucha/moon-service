@@ -157,6 +157,7 @@ public class ScoringOpportunitySearchEngine implements OpportunitySearchEngine {
             opportunities.add(new OpportunitySearchResponse.Opportunity(
                     text(node, "id"),
                     text(node, "windowKind"),
+                    moonPass(node.path("moonPass")),
                     text(node, "startsAt"),
                     text(node, "suggestedAt"),
                     text(node, "endsAt"),
@@ -174,6 +175,23 @@ public class ScoringOpportunitySearchEngine implements OpportunitySearchEngine {
             ));
         }
         return opportunities;
+    }
+
+    private static OpportunitySearchResponse.MoonPass moonPass(JsonNode node) {
+        return new OpportunitySearchResponse.MoonPass(
+                text(node, "id"),
+                text(node, "startsAt"),
+                text(node, "endsAt"),
+                moonPassPath(node.path("path"))
+        );
+    }
+
+    private static OpportunitySearchResponse.MoonPassPath moonPassPath(JsonNode node) {
+        return new OpportunitySearchResponse.MoonPassPath(
+                moonPathPoint(node.path("start")),
+                moonPathPoint(node.path("end")),
+                moonPathSamples(node.path("samples"))
+        );
     }
 
     private static OpportunitySearchResponse.ComponentScores componentScores(JsonNode node) {

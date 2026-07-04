@@ -50,6 +50,24 @@ class ScoringModelTest {
     }
 
     @Test
+    void summarizesOvercastCloudAsOvercast() {
+        WeatherFixture heavyCloud = new WeatherFixture(
+                89,
+                80,
+                90,
+                70,
+                5,
+                0.0,
+                20000,
+                2,
+                1.0
+        );
+
+        assertEquals("overcast", ScoringModel.weatherSummary(heavyCloud));
+        assertEquals("overcast", ScoringModel.weatherSegmentKind(heavyCloud));
+    }
+
+    @Test
     void returnsExposureBalanceVocabularyFromPythonContract() {
         assertEquals(
                 "moon_detail_easy_foreground_supported",

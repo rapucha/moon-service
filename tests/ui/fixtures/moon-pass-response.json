@@ -1,0 +1,475 @@
+{
+  "status": "ok",
+  "generatedAt": "2026-07-04T00:00:00Z",
+  "location": {
+    "id": "moon-service-3067696",
+    "kind": "real_location",
+    "displayName": "Prague, Czechia",
+    "latitude": 50.08804,
+    "longitude": 14.42076,
+    "elevationMeters": 202,
+    "timezone": "Europe/Prague",
+    "countryCode": "CZ"
+  },
+  "forecastHorizonDays": 7,
+  "startsAt": "2026-07-04T00:00:00Z",
+  "endsAt": "2026-07-11T00:00:00Z",
+  "candidateWindowsEvaluated": 14,
+  "opportunities": [
+    {
+      "id": "fixture-pass-a-best",
+      "windowKind": "moonset_low",
+      "moonPass": {
+        "id": "fixture-pass-a",
+        "startsAt": "2026-07-04T00:00:00Z",
+        "endsAt": "2026-07-04T07:25:00Z",
+        "path": {
+          "start": {
+            "at": "2026-07-04T00:00:00Z",
+            "altitudeDegrees": 0,
+            "azimuthDegrees": 112,
+            "sunAltitudeDegrees": -14,
+            "lightBucket": "night",
+            "role": "start"
+          },
+          "end": {
+            "at": "2026-07-04T07:25:00Z",
+            "altitudeDegrees": 0,
+            "azimuthDegrees": 248,
+            "sunAltitudeDegrees": 32,
+            "lightBucket": "daylight",
+            "role": "end"
+          },
+          "samples": [
+            {
+              "at": "2026-07-04T00:00:00Z",
+              "altitudeDegrees": 0,
+              "azimuthDegrees": 112,
+              "sunAltitudeDegrees": -14,
+              "lightBucket": "night",
+              "role": "start"
+            },
+            {
+              "at": "2026-07-04T03:40:00Z",
+              "altitudeDegrees": 27,
+              "azimuthDegrees": 180,
+              "sunAltitudeDegrees": -6,
+              "lightBucket": "civil_twilight",
+              "role": "path"
+            },
+            {
+              "at": "2026-07-04T07:25:00Z",
+              "altitudeDegrees": 0,
+              "azimuthDegrees": 248,
+              "sunAltitudeDegrees": 32,
+              "lightBucket": "daylight",
+              "role": "end"
+            }
+          ]
+        }
+      },
+      "startsAt": "2026-07-04T04:34:00Z",
+      "suggestedAt": "2026-07-04T06:40:00Z",
+      "endsAt": "2026-07-04T07:25:00Z",
+      "localTimeZone": "Europe/Prague",
+      "score": 81,
+      "confidence": "medium",
+      "components": {
+        "moonAltitudeFit": 30,
+        "sunLightFit": 16,
+        "moonIlluminationFit": 12,
+        "weatherFit": 18,
+        "forecastConfidence": 5
+      },
+      "moon": {
+        "altitudeDegrees": 6,
+        "azimuthDegrees": 245,
+        "illuminationPercent": 81,
+        "phaseAngleDegrees": 120,
+        "phaseName": "waxing_gibbous"
+      },
+      "moonPath": {
+        "start": {
+          "at": "2026-07-04T04:34:00Z",
+          "altitudeDegrees": 18,
+          "azimuthDegrees": 210,
+          "sunAltitudeDegrees": 4,
+          "lightBucket": "golden_hour",
+          "role": "start"
+        },
+        "suggested": {
+          "at": "2026-07-04T06:40:00Z",
+          "altitudeDegrees": 6,
+          "azimuthDegrees": 245,
+          "sunAltitudeDegrees": 32,
+          "lightBucket": "daylight",
+          "role": "suggested"
+        },
+        "end": {
+          "at": "2026-07-04T07:25:00Z",
+          "altitudeDegrees": 0,
+          "azimuthDegrees": 248,
+          "sunAltitudeDegrees": 32,
+          "lightBucket": "daylight",
+          "role": "end"
+        },
+        "samples": [
+          {
+            "at": "2026-07-04T04:34:00Z",
+            "altitudeDegrees": 18,
+            "azimuthDegrees": 210,
+            "sunAltitudeDegrees": 4,
+            "lightBucket": "golden_hour",
+            "role": "start"
+          },
+          {
+            "at": "2026-07-04T06:40:00Z",
+            "altitudeDegrees": 6,
+            "azimuthDegrees": 245,
+            "sunAltitudeDegrees": 32,
+            "lightBucket": "daylight",
+            "role": "suggested"
+          },
+          {
+            "at": "2026-07-04T07:25:00Z",
+            "altitudeDegrees": 0,
+            "azimuthDegrees": 248,
+            "sunAltitudeDegrees": 32,
+            "lightBucket": "daylight",
+            "role": "end"
+          }
+        ]
+      },
+      "sun": {
+        "altitudeDegrees": 32.2,
+        "lightBucket": "daylight"
+      },
+      "weather": {
+        "sourceResolution": "hourly",
+        "segmentKind": "partly_cloudy",
+        "cloudCoverMeanPercent": 38,
+        "cloudCoverMaxPercent": 52,
+        "lowCloudCoverMaxPercent": 20,
+        "midCloudCoverMaxPercent": 36,
+        "highCloudCoverMaxPercent": 52,
+        "precipitationProbabilityMaxPercent": 5,
+        "precipitationMm": 0,
+        "visibilityMinMeters": 20000,
+        "weatherCode": 2,
+        "summary": "partly cloudy"
+      },
+      "exposureBalance": {
+        "label": "moon_detail_easy_foreground_supported",
+        "text": "Ambient light should support foreground detail; expose carefully for the bright Moon."
+      },
+      "reason": "Fixture recommendation for UI smoke checks.",
+      "links": {
+        "ics": "/o/fixture-pass-a-best.ics"
+      }
+    },
+    {
+      "id": "fixture-pass-a-alt",
+      "windowKind": "moonrise_low",
+      "moonPass": {
+        "id": "fixture-pass-a",
+        "startsAt": "2026-07-04T00:00:00Z",
+        "endsAt": "2026-07-04T07:25:00Z",
+        "path": {
+          "start": {
+            "at": "2026-07-04T00:00:00Z",
+            "altitudeDegrees": 0,
+            "azimuthDegrees": 112,
+            "sunAltitudeDegrees": -14,
+            "lightBucket": "night",
+            "role": "start"
+          },
+          "end": {
+            "at": "2026-07-04T07:25:00Z",
+            "altitudeDegrees": 0,
+            "azimuthDegrees": 248,
+            "sunAltitudeDegrees": 32,
+            "lightBucket": "daylight",
+            "role": "end"
+          },
+          "samples": [
+            {
+              "at": "2026-07-04T00:00:00Z",
+              "altitudeDegrees": 0,
+              "azimuthDegrees": 112,
+              "sunAltitudeDegrees": -14,
+              "lightBucket": "night",
+              "role": "start"
+            },
+            {
+              "at": "2026-07-04T03:40:00Z",
+              "altitudeDegrees": 27,
+              "azimuthDegrees": 180,
+              "sunAltitudeDegrees": -6,
+              "lightBucket": "civil_twilight",
+              "role": "path"
+            },
+            {
+              "at": "2026-07-04T07:25:00Z",
+              "altitudeDegrees": 0,
+              "azimuthDegrees": 248,
+              "sunAltitudeDegrees": 32,
+              "lightBucket": "daylight",
+              "role": "end"
+            }
+          ]
+        }
+      },
+      "startsAt": "2026-07-04T02:10:00Z",
+      "suggestedAt": "2026-07-04T02:12:00Z",
+      "endsAt": "2026-07-04T04:30:00Z",
+      "localTimeZone": "Europe/Prague",
+      "score": 74,
+      "confidence": "medium",
+      "components": {
+        "moonAltitudeFit": 22,
+        "sunLightFit": 24,
+        "moonIlluminationFit": 10,
+        "weatherFit": 15,
+        "forecastConfidence": 3
+      },
+      "moon": {
+        "altitudeDegrees": 26.6,
+        "azimuthDegrees": 180,
+        "illuminationPercent": 81,
+        "phaseAngleDegrees": 120,
+        "phaseName": "waxing_gibbous"
+      },
+      "moonPath": {
+        "start": {
+          "at": "2026-07-04T02:10:00Z",
+          "altitudeDegrees": 12,
+          "azimuthDegrees": 145,
+          "sunAltitudeDegrees": -8,
+          "lightBucket": "nautical_twilight",
+          "role": "start"
+        },
+        "suggested": {
+          "at": "2026-07-04T02:12:00Z",
+          "altitudeDegrees": 26.6,
+          "azimuthDegrees": 180,
+          "sunAltitudeDegrees": -6,
+          "lightBucket": "civil_twilight",
+          "role": "suggested"
+        },
+        "end": {
+          "at": "2026-07-04T04:30:00Z",
+          "altitudeDegrees": 10,
+          "azimuthDegrees": 212,
+          "sunAltitudeDegrees": 1,
+          "lightBucket": "golden_hour",
+          "role": "end"
+        },
+        "samples": [
+          {
+            "at": "2026-07-04T02:10:00Z",
+            "altitudeDegrees": 12,
+            "azimuthDegrees": 145,
+            "sunAltitudeDegrees": -8,
+            "lightBucket": "nautical_twilight",
+            "role": "start"
+          },
+          {
+            "at": "2026-07-04T02:12:00Z",
+            "altitudeDegrees": 26.6,
+            "azimuthDegrees": 180,
+            "sunAltitudeDegrees": -6,
+            "lightBucket": "civil_twilight",
+            "role": "suggested"
+          },
+          {
+            "at": "2026-07-04T04:30:00Z",
+            "altitudeDegrees": 10,
+            "azimuthDegrees": 212,
+            "sunAltitudeDegrees": 1,
+            "lightBucket": "golden_hour",
+            "role": "end"
+          }
+        ]
+      },
+      "sun": {
+        "altitudeDegrees": -6,
+        "lightBucket": "civil_twilight"
+      },
+      "weather": {
+        "sourceResolution": "hourly",
+        "segmentKind": "clear",
+        "cloudCoverMeanPercent": 5,
+        "cloudCoverMaxPercent": 8,
+        "lowCloudCoverMaxPercent": 2,
+        "midCloudCoverMaxPercent": 4,
+        "highCloudCoverMaxPercent": 8,
+        "precipitationProbabilityMaxPercent": 0,
+        "precipitationMm": 0,
+        "visibilityMinMeters": 25000,
+        "weatherCode": 0,
+        "summary": "clear"
+      },
+      "exposureBalance": {
+        "label": "moon_bright_foreground_risk",
+        "text": "The Moon is bright while foreground light is limited; foreground detail may need careful exposure."
+      },
+      "reason": "Fixture alternate recommendation for UI smoke checks.",
+      "links": {
+        "ics": "/o/fixture-pass-a-alt.ics"
+      }
+    },
+    {
+      "id": "fixture-pass-b-best",
+      "windowKind": "moonset_low",
+      "moonPass": {
+        "id": "fixture-pass-b",
+        "startsAt": "2026-07-10T00:49:00Z",
+        "endsAt": "2026-07-10T15:21:00Z",
+        "path": {
+          "start": {
+            "at": "2026-07-10T00:49:00Z",
+            "altitudeDegrees": 0,
+            "azimuthDegrees": 50,
+            "sunAltitudeDegrees": -12,
+            "lightBucket": "night",
+            "role": "start"
+          },
+          "end": {
+            "at": "2026-07-10T15:21:00Z",
+            "altitudeDegrees": 0,
+            "azimuthDegrees": 310,
+            "sunAltitudeDegrees": 42,
+            "lightBucket": "daylight",
+            "role": "end"
+          },
+          "samples": [
+            {
+              "at": "2026-07-10T00:49:00Z",
+              "altitudeDegrees": 0,
+              "azimuthDegrees": 50,
+              "sunAltitudeDegrees": -12,
+              "lightBucket": "night",
+              "role": "start"
+            },
+            {
+              "at": "2026-07-10T08:00:00Z",
+              "altitudeDegrees": 64,
+              "azimuthDegrees": 180,
+              "sunAltitudeDegrees": 30,
+              "lightBucket": "daylight",
+              "role": "path"
+            },
+            {
+              "at": "2026-07-10T15:21:00Z",
+              "altitudeDegrees": 0,
+              "azimuthDegrees": 310,
+              "sunAltitudeDegrees": 42,
+              "lightBucket": "daylight",
+              "role": "end"
+            }
+          ]
+        }
+      },
+      "startsAt": "2026-07-10T12:00:00Z",
+      "suggestedAt": "2026-07-10T14:29:00Z",
+      "endsAt": "2026-07-10T15:21:00Z",
+      "localTimeZone": "Europe/Prague",
+      "score": 78,
+      "confidence": "medium",
+      "components": {
+        "moonAltitudeFit": 30,
+        "sunLightFit": 16,
+        "moonIlluminationFit": 12,
+        "weatherFit": 17,
+        "forecastConfidence": 3
+      },
+      "moon": {
+        "altitudeDegrees": 6.1,
+        "azimuthDegrees": 315,
+        "illuminationPercent": 70,
+        "phaseAngleDegrees": 200,
+        "phaseName": "waning_gibbous"
+      },
+      "moonPath": {
+        "start": {
+          "at": "2026-07-10T12:00:00Z",
+          "altitudeDegrees": 30,
+          "azimuthDegrees": 250,
+          "sunAltitudeDegrees": 44,
+          "lightBucket": "daylight",
+          "role": "start"
+        },
+        "suggested": {
+          "at": "2026-07-10T14:29:00Z",
+          "altitudeDegrees": 6.1,
+          "azimuthDegrees": 315,
+          "sunAltitudeDegrees": 42,
+          "lightBucket": "daylight",
+          "role": "suggested"
+        },
+        "end": {
+          "at": "2026-07-10T15:21:00Z",
+          "altitudeDegrees": 0,
+          "azimuthDegrees": 310,
+          "sunAltitudeDegrees": 42,
+          "lightBucket": "daylight",
+          "role": "end"
+        },
+        "samples": [
+          {
+            "at": "2026-07-10T12:00:00Z",
+            "altitudeDegrees": 30,
+            "azimuthDegrees": 250,
+            "sunAltitudeDegrees": 44,
+            "lightBucket": "daylight",
+            "role": "start"
+          },
+          {
+            "at": "2026-07-10T14:29:00Z",
+            "altitudeDegrees": 6.1,
+            "azimuthDegrees": 315,
+            "sunAltitudeDegrees": 42,
+            "lightBucket": "daylight",
+            "role": "suggested"
+          },
+          {
+            "at": "2026-07-10T15:21:00Z",
+            "altitudeDegrees": 0,
+            "azimuthDegrees": 310,
+            "sunAltitudeDegrees": 42,
+            "lightBucket": "daylight",
+            "role": "end"
+          }
+        ]
+      },
+      "sun": {
+        "altitudeDegrees": 42,
+        "lightBucket": "daylight"
+      },
+      "weather": {
+        "sourceResolution": "hourly",
+        "segmentKind": "partly_cloudy",
+        "cloudCoverMeanPercent": 45,
+        "cloudCoverMaxPercent": 58,
+        "lowCloudCoverMaxPercent": 20,
+        "midCloudCoverMaxPercent": 35,
+        "highCloudCoverMaxPercent": 58,
+        "precipitationProbabilityMaxPercent": 10,
+        "precipitationMm": 0,
+        "visibilityMinMeters": 18000,
+        "weatherCode": 2,
+        "summary": "partly cloudy"
+      },
+      "exposureBalance": {
+        "label": "balanced",
+        "text": "Ambient light and Moon brightness look reasonably balanced for a natural exposure."
+      },
+      "reason": "Fixture single recommendation for UI smoke checks.",
+      "links": {
+        "ics": "/o/fixture-pass-b-best.ics"
+      }
+    }
+  ],
+  "messages": [],
+  "rejected": []
+}

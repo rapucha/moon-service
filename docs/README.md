@@ -9,6 +9,7 @@ Start Here
 - Product direction:
   - `docs/product-notes.md`
   - `docs/ui-spec.md`
+  - `docs/design/README.md`
   - `docs/mvp-roadmap.md`
 - Architecture and API:
   - `docs/architecture.md`
