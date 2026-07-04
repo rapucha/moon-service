@@ -1,6 +1,6 @@
 import { sharePathFor } from "./api.js";
 import { element } from "./dom.js";
-import { candidateMeta } from "./format.js";
+import { candidateMeta, formatDateTime } from "./format.js";
 import { moonPassCard } from "./opportunityCard.js";
 import { fact } from "./terms.js";
 

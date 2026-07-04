@@ -1,0 +1,24 @@
+{
+  "compilerOptions": {
+    "allowJs": true,
+    "checkJs": true,
+    "lib": ["DOM", "DOM.Iterable", "ESNext"],
+    "module": "ES2022",
+    "moduleResolution": "bundler",
+    "noEmit": true,
+    "skipLibCheck": true,
+    "strict": false,
+    "target": "ES2022",
+    "types": ["node"]
+  },
+  "include": [
+    "backend/src/main/resources/static/*.js",
+    "tests/ui/**/*.js",
+    "playwright.config.js",
+    "eslint.config.js"
+  ],
+  "exclude": [
+    "backend/target/**",
+    "node_modules/**"
+  ]
+}

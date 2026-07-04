@@ -159,6 +159,31 @@ The page keeps recent searches only in browser `localStorage` under
 timezone only; the page still works if browser storage is unavailable. It does
 not create accounts, cookies, email subscriptions, or server-side user profiles.
 
+Frontend tooling is repo-local Node tooling. Install once with:
+
+```bash
+npm install
+```
+
+Useful checks:
+
+```bash
+npm run js:check
+npm run js:lint
+npm run js:docs
+npm run ui:smoke
+npm run frontend:check
+```
+
+`js:check` runs TypeScript over the plain JavaScript files with `checkJs`
+enabled, so JSDoc typedefs can catch API-shape and DOM mistakes without adding
+a frontend build step. `ui:smoke` runs Playwright against desktop and mobile
+viewports. By default it starts or reuses the backend on port `8081`, uses the
+system Chrome at `/usr/bin/google-chrome`, and mocks the opportunity API with a
+fixture so the smoke check does not depend on live providers. Override
+`MOON_SERVICE_BASE_URL`, `PLAYWRIGHT_CHROME_PATH`, or
+`MOON_SERVICE_PLAYWRIGHT_START_SERVER=false` when needed.
+
 Manual browser checks for frontend behavior:
 
 - Open `/search`, submit `Praha`, and confirm opportunities render with Moon,

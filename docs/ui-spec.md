@@ -309,6 +309,9 @@ UI direction.
 
 For UI changes that affect opportunity cards or charts:
 
+- Run `npm run frontend:check` when Node tooling is available. It combines
+  plain-JS TypeScript checking, ESLint, and Playwright desktop/mobile smoke
+  checks.
 - Check desktop and mobile responsive viewports.
 - Check at least one long opportunity window and one short opportunity window.
 - Verify that labels, dots, strokes, and chart dimensions remain visually

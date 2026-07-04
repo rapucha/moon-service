@@ -1,0 +1,10 @@
+{
+  "source": {
+    "include": ["backend/src/main/resources/static"],
+    "includePattern": ".+\\.js$"
+  },
+  "opts": {
+    "destination": "docs/generated/jsdoc",
+    "recurse": false
+  }
+}

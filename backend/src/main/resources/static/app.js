@@ -5,13 +5,13 @@ import { createResponseView } from "./responseView.js";
 
 var CONTROL_CHARACTER_PATTERN = /[\u0000-\u001F\u007F-\u009F\u061C\u200E\u200F\u202A-\u202E\u2066-\u2069]/u;
 
-var form = document.getElementById("search-form");
-var input = document.getElementById("location-input");
-var formFeedback = document.getElementById("form-feedback");
-var results = document.getElementById("results");
-var recentList = document.getElementById("recent-list");
-var clearRecent = document.getElementById("clear-recent");
-var submitButton = form.querySelector("button[type='submit']");
+var form = /** @type {HTMLFormElement} */ (document.getElementById("search-form"));
+var input = /** @type {HTMLInputElement} */ (document.getElementById("location-input"));
+var formFeedback = /** @type {HTMLElement} */ (document.getElementById("form-feedback"));
+var results = /** @type {HTMLElement} */ (document.getElementById("results"));
+var recentList = /** @type {HTMLElement} */ (document.getElementById("recent-list"));
+var clearRecent = /** @type {HTMLButtonElement} */ (document.getElementById("clear-recent"));
+var submitButton = /** @type {HTMLButtonElement} */ (form.querySelector("button[type='submit']"));
 var activeRequest = null;
 
 var responseView = createResponseView(results, {
@@ -40,7 +40,8 @@ window.addEventListener("popstate", function () {
 });
 
 document.addEventListener("click", function (event) {
-  var button = event.target.closest("[data-share-url]");
+  var target = event.target instanceof Element ? event.target : null;
+  var button = target ? target.closest("[data-share-url]") : null;
   if (!button) {
     return;
   }

@@ -1,4 +1,4 @@
-export function formatDateTime(value, timezone, countryCode) {
+export function formatDateTime(value, timezone, _countryCode) {
   if (!value) {
     return "Unavailable";
   }
@@ -13,13 +13,13 @@ export function formatDateTime(value, timezone, countryCode) {
   }
 }
 
-export function formatDateTimeWithZone(value, timezone, countryCode) {
-  var formatted = formatDateTime(value, timezone, countryCode);
+export function formatDateTimeWithZone(value, timezone, _countryCode) {
+  var formatted = formatDateTime(value, timezone, _countryCode);
   var zone = timeZoneLabel(value, timezone);
   return zone ? formatted + " " + zone : formatted;
 }
 
-export function formatTime(value, timezone, countryCode) {
+export function formatTime(value, timezone, _countryCode) {
   if (!value) {
     return "Unavailable";
   }
@@ -57,6 +57,7 @@ export function formatHourTick(value, timezone, countryCode) {
     return "";
   }
   try {
+    /** @type {Intl.DateTimeFormatOptions} */
     var options = usesTwentyFourHourClock()
       ? {
         hour: "2-digit",

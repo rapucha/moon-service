@@ -1,3 +1,7 @@
 __pycache__/
 *.py[cod]
 .idea/
+node_modules/
+playwright-report/
+test-results/
+docs/generated/
