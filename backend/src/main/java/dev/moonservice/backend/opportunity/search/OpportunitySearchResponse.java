@@ -31,6 +31,7 @@ public record OpportunitySearchResponse(
     public record Opportunity(
             String id,
             String windowKind,
+            MoonPass moonPass,
             String startsAt,
             String suggestedAt,
             String endsAt,
@@ -45,6 +46,21 @@ public record OpportunitySearchResponse(
             ExposureBalance exposureBalance,
             String reason,
             Map<String, String> links
+    ) {
+    }
+
+    public record MoonPass(
+            String id,
+            String startsAt,
+            String endsAt,
+            MoonPassPath path
+    ) {
+    }
+
+    public record MoonPassPath(
+            MoonPathPoint start,
+            MoonPathPoint end,
+            List<MoonPathPoint> samples
     ) {
     }
 

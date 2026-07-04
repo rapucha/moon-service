@@ -1,11 +1,3 @@
-export function formatWindow(opportunity, timezone, countryCode) {
-  var zone = timeZoneLabel(opportunity.startsAt, timezone);
-  return formatDateTime(opportunity.startsAt, timezone, countryCode)
-    + " to "
-    + formatTime(opportunity.endsAt, timezone, countryCode)
-    + (zone ? " " + zone : "");
-}
-
 export function formatDateTime(value, timezone, countryCode) {
   if (!value) {
     return "Unavailable";
@@ -145,16 +137,6 @@ export function percent(value) {
 export function readableToken(value) {
   var text = String(value || "").replace(/_/g, " ").trim();
   return text ? text.charAt(0).toUpperCase() + text.slice(1) : "";
-}
-
-export function cloudText(weather) {
-  if (Number.isFinite(weather.cloudCoverMeanPercent) && Number.isFinite(weather.cloudCoverMaxPercent)) {
-    return Math.round(weather.cloudCoverMeanPercent) + "% mean, " + Math.round(weather.cloudCoverMaxPercent) + "% max";
-  }
-  if (Number.isFinite(weather.cloudCoverMaxPercent)) {
-    return Math.round(weather.cloudCoverMaxPercent) + "% max";
-  }
-  return "unavailable";
 }
 
 export function precipitationText(weather) {

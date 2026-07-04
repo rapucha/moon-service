@@ -4,6 +4,8 @@ Purpose
 - Preserve useful UI design checkpoints that informed product decisions.
 - Keep mockups separate from the runtime frontend so implementation can follow
   once the direction is agreed.
+- For reversible UI experiment history, use the workflow in
+  `docs/ui-spec.md`.
 
 Moon Pass Card
 - `docs/design/moon-pass-card-mockups.html`: desktop mockups comparing compact
@@ -23,6 +25,6 @@ Current Direction
 - Mark the strongest recommendation with a `Best` badge and label the other
   same-pass window as `Alternative`.
 - Keep window length, Moon altitude/direction, light bucket, Sun altitude,
-  weather, cloud, and a short photo hint visible.
+  a coarse sky/weather label, and a short photo hint visible.
 - Use one shared pass-level Moon path chart where altitude, light buckets, and a
   top azimuth rail share the same time axis.

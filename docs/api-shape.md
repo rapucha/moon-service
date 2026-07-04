@@ -279,14 +279,31 @@ slices produced by ephemeris sampling. Low Moon remains the strongest default
 use case, but context Moon opportunities should not be excluded when light and
 weather are favorable.
 
-For each local day, the backend should find intervals where the apparent
-refracted Moon altitude is within the configured visible-Moon range, initially
-0 to 90 degrees. These intervals are bounded by Moonrise, Moonset, optional
-crossings through the configured altitude ceiling, and local day boundaries.
+The backend should first find physical Moon passes: continuous intervals where
+the apparent refracted Moon altitude stays above the local horizon. A pass is
+bounded by Moonrise, Moonset, or the search horizon edges. Local midnight is not
+a pass boundary.
+
+Useful recommendation windows live inside a Moon pass. A single pass may
+produce more than one opportunity, for example one while the Moon is ascending
+and another while it is descending. Recommendation windows may be bounded by
+Moonrise, Moonset, optional crossings through the configured altitude ceiling,
+the pass peak, or the search horizon edges.
 
 Response rules:
 
+- The current response remains a flat `opportunities` array. Follow-up #53
+  tracks whether the API should later become pass-centric, with Moon passes as
+  the primary ranked objects and recommendation windows nested inside them.
 - `startsAt` and `endsAt` define the useful opportunity window.
+- `moonPass` identifies the containing physical Moon pass. Clients may use
+  `moonPass.id` to group ascending and descending recommendations from the
+  same pass. `moonPass.startsAt` and `moonPass.endsAt` describe the whole pass,
+  which may cross local midnight.
+- `moonPass.path` describes Moon movement across the whole physical pass. The
+  current flat response repeats this bounded pass path on each opportunity so a
+  grouped client can draw one continuous pass chart; follow-up #53 can remove
+  that duplication if the API becomes pass-centric.
 - `suggestedAt` is optional and only identifies a representative time inside
   the window for sorting, links, or display.
 - `moon` describes the Moon at `suggestedAt`; keep this field as the compact
@@ -339,6 +356,55 @@ Response rules:
     {
       "id": "prague-cz-2026-06-29T1920Z",
       "windowKind": "moonrise_low",
+      "moonPass": {
+        "id": "prague-cz-pass-2026-06-29T1848Z",
+        "startsAt": "2026-06-29T18:48:00Z",
+        "endsAt": "2026-06-30T02:12:00Z",
+        "path": {
+          "start": {
+            "at": "2026-06-29T18:48:00Z",
+            "altitudeDegrees": 0.1,
+            "azimuthDegrees": 119.4,
+            "sunAltitudeDegrees": -1.2,
+            "lightBucket": "civil_twilight",
+            "role": "start"
+          },
+          "end": {
+            "at": "2026-06-30T02:12:00Z",
+            "altitudeDegrees": 0.1,
+            "azimuthDegrees": 236.8,
+            "sunAltitudeDegrees": -14.0,
+            "lightBucket": "night",
+            "role": "end"
+          },
+          "samples": [
+            {
+              "at": "2026-06-29T18:48:00Z",
+              "altitudeDegrees": 0.1,
+              "azimuthDegrees": 119.4,
+              "sunAltitudeDegrees": -1.2,
+              "lightBucket": "civil_twilight",
+              "role": "start"
+            },
+            {
+              "at": "2026-06-29T22:30:00Z",
+              "altitudeDegrees": 31.4,
+              "azimuthDegrees": 181.2,
+              "sunAltitudeDegrees": -15.3,
+              "lightBucket": "night",
+              "role": "path"
+            },
+            {
+              "at": "2026-06-30T02:12:00Z",
+              "altitudeDegrees": 0.1,
+              "azimuthDegrees": 236.8,
+              "sunAltitudeDegrees": -14.0,
+              "lightBucket": "night",
+              "role": "end"
+            }
+          ]
+        }
+      },
       "startsAt": "2026-06-29T18:48:00Z",
       "suggestedAt": "2026-06-29T19:20:00Z",
       "endsAt": "2026-06-29T20:04:00Z",

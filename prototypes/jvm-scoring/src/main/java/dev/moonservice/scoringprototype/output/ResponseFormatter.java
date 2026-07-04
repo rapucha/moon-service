@@ -67,6 +67,7 @@ public final class ResponseFormatter {
 
         opportunity.put("id", id);
         opportunity.put("windowKind", window.kind());
+        writeMoonPass(opportunity, window);
         opportunity.put("startsAt", window.startsAt().toString());
         opportunity.put("suggestedAt", window.suggested().instant().toString());
         opportunity.put("endsAt", window.endsAt().toString());
@@ -96,7 +97,7 @@ public final class ResponseFormatter {
 
         ObjectNode weatherNode = opportunity.putObject("weather");
         weatherNode.put("sourceResolution", "hourly");
-        weatherNode.put("segmentKind", weatherSegmentKind(weather));
+        weatherNode.put("segmentKind", ScoringModel.weatherSegmentKind(weather));
         weatherNode.put("cloudCoverMeanPercent", weather.cloudCoverPercent());
         weatherNode.put("cloudCoverMaxPercent", weather.cloudCoverPercent());
         weatherNode.put("lowCloudCoverMaxPercent", weather.lowCloudCoverPercent());
@@ -116,6 +117,25 @@ public final class ResponseFormatter {
 
         ObjectNode links = opportunity.putObject("links");
         links.put("ics", "/o/" + id + ".ics");
+    }
+
+    private static void writeMoonPass(ObjectNode opportunity, MoonWindow window) {
+        ObjectNode moonPass = opportunity.putObject("moonPass");
+        moonPass.put("id", window.passId());
+        moonPass.put("startsAt", window.passStartsAt().toString());
+        moonPass.put("endsAt", window.passEndsAt().toString());
+        writeMoonPassPath(moonPass.putObject("path"), window);
+    }
+
+    private static void writeMoonPassPath(ObjectNode path, MoonWindow window) {
+        List<MoonSample> samples = window.passPathSamples();
+        writeMoonPathPoint(path.putObject("start"), samples.getFirst(), "start");
+        writeMoonPathPoint(path.putObject("end"), samples.getLast(), "end");
+
+        ArrayNode sampleNodes = path.putArray("samples");
+        for (MoonSample sample : samples) {
+            writeMoonPathPoint(sampleNodes.addObject(), sample, roleForPass(window, sample));
+        }
     }
 
     private static void writeMoonPath(ObjectNode opportunity, MoonWindow window) {
@@ -151,19 +171,6 @@ public final class ResponseFormatter {
                 weather.precipitationProbabilityPercent(),
                 ScoringModel.exposureText(sample)
         );
-    }
-
-    private static String weatherSegmentKind(WeatherFixture weather) {
-        if (weather.weatherCode() == 0 || weather.weatherCode() == 1) {
-            return "clear";
-        }
-        if (weather.weatherCode() == 2 || weather.weatherCode() == 3) {
-            return "partly_cloudy";
-        }
-        if (weather.weatherCode() >= 50) {
-            return "precipitation_risk";
-        }
-        return "mixed";
     }
 
     private static String phaseName(MoonSample sample) {
@@ -205,6 +212,16 @@ public final class ResponseFormatter {
         return "path";
     }
 
+    private static String roleForPass(MoonWindow window, MoonSample sample) {
+        if (sample.instant().equals(window.passStartsAt())) {
+            return "start";
+        }
+        if (sample.instant().equals(window.passEndsAt())) {
+            return "end";
+        }
+        return "path";
+    }
+
     private static double normalizeDegrees(double value) {
         double normalized = value % 360.0;
         return normalized < 0.0 ? normalized + 360.0 : normalized;
@@ -231,7 +248,7 @@ public final class ResponseFormatter {
     private static void writeDiagnostics(ObjectNode parent) {
         ObjectNode diagnostics = parent.putObject("diagnostics");
         diagnostics.put("note", "Prototype only: fixture weather, no persistence, HTTP API, database, or backend framework.");
-        diagnostics.put("selectionRule", "Natural visible-Moon windows bounded by Moon altitude crossings and local day boundaries.");
+        diagnostics.put("selectionRule", "Moon passes are bounded by horizon crossings; recommendation windows inside a pass may be split by peak altitude or configured altitude thresholds.");
         diagnostics.put("weatherSource", "fixed_fixture");
         diagnostics.put("weatherResolution", "hourly_fixture");
     }

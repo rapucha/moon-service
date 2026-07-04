@@ -50,7 +50,7 @@ class WindowGeneratorTest {
     }
 
     @Test
-    void splitsCarryOverLowMoonWindowAtLocalDayBoundaries() {
+    void keepsCarryOverLowMoonWindowAcrossLocalDayBoundaries() {
         PrototypeConfig config = new PrototypeConfig(
                 Locations.PRAGUE,
                 LocalDate.parse("2026-06-29"),
@@ -64,15 +64,12 @@ class WindowGeneratorTest {
                 instant -> sample(instant, 4.0, -4.0)
         );
 
-        Instant firstLocalMidnight = LocalDate.parse("2026-06-30")
-                .atStartOfDay(Locations.PRAGUE.zoneId())
-                .toInstant();
-
-        assertEquals(2, windows.size());
-        assertEquals(config.start(), windows.get(0).startsAt());
-        assertEquals(firstLocalMidnight, windows.get(0).endsAt());
-        assertEquals(firstLocalMidnight, windows.get(1).startsAt());
-        assertEquals(config.end(), windows.get(1).endsAt());
+        assertEquals(1, windows.size());
+        MoonWindow window = windows.getFirst();
+        assertEquals(config.start(), window.startsAt());
+        assertEquals(config.end(), window.endsAt());
+        assertEquals(config.start(), window.passStartsAt());
+        assertEquals(config.end(), window.passEndsAt());
     }
 
     @Test
@@ -113,6 +110,40 @@ class WindowGeneratorTest {
 
         assertEquals(1, windows.size());
         assertEquals("moonrise_high_context", windows.getFirst().kind());
+    }
+
+    @Test
+    void createsAscendingAndDescendingOpportunitiesInsideOneMoonPass() {
+        PrototypeConfig config = new PrototypeConfig(
+                Locations.PRAGUE,
+                LocalDate.parse("2026-06-29"),
+                1,
+                90.0,
+                10
+        );
+        Instant start = config.start();
+
+        List<MoonWindow> windows = new WindowGenerator().findWindows(config, instant -> {
+            double hours = Duration.between(start, instant).toMinutes() / 60.0;
+            double altitude = 4.0 + (hours <= 12.0 ? hours : 24.0 - hours);
+            return sample(instant, altitude, -4.0);
+        });
+
+        assertEquals(2, windows.size());
+        MoonWindow riseWindow = windows.get(0);
+        MoonWindow setWindow = windows.get(1);
+        assertEquals("moonrise_low", riseWindow.kind());
+        assertEquals("moonset_low", setWindow.kind());
+        assertEquals(config.start(), riseWindow.passStartsAt());
+        assertEquals(config.end(), riseWindow.passEndsAt());
+        assertEquals(riseWindow.passId(), setWindow.passId());
+        assertEquals(start.plus(Duration.ofHours(12)), riseWindow.endsAt());
+        assertEquals(start.plus(Duration.ofHours(12)), setWindow.startsAt());
+        assertEquals(riseWindow.passPathSamples(), setWindow.passPathSamples());
+        assertEquals(config.start(), riseWindow.passPathSamples().getFirst().instant());
+        assertEquals(config.end(), riseWindow.passPathSamples().getLast().instant());
+        assertTrue(riseWindow.passPathSamples().stream()
+                .anyMatch(sample -> sample.instant().equals(start.plus(Duration.ofHours(18)))));
     }
 
     @Test
