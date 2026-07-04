@@ -611,6 +611,10 @@ dd {
   border-bottom: 1px solid var(--line);
 }
 
+.pass-choices.is-single {
+  grid-template-columns: minmax(0, 1fr);
+}
+
 .pass-choice-card {
   display: grid;
   gap: 10px;
@@ -718,6 +722,10 @@ dd {
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 8px 10px;
   margin: 0;
+}
+
+.pass-choices.is-single .pass-metric-grid {
+  grid-template-columns: repeat(5, minmax(0, 1fr));
 }
 
 .pass-metric {
@@ -1256,6 +1264,10 @@ summary {
   }
 
   .summary-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .pass-choices.is-single .pass-metric-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }

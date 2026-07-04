@@ -143,7 +143,8 @@ function moonPassTitle(pass, primary, timezone, countryCode) {
 }
 
 function passRecommendations(entries, timezone, countryCode) {
-  return element("section", { className: "pass-choices", ariaLabel: "Recommendations in this Moon pass" },
+  var className = "pass-choices" + (entries.length === 1 ? " is-single" : "");
+  return element("section", { className: className, ariaLabel: "Recommendations in this Moon pass" },
     entries.map(function (entry, index) {
       return passRecommendation(entry.opportunity, index === 0, timezone, countryCode);
     }));
