@@ -119,7 +119,12 @@ The backend must protect both Moon Service and upstream providers.
 
 Application-level limits:
 
-- Rate limit `/api/opportunities` by IP or coarse anonymous client fingerprint if abuse becomes visible.
+- Rate limit `/api/opportunities` by IP or coarse anonymous client fingerprint
+  before public alpha. For home-hosted alpha, start with an edge or ingress
+  limit around 30 requests per minute per client, with stricter handling for
+  one-character or otherwise high-ambiguity lookups.
+- Edge or ingress limits are acceptable as an early safety control, but the
+  documented `rate_limited` JSON response requires application-level handling.
 - Keep limits generous enough for manual use and testing.
 - Return `status: "rate_limited"` with HTTP `429` when a client is limited.
 - Include a retry hint when possible.

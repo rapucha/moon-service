@@ -130,7 +130,9 @@ observability ([#9](https://github.com/rapucha/moon-service/issues/9)).
 
 ## Hosting Direction
 
-Home hosting is acceptable for alpha or beta, but it should be treated as temporary.
+Home hosting is acceptable for alpha or beta, but it should be treated as
+temporary. The current self-hosting boundary is documented in
+`docs/self-hosting-alpha-plan.md`.
 
 Preferred exposure:
 
@@ -142,7 +144,12 @@ Feasible early hosts:
 
 - Lenovo Linux laptop for short alpha if sleep is disabled and Ethernet is used.
 - Existing Intel NUC for alpha/beta if resource usage is monitored.
-- Raspberry Pi 4/5 with SSD, or preferably an x86 mini PC for Java/Spring ergonomics.
+- Raspberry Pi 4/5 as a constrained alpha target. The current plan assumes
+  32 GB WD Purple SD cards for node-local storage plus roughly 64-80 GB of NFS
+  storage from another server. Avoid embedded etcd HA and treat the nodes as
+  rebuildable.
+- Prefer an x86 mini PC or other SSD-backed host later for Java/Spring
+  ergonomics and any durable database.
 
 ## Admin/Ops Surface
 
