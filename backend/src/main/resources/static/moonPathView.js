@@ -102,8 +102,9 @@ function altitudeChartSvg(sourcePoints, timezone, countryCode, mode, chartContex
   var width = mode === "mobile" ? MOBILE_ALTITUDE_WIDTH : DESKTOP_ALTITUDE_WIDTH;
   var plotEndX = left + chartWidth;
   var chartHeight = bottom - top;
-  var points = sourcePoints.map(function (sourcePoint) {
+  var points = sourcePoints.map(function (sourcePoint, index) {
     var point = Object.assign({}, sourcePoint);
+    point.sequence = index;
     point.x = left + ((point.time - firstTime) / timeSpan) * chartWidth;
     point.y = bottom - (clamp(point.altitudeDegrees, 0, ceiling) / ceiling) * chartHeight;
     return point;
@@ -111,11 +112,12 @@ function altitudeChartSvg(sourcePoints, timezone, countryCode, mode, chartContex
 
   var bands = lightBandSegments(points);
   var timeTicks = altitudeHourTicks(points, timezone, bottom + 29);
-  var path = smoothAltitudePath(points);
   var azimuthLabels = azimuthRailLabels(points, left, chartWidth, mode);
+  var markerImageUrl = moonPhaseImageDataUrl(moon.phaseAngleDegrees, 64);
   var suggestedGuides = points.filter(function (point) {
     return point.role === "suggested";
   });
+  var visibleMarkers = visibleAltitudeMarkers(points, mode);
 
   return svgElement("svg", {
     className: "altitude-chart altitude-chart-" + mode,
@@ -181,23 +183,62 @@ function altitudeChartSvg(sourcePoints, timezone, countryCode, mode, chartContex
         textAnchor: tick.anchor
       }, formatHourTick(tick.at, timezone, countryCode));
     }),
-    svgElement("path", { className: "chart-path", d: path.d }),
-    keyPathMarkers(points).map(function (point) {
-      return altitudeMarker(point, moon);
+    visibleMarkers.map(function (point) {
+      return altitudeMarker(point, markerImageUrl);
     })
   );
+}
+
+function visibleAltitudeMarkers(points, mode) {
+  var ordinaryMinimumDistance = mode === "mobile" ? 13 : 18;
+  var protectedMinimumDistance = mode === "mobile" ? 17 : 24;
+  var lastSequence = points.length - 1;
+  var protectedMarkers = points.filter(function (point) {
+    return isProtectedAltitudeMarker(point, lastSequence);
+  });
+  var visible = [];
+  var keptOrdinary = [];
+
+  points.forEach(function (point) {
+    if (isProtectedAltitudeMarker(point, lastSequence)) {
+      visible.push(point);
+      return;
+    }
+    if (isTooCloseToAny(point, protectedMarkers, protectedMinimumDistance)) {
+      return;
+    }
+    if (isTooCloseToAny(point, keptOrdinary, ordinaryMinimumDistance)) {
+      return;
+    }
+    visible.push(point);
+    keptOrdinary.push(point);
+  });
+
+  return visible.sort(function (a, b) {
+    return a.sequence - b.sequence;
+  });
+}
+
+function isProtectedAltitudeMarker(point, lastSequence) {
+  return point.role === "suggested" || point.sequence === 0 || point.sequence === lastSequence;
+}
+
+function isTooCloseToAny(point, others, minimumDistance) {
+  return others.some(function (other) {
+    return point !== other && markerDistance(point, other) < minimumDistance;
+  });
+}
+
+function markerDistance(a, b) {
+  var dx = round1(a.x) - round1(b.x);
+  var dy = round1(a.y) - round1(b.y);
+  return Math.sqrt((dx * dx) + (dy * dy));
 }
 
 function moonPathSamples(path) {
   var samples = Array.isArray(path.samples) ? path.samples : [path.start, path.suggested, path.end];
   return samples.filter(hasPosition).slice().sort(function (a, b) {
     return new Date(a.at).getTime() - new Date(b.at).getTime();
-  });
-}
-
-function keyPathMarkers(points) {
-  return points.filter(function (point) {
-    return point.role === "start" || point.role === "suggested" || point.role === "end";
   });
 }
 
@@ -343,117 +384,30 @@ function localMinuteOfHour(time, timezone) {
   }
 }
 
-function smoothAltitudePath(points) {
-  if (points.length === 0) {
-    return { type: "empty", d: "" };
-  }
-  if (points.length === 1) {
-    return { type: "point", d: "M " + round1(points[0].x) + " " + round1(points[0].y) };
-  }
-  if (points.length === 2) {
-    return { type: "line", d: linearPath(points) };
-  }
+function altitudeMarker(point, imageUrl) {
+  var suggested = point.role === "suggested";
+  var best = point.markerLabel === "Best";
+  var size = suggested ? (best ? 34 : 28) : 10.5;
+  var ringRadius = size / 2 - 1;
+  var className = "moon-sample-marker is-" + roleClass(point.role) + (best ? " is-best" : "");
+  var title = suggested
+    ? (point.markerLabel || "Suggested") + " Moon position, " + degrees(point.altitudeDegrees) + " altitude"
+    : "Moon position sample, " + degrees(point.altitudeDegrees) + " altitude";
 
-  var tangents = monotoneTangents(points);
-  var commands = ["M " + round1(points[0].x) + " " + round1(points[0].y)];
-  points.slice(0, -1).forEach(function (point, index) {
-    var next = points[index + 1];
-    var dx = next.x - point.x;
-    if (dx <= 0) {
-      commands.push(" L " + round1(next.x) + " " + round1(next.y));
-      return;
-    }
-    var control1X = point.x + dx / 3;
-    var control1Y = point.y + tangents[index] * dx / 3;
-    var control2X = next.x - dx / 3;
-    var control2Y = next.y - tangents[index + 1] * dx / 3;
-    commands.push(" C "
-      + round1(control1X) + " " + round1(control1Y) + ", "
-      + round1(control2X) + " " + round1(control2Y) + ", "
-      + round1(next.x) + " " + round1(next.y));
-  });
-
-  return {
-    type: "monotone-cubic",
-    d: commands.join("")
-  };
-}
-
-function linearPath(points) {
-  return points.map(function (point, index) {
-    return (index === 0 ? "M " : "L ") + round1(point.x) + " " + round1(point.y);
-  }).join(" ");
-}
-
-function monotoneTangents(points) {
-  var slopes = [];
-  var tangents = [];
-
-  points.slice(0, -1).forEach(function (point, index) {
-    var next = points[index + 1];
-    var dx = Math.max(1, next.x - point.x);
-    slopes.push((next.y - point.y) / dx);
-  });
-
-  tangents[0] = slopes[0];
-  tangents[points.length - 1] = slopes[slopes.length - 1];
-
-  for (var index = 1; index < points.length - 1; index += 1) {
-    var before = slopes[index - 1];
-    var after = slopes[index];
-    tangents[index] = before * after <= 0 ? 0 : (before + after) / 2;
-  }
-
-  slopes.forEach(function (slope, index) {
-    if (slope === 0) {
-      tangents[index] = 0;
-      tangents[index + 1] = 0;
-      return;
-    }
-
-    var first = tangents[index] / slope;
-    var second = tangents[index + 1] / slope;
-    if (first < 0 || second < 0) {
-      tangents[index] = 0;
-      tangents[index + 1] = 0;
-      return;
-    }
-
-    var sum = first * first + second * second;
-    if (sum > 9) {
-      var scale = 3 / Math.sqrt(sum);
-      tangents[index] = scale * first * slope;
-      tangents[index + 1] = scale * second * slope;
-    }
-  });
-
-  return tangents;
-}
-
-function altitudeMarker(point, moon) {
-  if (point.role !== "suggested") {
-    return svgElement("circle", {
-      className: "chart-dot is-" + roleClass(point.role),
-      cx: round1(point.x),
-      cy: round1(point.y),
-      r: 3.6
-    });
-  }
-
-  var size = 29;
-  var imageUrl = moonPhaseImageDataUrl(moon.phaseAngleDegrees, 64);
   return svgElement("g", {
-    className: "moon-marker is-suggested",
+    className: className,
+    "data-sequence": point.sequence,
+    "data-at": point.at,
     transform: "translate(" + round1(point.x) + " " + round1(point.y) + ")"
   },
-    svgElement("title", {}, "Suggested Moon position, " + degrees(point.altitudeDegrees) + " altitude"),
-    point.markerLabel
-      ? svgElement("text", { className: "moon-marker-label", x: 0, y: -24, textAnchor: "middle" }, point.markerLabel)
+    svgElement("title", {}, title),
+    suggested && point.markerLabel
+      ? svgElement("text", { className: "moon-sample-marker-label", x: 0, y: -24, textAnchor: "middle" }, point.markerLabel)
       : null,
-    svgElement("circle", { className: "moon-marker-halo", cx: 0, cy: 0, r: 17 }),
+    suggested ? svgElement("circle", { className: "moon-sample-marker-halo", cx: 0, cy: 0, r: best ? 20 : 17 }) : null,
     imageUrl
       ? svgElement("image", {
-        className: "moon-marker-image",
+        className: "moon-sample-marker-image",
         href: imageUrl,
         x: -size / 2,
         y: -size / 2,
@@ -461,8 +415,8 @@ function altitudeMarker(point, moon) {
         height: size,
         preserveAspectRatio: "xMidYMid meet"
       })
-      : svgElement("circle", { className: "chart-dot is-suggested", cx: 0, cy: 0, r: 7.5 }),
-    svgElement("circle", { className: "moon-marker-ring", cx: 0, cy: 0, r: size / 2 })
+      : svgElement("circle", { className: "moon-sample-dot is-" + roleClass(point.role), cx: 0, cy: 0, r: size / 2 }),
+    suggested ? svgElement("circle", { className: "moon-sample-marker-ring", cx: 0, cy: 0, r: ringRadius }) : null
   );
 }
 

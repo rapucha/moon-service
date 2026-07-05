@@ -14,6 +14,7 @@
   "include": [
     "backend/src/main/resources/static/*.js",
     "tests/ui/**/*.js",
+    "scripts/*.mjs",
     "playwright.config.js",
     "eslint.config.js"
   ],
