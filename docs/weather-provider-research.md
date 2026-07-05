@@ -448,7 +448,10 @@ or merged forecast-change intervals:
 
 For the first backend prototype:
 
-- Round coordinates to 3 decimal places for weather cache keys, roughly 100 meters latitude precision.
+- Round coordinates for weather cache keys. The initial research target was 3
+  decimal places, roughly 100 meters latitude precision, but the current
+  backend runtime uses 4 decimal places to stay closer to the provider request
+  shape while the weather-quality/privacy tradeoff is still being validated.
 - Store forecast records by provider, rounded coordinate, forecast hour, and fetch time.
 - Use a short TTL based on provider update cadence, initially 1 to 3 hours.
 - Keep raw JSON payloads for no more than 7 days in alpha, or skip raw payload storage entirely.

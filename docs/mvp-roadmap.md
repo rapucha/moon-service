@@ -95,9 +95,13 @@ Tasks:
 
 - Add basic logging and error reporting.
 - Add provider quota monitoring if using a backend.
-- Choose alpha hosting: laptop, NUC, mini PC, Raspberry Pi with SSD, or VPS.
+- Choose alpha hosting: laptop, NUC, mini PC, Raspberry Pi, or VPS.
 - Prefer Cloudflare Tunnel if home-hosted.
 - Document backup and restore behavior.
+- For Raspberry Pi hosting without SSDs, assume 32 GB SD cards plus roughly
+  64-80 GB of NFS-backed storage. Keep the SD-card-backed cluster rebuildable
+  and do not introduce durable application data until off-card backup and
+  restore are documented.
 
 Exit criteria:
 

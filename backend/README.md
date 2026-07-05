@@ -378,6 +378,25 @@ string or browser URL. If a reverse proxy, public tunnel, or hosting provider
 also exposes `/admin/**`, keep an operator access rule there too; the backend
 header token is the minimum app-level boundary.
 
+## Alpha Hosting Notes
+
+The current backend is suitable for a single-process private alpha. Keep one
+backend replica until provider counters and caches move to a durable/shared
+store. Multiple replicas would make `/admin/status` quota usage incomplete and
+would reduce cache effectiveness. Public request rate limiting is not currently
+backend-owned; use edge or ingress limits before public exposure, then add
+application-level `429` JSON when the product API contract requires it.
+
+For the current Raspberry Pi self-hosting plan, treat SD-card-backed nodes as
+rebuildable. Do not add a local Postgres deployment, durable shared cache, or
+long-retention logs only to support alpha hosting. Public RSS/Atom and `.ics`
+outputs should start deterministic and stateless; add Postgres later when
+private feeds, saved locations, alert subscriptions, durable provider counters,
+or durable cache state require it.
+
+The current planning boundary is documented in
+`docs/self-hosting-alpha-plan.md`.
+
 ## Direct Fixture Endpoint
 
 ```http
