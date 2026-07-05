@@ -388,6 +388,7 @@ function altitudeMarker(point, imageUrl) {
   var suggested = point.role === "suggested";
   var best = point.markerLabel === "Best";
   var size = suggested ? (best ? 34 : 28) : 10.5;
+  var ringRadius = size / 2 - 1;
   var className = "moon-sample-marker is-" + roleClass(point.role) + (best ? " is-best" : "");
   var title = suggested
     ? (point.markerLabel || "Suggested") + " Moon position, " + degrees(point.altitudeDegrees) + " altitude"
@@ -415,7 +416,7 @@ function altitudeMarker(point, imageUrl) {
         preserveAspectRatio: "xMidYMid meet"
       })
       : svgElement("circle", { className: "moon-sample-dot is-" + roleClass(point.role), cx: 0, cy: 0, r: size / 2 }),
-    suggested ? svgElement("circle", { className: "moon-sample-marker-ring", cx: 0, cy: 0, r: size / 2 }) : null
+    suggested ? svgElement("circle", { className: "moon-sample-marker-ring", cx: 0, cy: 0, r: ringRadius }) : null
   );
 }
 
