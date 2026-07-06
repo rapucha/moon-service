@@ -1,0 +1,9 @@
+<svg viewBox="0 0 22 48" xmlns="http://www.w3.org/2000/svg">
+  <rect class="moon-path-foreground-shape" x="0" y="0" width="22" height="48" rx="1" />
+  <rect class="moon-path-foreground-window" x="5" y="8" width="3" height="4" rx="0.7" />
+  <rect class="moon-path-foreground-window" x="14" y="8" width="3" height="4" rx="0.7" />
+  <rect class="moon-path-foreground-window" x="5" y="22" width="3" height="4" rx="0.7" />
+  <rect class="moon-path-foreground-window" x="14" y="22" width="3" height="4" rx="0.7" />
+  <rect class="moon-path-foreground-window" x="5" y="36" width="3" height="4" rx="0.7" />
+  <rect class="moon-path-foreground-window" x="14" y="36" width="3" height="4" rx="0.7" />
+</svg>
