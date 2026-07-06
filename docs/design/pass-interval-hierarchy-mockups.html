@@ -1,0 +1,1007 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Pass Interval Hierarchy Mockups</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --ink: #17211f;
+      --muted: #5d6966;
+      --line: #d9e1de;
+      --line-strong: #b7c5c1;
+      --surface: #ffffff;
+      --surface-subtle: #f5f8f7;
+      --surface-muted: #e9efed;
+      --best-surface: #f1f7f5;
+      --best-line: rgba(33, 111, 104, 0.52);
+      --accent: #216f68;
+      --blue: #2d5f8b;
+      --amber: #9a6d21;
+      --amber-soft: #f4e2bd;
+      --shadow: 0 18px 42px rgba(26, 41, 38, 0.12);
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: #edf2f0;
+      color: var(--ink);
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      background: #edf2f0;
+    }
+
+    .page {
+      width: min(1200px, calc(100% - 32px));
+      margin: 0 auto;
+      padding: 32px 0 44px;
+    }
+
+    .page-header {
+      display: grid;
+      gap: 8px;
+      margin-bottom: 22px;
+    }
+
+    .eyebrow {
+      margin: 0;
+      color: var(--blue);
+      font-size: 0.78rem;
+      font-weight: 800;
+      letter-spacing: 0;
+      text-transform: uppercase;
+    }
+
+    h1,
+    h2,
+    h3,
+    h4,
+    p {
+      overflow-wrap: anywhere;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: 1.8rem;
+      line-height: 1.12;
+      letter-spacing: 0;
+    }
+
+    .page-header p {
+      max-width: 760px;
+      margin: 0;
+      color: var(--muted);
+      line-height: 1.5;
+    }
+
+    .variant-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 18px;
+      align-items: start;
+    }
+
+    .variant {
+      min-width: 0;
+    }
+
+    .variant-label {
+      display: grid;
+      gap: 4px;
+      margin-bottom: 10px;
+    }
+
+    .variant-label h2 {
+      margin: 0;
+      font-size: 0.95rem;
+      letter-spacing: 0;
+    }
+
+    .variant-label p {
+      margin: 0;
+      color: var(--muted);
+      font-size: 0.86rem;
+      line-height: 1.45;
+    }
+
+    .result-panel {
+      display: grid;
+      gap: 14px;
+      min-width: 0;
+      padding: 16px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--surface);
+      box-shadow: var(--shadow);
+    }
+
+    .result-heading {
+      display: flex;
+      align-items: start;
+      justify-content: space-between;
+      gap: 14px;
+      padding-bottom: 12px;
+      border-bottom: 1px solid var(--line);
+    }
+
+    .result-heading h3 {
+      margin: 0;
+      font-size: 1.12rem;
+      letter-spacing: 0;
+    }
+
+    .result-heading p {
+      margin: 4px 0 0;
+      color: var(--muted);
+      font-size: 0.88rem;
+    }
+
+    .result-meta {
+      display: grid;
+      justify-items: end;
+      gap: 4px;
+      min-width: 148px;
+      color: var(--muted);
+      font-size: 0.78rem;
+      font-weight: 700;
+    }
+
+    .opportunity-card {
+      display: grid;
+      gap: 14px;
+      min-width: 0;
+      padding: 16px;
+      border: 1px solid var(--accent);
+      border-radius: 8px;
+      background: var(--surface);
+    }
+
+    .opportunity-header {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 82px;
+      gap: 14px;
+      align-items: start;
+    }
+
+    .rank-label {
+      margin: 0 0 4px;
+      color: var(--blue);
+      font-size: 0.74rem;
+      font-weight: 800;
+      letter-spacing: 0;
+      text-transform: uppercase;
+    }
+
+    .opportunity-title h3 {
+      margin: 0;
+      font-size: 1.04rem;
+      line-height: 1.28;
+      letter-spacing: 0;
+    }
+
+    .opportunity-title .reason {
+      margin: 5px 0 0;
+      color: var(--muted);
+      font-size: 0.88rem;
+      line-height: 1.42;
+    }
+
+    .pass-context {
+      display: grid;
+      gap: 3px;
+      margin-top: 6px;
+    }
+
+    .pass-context dt {
+      margin: 0;
+      color: var(--muted);
+      font-size: 0.7rem;
+      font-weight: 800;
+      text-transform: uppercase;
+    }
+
+    .pass-context dd {
+      margin: 0;
+      color: #3e4a47;
+      font-size: 0.92rem;
+      font-weight: 650;
+      line-height: 1.35;
+    }
+
+    .pass-context-row {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      gap: 12px;
+      align-items: center;
+      padding: 10px 12px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--surface-subtle);
+    }
+
+    .pass-context-row.is-simple {
+      grid-template-columns: 1fr;
+    }
+
+    .pass-context-row .pass-context {
+      margin-top: 0;
+    }
+
+    .score-block {
+      display: grid;
+      justify-items: end;
+      gap: 2px;
+    }
+
+    .score-value {
+      color: var(--amber);
+      font-size: 1.34rem;
+      font-weight: 820;
+      line-height: 1;
+    }
+
+    .score-label {
+      color: var(--muted);
+      font-size: 0.72rem;
+      font-weight: 760;
+      text-transform: uppercase;
+    }
+
+    .score-meter {
+      width: 74px;
+      height: 6px;
+      overflow: hidden;
+      border-radius: 999px;
+      background: var(--amber-soft);
+    }
+
+    .score-meter span {
+      display: block;
+      width: 82%;
+      height: 100%;
+      border-radius: inherit;
+      background: var(--amber);
+    }
+
+    .pass-choices {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 10px;
+      padding: 14px 0;
+      border-top: 1px solid var(--line);
+      border-bottom: 1px solid var(--line);
+    }
+
+    .variant-moved .pass-choices {
+      padding-top: 0;
+      border-top: 0;
+    }
+
+    .pass-choices.is-single {
+      grid-template-columns: minmax(0, 1fr);
+    }
+
+    .pass-choice-card {
+      display: grid;
+      gap: 10px;
+      min-width: 0;
+      padding: 12px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--surface-subtle);
+    }
+
+    .pass-choice-card.is-best {
+      border-color: var(--best-line);
+      background: var(--best-surface);
+    }
+
+    .pass-choice-header {
+      display: flex;
+      align-items: start;
+      justify-content: space-between;
+      gap: 10px;
+    }
+
+    .pass-choice-header h4 {
+      margin: 4px 0 0;
+      font-size: 1.08rem;
+      line-height: 1.2;
+      letter-spacing: 0;
+    }
+
+    .pass-choice-kind {
+      flex: 0 0 auto;
+      color: var(--amber);
+      font-size: 0.78rem;
+      font-weight: 820;
+      text-align: right;
+    }
+
+    .choice-badge,
+    .light-bucket {
+      display: inline-flex;
+      align-items: center;
+      min-height: 24px;
+      padding: 3px 8px;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      color: var(--ink);
+      font-size: 0.76rem;
+      font-weight: 740;
+      white-space: nowrap;
+    }
+
+    .choice-badge.is-best {
+      border-color: rgba(139, 100, 31, 0.38);
+      background: var(--amber-soft);
+      color: #5b4216;
+    }
+
+    .choice-badge.is-alt {
+      border-color: #7f8b88;
+      background: #cfd8d5;
+    }
+
+    .light-bucket {
+      border-color: #6cb8c7;
+      background: #d5f3f6;
+      color: #1f5964;
+    }
+
+    .light-bucket.is-nautical {
+      border-color: #7685bd;
+      background: #c1caed;
+      color: #26345f;
+    }
+
+    .pass-metric-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 8px 10px;
+      margin: 0;
+    }
+
+    .pass-metric {
+      min-width: 0;
+      padding-top: 8px;
+      border-top: 1px solid var(--line);
+    }
+
+    .pass-metric dt,
+    .photo-hint dt {
+      margin: 0 0 4px;
+      color: var(--muted);
+      font-size: 0.68rem;
+      font-weight: 780;
+      text-transform: uppercase;
+    }
+
+    .pass-metric dd,
+    .photo-hint dd {
+      margin: 0;
+      font-size: 0.88rem;
+      font-weight: 740;
+      line-height: 1.3;
+      overflow-wrap: anywhere;
+    }
+
+    .photo-hint {
+      display: grid;
+      gap: 2px;
+      margin: 0;
+      padding-top: 10px;
+      border-top: 1px solid var(--line);
+    }
+
+    .chart-panel {
+      display: grid;
+      gap: 8px;
+      padding-top: 2px;
+    }
+
+    .chart-head {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: 12px;
+    }
+
+    .chart-head h4 {
+      margin: 0;
+      font-size: 0.9rem;
+      letter-spacing: 0;
+    }
+
+    .chart-head p {
+      margin: 0;
+      color: var(--muted);
+      font-size: 0.78rem;
+    }
+
+    .chart {
+      width: 100%;
+      min-height: 132px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background:
+        linear-gradient(to bottom, rgba(213, 243, 246, 0.72) 0 34%, rgba(255, 241, 170, 0.52) 34% 56%, rgba(237, 242, 240, 0.92) 56% 100%);
+    }
+
+    .chart svg {
+      display: block;
+      width: 100%;
+      height: auto;
+    }
+
+    .chart-axis,
+    .chart-grid {
+      stroke: rgba(93, 105, 102, 0.36);
+      stroke-width: 1;
+    }
+
+    .chart-path {
+      fill: none;
+      stroke: #66736f;
+      stroke-width: 0;
+    }
+
+    .sample {
+      fill: #83908c;
+    }
+
+    .sample.is-best {
+      fill: #5b4216;
+      stroke: var(--amber-soft);
+      stroke-width: 6;
+    }
+
+    .sample.is-alt {
+      fill: #3e4a47;
+      stroke: #cfd8d5;
+      stroke-width: 5;
+    }
+
+    .tick-label {
+      fill: #5d6966;
+      font-size: 12px;
+      font-weight: 700;
+    }
+
+    .review-section {
+      margin-top: 24px;
+    }
+
+    @media (max-width: 980px) {
+      .variant-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    @media (max-width: 680px) {
+      .page {
+        width: min(100% - 20px, 560px);
+        padding-top: 18px;
+      }
+
+      h1 {
+        font-size: 1.42rem;
+      }
+
+      .result-heading,
+      .opportunity-header,
+      .pass-choices {
+        grid-template-columns: 1fr;
+      }
+
+      .result-heading {
+        display: grid;
+      }
+
+      .result-meta,
+      .score-block {
+        justify-items: start;
+      }
+
+      .pass-context-row {
+        grid-template-columns: 1fr;
+      }
+
+      .pass-choice-header {
+        display: grid;
+      }
+
+      .pass-choice-kind {
+        text-align: left;
+      }
+
+      .pass-metric-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main class="page">
+    <header class="page-header">
+      <p class="eyebrow">Moon pass card hierarchy</p>
+      <h1>Pass interval hierarchy options</h1>
+      <p>Option B is the preferred direction. The first row keeps Option A for comparison; the second row tests the preferred layout when a Moon pass has only one useful recommendation.</p>
+    </header>
+
+    <div class="variant-grid">
+      <section class="variant" aria-labelledby="variant-a-title">
+        <div class="variant-label">
+          <h2 id="variant-a-title">A. Quieter pass interval in the header</h2>
+          <p>The card still identifies the Moon pass first, but the timestamp is visually secondary to the Best and Alternative choices.</p>
+        </div>
+
+        <div class="result-panel">
+          <header class="result-heading">
+            <div>
+              <h3>Prague, Czechia</h3>
+              <p>Next ranked Moon opportunities</p>
+            </div>
+            <div class="result-meta" aria-label="Result metadata">
+              <span>Forecast 7 days</span>
+              <span>Europe/Prague</span>
+              <span>2 Moon passes</span>
+            </div>
+          </header>
+
+          <article class="opportunity-card">
+            <header class="opportunity-header">
+              <div class="opportunity-title">
+                <p class="rank-label">Best match</p>
+                <h3>Two useful low-Moon windows</h3>
+                <dl class="pass-context">
+                  <dt>Moon pass</dt>
+                  <dd>Thu 20:58 to Fri 05:09</dd>
+                </dl>
+                <p class="reason">Best balance of low altitude, ambient light, and clear weather.</p>
+              </div>
+              <div class="score-block" aria-label="Score 82">
+                <span class="score-value">82</span>
+                <span class="score-label">Score</span>
+                <span class="score-meter" aria-hidden="true"><span></span></span>
+              </div>
+            </header>
+
+            <section class="pass-choices" aria-label="Recommendations in this Moon pass">
+              <article class="pass-choice-card is-best">
+                <header class="pass-choice-header">
+                  <div>
+                    <span class="choice-badge is-best">Best</span>
+                    <h4>Thu 22:51</h4>
+                  </div>
+                  <span class="pass-choice-kind">Moonrise side</span>
+                </header>
+                <dl class="pass-metric-grid" aria-label="Best recommendation facts">
+                  <div class="pass-metric">
+                    <dt>Moon altitude</dt>
+                    <dd>3.2&deg; WSW</dd>
+                  </div>
+                  <div class="pass-metric">
+                    <dt>Window</dt>
+                    <dd>54 min</dd>
+                  </div>
+                  <div class="pass-metric">
+                    <dt>Light bucket</dt>
+                    <dd><span class="light-bucket">Civil twilight</span></dd>
+                  </div>
+                  <div class="pass-metric">
+                    <dt>Sky</dt>
+                    <dd>Clear</dd>
+                  </div>
+                </dl>
+                <dl class="photo-hint">
+                  <dt>Photo hint</dt>
+                  <dd>Balanced twilight with foreground detail.</dd>
+                </dl>
+              </article>
+
+              <article class="pass-choice-card">
+                <header class="pass-choice-header">
+                  <div>
+                    <span class="choice-badge is-alt">Alternative</span>
+                    <h4>Fri 04:42</h4>
+                  </div>
+                  <span class="pass-choice-kind">Moonset side</span>
+                </header>
+                <dl class="pass-metric-grid" aria-label="Alternative recommendation facts">
+                  <div class="pass-metric">
+                    <dt>Moon altitude</dt>
+                    <dd>2.8&deg; ESE</dd>
+                  </div>
+                  <div class="pass-metric">
+                    <dt>Window</dt>
+                    <dd>48 min</dd>
+                  </div>
+                  <div class="pass-metric">
+                    <dt>Light bucket</dt>
+                    <dd><span class="light-bucket is-nautical">Nautical twilight</span></dd>
+                  </div>
+                  <div class="pass-metric">
+                    <dt>Sky</dt>
+                    <dd>Mostly clear</dd>
+                  </div>
+                </dl>
+                <dl class="photo-hint">
+                  <dt>Photo hint</dt>
+                  <dd>Darker scene for silhouettes and city lights.</dd>
+                </dl>
+              </article>
+            </section>
+
+            <section class="chart-panel" aria-labelledby="variant-a-chart-title">
+              <div class="chart-head">
+                <h4 id="variant-a-chart-title">Moon path</h4>
+                <p>Altitude over time</p>
+              </div>
+              <div class="chart">
+                <svg viewBox="0 0 520 132" role="img" aria-label="Moon altitude path with best and alternative markers">
+                  <line class="chart-grid" x1="28" y1="36" x2="494" y2="36"></line>
+                  <line class="chart-grid" x1="28" y1="76" x2="494" y2="76"></line>
+                  <line class="chart-axis" x1="28" y1="104" x2="494" y2="104"></line>
+                  <polyline class="chart-path" points="34,96 94,75 158,52 222,39 286,43 350,60 414,82 488,98"></polyline>
+                  <circle class="sample" cx="34" cy="96" r="4"></circle>
+                  <circle class="sample is-best" cx="158" cy="52" r="5"></circle>
+                  <circle class="sample" cx="286" cy="43" r="4"></circle>
+                  <circle class="sample is-alt" cx="414" cy="82" r="5"></circle>
+                  <circle class="sample" cx="488" cy="98" r="4"></circle>
+                  <text class="tick-label" x="34" y="122">20:58</text>
+                  <text class="tick-label" x="146" y="24">Best</text>
+                  <text class="tick-label" x="398" y="68">Alt</text>
+                  <text class="tick-label" x="456" y="122">05:09</text>
+                </svg>
+              </div>
+            </section>
+          </article>
+        </div>
+      </section>
+
+      <section class="variant variant-moved" aria-labelledby="variant-b-title">
+        <div class="variant-label">
+          <h2 id="variant-b-title">B. Pass interval below recommendations (preferred)</h2>
+          <p>The first scan goes straight to Best and Alternative. The full Moon pass interval becomes quiet context after the choices.</p>
+        </div>
+
+        <div class="result-panel">
+          <header class="result-heading">
+            <div>
+              <h3>Prague, Czechia</h3>
+              <p>Next ranked Moon opportunities</p>
+            </div>
+            <div class="result-meta" aria-label="Result metadata">
+              <span>Forecast 7 days</span>
+              <span>Europe/Prague</span>
+              <span>2 Moon passes</span>
+            </div>
+          </header>
+
+          <article class="opportunity-card">
+            <header class="opportunity-header">
+              <div class="opportunity-title">
+                <p class="rank-label">Best match</p>
+                <h3>Two useful low-Moon windows</h3>
+              </div>
+              <div class="score-block" aria-label="Score 82">
+                <span class="score-value">82</span>
+                <span class="score-label">Score</span>
+                <span class="score-meter" aria-hidden="true"><span></span></span>
+              </div>
+            </header>
+
+            <section class="pass-choices" aria-label="Recommendations in this Moon pass">
+              <article class="pass-choice-card is-best">
+                <header class="pass-choice-header">
+                  <div>
+                    <span class="choice-badge is-best">Best</span>
+                    <h4>Thu 22:51</h4>
+                  </div>
+                  <span class="pass-choice-kind">Moonrise side</span>
+                </header>
+                <dl class="pass-metric-grid" aria-label="Best recommendation facts">
+                  <div class="pass-metric">
+                    <dt>Moon altitude</dt>
+                    <dd>3.2&deg; WSW</dd>
+                  </div>
+                  <div class="pass-metric">
+                    <dt>Window</dt>
+                    <dd>54 min</dd>
+                  </div>
+                  <div class="pass-metric">
+                    <dt>Light bucket</dt>
+                    <dd><span class="light-bucket">Civil twilight</span></dd>
+                  </div>
+                  <div class="pass-metric">
+                    <dt>Sky</dt>
+                    <dd>Clear</dd>
+                  </div>
+                </dl>
+                <dl class="photo-hint">
+                  <dt>Photo hint</dt>
+                  <dd>Balanced twilight with foreground detail.</dd>
+                </dl>
+              </article>
+
+              <article class="pass-choice-card">
+                <header class="pass-choice-header">
+                  <div>
+                    <span class="choice-badge is-alt">Alternative</span>
+                    <h4>Fri 04:42</h4>
+                  </div>
+                  <span class="pass-choice-kind">Moonset side</span>
+                </header>
+                <dl class="pass-metric-grid" aria-label="Alternative recommendation facts">
+                  <div class="pass-metric">
+                    <dt>Moon altitude</dt>
+                    <dd>2.8&deg; ESE</dd>
+                  </div>
+                  <div class="pass-metric">
+                    <dt>Window</dt>
+                    <dd>48 min</dd>
+                  </div>
+                  <div class="pass-metric">
+                    <dt>Light bucket</dt>
+                    <dd><span class="light-bucket is-nautical">Nautical twilight</span></dd>
+                  </div>
+                  <div class="pass-metric">
+                    <dt>Sky</dt>
+                    <dd>Mostly clear</dd>
+                  </div>
+                </dl>
+                <dl class="photo-hint">
+                  <dt>Photo hint</dt>
+                  <dd>Darker scene for silhouettes and city lights.</dd>
+                </dl>
+              </article>
+            </section>
+
+            <div class="pass-context-row is-simple">
+              <dl class="pass-context">
+                <dt>Moon pass</dt>
+                <dd>Thu 20:58 GMT+2 to Fri 05:09 GMT+2</dd>
+              </dl>
+            </div>
+
+            <section class="chart-panel" aria-labelledby="variant-b-chart-title">
+              <div class="chart-head">
+                <h4 id="variant-b-chart-title">Moon path</h4>
+                <p>Altitude over time</p>
+              </div>
+              <div class="chart">
+                <svg viewBox="0 0 520 132" role="img" aria-label="Moon altitude path with best and alternative markers">
+                  <line class="chart-grid" x1="28" y1="36" x2="494" y2="36"></line>
+                  <line class="chart-grid" x1="28" y1="76" x2="494" y2="76"></line>
+                  <line class="chart-axis" x1="28" y1="104" x2="494" y2="104"></line>
+                  <polyline class="chart-path" points="34,96 94,75 158,52 222,39 286,43 350,60 414,82 488,98"></polyline>
+                  <circle class="sample" cx="34" cy="96" r="4"></circle>
+                  <circle class="sample is-best" cx="158" cy="52" r="5"></circle>
+                  <circle class="sample" cx="286" cy="43" r="4"></circle>
+                  <circle class="sample is-alt" cx="414" cy="82" r="5"></circle>
+                  <circle class="sample" cx="488" cy="98" r="4"></circle>
+                  <text class="tick-label" x="34" y="122">20:58</text>
+                  <text class="tick-label" x="146" y="24">Best</text>
+                  <text class="tick-label" x="398" y="68">Alt</text>
+                  <text class="tick-label" x="456" y="122">05:09</text>
+                </svg>
+              </div>
+            </section>
+          </article>
+        </div>
+      </section>
+    </div>
+
+    <section class="review-section" aria-labelledby="single-variant-title">
+      <div class="variant-label">
+        <h2 id="single-variant-title">Preferred layout with one recommendation</h2>
+        <p>These use Option B but remove the Alternative card, so the review can check whether the pass interval still feels like useful context instead of duplicated headline text.</p>
+      </div>
+
+      <div class="variant-grid">
+        <section class="variant variant-moved" aria-labelledby="variant-c-title">
+          <div class="variant-label">
+            <h2 id="variant-c-title">C. One recommendation, same evening</h2>
+            <p>The pass interval is short and stays on the same date, so the context row should stay quiet.</p>
+          </div>
+
+          <div class="result-panel">
+            <header class="result-heading">
+              <div>
+                <h3>Prague, Czechia</h3>
+                <p>Next ranked Moon opportunities</p>
+              </div>
+              <div class="result-meta" aria-label="Result metadata">
+                <span>Forecast 7 days</span>
+                <span>Europe/Prague</span>
+                <span>1 Moon pass</span>
+              </div>
+            </header>
+
+            <article class="opportunity-card">
+              <header class="opportunity-header">
+                <div class="opportunity-title">
+                  <p class="rank-label">Best match</p>
+                  <h3>One useful low-Moon window</h3>
+                </div>
+                <div class="score-block" aria-label="Score 76">
+                  <span class="score-value">76</span>
+                  <span class="score-label">Score</span>
+                  <span class="score-meter" aria-hidden="true"><span></span></span>
+                </div>
+              </header>
+
+              <section class="pass-choices is-single" aria-label="Recommendation in this Moon pass">
+                <article class="pass-choice-card is-best">
+                  <header class="pass-choice-header">
+                    <div>
+                      <span class="choice-badge is-best">Best</span>
+                      <h4>Thu 21:18</h4>
+                    </div>
+                    <span class="pass-choice-kind">Moonrise side</span>
+                  </header>
+                  <dl class="pass-metric-grid" aria-label="Best recommendation facts">
+                    <div class="pass-metric">
+                      <dt>Moon altitude</dt>
+                      <dd>4.1&deg; SSW</dd>
+                    </div>
+                    <div class="pass-metric">
+                      <dt>Window</dt>
+                      <dd>42 min</dd>
+                    </div>
+                    <div class="pass-metric">
+                      <dt>Light bucket</dt>
+                      <dd><span class="light-bucket">Civil twilight</span></dd>
+                    </div>
+                    <div class="pass-metric">
+                      <dt>Sky</dt>
+                      <dd>Clear</dd>
+                    </div>
+                  </dl>
+                  <dl class="photo-hint">
+                    <dt>Photo hint</dt>
+                    <dd>Useful for lit foregrounds and a low crescent.</dd>
+                  </dl>
+                </article>
+              </section>
+
+              <div class="pass-context-row is-simple">
+                <dl class="pass-context">
+                  <dt>Moon pass</dt>
+                  <dd>Thu 19:44 GMT+2 to Thu 23:31 GMT+2</dd>
+                </dl>
+              </div>
+
+              <section class="chart-panel" aria-labelledby="variant-c-chart-title">
+                <div class="chart-head">
+                  <h4 id="variant-c-chart-title">Moon path</h4>
+                  <p>Altitude over time</p>
+                </div>
+                <div class="chart">
+                  <svg viewBox="0 0 520 132" role="img" aria-label="Moon altitude path with one best marker">
+                    <line class="chart-grid" x1="28" y1="36" x2="494" y2="36"></line>
+                    <line class="chart-grid" x1="28" y1="76" x2="494" y2="76"></line>
+                    <line class="chart-axis" x1="28" y1="104" x2="494" y2="104"></line>
+                    <polyline class="chart-path" points="34,98 94,78 158,56 222,42 286,38 350,47 414,70 488,96"></polyline>
+                    <circle class="sample" cx="34" cy="98" r="4"></circle>
+                    <circle class="sample is-best" cx="166" cy="54" r="5"></circle>
+                    <circle class="sample" cx="286" cy="38" r="4"></circle>
+                    <circle class="sample" cx="488" cy="96" r="4"></circle>
+                    <text class="tick-label" x="34" y="122">19:44</text>
+                    <text class="tick-label" x="154" y="28">Best</text>
+                    <text class="tick-label" x="456" y="122">23:31</text>
+                  </svg>
+                </div>
+              </section>
+            </article>
+          </div>
+        </section>
+
+        <section class="variant variant-moved" aria-labelledby="variant-d-title">
+          <div class="variant-label">
+            <h2 id="variant-d-title">D. One recommendation, overnight pass</h2>
+            <p>The suggested time is after midnight, so the context row still explains the full pass without leading the card.</p>
+          </div>
+
+          <div class="result-panel">
+            <header class="result-heading">
+              <div>
+                <h3>Prague, Czechia</h3>
+                <p>Next ranked Moon opportunities</p>
+              </div>
+              <div class="result-meta" aria-label="Result metadata">
+                <span>Forecast 7 days</span>
+                <span>Europe/Prague</span>
+                <span>1 Moon pass</span>
+              </div>
+            </header>
+
+            <article class="opportunity-card">
+              <header class="opportunity-header">
+                <div class="opportunity-title">
+                  <p class="rank-label">Best match</p>
+                  <h3>One useful low-Moon window</h3>
+                </div>
+                <div class="score-block" aria-label="Score 71">
+                  <span class="score-value">71</span>
+                  <span class="score-label">Score</span>
+                  <span class="score-meter" aria-hidden="true"><span></span></span>
+                </div>
+              </header>
+
+              <section class="pass-choices is-single" aria-label="Recommendation in this Moon pass">
+                <article class="pass-choice-card is-best">
+                  <header class="pass-choice-header">
+                    <div>
+                      <span class="choice-badge is-best">Best</span>
+                      <h4>Fri 04:42</h4>
+                    </div>
+                    <span class="pass-choice-kind">Moonset side</span>
+                  </header>
+                  <dl class="pass-metric-grid" aria-label="Best recommendation facts">
+                    <div class="pass-metric">
+                      <dt>Moon altitude</dt>
+                      <dd>2.8&deg; ESE</dd>
+                    </div>
+                    <div class="pass-metric">
+                      <dt>Window</dt>
+                      <dd>48 min</dd>
+                    </div>
+                    <div class="pass-metric">
+                      <dt>Light bucket</dt>
+                      <dd><span class="light-bucket is-nautical">Nautical twilight</span></dd>
+                    </div>
+                    <div class="pass-metric">
+                      <dt>Sky</dt>
+                      <dd>Mostly clear</dd>
+                    </div>
+                  </dl>
+                  <dl class="photo-hint">
+                    <dt>Photo hint</dt>
+                    <dd>Better for silhouettes, city lights, and a darker sky.</dd>
+                  </dl>
+                </article>
+              </section>
+
+              <div class="pass-context-row is-simple">
+                <dl class="pass-context">
+                  <dt>Moon pass</dt>
+                  <dd>Thu 20:58 GMT+2 to Fri 05:09 GMT+2</dd>
+                </dl>
+              </div>
+
+              <section class="chart-panel" aria-labelledby="variant-d-chart-title">
+                <div class="chart-head">
+                  <h4 id="variant-d-chart-title">Moon path</h4>
+                  <p>Altitude over time</p>
+                </div>
+                <div class="chart">
+                  <svg viewBox="0 0 520 132" role="img" aria-label="Moon altitude path with one best marker after midnight">
+                    <line class="chart-grid" x1="28" y1="36" x2="494" y2="36"></line>
+                    <line class="chart-grid" x1="28" y1="76" x2="494" y2="76"></line>
+                    <line class="chart-axis" x1="28" y1="104" x2="494" y2="104"></line>
+                    <polyline class="chart-path" points="34,96 94,75 158,52 222,39 286,43 350,60 414,82 488,98"></polyline>
+                    <circle class="sample" cx="34" cy="96" r="4"></circle>
+                    <circle class="sample" cx="158" cy="52" r="4"></circle>
+                    <circle class="sample" cx="286" cy="43" r="4"></circle>
+                    <circle class="sample is-best" cx="414" cy="82" r="5"></circle>
+                    <circle class="sample" cx="488" cy="98" r="4"></circle>
+                    <text class="tick-label" x="34" y="122">20:58</text>
+                    <text class="tick-label" x="398" y="68">Best</text>
+                    <text class="tick-label" x="456" y="122">05:09</text>
+                  </svg>
+                </div>
+              </section>
+            </article>
+          </div>
+        </section>
+      </div>
+    </section>
+  </main>
+</body>
+</html>

@@ -17,8 +17,16 @@ Moon Pass Card
   azimuth strip, and a compass ring.
 - `docs/design/combined-altitude-azimuth-mockups.html`: combined chart variants
   that put azimuth on the altitude chart's time axis.
-- `docs/design/final-moon-pass-card-mockup.html`: current final mockup combining
-  compact Moon pass cards with the selected top azimuth rail chart.
+- `docs/design/final-moon-pass-card-mockup.html`: previous final mockup
+  combining compact Moon pass cards with the selected top azimuth rail chart.
+- `docs/design/pass-interval-hierarchy-mockups.html`: current hierarchy mockup
+  for the Moon pass card, with the preferred pass interval placement.
+- `docs/design/generic-silhouette-mockups.html`: generic building, tree, and
+  hill silhouette variants for low-altitude Moon path intuition.
+- `docs/design/silhouette-followup-mockups.html`: simplified right-side
+  silhouette scale and animated foreground follow-up variants.
+- `docs/design/silhouette-three-layer-mockup.html`: single-card mockup for
+  three-layer near, mid, and far parallax silhouettes.
 
 Current Direction
 - Use compact recommendation rows instead of repeated prose summaries.

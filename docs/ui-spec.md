@@ -93,7 +93,7 @@ The card should include:
 - suggested time;
 - duration;
 - score and confidence;
-- short reason text;
+- short reason text when supplied by the API;
 - Moon altitude, azimuth, illumination, and phase;
 - Sun altitude and light bucket;
 - weather summary and relevant forecast risk;
@@ -112,14 +112,16 @@ showing every backend fact at equal visual weight.
 
 Each user-facing result card should represent one Moon pass, even when that pass
 has only one useful recommendation window. The card should be ranked by the best
-recommendation in that pass. The card title should show the pass start and end
-with exact dates and the location timezone, while compact recommendation cards
-show the useful window or windows inside the pass. Each recommendation card
-should show a `Best` or `Alternative` badge, suggested time, window side, Moon
-altitude and direction, window duration, light bucket, Sun altitude, a coarse
-sky/weather label, and a short photo hint. Avoid showing exact cloud-cover
-percentages in the compact card; keep raw weather numbers in lower-priority
-details or API data where they do not imply false precision.
+recommendation in that pass. The card title should state whether there is one
+or multiple useful low-Moon windows, while compact recommendation cards show the
+useful window or windows inside the pass. The full pass start and end should be
+shown as lower-priority Moon pass context below the recommendation cards, with
+exact dates and a short location timezone label. Each recommendation card should show a
+`Best` or `Alternative` badge, suggested time, window side, Moon altitude and
+direction, window duration, light bucket, Sun altitude, a coarse sky/weather
+label, and a short photo hint. Avoid showing exact cloud-cover percentages in
+the compact card; keep raw weather numbers in lower-priority details or API
+data where they do not imply false precision.
 The Moon path panel should be one pass-level chart that shows the path across
 the pass and marks each recommendation's suggested position, rather than
 showing a separate chart per recommendation.
@@ -181,6 +183,14 @@ Agreed behavior:
   schematic phase based on `phaseAngleDegrees`; true observer-oriented Moon
   rotation can wait until the backend provides a deliberate orientation value.
 - Light bucket bands may appear behind the altitude path.
+- A subtle animated generic foreground silhouette layer may appear behind the
+  chart markers and labels to help users build intuition for low Moon altitude.
+  It is visual-only, not landmark-aware, not terrain-aware, and must respect
+  `prefers-reduced-motion`. Silhouette heights should be modeled in apparent
+  altitude degrees rather than fixed pixels so they shrink on high-arc Moon
+  passes and grow on low-arc passes. The current reference scale is low hills
+  `2.2°`, small gabled building `3.0°`, tree `4.5°`, mid-rise block `5.5°`,
+  church or cathedral `6.8°`, and tall tower `11.7°`.
 
 Current v0 curve model:
 
@@ -195,6 +205,109 @@ Current v0 curve model:
   The frontend should not have to infer a rounded peak from only sparse points.
 - Treat this as a UI path model, not a terrain-aware or composition-exact Moon
   trajectory.
+
+## Moon Path Foreground Animation
+
+The foreground silhouettes in `moonPathView.js` are a visual altitude aid, not
+time data and not location-aware scenery. They sit behind Moon markers and axis
+labels, inside the altitude plot clip, so users can compare a low Moon altitude
+against familiar rough objects without reading the silhouettes as chart ticks.
+
+The runtime engine is configured near the top of
+`backend/src/main/resources/static/moonPathView.js`:
+
+- `SILHOUETTE_SEQUENCE_WIDTH` is the width, in SVG chart units, of one repeated
+  foreground sequence. The CSS drift shifts each layer by exactly this amount so
+  the repeated `<use>` elements loop without a visible jump.
+- `SILHOUETTE_HEIGHT_DEGREES` maps named object heights to apparent altitude
+  degrees. This is the main sizing unit for silhouettes. For example, a
+  `4.5°` tree is drawn shorter on a chart whose ceiling is `70°` than on a
+  chart whose ceiling is `35°`.
+- `SILHOUETTE_LAYERS` defines the animated parallax layers and the figures in
+  each repeated sequence.
+- `SILHOUETTE_SHAPE_BUILDERS` maps each figure `shape` key to the function that
+  draws the SVG paths and rectangles for that shape.
+
+SVG chart units are the units of the chart `viewBox`. They behave like local
+pixels inside the fixed chart coordinate system, not CSS pixels and not time.
+
+Layer semantics:
+
+- `far`: faintest and slowest layer. It carries sparse hills and tall forms so
+  the background reads as distant context.
+- `mid`: medium opacity and medium speed. It carries mid-rise and church-like
+  forms.
+- `near`: strongest and fastest layer. It carries the most readable houses,
+  trees, and towers.
+
+Layer parameters:
+
+- `id`: stable layer key used to build internal SVG definition IDs.
+- `className`: CSS class added to the rendered `<g>`, currently `is-far`,
+  `is-mid`, or `is-near`.
+- `opacity`: passed into CSS as `--moon-path-foreground-opacity`.
+- `durationSeconds`: animation duration. Smaller values move faster and create
+  the near-layer parallax effect.
+- `delaySeconds`: animation offset so layers do not align into one repeated
+  block at page load.
+- `offsetX`: horizontal offset, in SVG chart units, applied to every figure in
+  that layer's sequence.
+- `figures`: ordered list of objects drawn into one repeated sequence.
+
+Shape locations:
+
+- Figure adapters are named `foreground...Figure`, for example
+  `foregroundHouseFigure`.
+- Drawing helpers are named after the actual shape, for example
+  `foregroundHouse`, `foregroundTree`, and `foregroundChurch`.
+- Low-level SVG helpers are `artworkPath` and `artworkRect`.
+
+Figure parameters:
+
+- `shape`: key in `SILHOUETTE_SHAPE_BUILDERS`, such as `hill`, `house`, `tree`,
+  `blockBuilding`, `tallBuilding`, or `church`.
+- `x`: horizontal position inside the repeated sequence, in SVG chart units.
+  This is not time and is not tied to the hour axis.
+- `width`: shape-specific width in SVG chart units. Buildings use it as facade
+  width; hills use it as terrain span; trees currently derive crown width from
+  height and do not use `width`.
+- `height`: key into `SILHOUETTE_HEIGHT_DEGREES`.
+- `heightDegrees`: optional direct height in apparent altitude degrees. Prefer a
+  named `height` key for reusable generic shapes; use this only for one-off
+  figures that should not become a shared reference height.
+- `windowColumns`: number of window columns for rectangular building-like
+  shapes. Ignored by shapes that do not draw windows.
+- `windowRows`: number of window rows for rectangular building-like shapes.
+  Ignored by shapes that do not draw windows.
+
+The current generic reference heights are:
+
+- low hill: `2.2°`
+- small gabled building: `3.0°`
+- tree: `4.5°`
+- mid-rise block: `5.5°`
+- church or cathedral: `6.8°`
+- tall tower: `11.7°`
+
+To add a new shape:
+
+1. Add a builder function near the existing `foreground...Figure` functions in
+   `moonPathView.js`. The builder receives `(figure, x, baseline, height)` and
+   should return SVG nodes or an array of SVG nodes. `baseline` is the chart
+   y-coordinate for `0°` altitude, so shapes normally extend upward from it.
+2. Register the builder in `SILHOUETTE_SHAPE_BUILDERS` with a stable `shape`
+   key.
+3. Add one or more figure entries to `SILHOUETTE_LAYERS`.
+4. Use `artworkPath` and `artworkRect` helpers so generated SVG elements keep
+   `data-moon-path-artwork`. The visual-stability tests hide those elements to
+   freeze the Moon path while allowing silhouette iteration.
+5. Keep the silhouette behind markers and labels, preserve
+   `prefers-reduced-motion`, and update this section when adding new reusable
+   parameters or reference heights.
+
+Future landmark-aware or event-aware silhouettes should use the same shape
+registry, but they need separate product and provider decisions before the UI
+claims real city context.
 
 ## Azimuth Rail
 

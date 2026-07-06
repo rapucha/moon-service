@@ -6,6 +6,7 @@ const curveCases = fixture.diagnostics.curveCorpus.cases;
 const markerExpectations = markerExpectationsByPassId(fixture);
 
 test.beforeEach(async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: "reduce" });
   await page.route("**/api/opportunities**", async route => {
     await route.fulfill({
       status: 200,
