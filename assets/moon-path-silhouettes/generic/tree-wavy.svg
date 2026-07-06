@@ -1,0 +1,4 @@
+<svg viewBox="0 0 42 45" xmlns="http://www.w3.org/2000/svg">
+  <path class="moon-path-foreground-shape" d="M0 25 C0 16 6 10 13 11 C16 3 25 0 31 7 C37 8 42 14 42 21 C42 29 35 34 26 33 H16 C7 33 0 30 0 25 Z" />
+  <rect class="moon-path-foreground-shape" x="18" y="24" width="6" height="21" rx="1" />
+</svg>

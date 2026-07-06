@@ -213,23 +213,55 @@ time data and not location-aware scenery. They sit behind Moon markers and axis
 labels, inside the altitude plot clip, so users can compare a low Moon altitude
 against familiar rough objects without reading the silhouettes as chart ticks.
 
-The runtime engine is configured near the top of
-`backend/src/main/resources/static/moonPathView.js`:
+The runtime engine lives in
+`backend/src/main/resources/static/moonPathSilhouettes.js`. It is symbol-based:
+the runtime places sanitized SVG symbols from
+`backend/src/main/resources/static/moonPathSilhouetteSymbols.js` instead of
+constructing building/tree paths directly in the chart code.
 
-- `SILHOUETTE_SEQUENCE_WIDTH` is the width, in SVG chart units, of one repeated
+The symbol catalog is generated from source assets under
+`assets/moon-path-silhouettes/`:
+
+- `manifest.json` lists every symbol id, source SVG file, `baselineY`,
+  `intrinsicHeight`, tags, license, and attribution.
+- `generic/*.svg` contains the current project-owned generic silhouettes.
+- `scripts/build_moon_path_silhouette_symbols.mjs` validates and sanitizes the
+  manifest plus SVG files, then writes the generated static frontend module.
+- `npm run silhouettes:build` regenerates the module.
+- `npm run silhouettes:check` verifies that the generated module is current and
+  runs sanitizer/manifest tests.
+
+The runtime config in `moonPathSilhouettes.js` contains:
+
+- `SILHOUETTE_SEQUENCE_WIDTH`: the width, in SVG chart units, of one repeated
   foreground sequence. The CSS drift shifts each layer by exactly this amount so
   the repeated `<use>` elements loop without a visible jump.
-- `SILHOUETTE_HEIGHT_DEGREES` maps named object heights to apparent altitude
-  degrees. This is the main sizing unit for silhouettes. For example, a
-  `4.5°` tree is drawn shorter on a chart whose ceiling is `70°` than on a
-  chart whose ceiling is `35°`.
-- `SILHOUETTE_LAYERS` defines the animated parallax layers and the figures in
-  each repeated sequence.
-- `SILHOUETTE_SHAPE_BUILDERS` maps each figure `shape` key to the function that
-  draws the SVG paths and rectangles for that shape.
+- `SILHOUETTE_HEIGHT_DEGREES`: named reference heights in apparent altitude
+  degrees. For example, a `4.5°` tree is drawn shorter on a chart whose ceiling
+  is `70°` than on a chart whose ceiling is `35°`.
+- `SILHOUETTE_LAYERS`: animated parallax layer definitions and figure placement.
 
 SVG chart units are the units of the chart `viewBox`. They behave like local
 pixels inside the fixed chart coordinate system, not CSS pixels and not time.
+
+Symbol contract:
+
+- `id`: lowercase kebab-case key referenced by runtime figures.
+- `viewBox`: source SVG coordinate system, parsed from the SVG file.
+- `baselineY`: source SVG y-coordinate for the ground/`0°` baseline.
+- `intrinsicHeight`: source height used when scaling the symbol to
+  `heightDegrees`.
+- `tags`: lowercase metadata tags for future generic, location, or event packs.
+- `license`: required metadata for project-owned and third-party art.
+- `attribution`: required metadata for future legal/about surfaces.
+- `elements`: generated sanitized `path` and `rect` definitions. Do not edit
+  these by hand; edit the source SVG and rebuild.
+
+Sanitization is deliberately strict. The current source subset allows only
+simple root `<svg>` files containing self-closing `<path>` and `<rect>` elements
+with known classes. Scripts, event handlers, external references, embedded
+images, styles, filters, animation, remote URLs, and unsupported attributes are
+rejected before runtime.
 
 Layer semantics:
 
@@ -254,31 +286,30 @@ Layer parameters:
   that layer's sequence.
 - `figures`: ordered list of objects drawn into one repeated sequence.
 
-Shape locations:
+Symbol source locations:
 
-- Figure adapters are named `foreground...Figure`, for example
-  `foregroundHouseFigure`.
-- Drawing helpers are named after the actual shape, for example
-  `foregroundHouse`, `foregroundTree`, and `foregroundChurch`.
-- Low-level SVG helpers are `artworkPath` and `artworkRect`.
+- Source SVGs live under `assets/moon-path-silhouettes/generic/` for the
+  current generic pack.
+- Symbol metadata lives in `assets/moon-path-silhouettes/manifest.json`.
+- The generated runtime catalog is
+  `backend/src/main/resources/static/moonPathSilhouetteSymbols.js`.
+- Runtime placement and animation live in
+  `backend/src/main/resources/static/moonPathSilhouettes.js`.
 
 Figure parameters:
 
-- `shape`: key in `SILHOUETTE_SHAPE_BUILDERS`, such as `hill`, `house`, `tree`,
-  `blockBuilding`, `tallBuilding`, or `church`.
+- `symbol`: key from the generated symbol catalog, such as
+  `generic-tree-wavy` or `generic-church-small`.
 - `x`: horizontal position inside the repeated sequence, in SVG chart units.
   This is not time and is not tied to the hour axis.
-- `width`: shape-specific width in SVG chart units. Buildings use it as facade
-  width; hills use it as terrain span; trees currently derive crown width from
-  height and do not use `width`.
-- `height`: key into `SILHOUETTE_HEIGHT_DEGREES`.
-- `heightDegrees`: optional direct height in apparent altitude degrees. Prefer a
-  named `height` key for reusable generic shapes; use this only for one-off
-  figures that should not become a shared reference height.
-- `windowColumns`: number of window columns for rectangular building-like
-  shapes. Ignored by shapes that do not draw windows.
-- `windowRows`: number of window rows for rectangular building-like shapes.
-  Ignored by shapes that do not draw windows.
+- `heightDegrees`: target height in apparent altitude degrees. Runtime uses
+  this value plus the symbol `intrinsicHeight` and `baselineY` metadata to scale
+  and baseline-align the symbol.
+
+Runtime figure configs should not carry shape-construction parameters such as
+`windowColumns`, `windowRows`, or arbitrary path instructions. If a visual
+variant is needed, create a new source SVG and manifest entry, then reference
+that generated `symbol` id from the layer config.
 
 The current generic reference heights are:
 
@@ -289,25 +320,23 @@ The current generic reference heights are:
 - church or cathedral: `6.8°`
 - tall tower: `11.7°`
 
-To add a new shape:
+To add a new symbol:
 
-1. Add a builder function near the existing `foreground...Figure` functions in
-   `moonPathView.js`. The builder receives `(figure, x, baseline, height)` and
-   should return SVG nodes or an array of SVG nodes. `baseline` is the chart
-   y-coordinate for `0°` altitude, so shapes normally extend upward from it.
-2. Register the builder in `SILHOUETTE_SHAPE_BUILDERS` with a stable `shape`
-   key.
-3. Add one or more figure entries to `SILHOUETTE_LAYERS`.
-4. Use `artworkPath` and `artworkRect` helpers so generated SVG elements keep
-   `data-moon-path-artwork`. The visual-stability tests hide those elements to
-   freeze the Moon path while allowing silhouette iteration.
-5. Keep the silhouette behind markers and labels, preserve
+1. Add a safe SVG file under `assets/moon-path-silhouettes/`. Keep it in the
+   supported subset unless the sanitizer and tests are deliberately expanded.
+2. Add a manifest entry with `id`, `file`, `baselineY`, `intrinsicHeight`,
+   `tags`, `license`, and `attribution`.
+3. Run `npm run silhouettes:build`.
+4. Reference the generated symbol id from `SILHOUETTE_LAYERS` in
+   `moonPathSilhouettes.js`.
+5. Run `npm run silhouettes:check` and the frontend UI checks.
+6. Keep the silhouette behind markers and labels, preserve
    `prefers-reduced-motion`, and update this section when adding new reusable
-   parameters or reference heights.
+   metadata or reference heights.
 
-Future landmark-aware or event-aware silhouettes should use the same shape
-registry, but they need separate product and provider decisions before the UI
-claims real city context.
+Future landmark-aware or event-aware silhouettes should use the same symbol
+catalog and manifest path, but they need separate product and provider
+decisions before the UI claims real city context.
 
 ## Azimuth Rail
 

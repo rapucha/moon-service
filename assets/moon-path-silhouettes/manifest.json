@@ -1,0 +1,86 @@
+{
+  "schemaVersion": 1,
+  "symbols": [
+    {
+      "id": "generic-hill-130",
+      "file": "generic/hill-130.svg",
+      "baselineY": 16,
+      "intrinsicHeight": 16,
+      "tags": ["generic", "hill", "terrain"],
+      "license": "project-owned",
+      "attribution": "Moon Service generated generic silhouette"
+    },
+    {
+      "id": "generic-hill-146",
+      "file": "generic/hill-146.svg",
+      "baselineY": 16,
+      "intrinsicHeight": 16,
+      "tags": ["generic", "hill", "terrain"],
+      "license": "project-owned",
+      "attribution": "Moon Service generated generic silhouette"
+    },
+    {
+      "id": "generic-hill-166",
+      "file": "generic/hill-166.svg",
+      "baselineY": 16,
+      "intrinsicHeight": 16,
+      "tags": ["generic", "hill", "terrain"],
+      "license": "project-owned",
+      "attribution": "Moon Service generated generic silhouette"
+    },
+    {
+      "id": "generic-house-gabled",
+      "file": "generic/house-gabled.svg",
+      "baselineY": 32,
+      "intrinsicHeight": 32,
+      "tags": ["generic", "building", "house"],
+      "license": "project-owned",
+      "attribution": "Moon Service generated generic silhouette"
+    },
+    {
+      "id": "generic-tree-wavy",
+      "file": "generic/tree-wavy.svg",
+      "baselineY": 45,
+      "intrinsicHeight": 45,
+      "tags": ["generic", "tree", "foreground"],
+      "license": "project-owned",
+      "attribution": "Moon Service generated generic silhouette"
+    },
+    {
+      "id": "generic-block-2x2",
+      "file": "generic/block-2x2.svg",
+      "baselineY": 40,
+      "intrinsicHeight": 40,
+      "tags": ["generic", "building", "block"],
+      "license": "project-owned",
+      "attribution": "Moon Service generated generic silhouette"
+    },
+    {
+      "id": "generic-block-2x3",
+      "file": "generic/block-2x3.svg",
+      "baselineY": 48,
+      "intrinsicHeight": 48,
+      "tags": ["generic", "building", "block"],
+      "license": "project-owned",
+      "attribution": "Moon Service generated generic silhouette"
+    },
+    {
+      "id": "generic-tower-1x6",
+      "file": "generic/tower-1x6.svg",
+      "baselineY": 70,
+      "intrinsicHeight": 70,
+      "tags": ["generic", "building", "tower"],
+      "license": "project-owned",
+      "attribution": "Moon Service generated generic silhouette"
+    },
+    {
+      "id": "generic-church-small",
+      "file": "generic/church-small.svg",
+      "baselineY": 50,
+      "intrinsicHeight": 50,
+      "tags": ["generic", "building", "church"],
+      "license": "project-owned",
+      "attribution": "Moon Service generated generic silhouette"
+    }
+  ]
+}
