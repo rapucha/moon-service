@@ -606,13 +606,43 @@ dd {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 10px;
-  padding: 14px 0;
-  border-top: 1px solid var(--line);
+  padding: 0 0 14px;
   border-bottom: 1px solid var(--line);
 }
 
 .pass-choices.is-single {
   grid-template-columns: minmax(0, 1fr);
+}
+
+.pass-context-row {
+  display: grid;
+  gap: 4px;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface-subtle);
+}
+
+.pass-context {
+  display: grid;
+  gap: 3px;
+  margin: 0;
+}
+
+.pass-context dt {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.72rem;
+  font-weight: 780;
+  text-transform: uppercase;
+}
+
+.pass-context dd {
+  margin: 0;
+  color: var(--ink);
+  font-weight: 740;
+  line-height: 1.3;
+  overflow-wrap: anywhere;
 }
 
 .pass-choice-card {
@@ -935,10 +965,6 @@ dd {
   stroke: var(--line-strong);
 }
 
-.chart-tick.is-suggested {
-  stroke: rgba(139, 100, 31, 0.32);
-}
-
 .azimuth-rail-bg {
   fill: rgba(255, 255, 255, 0.56);
   stroke: var(--line);
@@ -977,6 +1003,27 @@ dd {
 
 .light-band.is-unknown {
   fill: var(--surface-muted);
+}
+
+.moon-path-foreground-layer {
+  pointer-events: none;
+}
+
+.moon-path-foreground {
+  fill: #2f413d;
+  opacity: var(--moon-path-foreground-opacity, 0.16);
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: moon-path-foreground-drift var(--moon-path-foreground-duration, 30s) linear infinite;
+  animation-delay: var(--moon-path-foreground-delay, 0s);
+}
+
+.moon-path-foreground-hill {
+  opacity: 0.72;
+}
+
+.moon-path-foreground-window {
+  fill: rgba(246, 249, 248, 0.55);
 }
 
 .compass-axis {
@@ -1043,6 +1090,16 @@ dd {
 .chart-time-label.is-suggested {
   fill: var(--amber);
   font-weight: 820;
+}
+
+@keyframes moon-path-foreground-drift {
+  from {
+    transform: translateX(0);
+  }
+
+  to {
+    transform: translateX(var(--moon-path-foreground-shift, -320px));
+  }
 }
 
 .exposure {
@@ -1367,5 +1424,12 @@ summary {
 
   .about-content h1 {
     font-size: 1.9rem;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .moon-path-foreground {
+    animation: none;
+    transform: translateX(-96px);
   }
 }

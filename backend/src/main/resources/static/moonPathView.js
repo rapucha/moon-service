@@ -15,6 +15,80 @@ var DESKTOP_PLOT_WIDTH = 672;
 var MOBILE_ALTITUDE_WIDTH = 320;
 var MOBILE_PLOT_WIDTH = 272;
 
+var SILHOUETTE_SEQUENCE_WIDTH = 320;
+
+// Moon path foreground tuning:
+// - Heights are apparent altitude degrees so the silhouettes scale with the chart ceiling.
+// - Smaller layer duration means faster parallax drift; opacity keeps the Moon path dominant.
+// - Add landmark, seasonal, or city-specific shapes by registering a builder in
+//   SILHOUETTE_SHAPE_BUILDERS and referencing that shape key from a layer's figures.
+// - See "Moon Path Foreground Animation" in docs/ui-spec.md for parameter semantics.
+var SILHOUETTE_HEIGHT_DEGREES = {
+  hill: 2.2,
+  house: 3,
+  tree: 4.5,
+  midRise: 5.5,
+  church: 6.8,
+  tallTower: 11.7
+};
+
+var SILHOUETTE_LAYERS = [
+  {
+    id: "far",
+    className: "is-far",
+    opacity: 0.1,
+    durationSeconds: 54,
+    delaySeconds: -21,
+    offsetX: 126,
+    figures: [
+      { shape: "hill", x: 0, width: 166, height: "hill" },
+      { shape: "blockBuilding", x: 88, width: 15, height: "midRise", windowColumns: 2, windowRows: 2 },
+      { shape: "tree", x: 184, height: "tree" },
+      { shape: "house", x: 228, width: 16, height: "house" },
+      { shape: "tallBuilding", x: 286, width: 9, height: "tallTower", windowColumns: 1, windowRows: 6 }
+    ]
+  },
+  {
+    id: "mid",
+    className: "is-mid",
+    opacity: 0.15,
+    durationSeconds: 34,
+    delaySeconds: -11,
+    offsetX: 48,
+    figures: [
+      { shape: "hill", x: 0, width: 146, height: "hill" },
+      { shape: "blockBuilding", x: 82, width: 20, height: "midRise", windowColumns: 2, windowRows: 3 },
+      { shape: "church", x: 166, width: 34, height: "church" },
+      { shape: "tree", x: 254, height: "tree" },
+      { shape: "house", x: 300, width: 18, height: "house" }
+    ]
+  },
+  {
+    id: "near",
+    className: "is-near",
+    opacity: 0.22,
+    durationSeconds: 24,
+    delaySeconds: 0,
+    offsetX: 0,
+    figures: [
+      { shape: "hill", x: 0, width: 130, height: "hill" },
+      { shape: "house", x: 82, width: 20, height: "house" },
+      { shape: "tree", x: 150, height: "tree" },
+      { shape: "blockBuilding", x: 224, width: 22, height: "midRise", windowColumns: 2, windowRows: 3 },
+      { shape: "tallBuilding", x: 276, width: 10, height: "tallTower", windowColumns: 1, windowRows: 6 }
+    ]
+  }
+];
+
+var SILHOUETTE_SHAPE_BUILDERS = {
+  hill: foregroundHillFigure,
+  house: foregroundHouseFigure,
+  tree: foregroundTreeFigure,
+  blockBuilding: foregroundBlockBuildingFigure,
+  tallBuilding: foregroundTallBuildingFigure,
+  church: foregroundChurchFigure
+};
+
 export function moonPathPanel(opportunity, timezone, countryCode, chartContext) {
   var path = opportunity.moonPath || {};
   var samples = moonPathSamples(path);
@@ -114,9 +188,6 @@ function altitudeChartSvg(sourcePoints, timezone, countryCode, mode, chartContex
   var timeTicks = altitudeHourTicks(points, timezone, bottom + 29);
   var azimuthLabels = azimuthRailLabels(points, left, chartWidth, mode);
   var markerImageUrl = moonPhaseImageDataUrl(moon.phaseAngleDegrees, 64);
-  var suggestedGuides = points.filter(function (point) {
-    return point.role === "suggested";
-  });
   var visibleMarkers = visibleAltitudeMarkers(points, mode);
 
   return svgElement("svg", {
@@ -153,19 +224,11 @@ function altitudeChartSvg(sourcePoints, timezone, countryCode, mode, chartContex
       },
         svgElement("title", {}, lightBandTitle(band, timezone, countryCode)));
     }),
+    altitudeForegroundArtwork(left, top, bottom, chartWidth, mode, firstTime, ceiling, chartHeight),
     svgElement("line", { className: "chart-gridline", x1: left, y1: bottom, x2: round1(plotEndX), y2: bottom }),
     svgElement("line", { className: "chart-gridline", x1: left, y1: top, x2: round1(plotEndX), y2: top }),
     svgElement("text", { className: "chart-axis-label", x: 4, y: bottom + 4 }, "0°"),
     svgElement("text", { className: "chart-axis-label", x: 4, y: top + 4 }, signedDegrees(ceiling)),
-    suggestedGuides.map(function (point) {
-      return svgElement("line", {
-        className: "chart-tick is-suggested",
-        x1: round1(point.x),
-        y1: railTop,
-        x2: round1(point.x),
-        y2: bottom + 5
-      });
-    }),
     timeTicks.map(function (tick) {
       return svgElement("line", {
         className: "chart-tick",
@@ -418,6 +481,266 @@ function altitudeMarker(point, imageUrl) {
       : svgElement("circle", { className: "moon-sample-dot is-" + roleClass(point.role), cx: 0, cy: 0, r: size / 2 }),
     suggested ? svgElement("circle", { className: "moon-sample-marker-ring", cx: 0, cy: 0, r: ringRadius }) : null
   );
+}
+
+function altitudeForegroundArtwork(left, top, bottom, chartWidth, mode, firstTime, ceiling, chartHeight) {
+  var idSuffix = mode + "-" + Math.abs(Math.round(firstTime)).toString(36);
+  var clipId = "moon-path-foreground-clip-" + idSuffix;
+  var layerSequences = SILHOUETTE_LAYERS.map(function (layer) {
+    return {
+      layer: layer,
+      sequenceId: "moon-path-foreground-" + layer.id + "-" + idSuffix
+    };
+  });
+  var sequenceWidth = SILHOUETTE_SEQUENCE_WIDTH;
+  var repetitions = Math.ceil(chartWidth / sequenceWidth) + 2;
+  var scale = foregroundAngleScale(ceiling, chartHeight);
+
+  return [
+    svgElement("defs", {},
+      svgElement("clipPath", { id: clipId },
+        svgElement("rect", {
+          x: left,
+          y: top,
+          width: round1(chartWidth),
+          height: bottom - top
+        })),
+      layerSequences.map(function (entry) {
+        return svgElement("g", { id: entry.sequenceId }, foregroundLayerShapes(entry.layer, bottom, scale));
+      })),
+    svgElement("g", {
+      className: "moon-path-foreground-layer",
+      "aria-hidden": "true",
+      "clip-path": "url(#" + clipId + ")"
+    },
+      layerSequences.map(function (entry) {
+        return svgElement("g", {
+          className: "moon-path-foreground " + entry.layer.className,
+          style: foregroundLayerStyle(entry.layer)
+        },
+          foregroundSequenceUses(entry.sequenceId, left, repetitions, sequenceWidth));
+      }))
+  ];
+}
+
+function foregroundAngleScale(ceiling, chartHeight) {
+  return function (degreesValue) {
+    return round1((degreesValue / Math.max(1, ceiling)) * chartHeight);
+  };
+}
+
+function foregroundLayerStyle(layer) {
+  return "--moon-path-foreground-opacity: " + layer.opacity
+    + "; --moon-path-foreground-duration: " + layer.durationSeconds + "s"
+    + "; --moon-path-foreground-delay: " + layer.delaySeconds + "s"
+    + "; --moon-path-foreground-shift: -" + SILHOUETTE_SEQUENCE_WIDTH + "px";
+}
+
+function foregroundSequenceUses(sequenceId, left, repetitions, sequenceWidth) {
+  var uses = [];
+  for (var index = 0; index < repetitions; index += 1) {
+    uses.push(svgElement("use", {
+      className: "moon-path-foreground-use",
+      "data-moon-path-artwork": "true",
+      href: "#" + sequenceId,
+      transform: "translate(" + round1(left + (index * sequenceWidth)) + " 0)"
+    }));
+  }
+  return uses;
+}
+
+function foregroundLayerShapes(layer, baseline, scale) {
+  return layer.figures.map(function (figure) {
+    return foregroundFigureShapes(figure, layer.offsetX || 0, baseline, scale);
+  }).flat();
+}
+
+function foregroundFigureShapes(figure, layerOffsetX, baseline, scale) {
+  var builder = SILHOUETTE_SHAPE_BUILDERS[figure.shape];
+  if (!builder) {
+    return [];
+  }
+  return builder(figure, layerOffsetX + (figure.x || 0), baseline, foregroundFigureHeight(figure, scale));
+}
+
+function foregroundFigureHeight(figure, scale) {
+  var degreesValue = Number.isFinite(figure.heightDegrees)
+    ? figure.heightDegrees
+    : SILHOUETTE_HEIGHT_DEGREES[figure.height];
+  return scale(Number.isFinite(degreesValue) ? degreesValue : 0);
+}
+
+function foregroundHillFigure(figure, x, baseline, height) {
+  return foregroundHill(x, baseline, figure.width || 120, height);
+}
+
+function foregroundHouseFigure(figure, x, baseline, height) {
+  return foregroundHouse(x, baseline, figure.width || 20, height);
+}
+
+function foregroundTreeFigure(figure, x, baseline, height) {
+  return foregroundTree(x, baseline, height);
+}
+
+function foregroundBlockBuildingFigure(figure, x, baseline, height) {
+  return foregroundBlockBuilding(
+    x,
+    baseline,
+    figure.width || 20,
+    height,
+    figure.windowColumns || 2,
+    figure.windowRows || 2);
+}
+
+function foregroundTallBuildingFigure(figure, x, baseline, height) {
+  return foregroundTallBuilding(
+    x,
+    baseline,
+    figure.width || 10,
+    height,
+    figure.windowColumns || 1,
+    figure.windowRows || 5);
+}
+
+function foregroundChurchFigure(figure, x, baseline, height) {
+  return foregroundChurch(x, baseline, figure.width || 34, height);
+}
+
+function foregroundHill(x, baseline, width, height) {
+  return artworkPath("moon-path-foreground-hill", "M" + p(x) + " " + p(baseline)
+    + "c" + p(width * 0.22) + " " + p(-height * 0.75)
+    + " " + p(width * 0.42) + " " + p(-height * 1.08)
+    + " " + p(width * 0.62) + " " + p(-height * 0.86)
+    + " " + p(width * 0.18) + " " + p(height * 0.2)
+    + " " + p(width * 0.24) + " " + p(height * 0.86)
+    + " " + p(width * 0.38) + " " + p(height * 0.86)
+    + "h" + p(-width) + "z");
+}
+
+function foregroundHouse(x, baseline, width, height) {
+  var roofHeight = Math.max(4, height * 0.36);
+  var bodyHeight = height - roofHeight;
+  var bodyY = baseline - bodyHeight;
+  return [
+    artworkRect("moon-path-foreground-shape", x, bodyY, width, bodyHeight, 1),
+    artworkPath("moon-path-foreground-shape", "M" + p(x - 3) + " " + p(bodyY)
+      + "L" + p(x + (width / 2)) + " " + p(baseline - height)
+      + "L" + p(x + width + 3) + " " + p(bodyY) + "z"),
+    foregroundWindows(x + (width * 0.2), bodyY + (bodyHeight * 0.22), width * 0.6, bodyHeight * 0.44, 2, 1)
+  ].flat();
+}
+
+function foregroundTree(x, baseline, height) {
+  var crownWidth = Math.max(16, height * 1.05);
+  var crownHeight = Math.max(10, height * 0.62);
+  var crownLeft = x - (crownWidth / 2);
+  var crownTop = baseline - height;
+  var crownStartY = crownTop + (crownHeight * 0.62);
+  var trunkWidth = Math.max(3, height * 0.12);
+  var trunkHeight = height * 0.52;
+  return [
+    artworkPath("moon-path-foreground-shape", "M" + p(crownLeft) + " " + p(crownStartY)
+      + "c0 " + p(-crownHeight * 0.2)
+      + " " + p(crownWidth * 0.14) + " " + p(-crownHeight * 0.34)
+      + " " + p(crownWidth * 0.3) + " " + p(-crownHeight * 0.32)
+      + " " + p(crownWidth * 0.06) + " " + p(-crownHeight * 0.22)
+      + " " + p(crownWidth * 0.28) + " " + p(-crownHeight * 0.3)
+      + " " + p(crownWidth * 0.44) + " " + p(-crownHeight * 0.14)
+      + " " + p(crownWidth * 0.16) + " " + p(crownHeight * 0.04)
+      + " " + p(crownWidth * 0.23) + " " + p(crownHeight * 0.18)
+      + " " + p(crownWidth * 0.24) + " " + p(crownHeight * 0.34)
+      + " " + p(crownWidth * 0.17) + " " + p(crownHeight * 0.04)
+      + " " + p(crownWidth * 0.28) + " " + p(crownHeight * 0.2)
+      + " " + p(crownWidth * 0.28) + " " + p(crownHeight * 0.38)
+      + " 0 " + p(crownHeight * 0.24)
+      + " " + p(-crownWidth * 0.2) + " " + p(crownHeight * 0.38)
+      + " " + p(-crownWidth * 0.42) + " " + p(crownHeight * 0.36)
+      + "h" + p(-crownWidth * 0.18)
+      + "c" + p(-crownWidth * 0.18) + " 0"
+      + " " + p(-crownWidth * 0.28) + " " + p(-crownHeight * 0.14)
+      + " " + p(-crownWidth * 0.28) + " " + p(-crownHeight * 0.62) + "z"),
+    artworkRect("moon-path-foreground-shape", x - (trunkWidth / 2), baseline - trunkHeight, trunkWidth, trunkHeight, 1)
+  ];
+}
+
+function foregroundBlockBuilding(x, baseline, width, height, windowColumns, windowRows) {
+  return [
+    artworkRect("moon-path-foreground-shape", x, baseline - height, width, height, 1),
+    foregroundWindows(x + (width * 0.18), baseline - (height * 0.84), width * 0.64, height * 0.62, windowColumns, windowRows)
+  ].flat();
+}
+
+function foregroundTallBuilding(x, baseline, width, height, windowColumns, windowRows) {
+  return [
+    artworkRect("moon-path-foreground-shape", x, baseline - height, width, height, 1),
+    foregroundWindows(x + (width * 0.24), baseline - (height * 0.88), width * 0.52, height * 0.68, windowColumns, windowRows)
+  ].flat();
+}
+
+function foregroundChurch(x, baseline, width, height) {
+  var bodyHeight = height * 0.5;
+  var towerWidth = width * 0.3;
+  var towerHeight = height * 0.76;
+  var spireTop = baseline - height;
+  var towerX = x + (width * 0.58);
+  var bodyY = baseline - bodyHeight;
+  var towerY = baseline - towerHeight;
+  return [
+    artworkRect("moon-path-foreground-shape", x, bodyY, width * 0.7, bodyHeight, 1),
+    artworkPath("moon-path-foreground-shape", "M" + p(x - 2) + " " + p(bodyY)
+      + "L" + p(x + (width * 0.35)) + " " + p(baseline - (height * 0.66))
+      + "L" + p(x + (width * 0.72)) + " " + p(bodyY) + "z"),
+    artworkRect("moon-path-foreground-shape", towerX, towerY, towerWidth, towerHeight, 1),
+    artworkPath("moon-path-foreground-shape", "M" + p(towerX - 2) + " " + p(towerY)
+      + "L" + p(towerX + (towerWidth / 2)) + " " + p(spireTop)
+      + "L" + p(towerX + towerWidth + 2) + " " + p(towerY) + "z"),
+    foregroundWindows(x + (width * 0.15), bodyY + (bodyHeight * 0.24), width * 0.34, bodyHeight * 0.46, 2, 1),
+    foregroundWindows(towerX + (towerWidth * 0.28), towerY + (towerHeight * 0.22), towerWidth * 0.44, towerHeight * 0.36, 1, 2)
+  ].flat();
+}
+
+function foregroundWindows(x, y, width, height, columns, rows) {
+  var windows = [];
+  var columnGap = width / Math.max(1, columns);
+  var rowGap = height / Math.max(1, rows);
+  var windowWidth = Math.max(1.4, Math.min(3.4, columnGap * 0.42));
+  var windowHeight = Math.max(1.8, Math.min(4.4, rowGap * 0.38));
+
+  for (var row = 0; row < rows; row += 1) {
+    for (var column = 0; column < columns; column += 1) {
+      windows.push(artworkRect("moon-path-foreground-window",
+        x + (columnGap * column) + ((columnGap - windowWidth) / 2),
+        y + (rowGap * row) + ((rowGap - windowHeight) / 2),
+        windowWidth,
+        windowHeight,
+        0.7));
+    }
+  }
+  return windows;
+}
+
+function artworkPath(className, d) {
+  return svgElement("path", {
+    className: className,
+    "data-moon-path-artwork": "true",
+    d: d
+  });
+}
+
+function artworkRect(className, x, y, width, height, rx) {
+  return svgElement("rect", {
+    className: className,
+    "data-moon-path-artwork": "true",
+    x: round1(x),
+    y: round1(y),
+    width: round1(width),
+    height: round1(height),
+    rx: rx
+  });
+}
+
+function p(value) {
+  return String(round1(value));
 }
 
 function lightBandTitle(band, timezone, countryCode) {

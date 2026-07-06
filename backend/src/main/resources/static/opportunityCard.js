@@ -2,7 +2,6 @@ import { element } from "./dom.js";
 import {
   degrees,
   durationText,
-  formatDateTime,
   formatDateTimeWithZone,
   readableToken
 } from "./format.js";
@@ -17,11 +16,11 @@ export function moonPassCard(pass, entries, index, timezone, countryCode, chartC
     element("header", { className: "opportunity-header" },
       element("div", { className: "opportunity-title" },
         element("p", { className: "rank-label" }, index === 0 ? "Best match" : "Option " + (index + 1)),
-        element("h3", {}, moonPassTitle(pass, primary, timezone, countryCode)),
-        element("p", { className: "reason" }, passSummaryText(entries.length))),
+        element("h3", {}, passSummaryText(entries.length))),
       scoreBlock(primary.score)
     ),
     passRecommendations(entries, timezone, countryCode),
+    passIntervalContext(pass, primary, timezone, countryCode),
     moonPathPanel(moonPassPathOpportunity(pass, entries, primary), timezone, countryCode, chartContext),
     opportunityActions(primary),
     scoreDetails(primary.components || {})
@@ -135,11 +134,22 @@ function moonPassTitle(pass, primary, timezone, countryCode) {
   var startsAt = (pass || {}).startsAt || (primary || {}).startsAt;
   var endsAt = (pass || {}).endsAt || (primary || {}).endsAt;
   if (!startsAt || !endsAt) {
-    return "Moon pass";
+    return "";
   }
-  return formatDateTime(startsAt, timezone, countryCode)
+  return formatDateTimeWithZone(startsAt, timezone, countryCode)
     + " to "
-    + formatDateTime(endsAt, timezone, countryCode);
+    + formatDateTimeWithZone(endsAt, timezone, countryCode);
+}
+
+function passIntervalContext(pass, primary, timezone, countryCode) {
+  var title = moonPassTitle(pass, primary, timezone, countryCode);
+  if (!title) {
+    return null;
+  }
+  return element("div", { className: "pass-context-row", ariaLabel: "Moon pass interval" },
+    element("dl", { className: "pass-context" },
+      element("dt", {}, "Moon pass"),
+      element("dd", {}, title)));
 }
 
 function passRecommendations(entries, timezone, countryCode) {
@@ -183,9 +193,13 @@ function metricSpacer() {
 }
 
 function passSummaryText(count) {
-  return count === 1
-    ? "One useful low-Moon window in this pass."
-    : count + " useful low-Moon windows in this pass.";
+  if (count === 1) {
+    return "One useful low-Moon window";
+  }
+  if (count === 2) {
+    return "Two useful low-Moon windows";
+  }
+  return count + " useful low-Moon windows";
 }
 
 function metricFact(label, value) {
