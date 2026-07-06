@@ -145,6 +145,9 @@ The panel should show:
 - start, suggested, and end azimuth;
 - a combined chart over the opportunity window or pass, with altitude plotted
   over time and azimuth shown as a top rail on the same time axis.
+- secondary Sun markers when sample Sun altitude fits inside the Moon-driven
+  altitude range. These markers should expose Sun altitude and azimuth without
+  competing visually with the Moon path.
 
 The suggested marker must sit on the displayed path at the suggested moment. The
 preferred way to do this is to construct the path so it passes through the real
@@ -182,6 +185,10 @@ Agreed behavior:
 - The suggested marker may show a compact, recognizable Moon phase. V0 may use a
   schematic phase based on `phaseAngleDegrees`; true observer-oriented Moon
   rotation can wait until the backend provides a deliberate orientation value.
+- Sun samples may be drawn as smaller amber markers on the same time and
+  altitude chart. Do not raise the chart ceiling for the Sun; omit Sun markers
+  whose altitude is higher than the maximum Moon altitude in the displayed
+  chart.
 - Light bucket bands may appear behind the altitude path.
 - A subtle animated generic foreground silhouette layer may appear behind the
   chart markers and labels to help users build intuition for low Moon altitude.

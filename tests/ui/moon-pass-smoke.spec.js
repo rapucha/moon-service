@@ -45,6 +45,14 @@ test("renders grouped Moon pass cards", async ({ page }) => {
     .toHaveAttribute("aria-hidden", "true");
   await expect(page.locator(".moon-pass-card").first().locator("[data-moon-path-artwork]").first())
     .toBeAttached();
+  await expect(page.locator(".moon-pass-card").first().locator(".altitude-chart-desktop .sun-sample-marker"))
+    .toHaveCount(3);
+  await expect(page.locator(".moon-pass-card").first().locator(".altitude-chart-desktop .sun-sample-marker[data-at='2026-07-04T06:40:00Z']"))
+    .toHaveCount(0);
+  await expect(page.locator(".moon-pass-card").first().locator(".altitude-chart-desktop .sun-sample-marker[data-at='2026-07-04T02:12:00Z']"))
+    .toHaveAttribute("data-sun-azimuth-degrees", "43");
+  await expect(page.locator(".moon-pass-card").first().locator(".altitude-chart-desktop .sun-sample-marker[data-at='2026-07-04T02:12:00Z'] title"))
+    .toHaveText("Sun position sample, -6.0° altitude, 43.0° azimuth NE");
 
   const azimuthRail = await page.locator(".moon-pass-card").first().locator(".altitude-chart-desktop").evaluate(chart => {
     const rail = chart.querySelector(".azimuth-rail-bg");

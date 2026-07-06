@@ -4,6 +4,7 @@
  * @property {number} altitudeDegrees
  * @property {number} azimuthDegrees
  * @property {number} sunAltitudeDegrees
+ * @property {number} sunAzimuthDegrees
  * @property {string} lightBucket
  * @property {string} role
  */
@@ -35,6 +36,7 @@
 /**
  * @typedef {Object} SunFacts
  * @property {number} altitudeDegrees
+ * @property {number} azimuthDegrees
  * @property {string} lightBucket
  */
 

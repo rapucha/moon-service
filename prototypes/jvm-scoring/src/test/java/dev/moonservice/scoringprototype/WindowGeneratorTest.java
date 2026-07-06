@@ -165,7 +165,8 @@ class WindowGeneratorTest {
                     120.0,
                     90.0,
                     180.0,
-                    -15.0 + hours * 2.0);
+                    -15.0 + hours * 2.0,
+                    90.0 + hours);
         });
 
         MoonWindow window = windows.getFirst();
@@ -202,6 +203,6 @@ class WindowGeneratorTest {
     }
 
     private static MoonSample sample(Instant instant, double moonAltitude, double sunAltitude) {
-        return new MoonSample(instant, moonAltitude, 120.0, 90.0, 180.0, sunAltitude);
+        return new MoonSample(instant, moonAltitude, 120.0, 90.0, 180.0, sunAltitude, 90.0);
     }
 }

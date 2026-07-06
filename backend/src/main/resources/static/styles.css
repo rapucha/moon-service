@@ -1043,6 +1043,32 @@ dd {
   filter: drop-shadow(0 2px 3px rgba(16, 31, 36, 0.24));
 }
 
+.sun-sample-marker {
+  opacity: 0.76;
+}
+
+.sun-sample-marker.is-below-horizon {
+  opacity: 0.54;
+}
+
+.sun-sample-halo {
+  fill: rgba(255, 188, 61, 0.24);
+  stroke: rgba(135, 85, 12, 0.24);
+  stroke-width: 1;
+}
+
+.sun-sample-ray {
+  stroke: #87550c;
+  stroke-linecap: round;
+  stroke-width: 1.4;
+}
+
+.sun-sample-dot {
+  fill: #ffc043;
+  stroke: #87550c;
+  stroke-width: 1.5;
+}
+
 .moon-sample-dot {
   fill: var(--surface);
   stroke: var(--accent);

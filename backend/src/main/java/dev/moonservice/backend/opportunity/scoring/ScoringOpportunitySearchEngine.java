@@ -229,6 +229,7 @@ public class ScoringOpportunitySearchEngine implements OpportunitySearchEngine {
                 doubleValue(node, "altitudeDegrees"),
                 doubleValue(node, "azimuthDegrees"),
                 doubleValue(node, "sunAltitudeDegrees"),
+                doubleValue(node, "sunAzimuthDegrees"),
                 text(node, "lightBucket"),
                 text(node, "role")
         );
@@ -245,6 +246,7 @@ public class ScoringOpportunitySearchEngine implements OpportunitySearchEngine {
     private static OpportunitySearchResponse.Sun sun(JsonNode node) {
         return new OpportunitySearchResponse.Sun(
                 doubleValue(node, "altitudeDegrees"),
+                doubleValue(node, "azimuthDegrees"),
                 text(node, "lightBucket")
         );
     }

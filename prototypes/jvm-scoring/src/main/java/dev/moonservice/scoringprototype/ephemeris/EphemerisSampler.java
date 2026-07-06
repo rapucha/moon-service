@@ -29,7 +29,8 @@ public final class EphemerisSampler {
                 moon.getAzimuth(),
                 100.0 * illumination.getPhaseFraction(),
                 Astronomy.moonPhase(time),
-                sun.getAltitude()
+                sun.getAltitude(),
+                sun.getAzimuth()
         );
     }
 

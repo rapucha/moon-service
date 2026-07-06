@@ -117,6 +117,7 @@ function altitudeChartSvg(sourcePoints, timezone, countryCode, mode, chartContex
   var azimuthLabels = azimuthRailLabels(points, left, chartWidth, mode);
   var markerImageUrl = moonPhaseImageDataUrl(moon.phaseAngleDegrees, 64);
   var visibleMarkers = visibleAltitudeMarkers(points, mode);
+  var sunMarkers = visibleSunMarkers(points, maxAltitude, ceiling, bottom, chartHeight, mode);
 
   return svgElement("svg", {
     className: "altitude-chart altitude-chart-" + mode,
@@ -173,6 +174,9 @@ function altitudeChartSvg(sourcePoints, timezone, countryCode, mode, chartContex
         y: tick.y,
         textAnchor: tick.anchor
       }, formatHourTick(tick.at, timezone, countryCode));
+    }),
+    sunMarkers.map(function (point) {
+      return sunMarker(point);
     }),
     visibleMarkers.map(function (point) {
       return altitudeMarker(point, markerImageUrl);
@@ -391,6 +395,8 @@ function altitudeMarker(point, imageUrl) {
 
   return svgElement("g", {
     className: className,
+    role: "img",
+    ariaLabel: title,
     "data-sequence": point.sequence,
     "data-at": point.at,
     transform: "translate(" + round1(point.x) + " " + round1(point.y) + ")"
@@ -412,6 +418,69 @@ function altitudeMarker(point, imageUrl) {
       })
       : svgElement("circle", { className: "moon-sample-dot is-" + roleClass(point.role), cx: 0, cy: 0, r: size / 2 }),
     suggested ? svgElement("circle", { className: "moon-sample-marker-ring", cx: 0, cy: 0, r: ringRadius }) : null
+  );
+}
+
+function visibleSunMarkers(points, maxMoonAltitude, ceiling, bottom, chartHeight, mode) {
+  var minimumDistance = mode === "mobile" ? 32 : 40;
+  var visible = [];
+
+  points.forEach(function (point) {
+    if (!Number.isFinite(point.sunAltitudeDegrees)
+      || !Number.isFinite(point.sunAzimuthDegrees)
+      || point.sunAltitudeDegrees > maxMoonAltitude) {
+      return;
+    }
+
+    var marker = {
+      at: point.at,
+      sequence: point.sequence,
+      x: point.x,
+      y: sunMarkerY(point.sunAltitudeDegrees, ceiling, bottom, chartHeight),
+      altitudeDegrees: point.sunAltitudeDegrees,
+      azimuthDegrees: point.sunAzimuthDegrees
+    };
+    if (isTooCloseToAny(marker, visible, minimumDistance)) {
+      return;
+    }
+    visible.push(marker);
+  });
+
+  return visible;
+}
+
+function sunMarkerY(sunAltitudeDegrees, ceiling, bottom, chartHeight) {
+  var y = bottom - (clamp(sunAltitudeDegrees, 0, ceiling) / ceiling) * chartHeight;
+  return sunAltitudeDegrees < 0 ? y - 6 : y;
+}
+
+function sunMarker(point) {
+  var belowHorizon = point.altitudeDegrees < 0;
+  var className = "sun-sample-marker" + (belowHorizon ? " is-below-horizon" : "");
+  var title = "Sun position sample, "
+    + degrees(point.altitudeDegrees)
+    + " altitude, "
+    + degrees(point.azimuthDegrees)
+    + " azimuth "
+    + compassDirection(point.azimuthDegrees);
+
+  return svgElement("g", {
+    className: className,
+    role: "img",
+    ariaLabel: title,
+    "data-sequence": point.sequence,
+    "data-at": point.at,
+    "data-sun-altitude-degrees": round1(point.altitudeDegrees),
+    "data-sun-azimuth-degrees": round1(point.azimuthDegrees),
+    transform: "translate(" + round1(point.x) + " " + round1(point.y) + ")"
+  },
+    svgElement("title", {}, title),
+    svgElement("circle", { className: "sun-sample-halo", cx: 0, cy: 0, r: 8 }),
+    svgElement("line", { className: "sun-sample-ray", x1: -8, y1: 0, x2: -5, y2: 0 }),
+    svgElement("line", { className: "sun-sample-ray", x1: 5, y1: 0, x2: 8, y2: 0 }),
+    svgElement("line", { className: "sun-sample-ray", x1: 0, y1: -8, x2: 0, y2: -5 }),
+    svgElement("line", { className: "sun-sample-ray", x1: 0, y1: 5, x2: 0, y2: 8 }),
+    svgElement("circle", { className: "sun-sample-dot", cx: 0, cy: 0, r: 4.2 })
   );
 }
 
@@ -446,6 +515,7 @@ function chartSamples(samples) {
       altitudeDegrees: sample.altitudeDegrees,
       azimuthDegrees: sample.azimuthDegrees,
       sunAltitudeDegrees: sample.sunAltitudeDegrees,
+      sunAzimuthDegrees: sample.sunAzimuthDegrees,
       lightBucket: sample.lightBucket,
       role: sample.role || "path",
       markerLabel: sample.markerLabel
