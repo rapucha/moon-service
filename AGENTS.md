@@ -66,6 +66,10 @@ The main unresolved choice is now the exact first web/API contract for city look
 - Do not permanently store user locations server-side unless saved alerts require it and the privacy model is updated.
 - Design device identity recovery before relying on anonymous device-bound accounts.
 - Treat Android Auto Backup and Firebase Cloud Messaging as conveniences with platform assumptions, not universal guarantees.
+- If subagents, delegation, or parallel agent work may help a session, ask the
+  user near the beginning of that session for explicit permission to use
+  subagents. Treat this as a request for active-session authorization, not as
+  an override of any runtime, tool, sandbox, or external-model approval rules.
 - Treat user wording as intentional. If the user phrases a request as a
   question or feasibility check, such as starting with "can you", "could you",
   "is it possible", "should we", or ending with a question mark, answer the
