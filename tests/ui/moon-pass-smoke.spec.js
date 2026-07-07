@@ -46,13 +46,17 @@ test("renders grouped Moon pass cards", async ({ page }) => {
   await expect(page.locator(".moon-pass-card").first().locator("[data-moon-path-artwork]").first())
     .toBeAttached();
   await expect(page.locator(".moon-pass-card").first().locator(".altitude-chart-desktop .sun-sample-marker"))
-    .toHaveCount(3);
+    .toHaveCount(0);
   await expect(page.locator(".moon-pass-card").first().locator(".altitude-chart-desktop .sun-sample-marker[data-at='2026-07-04T06:40:00Z']"))
     .toHaveCount(0);
   await expect(page.locator(".moon-pass-card").first().locator(".altitude-chart-desktop .sun-sample-marker[data-at='2026-07-04T02:12:00Z']"))
-    .toHaveAttribute("data-sun-azimuth-degrees", "43");
-  await expect(page.locator(".moon-pass-card").first().locator(".altitude-chart-desktop .sun-sample-marker[data-at='2026-07-04T02:12:00Z'] title"))
-    .toHaveText("Sun position sample, -6.0° altitude, 43.0° azimuth NE");
+    .toHaveCount(0);
+  await expect(page.locator(".moon-pass-card").nth(1).locator(".altitude-chart-desktop .sun-sample-marker"))
+    .toHaveCount(3);
+  await expect(page.locator(".moon-pass-card").nth(1).locator(".altitude-chart-desktop .sun-sample-marker[data-at='2026-07-10T08:00:00Z']"))
+    .toHaveAttribute("data-sun-azimuth-degrees", "145");
+  await expect(page.locator(".moon-pass-card").nth(1).locator(".altitude-chart-desktop .sun-sample-marker[data-at='2026-07-10T08:00:00Z'] title"))
+    .toHaveText("Sun position sample, 30.0° altitude, 145.0° azimuth SE");
 
   const azimuthRail = await page.locator(".moon-pass-card").first().locator(".altitude-chart-desktop").evaluate(chart => {
     const rail = chart.querySelector(".azimuth-rail-bg");

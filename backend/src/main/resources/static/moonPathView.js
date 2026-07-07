@@ -428,6 +428,7 @@ function visibleSunMarkers(points, maxMoonAltitude, ceiling, bottom, chartHeight
   points.forEach(function (point) {
     if (!Number.isFinite(point.sunAltitudeDegrees)
       || !Number.isFinite(point.sunAzimuthDegrees)
+      || point.sunAltitudeDegrees < 0
       || point.sunAltitudeDegrees > maxMoonAltitude) {
       return;
     }
@@ -450,13 +451,10 @@ function visibleSunMarkers(points, maxMoonAltitude, ceiling, bottom, chartHeight
 }
 
 function sunMarkerY(sunAltitudeDegrees, ceiling, bottom, chartHeight) {
-  var y = bottom - (clamp(sunAltitudeDegrees, 0, ceiling) / ceiling) * chartHeight;
-  return sunAltitudeDegrees < 0 ? y - 6 : y;
+  return bottom - (clamp(sunAltitudeDegrees, 0, ceiling) / ceiling) * chartHeight;
 }
 
 function sunMarker(point) {
-  var belowHorizon = point.altitudeDegrees < 0;
-  var className = "sun-sample-marker" + (belowHorizon ? " is-below-horizon" : "");
   var title = "Sun position sample, "
     + degrees(point.altitudeDegrees)
     + " altitude, "
@@ -465,7 +463,7 @@ function sunMarker(point) {
     + compassDirection(point.azimuthDegrees);
 
   return svgElement("g", {
-    className: className,
+    className: "sun-sample-marker",
     role: "img",
     ariaLabel: title,
     "data-sequence": point.sequence,

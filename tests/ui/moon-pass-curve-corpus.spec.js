@@ -260,6 +260,7 @@ function visibleSunMarkers(samples, mode, mobileReferenceDurationMs) {
   for (const point of points) {
     if (!Number.isFinite(point.sunAltitudeDegrees)
       || !Number.isFinite(point.sunAzimuthDegrees)
+      || point.sunAltitudeDegrees < 0
       || point.sunAltitudeDegrees > maxMoonAltitude) {
       continue;
     }
@@ -277,8 +278,7 @@ function visibleSunMarkers(samples, mode, mobileReferenceDurationMs) {
 }
 
 function sunMarkerY(sunAltitudeDegrees, ceiling) {
-  const y = 326 - (Math.min(Math.max(sunAltitudeDegrees, 0), ceiling) / ceiling) * (326 - 70);
-  return sunAltitudeDegrees < 0 ? y - 6 : y;
+  return 326 - (Math.min(Math.max(sunAltitudeDegrees, 0), ceiling) / ceiling) * (326 - 70);
 }
 
 function visibleMarkers(samples, mode, mobileReferenceDurationMs) {

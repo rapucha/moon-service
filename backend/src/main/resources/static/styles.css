@@ -1047,10 +1047,6 @@ dd {
   opacity: 0.76;
 }
 
-.sun-sample-marker.is-below-horizon {
-  opacity: 0.54;
-}
-
 .sun-sample-halo {
   fill: rgba(255, 188, 61, 0.24);
   stroke: rgba(135, 85, 12, 0.24);

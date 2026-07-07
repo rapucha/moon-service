@@ -186,9 +186,9 @@ Agreed behavior:
   schematic phase based on `phaseAngleDegrees`; true observer-oriented Moon
   rotation can wait until the backend provides a deliberate orientation value.
 - Sun samples may be drawn as smaller amber markers on the same time and
-  altitude chart. Do not raise the chart ceiling for the Sun; omit Sun markers
-  whose altitude is higher than the maximum Moon altitude in the displayed
-  chart.
+  altitude chart when the Sun altitude is zero or positive. Do not raise the
+  chart ceiling for the Sun; omit Sun markers whose altitude is higher than the
+  maximum Moon altitude in the displayed chart.
 - Light bucket bands may appear behind the altitude path.
 - A subtle animated generic foreground silhouette layer may appear behind the
   chart markers and labels to help users build intuition for low Moon altitude.
