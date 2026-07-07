@@ -406,6 +406,14 @@
       fill: rgba(255, 255, 255, 0.55);
     }
 
+    .sun-aperture-flare {
+      fill: rgba(255, 236, 156, 0.42);
+    }
+
+    .sun-aperture-flare-core {
+      fill: rgba(255, 255, 230, 0.72);
+    }
+
     .sun-ring {
       fill: none;
       stroke: var(--amber-strong);
@@ -422,12 +430,6 @@
       fill: rgba(255, 194, 71, 0.38);
       stroke: rgba(111, 67, 7, 0.28);
       stroke-width: 0.8;
-    }
-
-    .sun-aperture-blade {
-      fill: rgba(255, 145, 29, 0.18);
-      stroke: rgba(111, 67, 7, 0.16);
-      stroke-width: 0.65;
     }
 
     .sun-aperture-dark-center {
@@ -579,25 +581,6 @@
         <circle class="sun-core" cx="-3.2" cy="-4.2" r="3"></circle>
       </symbol>
 
-      <symbol id="marker-sun-aperture-blades" viewBox="-24 -24 48 48">
-        <circle class="sun-halo" cx="0" cy="0" r="17.5"></circle>
-        <path class="sun-ray-soft" d="M0 -18.6l2.6 5.2h-5.2z"></path>
-        <path class="sun-ray-soft" d="M16.1 -9.3l-2.1 5.4-3.1-4.6z"></path>
-        <path class="sun-ray-soft" d="M16.1 9.3l-5.2 -0.8 3.1 -4.6z"></path>
-        <path class="sun-ray-soft" d="M0 18.6l-2.6 -5.2h5.2z"></path>
-        <path class="sun-ray-soft" d="M-16.1 9.3l2.1 -5.4 3.1 4.6z"></path>
-        <path class="sun-ray-soft" d="M-16.1 -9.3l5.2 0.8 -3.1 4.6z"></path>
-        <circle class="sun-disk" cx="0" cy="0" r="12.8"></circle>
-        <path class="sun-aperture-blade" d="M-2.6 -11.2l5.4 4.4 -4.8 3 -4.5 -6.5z"></path>
-        <path class="sun-aperture-blade" d="M8.4 -7.7l-0.5 7 -5 -1.6 2.6 -7.1z"></path>
-        <path class="sun-aperture-blade" d="M11 3.5l-6.4 3.2 -0.4 -5.2 7.4 -0.9z"></path>
-        <path class="sun-aperture-blade" d="M2.6 11.2l-5.4 -4.4 4.8 -3 4.5 6.5z"></path>
-        <path class="sun-aperture-blade" d="M-8.4 7.7l0.5 -7 5 1.6 -2.6 7.1z"></path>
-        <path class="sun-aperture-blade" d="M-11 -3.5l6.4 -3.2 0.4 5.2 -7.4 0.9z"></path>
-        <path class="sun-aperture-dark-center" d="M0 -11.2l9.7 5.6v11.2L0 11.2l-9.7 -5.6v-11.2z"></path>
-        <circle class="sun-ring" cx="0" cy="0" r="12.8" stroke-width="1.05"></circle>
-      </symbol>
-
       <symbol id="marker-sun-aperture-rays" viewBox="-24 -24 48 48">
         <circle class="sun-halo" cx="0" cy="0" r="17.5"></circle>
         <line class="sun-ray-long" x1="-20" y1="0" x2="-14.6" y2="0"></line>
@@ -610,8 +593,9 @@
         <line class="sun-ray" x1="10.6" y1="10.6" x2="14.2" y2="14.2" stroke-width="1.05"></line>
         <circle class="sun-disk" cx="0" cy="0" r="12.5"></circle>
         <circle class="sun-ring" cx="0" cy="0" r="8.8" stroke-width="0.85" opacity="0.7"></circle>
-        <path class="sun-aperture-dark-center" d="M0 -10.9l9.4 5.4v10.9L0 10.9l-9.4 -5.4v-10.9z"></path>
-        <circle class="sun-core" cx="-3.2" cy="-4.3" r="2.4"></circle>
+        <path class="sun-aperture-dark-center" d="M0 -11.8l10.2 5.9v11.8L0 11.8l-10.2 -5.9v-11.8z"></path>
+        <circle class="sun-aperture-flare" cx="-3.5" cy="-4.9" r="2.7"></circle>
+        <circle class="sun-aperture-flare-core" cx="-3.9" cy="-5.2" r="1.15"></circle>
       </symbol>
     </defs>
   </svg>
@@ -652,7 +636,7 @@
           </g>
 
           <g transform="translate(642 88)">
-            <use href="#marker-sun-aperture-blades" class="sun-marker" width="48" height="48" x="-24" y="-24"></use>
+            <use href="#marker-sun-aperture-rays" class="sun-marker" width="48" height="48" x="-24" y="-24"></use>
             <text class="scale-label" x="0" y="54" text-anchor="middle">Richer option</text>
             <text class="scale-note" x="0" y="70" text-anchor="middle">more detail, still compact</text>
           </g>
@@ -852,8 +836,8 @@
 
       <article class="variant">
         <div class="variant-copy">
-          <h2>D. Aperture explorations <span class="badge">Photographer cue</span></h2>
-          <p>Reworked aperture-style options with very wide dark openings and less internal clutter. The chart compares the blade and ray treatments at real sample size.</p>
+          <h2>D. Selected aperture flare <span class="badge is-preferred">Selected</span></h2>
+          <p>The chosen D3 marker keeps the wide dark aperture, long Sun rays, and a small intentional flare ghost in the upper-left aperture zone.</p>
         </div>
         <div class="chart-shell">
           <svg class="chart-svg" viewBox="0 0 760 390" role="img" aria-label="Moon path chart with aperture Sun marker variants">
@@ -890,7 +874,6 @@
             <text class="chart-time-label" x="656" y="355" text-anchor="middle">13</text>
 
             <path class="sun-track" d="M344 248C384 222 426 198 486 174"></path>
-            <g transform="translate(344 248)"><use href="#marker-sun-aperture-blades" class="sun-marker" width="48" height="48" x="-24" y="-24"></use></g>
             <g transform="translate(486 174)"><use href="#marker-sun-aperture-rays" class="sun-marker" width="48" height="48" x="-24" y="-24"></use></g>
 
             <circle class="moon-dot" cx="74" cy="326" r="5"></circle>
@@ -911,8 +894,7 @@
           </svg>
         </div>
         <ul class="variant-notes" aria-label="Aperture Sun marker notes">
-          <li><strong>D2 Dark blades</strong><span>Keeps blade geometry with a wider dark aperture center.</span></li>
-          <li><strong>D3 Dark rays</strong><span>Most Sun-like at small size, now with a wider dark aperture.</span></li>
+          <li><strong>D3 Dark rays</strong><span>Long rays, wide dark aperture, and intentional upper-left flare.</span></li>
         </ul>
       </article>
     </section>
@@ -922,7 +904,7 @@
       <ul>
         <li>All proposed Sun markers use a footprint close to the Alternative Moon marker, but still smaller than the Best Moon marker.</li>
         <li>The chart should continue to omit negative-altitude Sun positions and Sun positions above the maximum displayed Moon altitude.</li>
-        <li>Variant A is the cleanest production candidate; variant B is the most photographic; variant C emphasizes azimuth; variant D now compares only D2 and D3 with wider dark openings inside bright Sun disks.</li>
+        <li>Variant A is the cleanest conservative candidate; variant B is the most photographic; variant C emphasizes azimuth; variant D3 is the selected aperture-flare direction.</li>
       </ul>
     </section>
   </main>
