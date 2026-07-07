@@ -27,6 +27,10 @@ Moon Pass Card
   silhouette scale and animated foreground follow-up variants.
 - `docs/design/silhouette-three-layer-mockup.html`: single-card mockup for
   three-layer near, mid, and far parallax silhouettes.
+- `docs/design/sun-marker-mockups.html`: larger, richer secondary Sun marker
+  variants sized closer to the Alternative Moon marker.
+- `docs/design/assets/sun-marker-aperture-flare.svg`: selected D3 Sun marker
+  resource for the Sun path implementation.
 
 Current Direction
 - Use compact recommendation rows instead of repeated prose summaries.

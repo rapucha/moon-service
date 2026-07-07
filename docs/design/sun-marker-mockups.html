@@ -1,0 +1,880 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Sun Marker Mockups</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --bg: #edf2f0;
+      --surface: #ffffff;
+      --surface-soft: #f7f9f8;
+      --ink: #17211f;
+      --muted: #5f6b68;
+      --line: #d8e1dd;
+      --line-strong: #afbeb9;
+      --accent: #216f68;
+      --blue: #2d5f8b;
+      --amber: #a86f16;
+      --amber-strong: #6f4307;
+      --amber-soft: #fff0bd;
+      --sun: #ffc247;
+      --sun-hot: #fff4a8;
+      --night: #798593;
+      --nautical: #a8b4e0;
+      --civil: #b7edf3;
+      --golden: #ffd98a;
+      --daylight: #fff1aa;
+      --landmark: #2f413d;
+      --shadow: 0 18px 42px rgba(26, 41, 38, 0.12);
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: var(--bg);
+      color: var(--ink);
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      background: var(--bg);
+    }
+
+    h1,
+    h2,
+    h3,
+    code,
+    p,
+    li {
+      overflow-wrap: anywhere;
+    }
+
+    .page {
+      width: min(1240px, calc(100% - 32px));
+      margin: 0 auto;
+      padding: 32px 0 44px;
+    }
+
+    .page-header {
+      display: grid;
+      gap: 8px;
+      margin-bottom: 22px;
+      padding-bottom: 16px;
+      border-bottom: 1px solid var(--line);
+    }
+
+    .eyebrow,
+    .marker-label {
+      margin: 0;
+      color: var(--blue);
+      font-size: 0.76rem;
+      font-weight: 800;
+      letter-spacing: 0;
+      text-transform: uppercase;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: 1.7rem;
+      line-height: 1.14;
+      letter-spacing: 0;
+    }
+
+    .page-header p {
+      max-width: 840px;
+      margin: 0;
+      color: var(--muted);
+      line-height: 1.5;
+    }
+
+    .defs {
+      position: absolute;
+      width: 0;
+      height: 0;
+      overflow: hidden;
+    }
+
+    .reference-panel,
+    .decision-panel,
+    .variant {
+      min-width: 0;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--surface);
+      box-shadow: var(--shadow);
+    }
+
+    .reference-panel {
+      display: grid;
+      grid-template-columns: minmax(260px, 0.64fr) minmax(360px, 1fr);
+      gap: 18px;
+      align-items: center;
+      margin-bottom: 22px;
+      padding: 18px;
+    }
+
+    .reference-copy {
+      display: grid;
+      gap: 10px;
+    }
+
+    .reference-copy h2,
+    .variant-copy h2,
+    .decision-panel h2 {
+      margin: 0;
+      font-size: 1.05rem;
+      letter-spacing: 0;
+    }
+
+    .reference-copy p,
+    .variant-copy p,
+    .decision-panel p,
+    .decision-panel li {
+      margin: 0;
+      color: var(--muted);
+      font-size: 0.9rem;
+      line-height: 1.5;
+    }
+
+    .scale-card {
+      min-width: 0;
+      padding: 14px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--surface-soft);
+    }
+
+    .scale-svg,
+    .chart-svg {
+      display: block;
+      width: 100%;
+      height: auto;
+    }
+
+    .scale-svg {
+      aspect-ratio: 780 / 176;
+    }
+
+    .variant-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 18px;
+      align-items: start;
+    }
+
+    .variant {
+      display: grid;
+      gap: 12px;
+      padding: 16px;
+    }
+
+    .variant-copy {
+      display: grid;
+      gap: 6px;
+      min-width: 0;
+      padding-bottom: 10px;
+      border-bottom: 1px solid var(--line);
+    }
+
+    .variant-copy h2 {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      align-items: center;
+    }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      min-height: 20px;
+      padding: 2px 7px;
+      border-radius: 999px;
+      background: #e8f0ee;
+      color: var(--accent);
+      font-size: 0.72rem;
+      font-weight: 850;
+      letter-spacing: 0;
+      text-transform: uppercase;
+    }
+
+    .badge.is-preferred {
+      background: var(--amber-soft);
+      color: var(--amber-strong);
+    }
+
+    .chart-shell {
+      min-width: 0;
+      padding: 10px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #fbfcfb;
+    }
+
+    .chart-svg {
+      aspect-ratio: 760 / 390;
+      overflow: visible;
+    }
+
+    .decision-panel {
+      display: grid;
+      gap: 12px;
+      margin-top: 18px;
+      padding: 18px;
+    }
+
+    .variant-notes {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(128px, 1fr));
+      gap: 8px;
+      margin: 0;
+      padding: 0;
+      list-style: none;
+    }
+
+    .variant-notes li {
+      display: grid;
+      gap: 3px;
+      min-width: 0;
+      padding: 9px 10px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--surface-soft);
+    }
+
+    .variant-notes strong {
+      color: var(--ink);
+      font-size: 0.78rem;
+      line-height: 1.25;
+    }
+
+    .variant-notes span {
+      color: var(--muted);
+      font-size: 0.76rem;
+      line-height: 1.35;
+    }
+
+    code {
+      font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+      font-size: 0.88em;
+    }
+
+    .decision-panel ul {
+      display: grid;
+      gap: 8px;
+      margin: 0;
+      padding-left: 20px;
+    }
+
+    .azimuth-rail-bg {
+      fill: #edf4f2;
+      stroke: var(--line);
+    }
+
+    .azimuth-rail-label {
+      fill: var(--accent);
+      font-size: 12px;
+      font-weight: 820;
+    }
+
+    .light-band {
+      opacity: 0.32;
+    }
+
+    .light-band.is-night {
+      fill: var(--night);
+    }
+
+    .light-band.is-nautical {
+      fill: var(--nautical);
+    }
+
+    .light-band.is-civil {
+      fill: var(--civil);
+    }
+
+    .light-band.is-golden {
+      fill: var(--golden);
+    }
+
+    .light-band.is-daylight {
+      fill: var(--daylight);
+    }
+
+    .chart-gridline,
+    .chart-tick {
+      fill: none;
+      stroke: var(--line);
+      stroke-width: 1;
+    }
+
+    .chart-tick {
+      stroke: var(--line-strong);
+    }
+
+    .chart-axis-label,
+    .chart-time-label,
+    .scale-label,
+    .scale-note {
+      fill: var(--muted);
+      font-size: 11px;
+      font-weight: 760;
+    }
+
+    .scale-label {
+      fill: var(--ink);
+      font-size: 13px;
+      font-weight: 850;
+    }
+
+    .scale-note {
+      font-size: 10px;
+    }
+
+    .moon-dot {
+      fill: var(--surface);
+      stroke: var(--accent);
+      stroke-width: 2;
+    }
+
+    .moon-sample-marker-halo {
+      fill: rgba(255, 217, 138, 0.34);
+      stroke: rgba(91, 66, 22, 0.22);
+      stroke-width: 1;
+    }
+
+    .moon-sample-marker-ring {
+      fill: none;
+      stroke: #5b4216;
+      stroke-width: 3.2;
+    }
+
+    .moon-sample-marker-label {
+      fill: #5b4216;
+      font-size: 11px;
+      font-weight: 820;
+      paint-order: stroke;
+      stroke: rgba(255, 255, 255, 0.72);
+      stroke-width: 3px;
+    }
+
+    .moon-phase-fill {
+      fill: #f6f0d8;
+      stroke: #5b4216;
+      stroke-width: 1.3;
+    }
+
+    .moon-phase-shadow {
+      fill: rgba(31, 38, 40, 0.42);
+    }
+
+    .foreground-layer {
+      fill: var(--landmark);
+      opacity: 0.16;
+      pointer-events: none;
+    }
+
+    .foreground-layer.is-near {
+      opacity: 0.24;
+    }
+
+    .sun-track {
+      fill: none;
+      stroke: rgba(168, 111, 22, 0.34);
+      stroke-dasharray: 4 7;
+      stroke-linecap: round;
+      stroke-width: 1.2;
+    }
+
+    .sun-marker {
+      overflow: visible;
+      opacity: 0.94;
+    }
+
+    .sun-marker.is-muted {
+      opacity: 0.42;
+    }
+
+    .sun-halo {
+      fill: rgba(255, 194, 71, 0.22);
+      stroke: rgba(111, 67, 7, 0.18);
+      stroke-width: 1;
+    }
+
+    .sun-disk {
+      fill: url("#sun-disk-gradient");
+      stroke: var(--amber-strong);
+      stroke-width: 1.3;
+    }
+
+    .sun-core {
+      fill: rgba(255, 255, 255, 0.55);
+    }
+
+    .sun-ring {
+      fill: none;
+      stroke: var(--amber-strong);
+      stroke-linecap: round;
+    }
+
+    .sun-ray {
+      fill: none;
+      stroke: var(--amber-strong);
+      stroke-linecap: round;
+    }
+
+    .sun-ray-soft {
+      fill: rgba(255, 194, 71, 0.38);
+      stroke: rgba(111, 67, 7, 0.28);
+      stroke-width: 0.8;
+    }
+
+    .sun-horizon-line {
+      fill: none;
+      stroke: rgba(111, 67, 7, 0.7);
+      stroke-linecap: round;
+      stroke-width: 1.1;
+    }
+
+    .azimuth-notch {
+      fill: #fff7cc;
+      stroke: var(--amber-strong);
+      stroke-linejoin: round;
+      stroke-width: 1.1;
+    }
+
+    .old-sun-halo {
+      fill: rgba(255, 188, 61, 0.24);
+      stroke: rgba(135, 85, 12, 0.24);
+      stroke-width: 1;
+    }
+
+    .old-sun-ray {
+      stroke: #87550c;
+      stroke-linecap: round;
+      stroke-width: 1.4;
+    }
+
+    .old-sun-dot {
+      fill: #ffc043;
+      stroke: #87550c;
+      stroke-width: 1.5;
+    }
+
+    @media (max-width: 920px) {
+      .reference-panel,
+      .variant-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    @media (max-width: 560px) {
+      .page {
+        width: min(100% - 20px, 1240px);
+        padding-top: 22px;
+      }
+
+      .reference-panel,
+      .variant,
+      .decision-panel {
+        padding: 12px;
+      }
+
+      .chart-shell {
+        padding: 6px;
+      }
+
+      .variant-notes {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+<body>
+  <svg class="defs" aria-hidden="true" focusable="false">
+    <defs>
+      <radialGradient id="sun-disk-gradient" cx="38%" cy="32%" r="68%">
+        <stop offset="0" stop-color="#fff8bc"></stop>
+        <stop offset="0.46" stop-color="#ffd15c"></stop>
+        <stop offset="1" stop-color="#e18b22"></stop>
+      </radialGradient>
+
+      <symbol id="marker-current-sun" viewBox="-20 -20 40 40">
+        <circle class="old-sun-halo" cx="0" cy="0" r="8"></circle>
+        <line class="old-sun-ray" x1="-8" y1="0" x2="-5" y2="0"></line>
+        <line class="old-sun-ray" x1="5" y1="0" x2="8" y2="0"></line>
+        <line class="old-sun-ray" x1="0" y1="-8" x2="0" y2="-5"></line>
+        <line class="old-sun-ray" x1="0" y1="5" x2="0" y2="8"></line>
+        <circle class="old-sun-dot" cx="0" cy="0" r="4.2"></circle>
+      </symbol>
+
+      <symbol id="marker-alt-moon" viewBox="-24 -28 48 56">
+        <circle class="moon-sample-marker-halo" cx="0" cy="0" r="17"></circle>
+        <circle class="moon-phase-fill" cx="0" cy="0" r="14"></circle>
+        <path class="moon-phase-shadow" d="M0 -14c7 4 7 24 0 28 12-2 14-10 14-14s-2-12-14-14z"></path>
+        <circle class="moon-sample-marker-ring" cx="0" cy="0" r="13"></circle>
+      </symbol>
+
+      <symbol id="marker-best-moon" viewBox="-26 -30 52 60">
+        <circle class="moon-sample-marker-halo" cx="0" cy="0" r="20"></circle>
+        <circle class="moon-phase-fill" cx="0" cy="0" r="17"></circle>
+        <path class="moon-phase-shadow" d="M0 -17c8 5 8 29 0 34 14-3 17-12 17-17s-3-14-17-17z"></path>
+        <circle class="moon-sample-marker-ring" cx="0" cy="0" r="16"></circle>
+      </symbol>
+
+      <symbol id="marker-sun-corona" viewBox="-24 -24 48 48">
+        <circle class="sun-halo" cx="0" cy="0" r="17"></circle>
+        <line class="sun-ray" x1="-18" y1="0" x2="-14" y2="0" stroke-width="1.6"></line>
+        <line class="sun-ray" x1="14" y1="0" x2="18" y2="0" stroke-width="1.6"></line>
+        <line class="sun-ray" x1="0" y1="-18" x2="0" y2="-14" stroke-width="1.6"></line>
+        <line class="sun-ray" x1="0" y1="14" x2="0" y2="18" stroke-width="1.6"></line>
+        <line class="sun-ray" x1="-12.7" y1="-12.7" x2="-9.8" y2="-9.8" stroke-width="1.25"></line>
+        <line class="sun-ray" x1="9.8" y1="-9.8" x2="12.7" y2="-12.7" stroke-width="1.25"></line>
+        <line class="sun-ray" x1="-12.7" y1="12.7" x2="-9.8" y2="9.8" stroke-width="1.25"></line>
+        <line class="sun-ray" x1="9.8" y1="9.8" x2="12.7" y2="12.7" stroke-width="1.25"></line>
+        <circle class="sun-disk" cx="0" cy="0" r="12.4"></circle>
+        <circle class="sun-core" cx="-3.6" cy="-4.2" r="3.4"></circle>
+        <circle class="sun-ring" cx="0" cy="0" r="9.2" stroke-width="0.85" opacity="0.72"></circle>
+      </symbol>
+
+      <symbol id="marker-sun-horizon" viewBox="-24 -24 48 48">
+        <circle class="sun-halo" cx="0" cy="0" r="17.5"></circle>
+        <path class="sun-ray-soft" d="M0 -19l3.4 6.5h-6.8z"></path>
+        <path class="sun-ray-soft" d="M16.4 -9.5l-3 6.7-3.3-5.7z"></path>
+        <path class="sun-ray-soft" d="M16.4 9.5l-6.3-1 3.3-5.7z"></path>
+        <path class="sun-ray-soft" d="M0 19l-3.4-6.5h6.8z"></path>
+        <path class="sun-ray-soft" d="M-16.4 9.5l3-6.7 3.3 5.7z"></path>
+        <path class="sun-ray-soft" d="M-16.4 -9.5l6.3 1-3.3 5.7z"></path>
+        <circle class="sun-disk" cx="0" cy="0" r="12.6"></circle>
+        <path class="sun-horizon-line" d="M-8 1.2c3.4 1.8 12.6 1.8 16 0"></path>
+        <path class="sun-ring" d="M-8.4 5.7c3.8 2.7 13 2.7 16.8 0" stroke-width="0.9" opacity="0.7"></path>
+        <circle class="sun-core" cx="-3.2" cy="-4.3" r="3.2"></circle>
+      </symbol>
+
+      <symbol id="marker-sun-compass" viewBox="-24 -24 48 48">
+        <circle class="sun-halo" cx="0" cy="0" r="16.8"></circle>
+        <circle class="sun-disk" cx="0" cy="0" r="12.2"></circle>
+        <circle class="sun-ring" cx="0" cy="0" r="15" stroke-width="1.2"></circle>
+        <circle class="sun-ring" cx="0" cy="0" r="8.8" stroke-width="0.75" opacity="0.62"></circle>
+        <path class="azimuth-notch" d="M8.6 -13.2l10.8 -5.2 -4.9 10.9z"></path>
+        <line class="sun-ray" x1="-15.2" y1="0" x2="-12.4" y2="0" stroke-width="1.1"></line>
+        <line class="sun-ray" x1="12.4" y1="0" x2="15.2" y2="0" stroke-width="1.1"></line>
+        <line class="sun-ray" x1="0" y1="-15.2" x2="0" y2="-12.4" stroke-width="1.1"></line>
+        <line class="sun-ray" x1="0" y1="12.4" x2="0" y2="15.2" stroke-width="1.1"></line>
+        <circle class="sun-core" cx="-3.2" cy="-4.2" r="3"></circle>
+      </symbol>
+    </defs>
+  </svg>
+
+  <main class="page">
+    <header class="page-header">
+      <p class="eyebrow">Moon path design follow-up</p>
+      <h1>Sun marker mockups</h1>
+      <p>These variants make the Sun marker materially larger than the first simple marker and closer to the Alternative Moon marker scale. Each option keeps the Sun visually secondary to the Moon path while giving photographers clearer altitude and azimuth context.</p>
+    </header>
+
+    <section class="reference-panel" aria-labelledby="scale-title">
+      <div class="reference-copy">
+        <p class="marker-label">Scale target</p>
+        <h2 id="scale-title">Move from tiny glyph to chart object</h2>
+        <p>The current simple Sun marker is about half the visual mass of the Alternative Moon marker. These mockups target a 25 to 29 px core-plus-corona footprint, with halos near the Alternative Moon halo size.</p>
+      </div>
+      <div class="scale-card">
+        <svg class="scale-svg" viewBox="0 0 780 176" role="img" aria-label="Sun marker scale comparison">
+          <line class="chart-gridline" x1="34" y1="88" x2="746" y2="88"></line>
+
+          <g transform="translate(105 88)">
+            <use href="#marker-current-sun" class="sun-marker is-muted" width="40" height="40" x="-20" y="-20"></use>
+            <text class="scale-label" x="0" y="54" text-anchor="middle">Current simple</text>
+            <text class="scale-note" x="0" y="70" text-anchor="middle">small dot/ray glyph</text>
+          </g>
+
+          <g transform="translate(280 88)">
+            <use href="#marker-alt-moon" width="48" height="56" x="-24" y="-28"></use>
+            <text class="scale-label" x="0" y="54" text-anchor="middle">Alternative Moon</text>
+            <text class="scale-note" x="0" y="70" text-anchor="middle">target reference size</text>
+          </g>
+
+          <g transform="translate(470 88)">
+            <use href="#marker-sun-corona" class="sun-marker" width="48" height="48" x="-24" y="-24"></use>
+            <text class="scale-label" x="0" y="54" text-anchor="middle">Proposed Sun</text>
+            <text class="scale-note" x="0" y="70" text-anchor="middle">larger disk and corona</text>
+          </g>
+
+          <g transform="translate(642 88)">
+            <image href="assets/sun-marker-aperture-flare.svg" class="sun-marker" width="48" height="48" x="-24" y="-24"></image>
+            <text class="scale-label" x="0" y="54" text-anchor="middle">Richer option</text>
+            <text class="scale-note" x="0" y="70" text-anchor="middle">more detail, still compact</text>
+          </g>
+        </svg>
+      </div>
+    </section>
+
+    <section class="variant-grid" aria-label="Sun marker variants">
+      <article class="variant">
+        <div class="variant-copy">
+          <h2>A. Corona disk <span class="badge is-preferred">Preferred</span></h2>
+          <p>Closest to the Alternative Moon scale without looking like another Moon. The larger warm disk, eight short rays, and inner highlight stay legible at chart size.</p>
+        </div>
+        <div class="chart-shell">
+          <svg class="chart-svg" viewBox="0 0 760 390" role="img" aria-label="Moon path chart with corona disk Sun markers">
+            <rect class="azimuth-rail-bg" x="34" y="20" width="692" height="32" rx="6"></rect>
+            <text class="azimuth-rail-label" x="42" y="41">ENE</text>
+            <text class="azimuth-rail-label" x="206" y="41" text-anchor="middle">SE</text>
+            <text class="azimuth-rail-label" x="374" y="41" text-anchor="middle">S</text>
+            <text class="azimuth-rail-label" x="542" y="41" text-anchor="middle">WSW</text>
+            <text class="azimuth-rail-label" x="718" y="41" text-anchor="end">WNW</text>
+
+            <rect class="light-band is-night" x="34" y="70" width="170" height="256"></rect>
+            <rect class="light-band is-nautical" x="204" y="70" width="72" height="256"></rect>
+            <rect class="light-band is-civil" x="276" y="70" width="50" height="256"></rect>
+            <rect class="light-band is-golden" x="326" y="70" width="84" height="256"></rect>
+            <rect class="light-band is-daylight" x="410" y="70" width="316" height="256"></rect>
+
+            <g class="foreground-layer">
+              <path d="M34 326h692v-24l-34 5-34-12-42 14-46-28-44 30-56-12-34 15-38-20-52 24-60-48-42 42-50-18-48 24-44-10-34 18z"></path>
+            </g>
+
+            <line class="chart-gridline" x1="34" y1="326" x2="726" y2="326"></line>
+            <line class="chart-gridline" x1="34" y1="70" x2="726" y2="70"></line>
+            <text class="chart-axis-label" x="4" y="330">0&deg;</text>
+            <text class="chart-axis-label" x="4" y="74">+45&deg;</text>
+            <line class="chart-tick" x1="104" y1="326" x2="104" y2="331"></line>
+            <line class="chart-tick" x1="242" y1="326" x2="242" y2="331"></line>
+            <line class="chart-tick" x1="380" y1="326" x2="380" y2="331"></line>
+            <line class="chart-tick" x1="518" y1="326" x2="518" y2="331"></line>
+            <line class="chart-tick" x1="656" y1="326" x2="656" y2="331"></line>
+            <text class="chart-time-label" x="104" y="355" text-anchor="middle">01</text>
+            <text class="chart-time-label" x="242" y="355" text-anchor="middle">04</text>
+            <text class="chart-time-label" x="380" y="355" text-anchor="middle">07</text>
+            <text class="chart-time-label" x="518" y="355" text-anchor="middle">10</text>
+            <text class="chart-time-label" x="656" y="355" text-anchor="middle">13</text>
+
+            <path class="sun-track" d="M286 292C340 260 404 226 486 186"></path>
+            <g transform="translate(286 292)"><use href="#marker-sun-corona" class="sun-marker" width="48" height="48" x="-24" y="-24"></use></g>
+            <g transform="translate(386 236)"><use href="#marker-sun-corona" class="sun-marker" width="48" height="48" x="-24" y="-24"></use></g>
+            <g transform="translate(486 186)"><use href="#marker-sun-corona" class="sun-marker" width="48" height="48" x="-24" y="-24"></use></g>
+
+            <circle class="moon-dot" cx="74" cy="326" r="5"></circle>
+            <circle class="moon-dot" cx="146" cy="246" r="5"></circle>
+            <circle class="moon-dot" cx="272" cy="132" r="5"></circle>
+            <circle class="moon-dot" cx="402" cy="112" r="5"></circle>
+            <circle class="moon-dot" cx="496" cy="186" r="5"></circle>
+            <circle class="moon-dot" cx="692" cy="326" r="5"></circle>
+
+            <g transform="translate(206 292)">
+              <text class="moon-sample-marker-label" x="0" y="-24" text-anchor="middle">Alt</text>
+              <use href="#marker-alt-moon" width="48" height="56" x="-24" y="-28"></use>
+            </g>
+            <g transform="translate(562 306)">
+              <text class="moon-sample-marker-label" x="0" y="-24" text-anchor="middle">Best</text>
+              <use href="#marker-best-moon" width="52" height="60" x="-26" y="-30"></use>
+            </g>
+          </svg>
+        </div>
+      </article>
+
+      <article class="variant">
+        <div class="variant-copy">
+          <h2>B. Horizon glow <span class="badge">Low-sun feel</span></h2>
+          <p>Uses a larger disk with soft triangular rays and two subtle horizon arcs. It reads more photographic, especially for sunrise and golden-hour samples.</p>
+        </div>
+        <div class="chart-shell">
+          <svg class="chart-svg" viewBox="0 0 760 390" role="img" aria-label="Moon path chart with horizon glow Sun markers">
+            <rect class="azimuth-rail-bg" x="34" y="20" width="692" height="32" rx="6"></rect>
+            <text class="azimuth-rail-label" x="42" y="41">ENE</text>
+            <text class="azimuth-rail-label" x="206" y="41" text-anchor="middle">SE</text>
+            <text class="azimuth-rail-label" x="374" y="41" text-anchor="middle">S</text>
+            <text class="azimuth-rail-label" x="542" y="41" text-anchor="middle">WSW</text>
+            <text class="azimuth-rail-label" x="718" y="41" text-anchor="end">WNW</text>
+
+            <rect class="light-band is-night" x="34" y="70" width="170" height="256"></rect>
+            <rect class="light-band is-nautical" x="204" y="70" width="72" height="256"></rect>
+            <rect class="light-band is-civil" x="276" y="70" width="50" height="256"></rect>
+            <rect class="light-band is-golden" x="326" y="70" width="84" height="256"></rect>
+            <rect class="light-band is-daylight" x="410" y="70" width="316" height="256"></rect>
+
+            <g class="foreground-layer is-near">
+              <path d="M34 326h692v-22l-38 8-34-18-52 22-44-36-58 35-52-12-34 17-42-22-58 24-44-52-58 48-54-20-44 26-36-10z"></path>
+            </g>
+
+            <line class="chart-gridline" x1="34" y1="326" x2="726" y2="326"></line>
+            <line class="chart-gridline" x1="34" y1="70" x2="726" y2="70"></line>
+            <text class="chart-axis-label" x="4" y="330">0&deg;</text>
+            <text class="chart-axis-label" x="4" y="74">+45&deg;</text>
+            <line class="chart-tick" x1="104" y1="326" x2="104" y2="331"></line>
+            <line class="chart-tick" x1="242" y1="326" x2="242" y2="331"></line>
+            <line class="chart-tick" x1="380" y1="326" x2="380" y2="331"></line>
+            <line class="chart-tick" x1="518" y1="326" x2="518" y2="331"></line>
+            <line class="chart-tick" x1="656" y1="326" x2="656" y2="331"></line>
+            <text class="chart-time-label" x="104" y="355" text-anchor="middle">01</text>
+            <text class="chart-time-label" x="242" y="355" text-anchor="middle">04</text>
+            <text class="chart-time-label" x="380" y="355" text-anchor="middle">07</text>
+            <text class="chart-time-label" x="518" y="355" text-anchor="middle">10</text>
+            <text class="chart-time-label" x="656" y="355" text-anchor="middle">13</text>
+
+            <path class="sun-track" d="M286 292C340 260 404 226 486 186"></path>
+            <g transform="translate(286 292)"><use href="#marker-sun-horizon" class="sun-marker" width="48" height="48" x="-24" y="-24"></use></g>
+            <g transform="translate(386 236)"><use href="#marker-sun-horizon" class="sun-marker" width="48" height="48" x="-24" y="-24"></use></g>
+            <g transform="translate(486 186)"><use href="#marker-sun-horizon" class="sun-marker" width="48" height="48" x="-24" y="-24"></use></g>
+
+            <circle class="moon-dot" cx="74" cy="326" r="5"></circle>
+            <circle class="moon-dot" cx="146" cy="246" r="5"></circle>
+            <circle class="moon-dot" cx="272" cy="132" r="5"></circle>
+            <circle class="moon-dot" cx="402" cy="112" r="5"></circle>
+            <circle class="moon-dot" cx="496" cy="186" r="5"></circle>
+            <circle class="moon-dot" cx="692" cy="326" r="5"></circle>
+
+            <g transform="translate(206 292)">
+              <text class="moon-sample-marker-label" x="0" y="-24" text-anchor="middle">Alt</text>
+              <use href="#marker-alt-moon" width="48" height="56" x="-24" y="-28"></use>
+            </g>
+            <g transform="translate(562 306)">
+              <text class="moon-sample-marker-label" x="0" y="-24" text-anchor="middle">Best</text>
+              <use href="#marker-best-moon" width="52" height="60" x="-26" y="-30"></use>
+            </g>
+          </svg>
+        </div>
+      </article>
+
+      <article class="variant">
+        <div class="variant-copy">
+          <h2>C. Compass notch <span class="badge">Azimuth cue</span></h2>
+          <p>Adds a small northeast-facing notch to make the marker feel directional. It is useful for azimuth context, but the extra point may compete with dense chart labels.</p>
+        </div>
+        <div class="chart-shell">
+          <svg class="chart-svg" viewBox="0 0 760 390" role="img" aria-label="Moon path chart with compass notch Sun markers">
+            <rect class="azimuth-rail-bg" x="34" y="20" width="692" height="32" rx="6"></rect>
+            <text class="azimuth-rail-label" x="42" y="41">ENE</text>
+            <text class="azimuth-rail-label" x="206" y="41" text-anchor="middle">SE</text>
+            <text class="azimuth-rail-label" x="374" y="41" text-anchor="middle">S</text>
+            <text class="azimuth-rail-label" x="542" y="41" text-anchor="middle">WSW</text>
+            <text class="azimuth-rail-label" x="718" y="41" text-anchor="end">WNW</text>
+
+            <rect class="light-band is-night" x="34" y="70" width="170" height="256"></rect>
+            <rect class="light-band is-nautical" x="204" y="70" width="72" height="256"></rect>
+            <rect class="light-band is-civil" x="276" y="70" width="50" height="256"></rect>
+            <rect class="light-band is-golden" x="326" y="70" width="84" height="256"></rect>
+            <rect class="light-band is-daylight" x="410" y="70" width="316" height="256"></rect>
+
+            <g class="foreground-layer">
+              <path d="M34 326h692v-24l-34 5-34-12-42 14-46-28-44 30-56-12-34 15-38-20-52 24-60-48-42 42-50-18-48 24-44-10-34 18z"></path>
+            </g>
+
+            <line class="chart-gridline" x1="34" y1="326" x2="726" y2="326"></line>
+            <line class="chart-gridline" x1="34" y1="70" x2="726" y2="70"></line>
+            <text class="chart-axis-label" x="4" y="330">0&deg;</text>
+            <text class="chart-axis-label" x="4" y="74">+45&deg;</text>
+            <line class="chart-tick" x1="104" y1="326" x2="104" y2="331"></line>
+            <line class="chart-tick" x1="242" y1="326" x2="242" y2="331"></line>
+            <line class="chart-tick" x1="380" y1="326" x2="380" y2="331"></line>
+            <line class="chart-tick" x1="518" y1="326" x2="518" y2="331"></line>
+            <line class="chart-tick" x1="656" y1="326" x2="656" y2="331"></line>
+            <text class="chart-time-label" x="104" y="355" text-anchor="middle">01</text>
+            <text class="chart-time-label" x="242" y="355" text-anchor="middle">04</text>
+            <text class="chart-time-label" x="380" y="355" text-anchor="middle">07</text>
+            <text class="chart-time-label" x="518" y="355" text-anchor="middle">10</text>
+            <text class="chart-time-label" x="656" y="355" text-anchor="middle">13</text>
+
+            <path class="sun-track" d="M286 292C340 260 404 226 486 186"></path>
+            <g transform="translate(286 292)"><use href="#marker-sun-compass" class="sun-marker" width="48" height="48" x="-24" y="-24"></use></g>
+            <g transform="translate(386 236)"><use href="#marker-sun-compass" class="sun-marker" width="48" height="48" x="-24" y="-24"></use></g>
+            <g transform="translate(486 186)"><use href="#marker-sun-compass" class="sun-marker" width="48" height="48" x="-24" y="-24"></use></g>
+
+            <circle class="moon-dot" cx="74" cy="326" r="5"></circle>
+            <circle class="moon-dot" cx="146" cy="246" r="5"></circle>
+            <circle class="moon-dot" cx="272" cy="132" r="5"></circle>
+            <circle class="moon-dot" cx="402" cy="112" r="5"></circle>
+            <circle class="moon-dot" cx="496" cy="186" r="5"></circle>
+            <circle class="moon-dot" cx="692" cy="326" r="5"></circle>
+
+            <g transform="translate(206 292)">
+              <text class="moon-sample-marker-label" x="0" y="-24" text-anchor="middle">Alt</text>
+              <use href="#marker-alt-moon" width="48" height="56" x="-24" y="-28"></use>
+            </g>
+            <g transform="translate(562 306)">
+              <text class="moon-sample-marker-label" x="0" y="-24" text-anchor="middle">Best</text>
+              <use href="#marker-best-moon" width="52" height="60" x="-26" y="-30"></use>
+            </g>
+          </svg>
+        </div>
+      </article>
+
+      <article class="variant">
+        <div class="variant-copy">
+          <h2>D. Selected aperture flare <span class="badge is-preferred">Selected</span></h2>
+          <p>The chosen D3 marker keeps the wide dark aperture, long Sun rays, and a small intentional flare ghost in the upper-left aperture zone.</p>
+        </div>
+        <div class="chart-shell">
+          <svg class="chart-svg" viewBox="0 0 760 390" role="img" aria-label="Moon path chart with aperture Sun marker variants">
+            <rect class="azimuth-rail-bg" x="34" y="20" width="692" height="32" rx="6"></rect>
+            <text class="azimuth-rail-label" x="42" y="41">ENE</text>
+            <text class="azimuth-rail-label" x="206" y="41" text-anchor="middle">SE</text>
+            <text class="azimuth-rail-label" x="374" y="41" text-anchor="middle">S</text>
+            <text class="azimuth-rail-label" x="542" y="41" text-anchor="middle">WSW</text>
+            <text class="azimuth-rail-label" x="718" y="41" text-anchor="end">WNW</text>
+
+            <rect class="light-band is-night" x="34" y="70" width="170" height="256"></rect>
+            <rect class="light-band is-nautical" x="204" y="70" width="72" height="256"></rect>
+            <rect class="light-band is-civil" x="276" y="70" width="50" height="256"></rect>
+            <rect class="light-band is-golden" x="326" y="70" width="84" height="256"></rect>
+            <rect class="light-band is-daylight" x="410" y="70" width="316" height="256"></rect>
+
+            <g class="foreground-layer is-near">
+              <path d="M34 326h692v-22l-38 8-34-18-52 22-44-36-58 35-52-12-34 17-42-22-58 24-44-52-58 48-54-20-44 26-36-10z"></path>
+            </g>
+
+            <line class="chart-gridline" x1="34" y1="326" x2="726" y2="326"></line>
+            <line class="chart-gridline" x1="34" y1="70" x2="726" y2="70"></line>
+            <text class="chart-axis-label" x="4" y="330">0&deg;</text>
+            <text class="chart-axis-label" x="4" y="74">+45&deg;</text>
+            <line class="chart-tick" x1="104" y1="326" x2="104" y2="331"></line>
+            <line class="chart-tick" x1="242" y1="326" x2="242" y2="331"></line>
+            <line class="chart-tick" x1="380" y1="326" x2="380" y2="331"></line>
+            <line class="chart-tick" x1="518" y1="326" x2="518" y2="331"></line>
+            <line class="chart-tick" x1="656" y1="326" x2="656" y2="331"></line>
+            <text class="chart-time-label" x="104" y="355" text-anchor="middle">01</text>
+            <text class="chart-time-label" x="242" y="355" text-anchor="middle">04</text>
+            <text class="chart-time-label" x="380" y="355" text-anchor="middle">07</text>
+            <text class="chart-time-label" x="518" y="355" text-anchor="middle">10</text>
+            <text class="chart-time-label" x="656" y="355" text-anchor="middle">13</text>
+
+            <path class="sun-track" d="M344 248C384 222 426 198 486 174"></path>
+            <g transform="translate(486 174)"><image href="assets/sun-marker-aperture-flare.svg" class="sun-marker" width="48" height="48" x="-24" y="-24"></image></g>
+
+            <circle class="moon-dot" cx="74" cy="326" r="5"></circle>
+            <circle class="moon-dot" cx="146" cy="246" r="5"></circle>
+            <circle class="moon-dot" cx="272" cy="132" r="5"></circle>
+            <circle class="moon-dot" cx="402" cy="112" r="5"></circle>
+            <circle class="moon-dot" cx="496" cy="186" r="5"></circle>
+            <circle class="moon-dot" cx="692" cy="326" r="5"></circle>
+
+            <g transform="translate(206 292)">
+              <text class="moon-sample-marker-label" x="0" y="-24" text-anchor="middle">Alt</text>
+              <use href="#marker-alt-moon" width="48" height="56" x="-24" y="-28"></use>
+            </g>
+            <g transform="translate(562 306)">
+              <text class="moon-sample-marker-label" x="0" y="-24" text-anchor="middle">Best</text>
+              <use href="#marker-best-moon" width="52" height="60" x="-26" y="-30"></use>
+            </g>
+          </svg>
+        </div>
+        <ul class="variant-notes" aria-label="Aperture Sun marker notes">
+          <li><strong>D3 Dark rays</strong><span>Long rays, wide dark aperture, and intentional upper-left flare.</span></li>
+        </ul>
+      </article>
+    </section>
+
+    <section class="decision-panel" aria-labelledby="decision-title">
+      <h2 id="decision-title">Implementation notes</h2>
+      <ul>
+        <li>All proposed Sun markers use a footprint close to the Alternative Moon marker, but still smaller than the Best Moon marker.</li>
+        <li>The selected D3 aperture-flare marker is stored as <code>docs/design/assets/sun-marker-aperture-flare.svg</code> for reuse in the implementation branch.</li>
+        <li>The chart should continue to omit negative-altitude Sun positions and Sun positions above the maximum displayed Moon altitude.</li>
+        <li>Variant A is the cleanest conservative candidate; variant B is the most photographic; variant C emphasizes azimuth; variant D3 is the selected aperture-flare direction.</li>
+      </ul>
+    </section>
+  </main>
+</body>
+</html>
