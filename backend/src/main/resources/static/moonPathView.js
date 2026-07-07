@@ -117,7 +117,7 @@ function altitudeChartSvg(sourcePoints, timezone, countryCode, mode, chartContex
   var azimuthLabels = azimuthRailLabels(points, left, chartWidth, mode);
   var markerImageUrl = moonPhaseImageDataUrl(moon.phaseAngleDegrees, 64);
   var visibleMarkers = visibleAltitudeMarkers(points, mode);
-  var sunMarkers = visibleSunMarkers(points, maxAltitude, ceiling, bottom, chartHeight, mode);
+  var sunMarkers = visibleSunMarkers(points, ceiling, bottom, chartHeight, mode);
 
   return svgElement("svg", {
     className: "altitude-chart altitude-chart-" + mode,
@@ -421,15 +421,14 @@ function altitudeMarker(point, imageUrl) {
   );
 }
 
-function visibleSunMarkers(points, maxMoonAltitude, ceiling, bottom, chartHeight, mode) {
+function visibleSunMarkers(points, ceiling, bottom, chartHeight, mode) {
   var minimumDistance = mode === "mobile" ? 32 : 40;
   var visible = [];
 
   points.forEach(function (point) {
     if (!Number.isFinite(point.sunAltitudeDegrees)
       || !Number.isFinite(point.sunAzimuthDegrees)
-      || point.sunAltitudeDegrees < 0
-      || point.sunAltitudeDegrees > maxMoonAltitude) {
+      || point.sunAltitudeDegrees < 0) {
       return;
     }
 

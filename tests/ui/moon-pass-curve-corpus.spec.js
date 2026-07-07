@@ -260,8 +260,7 @@ function visibleSunMarkers(samples, mode, mobileReferenceDurationMs) {
   for (const point of points) {
     if (!Number.isFinite(point.sunAltitudeDegrees)
       || !Number.isFinite(point.sunAzimuthDegrees)
-      || point.sunAltitudeDegrees < 0
-      || point.sunAltitudeDegrees > maxMoonAltitude) {
+      || point.sunAltitudeDegrees < 0) {
       continue;
     }
 
