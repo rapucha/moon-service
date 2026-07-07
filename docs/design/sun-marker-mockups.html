@@ -223,6 +223,37 @@
       padding: 18px;
     }
 
+    .variant-notes {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 8px;
+      margin: 0;
+      padding: 0;
+      list-style: none;
+    }
+
+    .variant-notes li {
+      display: grid;
+      gap: 3px;
+      min-width: 0;
+      padding: 9px 10px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--surface-soft);
+    }
+
+    .variant-notes strong {
+      color: var(--ink);
+      font-size: 0.78rem;
+      line-height: 1.25;
+    }
+
+    .variant-notes span {
+      color: var(--muted);
+      font-size: 0.76rem;
+      line-height: 1.35;
+    }
+
     .decision-panel ul {
       display: grid;
       gap: 8px;
@@ -394,9 +425,30 @@
     }
 
     .sun-aperture-blade {
-      fill: rgba(255, 145, 29, 0.28);
-      stroke: rgba(111, 67, 7, 0.18);
-      stroke-width: 0.5;
+      fill: rgba(255, 145, 29, 0.18);
+      stroke: rgba(111, 67, 7, 0.16);
+      stroke-width: 0.65;
+    }
+
+    .sun-aperture-groove {
+      fill: none;
+      stroke: rgba(111, 67, 7, 0.64);
+      stroke-linecap: round;
+      stroke-width: 1.05;
+    }
+
+    .sun-aperture-center {
+      fill: rgba(255, 248, 188, 0.66);
+      stroke: rgba(111, 67, 7, 0.72);
+      stroke-linejoin: round;
+      stroke-width: 0.95;
+    }
+
+    .sun-ray-long {
+      fill: none;
+      stroke: var(--amber-strong);
+      stroke-linecap: round;
+      stroke-width: 1.35;
     }
 
     .sun-horizon-line {
@@ -452,6 +504,10 @@
 
       .chart-shell {
         padding: 6px;
+      }
+
+      .variant-notes {
+        grid-template-columns: 1fr;
       }
     }
   </style>
@@ -532,15 +588,54 @@
 
       <symbol id="marker-sun-aperture" viewBox="-24 -24 48 48">
         <circle class="sun-halo" cx="0" cy="0" r="17.5"></circle>
+        <line class="sun-ray" x1="-17.2" y1="0" x2="-13.7" y2="0" stroke-width="1.25"></line>
+        <line class="sun-ray" x1="13.7" y1="0" x2="17.2" y2="0" stroke-width="1.25"></line>
+        <line class="sun-ray" x1="0" y1="-17.2" x2="0" y2="-13.7" stroke-width="1.25"></line>
+        <line class="sun-ray" x1="0" y1="13.7" x2="0" y2="17.2" stroke-width="1.25"></line>
         <circle class="sun-disk" cx="0" cy="0" r="12.8"></circle>
-        <path class="sun-aperture-blade" d="M0 -11.2l5.7 9.9H0z"></path>
-        <path class="sun-aperture-blade" d="M9.7 -5.6L1.4 -1.4l4.8 -8.2z"></path>
-        <path class="sun-aperture-blade" d="M9.7 5.6H1.4l8.3 -4.2z"></path>
-        <path class="sun-aperture-blade" d="M0 11.2l-5.7 -9.9H0z"></path>
-        <path class="sun-aperture-blade" d="M-9.7 5.6l8.3 -4.2 -4.8 8.2z"></path>
-        <path class="sun-aperture-blade" d="M-9.7 -5.6h8.3l-8.3 4.2z"></path>
-        <circle class="sun-core" cx="-3.2" cy="-4.2" r="3"></circle>
+        <path class="sun-aperture-groove" d="M-3.8 -9.3c4.5 -1.8 9 -0.8 12 2.7"></path>
+        <path class="sun-aperture-groove" d="M8.3 -6.9c2.8 3.8 2.9 8.5 0.5 12.5"></path>
+        <path class="sun-aperture-groove" d="M9.1 3.8c-1.6 4.5 -5.5 7.2 -10.3 7.3"></path>
+        <path class="sun-aperture-groove" d="M3.8 9.3c-4.5 1.8 -9 0.8 -12 -2.7"></path>
+        <path class="sun-aperture-groove" d="M-8.3 6.9c-2.8 -3.8 -2.9 -8.5 -0.5 -12.5"></path>
+        <path class="sun-aperture-groove" d="M-9.1 -3.8c1.6 -4.5 5.5 -7.2 10.3 -7.3"></path>
+        <path class="sun-aperture-center" d="M0 -4.6l4 2.3v4.6L0 4.6l-4 -2.3v-4.6z"></path>
         <circle class="sun-ring" cx="0" cy="0" r="12.8" stroke-width="1.1"></circle>
+      </symbol>
+
+      <symbol id="marker-sun-aperture-blades" viewBox="-24 -24 48 48">
+        <circle class="sun-halo" cx="0" cy="0" r="17.5"></circle>
+        <path class="sun-ray-soft" d="M0 -18.6l2.6 5.2h-5.2z"></path>
+        <path class="sun-ray-soft" d="M16.1 -9.3l-2.1 5.4-3.1-4.6z"></path>
+        <path class="sun-ray-soft" d="M16.1 9.3l-5.2 -0.8 3.1 -4.6z"></path>
+        <path class="sun-ray-soft" d="M0 18.6l-2.6 -5.2h5.2z"></path>
+        <path class="sun-ray-soft" d="M-16.1 9.3l2.1 -5.4 3.1 4.6z"></path>
+        <path class="sun-ray-soft" d="M-16.1 -9.3l5.2 0.8 -3.1 4.6z"></path>
+        <circle class="sun-disk" cx="0" cy="0" r="12.8"></circle>
+        <path class="sun-aperture-blade" d="M-1.2 -10.7l5.8 5.4 -3.7 2.3 -5 -6.3z"></path>
+        <path class="sun-aperture-blade" d="M8.7 -6.3l-1.2 7.8 -4 -2.1 2.9 -7.4z"></path>
+        <path class="sun-aperture-blade" d="M9.9 4.4l-7.1 3.4 -0.2 -4.5 7.8 -1.1z"></path>
+        <path class="sun-aperture-blade" d="M1.2 10.7l-5.8 -5.4 3.7 -2.3 5 6.3z"></path>
+        <path class="sun-aperture-blade" d="M-8.7 6.3l1.2 -7.8 4 2.1 -2.9 7.4z"></path>
+        <path class="sun-aperture-blade" d="M-9.9 -4.4l7.1 -3.4 0.2 4.5 -7.8 1.1z"></path>
+        <path class="sun-aperture-center" d="M0 -4.5l3.9 2.2v4.5L0 4.5l-3.9 -2.2v-4.5z"></path>
+        <circle class="sun-ring" cx="0" cy="0" r="12.8" stroke-width="1.05"></circle>
+      </symbol>
+
+      <symbol id="marker-sun-aperture-rays" viewBox="-24 -24 48 48">
+        <circle class="sun-halo" cx="0" cy="0" r="17.5"></circle>
+        <line class="sun-ray-long" x1="-20" y1="0" x2="-14.6" y2="0"></line>
+        <line class="sun-ray-long" x1="14.6" y1="0" x2="20" y2="0"></line>
+        <line class="sun-ray-long" x1="0" y1="-20" x2="0" y2="-14.6"></line>
+        <line class="sun-ray-long" x1="0" y1="14.6" x2="0" y2="20"></line>
+        <line class="sun-ray" x1="-14.2" y1="-14.2" x2="-10.6" y2="-10.6" stroke-width="1.05"></line>
+        <line class="sun-ray" x1="10.6" y1="-10.6" x2="14.2" y2="-14.2" stroke-width="1.05"></line>
+        <line class="sun-ray" x1="-14.2" y1="14.2" x2="-10.6" y2="10.6" stroke-width="1.05"></line>
+        <line class="sun-ray" x1="10.6" y1="10.6" x2="14.2" y2="14.2" stroke-width="1.05"></line>
+        <circle class="sun-disk" cx="0" cy="0" r="12.5"></circle>
+        <circle class="sun-ring" cx="0" cy="0" r="8.8" stroke-width="0.85" opacity="0.7"></circle>
+        <path class="sun-aperture-center" d="M0 -4.4l3.8 2.2v4.4L0 4.4l-3.8 -2.2v-4.4z"></path>
+        <circle class="sun-core" cx="-3.2" cy="-4.3" r="2.4"></circle>
       </symbol>
     </defs>
   </svg>
@@ -781,11 +876,11 @@
 
       <article class="variant">
         <div class="variant-copy">
-          <h2>D. Aperture sun <span class="badge">Photographer cue</span></h2>
-          <p>The richest icon: a Sun disk with aperture-like blades. It is the nicest in the scale strip, but the internal detail may be too busy for repeated chart samples.</p>
+          <h2>D. Aperture explorations <span class="badge">Photographer cue</span></h2>
+          <p>Reworked aperture-style options with less internal clutter. The chart shows a clean shutter-groove mark, a softer blade mark, and a longer-ray mark at real sample size.</p>
         </div>
         <div class="chart-shell">
-          <svg class="chart-svg" viewBox="0 0 760 390" role="img" aria-label="Moon path chart with aperture Sun markers">
+          <svg class="chart-svg" viewBox="0 0 760 390" role="img" aria-label="Moon path chart with aperture Sun marker variants">
             <rect class="azimuth-rail-bg" x="34" y="20" width="692" height="32" rx="6"></rect>
             <text class="azimuth-rail-label" x="42" y="41">ENE</text>
             <text class="azimuth-rail-label" x="206" y="41" text-anchor="middle">SE</text>
@@ -820,8 +915,8 @@
 
             <path class="sun-track" d="M286 292C340 260 404 226 486 186"></path>
             <g transform="translate(286 292)"><use href="#marker-sun-aperture" class="sun-marker" width="48" height="48" x="-24" y="-24"></use></g>
-            <g transform="translate(386 236)"><use href="#marker-sun-aperture" class="sun-marker" width="48" height="48" x="-24" y="-24"></use></g>
-            <g transform="translate(486 186)"><use href="#marker-sun-aperture" class="sun-marker" width="48" height="48" x="-24" y="-24"></use></g>
+            <g transform="translate(386 236)"><use href="#marker-sun-aperture-blades" class="sun-marker" width="48" height="48" x="-24" y="-24"></use></g>
+            <g transform="translate(486 186)"><use href="#marker-sun-aperture-rays" class="sun-marker" width="48" height="48" x="-24" y="-24"></use></g>
 
             <circle class="moon-dot" cx="74" cy="326" r="5"></circle>
             <circle class="moon-dot" cx="146" cy="246" r="5"></circle>
@@ -840,6 +935,11 @@
             </g>
           </svg>
         </div>
+        <ul class="variant-notes" aria-label="Aperture Sun marker notes">
+          <li><strong>D1 Shutter grooves</strong><span>Best balance: aperture cue without muddy filled blades.</span></li>
+          <li><strong>D2 Soft blades</strong><span>Keeps blade geometry, but lighter and less dense than the first version.</span></li>
+          <li><strong>D3 Long rays</strong><span>Most Sun-like at small size, with a small aperture center.</span></li>
+        </ul>
       </article>
     </section>
 
@@ -848,7 +948,7 @@
       <ul>
         <li>All proposed Sun markers use a footprint close to the Alternative Moon marker, but still smaller than the Best Moon marker.</li>
         <li>The chart should continue to omit negative-altitude Sun positions and Sun positions above the maximum displayed Moon altitude.</li>
-        <li>Variant A is the cleanest production candidate; variant B is the most photographic; variant C emphasizes azimuth; variant D is visually richer but risks becoming busy in repeated samples.</li>
+        <li>Variant A is the cleanest production candidate; variant B is the most photographic; variant C emphasizes azimuth; variant D now compares aperture-inspired treatments with cleaner shutter grooves, softer blades, and longer rays.</li>
       </ul>
     </section>
   </main>
