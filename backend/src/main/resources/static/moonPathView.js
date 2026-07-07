@@ -16,6 +16,8 @@ var DESKTOP_PLOT_WIDTH = 672;
 var MOBILE_ALTITUDE_WIDTH = 320;
 var MOBILE_PLOT_WIDTH = 272;
 var AZIMUTH_RAIL_LABEL_EDGE_INSET = 10;
+var SUN_SAMPLE_MARKER_IMAGE_URL = "/sun-marker-aperture-flare.svg";
+var SUN_SAMPLE_MARKER_SIZE = 42;
 
 export function moonPathPanel(opportunity, timezone, countryCode, chartContext) {
   var path = opportunity.moonPath || {};
@@ -469,15 +471,19 @@ function sunMarker(point) {
     "data-at": point.at,
     "data-sun-altitude-degrees": round1(point.altitudeDegrees),
     "data-sun-azimuth-degrees": round1(point.azimuthDegrees),
+    "data-marker-resource": SUN_SAMPLE_MARKER_IMAGE_URL,
     transform: "translate(" + round1(point.x) + " " + round1(point.y) + ")"
   },
     svgElement("title", {}, title),
-    svgElement("circle", { className: "sun-sample-halo", cx: 0, cy: 0, r: 8 }),
-    svgElement("line", { className: "sun-sample-ray", x1: -8, y1: 0, x2: -5, y2: 0 }),
-    svgElement("line", { className: "sun-sample-ray", x1: 5, y1: 0, x2: 8, y2: 0 }),
-    svgElement("line", { className: "sun-sample-ray", x1: 0, y1: -8, x2: 0, y2: -5 }),
-    svgElement("line", { className: "sun-sample-ray", x1: 0, y1: 5, x2: 0, y2: 8 }),
-    svgElement("circle", { className: "sun-sample-dot", cx: 0, cy: 0, r: 4.2 })
+    svgElement("image", {
+      className: "sun-sample-marker-image",
+      href: SUN_SAMPLE_MARKER_IMAGE_URL,
+      x: -SUN_SAMPLE_MARKER_SIZE / 2,
+      y: -SUN_SAMPLE_MARKER_SIZE / 2,
+      width: SUN_SAMPLE_MARKER_SIZE,
+      height: SUN_SAMPLE_MARKER_SIZE,
+      preserveAspectRatio: "xMidYMid meet"
+    })
   );
 }
 

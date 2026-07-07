@@ -91,12 +91,14 @@ test("keeps corpus dot markers within basic SVG invariants", async ({ page }) =>
         if (!match) {
           throw new Error("Missing Sun marker transform for " + curveCase.id);
         }
+        const markerImage = marker.querySelector("image.sun-sample-marker-image");
         return {
           sequence: Number(marker.getAttribute("data-sequence")),
           x: Number(match[1]),
           y: Number(match[2]),
           altitudeDegrees: Number(marker.getAttribute("data-sun-altitude-degrees")),
-          azimuthDegrees: Number(marker.getAttribute("data-sun-azimuth-degrees"))
+          azimuthDegrees: Number(marker.getAttribute("data-sun-azimuth-degrees")),
+          imageHref: markerImage?.getAttribute("href") || ""
         };
       }).sort((a, b) => a.sequence - b.sequence);
       return {
@@ -111,7 +113,8 @@ test("keeps corpus dot markers within basic SVG invariants", async ({ page }) =>
         sunClosePairs: closePairCount(sunSamples, sunSamples, chartSelector.includes("mobile") ? 32 : 40),
         outOfBounds: samples.filter(point => point.x < bounds.minX || point.x > bounds.maxX || point.y < bounds.minY || point.y > bounds.maxY).length,
         sunOutOfBounds: sunSamples.filter(point => point.x < bounds.minX || point.x > bounds.maxX || point.y < bounds.minY || point.y > bounds.maxY).length,
-        sunMissingData: sunSamples.filter(point => !Number.isFinite(point.altitudeDegrees) || !Number.isFinite(point.azimuthDegrees)).length
+        sunMissingData: sunSamples.filter(point => !Number.isFinite(point.altitudeDegrees) || !Number.isFinite(point.azimuthDegrees)).length,
+        sunMissingImage: sunSamples.filter(point => point.imageHref !== "/sun-marker-aperture-flare.svg").length
       };
     }
 
@@ -175,6 +178,8 @@ test("keeps corpus dot markers within basic SVG invariants", async ({ page }) =>
     expect(item.mobile.sunOutOfBounds, item.id).toBe(0);
     expect(item.desktop.sunMissingData, item.id).toBe(0);
     expect(item.mobile.sunMissingData, item.id).toBe(0);
+    expect(item.desktop.sunMissingImage, item.id).toBe(0);
+    expect(item.mobile.sunMissingImage, item.id).toBe(0);
   }
 });
 

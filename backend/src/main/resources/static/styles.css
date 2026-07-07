@@ -1044,25 +1044,11 @@ dd {
 }
 
 .sun-sample-marker {
-  opacity: 0.76;
+  opacity: 0.88;
 }
 
-.sun-sample-halo {
-  fill: rgba(255, 188, 61, 0.24);
-  stroke: rgba(135, 85, 12, 0.24);
-  stroke-width: 1;
-}
-
-.sun-sample-ray {
-  stroke: #87550c;
-  stroke-linecap: round;
-  stroke-width: 1.4;
-}
-
-.sun-sample-dot {
-  fill: #ffc043;
-  stroke: #87550c;
-  stroke-width: 1.5;
+.sun-sample-marker-image {
+  filter: drop-shadow(0 1px 2px rgba(91, 66, 22, 0.24));
 }
 
 .moon-sample-dot {

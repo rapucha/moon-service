@@ -47,6 +47,12 @@ test("renders grouped Moon pass cards", async ({ page }) => {
     .toBeAttached();
   await expect(page.locator(".moon-pass-card").first().locator(".altitude-chart-desktop .sun-sample-marker"))
     .toHaveCount(2);
+  await expect(page.locator(".moon-pass-card").first().locator(".altitude-chart-desktop .sun-sample-marker image.sun-sample-marker-image"))
+    .toHaveCount(2);
+  await expect(page.locator(".moon-pass-card").first().locator(".altitude-chart-desktop .sun-sample-marker").first())
+    .toHaveAttribute("data-marker-resource", "/sun-marker-aperture-flare.svg");
+  await expect(page.locator(".moon-pass-card").first().locator(".altitude-chart-desktop .sun-sample-marker image.sun-sample-marker-image").first())
+    .toHaveAttribute("href", "/sun-marker-aperture-flare.svg");
   await expect(page.locator(".moon-pass-card").first().locator(".altitude-chart-desktop .sun-sample-marker[data-at='2026-07-04T06:40:00Z']"))
     .toHaveAttribute("data-sun-altitude-degrees", "32");
   await expect(page.locator(".moon-pass-card").first().locator(".altitude-chart-desktop .sun-sample-marker[data-at='2026-07-04T06:40:00Z'] title"))
