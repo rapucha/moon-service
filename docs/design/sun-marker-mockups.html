@@ -45,6 +45,7 @@
     h1,
     h2,
     h3,
+    code,
     p,
     li {
       overflow-wrap: anywhere;
@@ -254,6 +255,11 @@
       line-height: 1.35;
     }
 
+    code {
+      font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+      font-size: 0.88em;
+    }
+
     .decision-panel ul {
       display: grid;
       gap: 8px;
@@ -406,14 +412,6 @@
       fill: rgba(255, 255, 255, 0.55);
     }
 
-    .sun-aperture-flare {
-      fill: rgba(255, 236, 156, 0.42);
-    }
-
-    .sun-aperture-flare-core {
-      fill: rgba(255, 255, 230, 0.72);
-    }
-
     .sun-ring {
       fill: none;
       stroke: var(--amber-strong);
@@ -430,20 +428,6 @@
       fill: rgba(255, 194, 71, 0.38);
       stroke: rgba(111, 67, 7, 0.28);
       stroke-width: 0.8;
-    }
-
-    .sun-aperture-dark-center {
-      fill: rgba(93, 56, 8, 0.78);
-      stroke: rgba(255, 246, 190, 0.76);
-      stroke-linejoin: round;
-      stroke-width: 0.95;
-    }
-
-    .sun-ray-long {
-      fill: none;
-      stroke: var(--amber-strong);
-      stroke-linecap: round;
-      stroke-width: 1.35;
     }
 
     .sun-horizon-line {
@@ -580,23 +564,6 @@
         <line class="sun-ray" x1="0" y1="12.4" x2="0" y2="15.2" stroke-width="1.1"></line>
         <circle class="sun-core" cx="-3.2" cy="-4.2" r="3"></circle>
       </symbol>
-
-      <symbol id="marker-sun-aperture-rays" viewBox="-24 -24 48 48">
-        <circle class="sun-halo" cx="0" cy="0" r="17.5"></circle>
-        <line class="sun-ray-long" x1="-20" y1="0" x2="-14.6" y2="0"></line>
-        <line class="sun-ray-long" x1="14.6" y1="0" x2="20" y2="0"></line>
-        <line class="sun-ray-long" x1="0" y1="-20" x2="0" y2="-14.6"></line>
-        <line class="sun-ray-long" x1="0" y1="14.6" x2="0" y2="20"></line>
-        <line class="sun-ray" x1="-14.2" y1="-14.2" x2="-10.6" y2="-10.6" stroke-width="1.05"></line>
-        <line class="sun-ray" x1="10.6" y1="-10.6" x2="14.2" y2="-14.2" stroke-width="1.05"></line>
-        <line class="sun-ray" x1="-14.2" y1="14.2" x2="-10.6" y2="10.6" stroke-width="1.05"></line>
-        <line class="sun-ray" x1="10.6" y1="10.6" x2="14.2" y2="14.2" stroke-width="1.05"></line>
-        <circle class="sun-disk" cx="0" cy="0" r="12.5"></circle>
-        <circle class="sun-ring" cx="0" cy="0" r="8.8" stroke-width="0.85" opacity="0.7"></circle>
-        <path class="sun-aperture-dark-center" d="M0 -11.8l10.2 5.9v11.8L0 11.8l-10.2 -5.9v-11.8z"></path>
-        <circle class="sun-aperture-flare" cx="-3.5" cy="-4.9" r="2.7"></circle>
-        <circle class="sun-aperture-flare-core" cx="-3.9" cy="-5.2" r="1.15"></circle>
-      </symbol>
     </defs>
   </svg>
 
@@ -636,7 +603,7 @@
           </g>
 
           <g transform="translate(642 88)">
-            <use href="#marker-sun-aperture-rays" class="sun-marker" width="48" height="48" x="-24" y="-24"></use>
+            <image href="assets/sun-marker-aperture-flare.svg" class="sun-marker" width="48" height="48" x="-24" y="-24"></image>
             <text class="scale-label" x="0" y="54" text-anchor="middle">Richer option</text>
             <text class="scale-note" x="0" y="70" text-anchor="middle">more detail, still compact</text>
           </g>
@@ -874,7 +841,7 @@
             <text class="chart-time-label" x="656" y="355" text-anchor="middle">13</text>
 
             <path class="sun-track" d="M344 248C384 222 426 198 486 174"></path>
-            <g transform="translate(486 174)"><use href="#marker-sun-aperture-rays" class="sun-marker" width="48" height="48" x="-24" y="-24"></use></g>
+            <g transform="translate(486 174)"><image href="assets/sun-marker-aperture-flare.svg" class="sun-marker" width="48" height="48" x="-24" y="-24"></image></g>
 
             <circle class="moon-dot" cx="74" cy="326" r="5"></circle>
             <circle class="moon-dot" cx="146" cy="246" r="5"></circle>
@@ -903,6 +870,7 @@
       <h2 id="decision-title">Implementation notes</h2>
       <ul>
         <li>All proposed Sun markers use a footprint close to the Alternative Moon marker, but still smaller than the Best Moon marker.</li>
+        <li>The selected D3 aperture-flare marker is stored as <code>docs/design/assets/sun-marker-aperture-flare.svg</code> for reuse in the implementation branch.</li>
         <li>The chart should continue to omit negative-altitude Sun positions and Sun positions above the maximum displayed Moon altitude.</li>
         <li>Variant A is the cleanest conservative candidate; variant B is the most photographic; variant C emphasizes azimuth; variant D3 is the selected aperture-flare direction.</li>
       </ul>
