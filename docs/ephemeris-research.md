@@ -96,6 +96,7 @@ EphemerisService
     - next moonrise time
     - next moonset time
     - Sun altitude degrees
+    - Sun azimuth degrees
 ```
 
 This boundary allows replacing the ephemeris library later without changing scoring or UI code.

@@ -30,7 +30,8 @@
             "azimuthDegrees": 112,
             "sunAltitudeDegrees": -14,
             "lightBucket": "night",
-            "role": "start"
+            "role": "start",
+            "sunAzimuthDegrees": 24
           },
           "end": {
             "at": "2026-07-04T07:25:00Z",
@@ -38,7 +39,8 @@
             "azimuthDegrees": 248,
             "sunAltitudeDegrees": 32,
             "lightBucket": "daylight",
-            "role": "end"
+            "role": "end",
+            "sunAzimuthDegrees": 114
           },
           "samples": [
             {
@@ -47,7 +49,8 @@
               "azimuthDegrees": 112,
               "sunAltitudeDegrees": -14,
               "lightBucket": "night",
-              "role": "start"
+              "role": "start",
+              "sunAzimuthDegrees": 24
             },
             {
               "at": "2026-07-04T03:40:00Z",
@@ -55,7 +58,8 @@
               "azimuthDegrees": 180,
               "sunAltitudeDegrees": -6,
               "lightBucket": "civil_twilight",
-              "role": "path"
+              "role": "path",
+              "sunAzimuthDegrees": 58
             },
             {
               "at": "2026-07-04T07:25:00Z",
@@ -63,7 +67,8 @@
               "azimuthDegrees": 248,
               "sunAltitudeDegrees": 32,
               "lightBucket": "daylight",
-              "role": "end"
+              "role": "end",
+              "sunAzimuthDegrees": 114
             }
           ]
         }
@@ -95,7 +100,8 @@
           "azimuthDegrees": 210,
           "sunAltitudeDegrees": 4,
           "lightBucket": "golden_hour",
-          "role": "start"
+          "role": "start",
+          "sunAzimuthDegrees": 71
         },
         "suggested": {
           "at": "2026-07-04T06:40:00Z",
@@ -103,7 +109,8 @@
           "azimuthDegrees": 245,
           "sunAltitudeDegrees": 32,
           "lightBucket": "daylight",
-          "role": "suggested"
+          "role": "suggested",
+          "sunAzimuthDegrees": 102
         },
         "end": {
           "at": "2026-07-04T07:25:00Z",
@@ -111,7 +118,8 @@
           "azimuthDegrees": 248,
           "sunAltitudeDegrees": 32,
           "lightBucket": "daylight",
-          "role": "end"
+          "role": "end",
+          "sunAzimuthDegrees": 114
         },
         "samples": [
           {
@@ -120,7 +128,8 @@
             "azimuthDegrees": 210,
             "sunAltitudeDegrees": 4,
             "lightBucket": "golden_hour",
-            "role": "start"
+            "role": "start",
+            "sunAzimuthDegrees": 71
           },
           {
             "at": "2026-07-04T06:40:00Z",
@@ -128,7 +137,8 @@
             "azimuthDegrees": 245,
             "sunAltitudeDegrees": 32,
             "lightBucket": "daylight",
-            "role": "suggested"
+            "role": "suggested",
+            "sunAzimuthDegrees": 102
           },
           {
             "at": "2026-07-04T07:25:00Z",
@@ -136,13 +146,15 @@
             "azimuthDegrees": 248,
             "sunAltitudeDegrees": 32,
             "lightBucket": "daylight",
-            "role": "end"
+            "role": "end",
+            "sunAzimuthDegrees": 114
           }
         ]
       },
       "sun": {
         "altitudeDegrees": 32.2,
-        "lightBucket": "daylight"
+        "lightBucket": "daylight",
+        "azimuthDegrees": 102
       },
       "weather": {
         "sourceResolution": "hourly",
@@ -181,7 +193,8 @@
             "azimuthDegrees": 112,
             "sunAltitudeDegrees": -14,
             "lightBucket": "night",
-            "role": "start"
+            "role": "start",
+            "sunAzimuthDegrees": 24
           },
           "end": {
             "at": "2026-07-04T07:25:00Z",
@@ -189,7 +202,8 @@
             "azimuthDegrees": 248,
             "sunAltitudeDegrees": 32,
             "lightBucket": "daylight",
-            "role": "end"
+            "role": "end",
+            "sunAzimuthDegrees": 114
           },
           "samples": [
             {
@@ -198,7 +212,8 @@
               "azimuthDegrees": 112,
               "sunAltitudeDegrees": -14,
               "lightBucket": "night",
-              "role": "start"
+              "role": "start",
+              "sunAzimuthDegrees": 24
             },
             {
               "at": "2026-07-04T03:40:00Z",
@@ -206,7 +221,8 @@
               "azimuthDegrees": 180,
               "sunAltitudeDegrees": -6,
               "lightBucket": "civil_twilight",
-              "role": "path"
+              "role": "path",
+              "sunAzimuthDegrees": 58
             },
             {
               "at": "2026-07-04T07:25:00Z",
@@ -214,7 +230,8 @@
               "azimuthDegrees": 248,
               "sunAltitudeDegrees": 32,
               "lightBucket": "daylight",
-              "role": "end"
+              "role": "end",
+              "sunAzimuthDegrees": 114
             }
           ]
         }
@@ -246,7 +263,8 @@
           "azimuthDegrees": 145,
           "sunAltitudeDegrees": -8,
           "lightBucket": "nautical_twilight",
-          "role": "start"
+          "role": "start",
+          "sunAzimuthDegrees": 42
         },
         "suggested": {
           "at": "2026-07-04T02:12:00Z",
@@ -254,7 +272,8 @@
           "azimuthDegrees": 180,
           "sunAltitudeDegrees": -6,
           "lightBucket": "civil_twilight",
-          "role": "suggested"
+          "role": "suggested",
+          "sunAzimuthDegrees": 43
         },
         "end": {
           "at": "2026-07-04T04:30:00Z",
@@ -262,7 +281,8 @@
           "azimuthDegrees": 212,
           "sunAltitudeDegrees": 1,
           "lightBucket": "golden_hour",
-          "role": "end"
+          "role": "end",
+          "sunAzimuthDegrees": 70
         },
         "samples": [
           {
@@ -271,7 +291,8 @@
             "azimuthDegrees": 145,
             "sunAltitudeDegrees": -8,
             "lightBucket": "nautical_twilight",
-            "role": "start"
+            "role": "start",
+            "sunAzimuthDegrees": 42
           },
           {
             "at": "2026-07-04T02:12:00Z",
@@ -279,7 +300,8 @@
             "azimuthDegrees": 180,
             "sunAltitudeDegrees": -6,
             "lightBucket": "civil_twilight",
-            "role": "suggested"
+            "role": "suggested",
+            "sunAzimuthDegrees": 43
           },
           {
             "at": "2026-07-04T04:30:00Z",
@@ -287,13 +309,15 @@
             "azimuthDegrees": 212,
             "sunAltitudeDegrees": 1,
             "lightBucket": "golden_hour",
-            "role": "end"
+            "role": "end",
+            "sunAzimuthDegrees": 70
           }
         ]
       },
       "sun": {
         "altitudeDegrees": -6,
-        "lightBucket": "civil_twilight"
+        "lightBucket": "civil_twilight",
+        "azimuthDegrees": 43
       },
       "weather": {
         "sourceResolution": "hourly",
@@ -332,7 +356,8 @@
             "azimuthDegrees": 50,
             "sunAltitudeDegrees": -12,
             "lightBucket": "night",
-            "role": "start"
+            "role": "start",
+            "sunAzimuthDegrees": 31
           },
           "end": {
             "at": "2026-07-10T15:21:00Z",
@@ -340,7 +365,8 @@
             "azimuthDegrees": 310,
             "sunAltitudeDegrees": 42,
             "lightBucket": "daylight",
-            "role": "end"
+            "role": "end",
+            "sunAzimuthDegrees": 270
           },
           "samples": [
             {
@@ -349,7 +375,8 @@
               "azimuthDegrees": 50,
               "sunAltitudeDegrees": -12,
               "lightBucket": "night",
-              "role": "start"
+              "role": "start",
+              "sunAzimuthDegrees": 31
             },
             {
               "at": "2026-07-10T08:00:00Z",
@@ -357,7 +384,8 @@
               "azimuthDegrees": 180,
               "sunAltitudeDegrees": 30,
               "lightBucket": "daylight",
-              "role": "path"
+              "role": "path",
+              "sunAzimuthDegrees": 145
             },
             {
               "at": "2026-07-10T15:21:00Z",
@@ -365,7 +393,8 @@
               "azimuthDegrees": 310,
               "sunAltitudeDegrees": 42,
               "lightBucket": "daylight",
-              "role": "end"
+              "role": "end",
+              "sunAzimuthDegrees": 270
             }
           ]
         }
@@ -397,7 +426,8 @@
           "azimuthDegrees": 250,
           "sunAltitudeDegrees": 44,
           "lightBucket": "daylight",
-          "role": "start"
+          "role": "start",
+          "sunAzimuthDegrees": 215
         },
         "suggested": {
           "at": "2026-07-10T14:29:00Z",
@@ -405,7 +435,8 @@
           "azimuthDegrees": 315,
           "sunAltitudeDegrees": 42,
           "lightBucket": "daylight",
-          "role": "suggested"
+          "role": "suggested",
+          "sunAzimuthDegrees": 258
         },
         "end": {
           "at": "2026-07-10T15:21:00Z",
@@ -413,7 +444,8 @@
           "azimuthDegrees": 310,
           "sunAltitudeDegrees": 42,
           "lightBucket": "daylight",
-          "role": "end"
+          "role": "end",
+          "sunAzimuthDegrees": 270
         },
         "samples": [
           {
@@ -422,7 +454,8 @@
             "azimuthDegrees": 250,
             "sunAltitudeDegrees": 44,
             "lightBucket": "daylight",
-            "role": "start"
+            "role": "start",
+            "sunAzimuthDegrees": 215
           },
           {
             "at": "2026-07-10T14:29:00Z",
@@ -430,7 +463,8 @@
             "azimuthDegrees": 315,
             "sunAltitudeDegrees": 42,
             "lightBucket": "daylight",
-            "role": "suggested"
+            "role": "suggested",
+            "sunAzimuthDegrees": 258
           },
           {
             "at": "2026-07-10T15:21:00Z",
@@ -438,13 +472,15 @@
             "azimuthDegrees": 310,
             "sunAltitudeDegrees": 42,
             "lightBucket": "daylight",
-            "role": "end"
+            "role": "end",
+            "sunAzimuthDegrees": 270
           }
         ]
       },
       "sun": {
         "altitudeDegrees": 42,
-        "lightBucket": "daylight"
+        "lightBucket": "daylight",
+        "azimuthDegrees": 258
       },
       "weather": {
         "sourceResolution": "hourly",

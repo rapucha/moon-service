@@ -16,6 +16,8 @@ var DESKTOP_PLOT_WIDTH = 672;
 var MOBILE_ALTITUDE_WIDTH = 320;
 var MOBILE_PLOT_WIDTH = 272;
 var AZIMUTH_RAIL_LABEL_EDGE_INSET = 10;
+var SUN_SAMPLE_MARKER_IMAGE_URL = "/sun-marker-aperture-flare.svg";
+var SUN_SAMPLE_MARKER_SIZE = 42;
 
 export function moonPathPanel(opportunity, timezone, countryCode, chartContext) {
   var path = opportunity.moonPath || {};
@@ -117,6 +119,7 @@ function altitudeChartSvg(sourcePoints, timezone, countryCode, mode, chartContex
   var azimuthLabels = azimuthRailLabels(points, left, chartWidth, mode);
   var markerImageUrl = moonPhaseImageDataUrl(moon.phaseAngleDegrees, 64);
   var visibleMarkers = visibleAltitudeMarkers(points, mode);
+  var sunMarkers = visibleSunMarkers(points, ceiling, bottom, chartHeight, mode);
 
   return svgElement("svg", {
     className: "altitude-chart altitude-chart-" + mode,
@@ -173,6 +176,9 @@ function altitudeChartSvg(sourcePoints, timezone, countryCode, mode, chartContex
         y: tick.y,
         textAnchor: tick.anchor
       }, formatHourTick(tick.at, timezone, countryCode));
+    }),
+    sunMarkers.map(function (point) {
+      return sunMarker(point);
     }),
     visibleMarkers.map(function (point) {
       return altitudeMarker(point, markerImageUrl);
@@ -391,6 +397,8 @@ function altitudeMarker(point, imageUrl) {
 
   return svgElement("g", {
     className: className,
+    role: "img",
+    ariaLabel: title,
     "data-sequence": point.sequence,
     "data-at": point.at,
     transform: "translate(" + round1(point.x) + " " + round1(point.y) + ")"
@@ -412,6 +420,70 @@ function altitudeMarker(point, imageUrl) {
       })
       : svgElement("circle", { className: "moon-sample-dot is-" + roleClass(point.role), cx: 0, cy: 0, r: size / 2 }),
     suggested ? svgElement("circle", { className: "moon-sample-marker-ring", cx: 0, cy: 0, r: ringRadius }) : null
+  );
+}
+
+function visibleSunMarkers(points, ceiling, bottom, chartHeight, mode) {
+  var minimumDistance = mode === "mobile" ? 32 : 40;
+  var visible = [];
+
+  points.forEach(function (point) {
+    if (!Number.isFinite(point.sunAltitudeDegrees)
+      || !Number.isFinite(point.sunAzimuthDegrees)
+      || point.sunAltitudeDegrees < 0) {
+      return;
+    }
+
+    var marker = {
+      at: point.at,
+      sequence: point.sequence,
+      x: point.x,
+      y: sunMarkerY(point.sunAltitudeDegrees, ceiling, bottom, chartHeight),
+      altitudeDegrees: point.sunAltitudeDegrees,
+      azimuthDegrees: point.sunAzimuthDegrees
+    };
+    if (isTooCloseToAny(marker, visible, minimumDistance)) {
+      return;
+    }
+    visible.push(marker);
+  });
+
+  return visible;
+}
+
+function sunMarkerY(sunAltitudeDegrees, ceiling, bottom, chartHeight) {
+  return bottom - (clamp(sunAltitudeDegrees, 0, ceiling) / ceiling) * chartHeight;
+}
+
+function sunMarker(point) {
+  var title = "Sun position sample, "
+    + degrees(point.altitudeDegrees)
+    + " altitude, "
+    + degrees(point.azimuthDegrees)
+    + " azimuth "
+    + compassDirection(point.azimuthDegrees);
+
+  return svgElement("g", {
+    className: "sun-sample-marker",
+    role: "img",
+    ariaLabel: title,
+    "data-sequence": point.sequence,
+    "data-at": point.at,
+    "data-sun-altitude-degrees": round1(point.altitudeDegrees),
+    "data-sun-azimuth-degrees": round1(point.azimuthDegrees),
+    "data-marker-resource": SUN_SAMPLE_MARKER_IMAGE_URL,
+    transform: "translate(" + round1(point.x) + " " + round1(point.y) + ")"
+  },
+    svgElement("title", {}, title),
+    svgElement("image", {
+      className: "sun-sample-marker-image",
+      href: SUN_SAMPLE_MARKER_IMAGE_URL,
+      x: -SUN_SAMPLE_MARKER_SIZE / 2,
+      y: -SUN_SAMPLE_MARKER_SIZE / 2,
+      width: SUN_SAMPLE_MARKER_SIZE,
+      height: SUN_SAMPLE_MARKER_SIZE,
+      preserveAspectRatio: "xMidYMid meet"
+    })
   );
 }
 
@@ -446,6 +518,7 @@ function chartSamples(samples) {
       altitudeDegrees: sample.altitudeDegrees,
       azimuthDegrees: sample.azimuthDegrees,
       sunAltitudeDegrees: sample.sunAltitudeDegrees,
+      sunAzimuthDegrees: sample.sunAzimuthDegrees,
       lightBucket: sample.lightBucket,
       role: sample.role || "path",
       markerLabel: sample.markerLabel

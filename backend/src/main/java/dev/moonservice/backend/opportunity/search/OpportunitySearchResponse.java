@@ -95,6 +95,7 @@ public record OpportunitySearchResponse(
             double altitudeDegrees,
             double azimuthDegrees,
             double sunAltitudeDegrees,
+            double sunAzimuthDegrees,
             String lightBucket,
             String role
     ) {
@@ -102,6 +103,7 @@ public record OpportunitySearchResponse(
 
     public record Sun(
             double altitudeDegrees,
+            double azimuthDegrees,
             String lightBucket
     ) {
     }

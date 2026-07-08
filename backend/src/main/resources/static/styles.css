@@ -1043,6 +1043,14 @@ dd {
   filter: drop-shadow(0 2px 3px rgba(16, 31, 36, 0.24));
 }
 
+.sun-sample-marker {
+  opacity: 0.84;
+}
+
+.sun-sample-marker-image {
+  filter: drop-shadow(0 1px 1px rgba(166, 113, 24, 0.08));
+}
+
 .moon-sample-dot {
   fill: var(--surface);
   stroke: var(--accent);

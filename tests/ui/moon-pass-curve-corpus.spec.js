@@ -30,6 +30,8 @@ test("renders provider-free curve corpus for review", async ({ page }, testInfo)
     await expect(card.locator(".chart-path")).toHaveCount(0);
     await expect(card.locator(".altitude-chart-desktop .moon-sample-marker")).toHaveCount(expected.desktopVisibleCount);
     await expect(card.locator(".altitude-chart-mobile .moon-sample-marker")).toHaveCount(expected.mobileVisibleCount);
+    await expect(card.locator(".altitude-chart-desktop .sun-sample-marker")).toHaveCount(expected.desktopSunVisibleCount);
+    await expect(card.locator(".altitude-chart-mobile .sun-sample-marker")).toHaveCount(expected.mobileSunVisibleCount);
     await expect(card.locator(".altitude-chart-desktop .moon-sample-marker.is-suggested")).toHaveCount(curveCase.recommendationCount);
     await expect(card.locator(".altitude-chart-desktop .moon-sample-marker-label")).toHaveText(expected.labels);
     await expect(card.locator(".pass-choice-card")).toHaveCount(curveCase.recommendationCount);
@@ -60,6 +62,7 @@ test("keeps corpus dot markers within basic SVG invariants", async ({ page }) =>
 
     function chartDiagnostics(card, chartSelector, curveCase) {
       const markers = Array.from(card.querySelectorAll(chartSelector + " .moon-sample-marker"));
+      const sunMarkers = Array.from(card.querySelectorAll(chartSelector + " .sun-sample-marker"));
       if (markers.length === 0) {
         throw new Error("Missing dot markers for " + curveCase.id + " " + chartSelector);
       }
@@ -82,14 +85,36 @@ test("keeps corpus dot markers within basic SVG invariants", async ({ page }) =>
       const bounds = chartSelector.includes("mobile")
         ? { minX: 34, maxX: 306, minY: 70, maxY: 326 }
         : { minX: 34, maxX: 706, minY: 70, maxY: 326 };
+      const sunSamples = sunMarkers.map(marker => {
+        const transform = marker.getAttribute("transform") || "";
+        const match = transform.match(/translate\(([-0-9.]+)\s+([-0-9.]+)\)/);
+        if (!match) {
+          throw new Error("Missing Sun marker transform for " + curveCase.id);
+        }
+        const markerImage = marker.querySelector("image.sun-sample-marker-image");
+        return {
+          sequence: Number(marker.getAttribute("data-sequence")),
+          x: Number(match[1]),
+          y: Number(match[2]),
+          altitudeDegrees: Number(marker.getAttribute("data-sun-altitude-degrees")),
+          azimuthDegrees: Number(marker.getAttribute("data-sun-azimuth-degrees")),
+          imageHref: markerImage?.getAttribute("href") || ""
+        };
+      }).sort((a, b) => a.sequence - b.sequence);
       return {
         markerCount: samples.length,
+        sunMarkerCount: sunSamples.length,
         suggestedCount: samples.filter(point => point.suggested).length,
         protectedSequences: protectedSamples.map(point => point.sequence),
         backtracks: xBacktrackCount(samples),
+        sunBacktracks: xBacktrackCount(sunSamples),
         ordinaryClosePairs: closePairCount(ordinarySamples, ordinarySamples, chartSelector.includes("mobile") ? 13 : 18),
         ordinaryNearProtected: closePairCount(ordinarySamples, protectedSamples, chartSelector.includes("mobile") ? 17 : 24),
-        outOfBounds: samples.filter(point => point.x < bounds.minX || point.x > bounds.maxX || point.y < bounds.minY || point.y > bounds.maxY).length
+        sunClosePairs: closePairCount(sunSamples, sunSamples, chartSelector.includes("mobile") ? 32 : 40),
+        outOfBounds: samples.filter(point => point.x < bounds.minX || point.x > bounds.maxX || point.y < bounds.minY || point.y > bounds.maxY).length,
+        sunOutOfBounds: sunSamples.filter(point => point.x < bounds.minX || point.x > bounds.maxX || point.y < bounds.minY || point.y > bounds.maxY).length,
+        sunMissingData: sunSamples.filter(point => !Number.isFinite(point.altitudeDegrees) || !Number.isFinite(point.azimuthDegrees)).length,
+        sunMissingImage: sunSamples.filter(point => point.imageHref !== "/sun-marker-aperture-flare.svg").length
       };
     }
 
@@ -131,18 +156,30 @@ test("keeps corpus dot markers within basic SVG invariants", async ({ page }) =>
     const expected = markerExpectations.get(item.passId);
     expect(item.desktop.markerCount, item.id).toBe(expected.desktopVisibleCount);
     expect(item.mobile.markerCount, item.id).toBe(expected.mobileVisibleCount);
+    expect(item.desktop.sunMarkerCount, item.id).toBe(expected.desktopSunVisibleCount);
+    expect(item.mobile.sunMarkerCount, item.id).toBe(expected.mobileSunVisibleCount);
     expect(item.desktop.suggestedCount, item.id).toBe(expected.labels.length);
     expect(item.mobile.suggestedCount, item.id).toBe(expected.labels.length);
     expect(item.desktop.protectedSequences, item.id).toEqual(expected.protectedSequences);
     expect(item.mobile.protectedSequences, item.id).toEqual(expected.protectedSequences);
     expect(item.desktop.backtracks, item.id).toBe(0);
     expect(item.mobile.backtracks, item.id).toBe(0);
+    expect(item.desktop.sunBacktracks, item.id).toBe(0);
+    expect(item.mobile.sunBacktracks, item.id).toBe(0);
     expect(item.desktop.ordinaryClosePairs, item.id).toBe(0);
     expect(item.mobile.ordinaryClosePairs, item.id).toBe(0);
     expect(item.desktop.ordinaryNearProtected, item.id).toBe(0);
     expect(item.mobile.ordinaryNearProtected, item.id).toBe(0);
+    expect(item.desktop.sunClosePairs, item.id).toBe(0);
+    expect(item.mobile.sunClosePairs, item.id).toBe(0);
     expect(item.desktop.outOfBounds, item.id).toBe(0);
     expect(item.mobile.outOfBounds, item.id).toBe(0);
+    expect(item.desktop.sunOutOfBounds, item.id).toBe(0);
+    expect(item.mobile.sunOutOfBounds, item.id).toBe(0);
+    expect(item.desktop.sunMissingData, item.id).toBe(0);
+    expect(item.mobile.sunMissingData, item.id).toBe(0);
+    expect(item.desktop.sunMissingImage, item.id).toBe(0);
+    expect(item.mobile.sunMissingImage, item.id).toBe(0);
   }
 });
 
@@ -199,12 +236,16 @@ function markerExpectationsByPassId(payload) {
       .map(sample => sample.markerLabel);
     const desktopVisible = visibleMarkers(samples, "desktop", mobileReferenceDurationMs);
     const mobileVisible = visibleMarkers(samples, "mobile", mobileReferenceDurationMs);
+    const desktopSunVisible = visibleSunMarkers(samples, "desktop", mobileReferenceDurationMs);
+    const mobileSunVisible = visibleSunMarkers(samples, "mobile", mobileReferenceDurationMs);
     const lastSequence = Math.max(0, samples.length - 1);
 
     return [passId, {
       sourceCount: samples.length,
       desktopVisibleCount: desktopVisible.length,
       mobileVisibleCount: mobileVisible.length,
+      desktopSunVisibleCount: desktopSunVisible.length,
+      mobileSunVisibleCount: mobileSunVisible.length,
       protectedSequences: samples
         .map((sample, index) => ({ sample, index }))
         .filter(({ sample, index }) => sample.role === "suggested" || index === 0 || index === lastSequence)
@@ -212,6 +253,36 @@ function markerExpectationsByPassId(payload) {
       labels
     }];
   }));
+}
+
+function visibleSunMarkers(samples, mode, mobileReferenceDurationMs) {
+  const points = chartPoints(samples, mode, mobileReferenceDurationMs);
+  const maxMoonAltitude = points.reduce((max, point) => Math.max(max, point.altitudeDegrees), 0);
+  const ceiling = Math.min(90, Math.max(12, Math.ceil((maxMoonAltitude + 1) / 5) * 5));
+  const minimumDistance = mode === "mobile" ? 32 : 40;
+  const visible = [];
+
+  for (const point of points) {
+    if (!Number.isFinite(point.sunAltitudeDegrees)
+      || !Number.isFinite(point.sunAzimuthDegrees)
+      || point.sunAltitudeDegrees < 0) {
+      continue;
+    }
+
+    const marker = {
+      ...point,
+      y: sunMarkerY(point.sunAltitudeDegrees, ceiling)
+    };
+    if (!isTooCloseToAny(marker, visible, minimumDistance)) {
+      visible.push(marker);
+    }
+  }
+
+  return visible;
+}
+
+function sunMarkerY(sunAltitudeDegrees, ceiling) {
+  return 326 - (Math.min(Math.max(sunAltitudeDegrees, 0), ceiling) / ceiling) * (326 - 70);
 }
 
 function visibleMarkers(samples, mode, mobileReferenceDurationMs) {
@@ -242,6 +313,8 @@ function chartPoints(samples, mode, mobileReferenceDurationMs) {
     time: new Date(sample.at).getTime(),
     altitudeDegrees: sample.altitudeDegrees,
     azimuthDegrees: sample.azimuthDegrees,
+    sunAltitudeDegrees: sample.sunAltitudeDegrees,
+    sunAzimuthDegrees: sample.sunAzimuthDegrees,
     role: sample.role || "path"
   })).filter(sample => Number.isFinite(sample.time)
     && Number.isFinite(sample.altitudeDegrees)

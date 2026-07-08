@@ -323,6 +323,9 @@ Response rules:
 - `moonPath` points include `lightBucket` derived from Sun altitude so clients
   can show daylight, golden hour, twilight, and night changes across the same
   Moon path without treating weather precision as minute-level.
+- `moonPath` points include `sunAzimuthDegrees` alongside
+  `sunAltitudeDegrees` so clients can annotate secondary Sun positions without
+  doing their own ephemeris calculation.
 - Do not expose ephemeris sampling cadence such as `stepMinutes` in the public
   API.
 - Weather fields on an opportunity are aggregates over the merged weather
@@ -371,6 +374,7 @@ Response rules:
             "altitudeDegrees": 0.1,
             "azimuthDegrees": 119.4,
             "sunAltitudeDegrees": -1.2,
+            "sunAzimuthDegrees": 306.4,
             "lightBucket": "civil_twilight",
             "role": "start"
           },
@@ -379,6 +383,7 @@ Response rules:
             "altitudeDegrees": 0.1,
             "azimuthDegrees": 236.8,
             "sunAltitudeDegrees": -14.0,
+            "sunAzimuthDegrees": 42.1,
             "lightBucket": "night",
             "role": "end"
           },
@@ -388,6 +393,7 @@ Response rules:
               "altitudeDegrees": 0.1,
               "azimuthDegrees": 119.4,
               "sunAltitudeDegrees": -1.2,
+              "sunAzimuthDegrees": 306.4,
               "lightBucket": "civil_twilight",
               "role": "start"
             },
@@ -396,6 +402,7 @@ Response rules:
               "altitudeDegrees": 31.4,
               "azimuthDegrees": 181.2,
               "sunAltitudeDegrees": -15.3,
+              "sunAzimuthDegrees": 354.8,
               "lightBucket": "night",
               "role": "path"
             },
@@ -404,6 +411,7 @@ Response rules:
               "altitudeDegrees": 0.1,
               "azimuthDegrees": 236.8,
               "sunAltitudeDegrees": -14.0,
+              "sunAzimuthDegrees": 42.1,
               "lightBucket": "night",
               "role": "end"
             }
@@ -429,6 +437,7 @@ Response rules:
           "altitudeDegrees": 0.1,
           "azimuthDegrees": 119.4,
           "sunAltitudeDegrees": -1.2,
+          "sunAzimuthDegrees": 306.4,
           "lightBucket": "civil_twilight",
           "role": "start"
         },
@@ -437,6 +446,7 @@ Response rules:
           "altitudeDegrees": 4.2,
           "azimuthDegrees": 126.5,
           "sunAltitudeDegrees": -4.8,
+          "sunAzimuthDegrees": 312.2,
           "lightBucket": "civil_twilight",
           "role": "suggested"
         },
@@ -445,6 +455,7 @@ Response rules:
           "altitudeDegrees": 11.8,
           "azimuthDegrees": 138.2,
           "sunAltitudeDegrees": -9.1,
+          "sunAzimuthDegrees": 321.7,
           "lightBucket": "nautical_twilight",
           "role": "end"
         },
@@ -454,6 +465,7 @@ Response rules:
             "altitudeDegrees": 0.1,
             "azimuthDegrees": 119.4,
             "sunAltitudeDegrees": -1.2,
+            "sunAzimuthDegrees": 306.4,
             "lightBucket": "civil_twilight",
             "role": "start"
           },
@@ -462,6 +474,7 @@ Response rules:
             "altitudeDegrees": 2.5,
             "azimuthDegrees": 123.6,
             "sunAltitudeDegrees": -3.2,
+            "sunAzimuthDegrees": 309.8,
             "lightBucket": "civil_twilight",
             "role": "path"
           },
@@ -470,6 +483,7 @@ Response rules:
             "altitudeDegrees": 4.2,
             "azimuthDegrees": 126.5,
             "sunAltitudeDegrees": -4.8,
+            "sunAzimuthDegrees": 312.2,
             "lightBucket": "civil_twilight",
             "role": "suggested"
           },
@@ -478,6 +492,7 @@ Response rules:
             "altitudeDegrees": 7.1,
             "azimuthDegrees": 131.8,
             "sunAltitudeDegrees": -6.8,
+            "sunAzimuthDegrees": 316.9,
             "lightBucket": "nautical_twilight",
             "role": "path"
           },
@@ -486,6 +501,7 @@ Response rules:
             "altitudeDegrees": 11.8,
             "azimuthDegrees": 138.2,
             "sunAltitudeDegrees": -9.1,
+            "sunAzimuthDegrees": 321.7,
             "lightBucket": "nautical_twilight",
             "role": "end"
           }
@@ -493,6 +509,7 @@ Response rules:
       },
       "sun": {
         "altitudeDegrees": -4.8,
+        "azimuthDegrees": 312.2,
         "lightBucket": "civil_twilight"
       },
       "weather": {

@@ -54,6 +54,8 @@ class ScoringOpportunitySearchEngineTest {
         assertEquals(first.endsAt(), first.moonPath().end().at());
         assertFalse(first.moonPath().suggested().lightBucket().isBlank());
         assertTrue(Double.isFinite(first.moonPath().suggested().sunAltitudeDegrees()));
+        assertTrue(Double.isFinite(first.moonPath().suggested().sunAzimuthDegrees()));
+        assertTrue(Double.isFinite(first.sun().azimuthDegrees()));
         assertTrue(first.moonPath().samples().size() >= 5);
         assertFalse(first.moonPath().samples().getFirst().lightBucket().isBlank());
         assertTrue(response.messages().stream()

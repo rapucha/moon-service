@@ -93,6 +93,7 @@ public final class ResponseFormatter {
 
         ObjectNode sun = opportunity.putObject("sun");
         sun.put("altitudeDegrees", round3(window.suggested().sunAltitudeDegrees()));
+        sun.put("azimuthDegrees", round3(window.suggested().sunAzimuthDegrees()));
         sun.put("lightBucket", ScoringModel.lightBucket(window.suggested().sunAltitudeDegrees()));
 
         ObjectNode weatherNode = opportunity.putObject("weather");
@@ -155,6 +156,7 @@ public final class ResponseFormatter {
         node.put("altitudeDegrees", round3(sample.moonAltitudeDegrees()));
         node.put("azimuthDegrees", round3(sample.moonAzimuthDegrees()));
         node.put("sunAltitudeDegrees", round3(sample.sunAltitudeDegrees()));
+        node.put("sunAzimuthDegrees", round3(sample.sunAzimuthDegrees()));
         node.put("lightBucket", ScoringModel.lightBucket(sample.sunAltitudeDegrees()));
         node.put("role", role);
     }

@@ -91,7 +91,8 @@ class V0ScoringPolicyTest {
                 120.0,
                 moonIlluminationPercent,
                 180.0,
-                sunAltitudeDegrees
+                sunAltitudeDegrees,
+                90.0
         );
         MoonSample start = new MoonSample(
                 SUGGESTED_AT.minus(Duration.ofMinutes(30)),
@@ -99,7 +100,8 @@ class V0ScoringPolicyTest {
                 116.0,
                 moonIlluminationPercent,
                 180.0,
-                sunAltitudeDegrees
+                sunAltitudeDegrees,
+                86.0
         );
         MoonSample end = new MoonSample(
                 SUGGESTED_AT.plus(Duration.ofMinutes(30)),
@@ -107,7 +109,8 @@ class V0ScoringPolicyTest {
                 124.0,
                 moonIlluminationPercent,
                 180.0,
-                sunAltitudeDegrees
+                sunAltitudeDegrees,
+                94.0
         );
         MoonWindow window = new MoonWindow(
                 Locations.PRAGUE,

@@ -45,6 +45,41 @@ test("renders grouped Moon pass cards", async ({ page }) => {
     .toHaveAttribute("aria-hidden", "true");
   await expect(page.locator(".moon-pass-card").first().locator("[data-moon-path-artwork]").first())
     .toBeAttached();
+  await expect(page.locator(".moon-pass-card").first().locator(".altitude-chart-desktop .sun-sample-marker"))
+    .toHaveCount(2);
+  await expect(page.locator(".moon-pass-card").first().locator(".altitude-chart-desktop .sun-sample-marker image.sun-sample-marker-image"))
+    .toHaveCount(2);
+  await expect(page.locator(".moon-pass-card").first().locator(".altitude-chart-desktop .sun-sample-marker").first())
+    .toHaveAttribute("data-marker-resource", "/sun-marker-aperture-flare.svg");
+  await expect(page.locator(".moon-pass-card").first().locator(".altitude-chart-desktop .sun-sample-marker image.sun-sample-marker-image").first())
+    .toHaveAttribute("href", "/sun-marker-aperture-flare.svg");
+  await expect(page.locator(".moon-pass-card").first().locator(".altitude-chart-desktop .sun-sample-marker[data-at='2026-07-04T06:40:00Z']"))
+    .toHaveAttribute("data-sun-altitude-degrees", "32");
+  await expect(page.locator(".moon-pass-card").first().locator(".altitude-chart-desktop .sun-sample-marker[data-at='2026-07-04T06:40:00Z'] title"))
+    .toHaveText("Sun position sample, 32.0° altitude, 102.0° azimuth ESE");
+  await expect(page.locator(".moon-pass-card").first().locator(".altitude-chart-desktop .sun-sample-marker[data-at='2026-07-04T02:12:00Z']"))
+    .toHaveCount(0);
+  await expect(page.locator(".moon-pass-card").nth(1).locator(".altitude-chart-desktop .sun-sample-marker"))
+    .toHaveCount(3);
+  await expect(page.locator(".moon-pass-card").nth(1).locator(".altitude-chart-desktop .sun-sample-marker[data-at='2026-07-10T08:00:00Z']"))
+    .toHaveAttribute("data-sun-azimuth-degrees", "145");
+  await expect(page.locator(".moon-pass-card").nth(1).locator(".altitude-chart-desktop .sun-sample-marker[data-at='2026-07-10T08:00:00Z'] title"))
+    .toHaveText("Sun position sample, 30.0° altitude, 145.0° azimuth SE");
+
+  const saturatedSunMarker = await page.locator(".moon-pass-card").first()
+    .locator(".altitude-chart-desktop .sun-sample-marker[data-at='2026-07-04T06:40:00Z']")
+    .evaluate(marker => {
+      const transform = marker.getAttribute("transform") || "";
+      const match = transform.match(/translate\(([-0-9.]+)\s+([-0-9.]+)\)/);
+      const gridlineY = Array.from(marker.closest("svg")?.querySelectorAll(".chart-gridline") || [])
+        .map(line => Number(line.getAttribute("y1")))
+        .filter(Number.isFinite);
+      return {
+        y: match ? Number(match[2]) : Number.NaN,
+        topY: Math.min(...gridlineY)
+      };
+    });
+  expect(saturatedSunMarker.y).toBe(saturatedSunMarker.topY);
 
   const azimuthRail = await page.locator(".moon-pass-card").first().locator(".altitude-chart-desktop").evaluate(chart => {
     const rail = chart.querySelector(".azimuth-rail-bg");

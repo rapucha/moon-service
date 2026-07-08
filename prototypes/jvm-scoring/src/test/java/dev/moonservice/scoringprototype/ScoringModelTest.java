@@ -94,7 +94,8 @@ class ScoringModelTest {
                 120.0,
                 illumination,
                 180.0,
-                sunAltitude
+                sunAltitude,
+                90.0
         );
     }
 }

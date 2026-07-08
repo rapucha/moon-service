@@ -71,6 +71,7 @@ class PragueContractTest {
         assertTrue(first.path("links").path("ics").asString().startsWith("/o/prague-cz-"));
         assertEquals(24, first.path("components").path("weatherFit").asInt());
         assertEquals(5, first.path("components").path("forecastConfidence").asInt());
+        assertTrue(first.path("sun").has("azimuthDegrees"));
         assertFalse(first.path("sun").path("lightBucket").asString().isBlank());
         assertEquals("hourly", first.path("weather").path("sourceResolution").asString());
         assertEquals("partly_cloudy", first.path("weather").path("segmentKind").asString());
@@ -103,8 +104,10 @@ class PragueContractTest {
         assertFalse(path.path("suggested").path("lightBucket").asString().isBlank());
         assertFalse(path.path("end").path("lightBucket").asString().isBlank());
         assertTrue(path.path("suggested").has("sunAltitudeDegrees"));
+        assertTrue(path.path("suggested").has("sunAzimuthDegrees"));
         assertTrue(path.path("samples").isArray());
         assertTrue(path.path("samples").size() >= 5);
+        assertTrue(path.path("samples").get(0).has("sunAzimuthDegrees"));
         assertFalse(path.path("samples").get(0).path("lightBucket").asString().isBlank());
     }
 
@@ -117,6 +120,7 @@ class PragueContractTest {
         assertEquals("end", path.path("end").path("role").asString());
         assertTrue(path.path("samples").isArray());
         assertTrue(path.path("samples").size() >= 5);
+        assertTrue(path.path("samples").get(0).has("sunAzimuthDegrees"));
         assertFalse(path.path("samples").get(0).path("lightBucket").asString().isBlank());
     }
 }
