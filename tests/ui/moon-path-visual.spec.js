@@ -32,8 +32,8 @@ test("keeps a representative Moon path card visually stable", async ({ page }, t
 
 function visibleChartSelector(projectName) {
   return projectName === "mobile"
-    ? ".altitude-chart-mobile"
-    : ".altitude-chart-desktop";
+    ? ".moon-altitude-chart.altitude-chart-mobile"
+    : ".moon-altitude-chart.altitude-chart-desktop";
 }
 
 async function hideMoonPathArtwork(page) {
