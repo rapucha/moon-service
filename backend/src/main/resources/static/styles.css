@@ -1044,11 +1044,11 @@ dd {
 }
 
 .sun-sample-marker {
-  opacity: 0.72;
+  opacity: 0.84;
 }
 
 .sun-sample-marker-image {
-  filter: drop-shadow(0 1px 1px rgba(91, 66, 22, 0.14));
+  filter: drop-shadow(0 1px 1px rgba(166, 113, 24, 0.08));
 }
 
 .moon-sample-dot {
