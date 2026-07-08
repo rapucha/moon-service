@@ -262,7 +262,7 @@ export function createResponseView(results, callbacks) {
               + " - "
               + formatDateTime(window.endsAt, timezone, countryCode)
               + ": "
-              + (window.reason || "Rejected by scoring filters."));
+              + (window.reason || window.reasonCode || "Rejected by scoring filters."));
         })
       )
     );

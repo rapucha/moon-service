@@ -98,4 +98,16 @@
  * @property {OpportunityLinks} links
  */
 
+/**
+ * @typedef {Object} RejectedWindow
+ * @property {string} startsAt
+ * @property {string} endsAt
+ * @property {string=} reasonCode
+ * @property {string=} reason
+ * @property {number=} moonSunSeparationDegrees
+ * @property {number=} moonIlluminationPercent
+ * @property {number=} moonAltitudeDegrees
+ * @property {number=} sunAltitudeDegrees
+ */
+
 export {};

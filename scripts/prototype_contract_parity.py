@@ -57,6 +57,7 @@ EXPOSURE_LABELS = {
 REJECTION_REASONS = {
     "moon_below_horizon",
     "moon_too_high_for_low_moon_mode",
+    "thin_crescent_near_conjunction",
     "overcast",
     "high_precipitation_probability",
     "low_visibility",
@@ -174,13 +175,21 @@ def assert_contract_shape(name: str, response: dict[str, Any]) -> None:
             raise AssertionError(f"{name}: unknown exposure label {label!r}")
 
     for rejected in response["rejected"]:
-        for reason in rejected["reasons"]:
+        for reason in rejection_reasons(rejected):
             if reason not in REJECTION_REASONS:
                 raise AssertionError(f"{name}: unknown rejection reason {reason!r}")
 
     message_codes = {message["code"] for message in response["messages"]}
     if "local_horizon_not_modelled" not in message_codes:
         raise AssertionError(f"{name}: missing local horizon message")
+
+
+def rejection_reasons(rejected: dict[str, Any]) -> list[str]:
+    if "reasons" in rejected:
+        return rejected["reasons"]
+    if "reasonCode" in rejected:
+        return [rejected["reasonCode"]]
+    return []
 
 
 def assert_maven_refactor_contract(response: dict[str, Any]) -> None:

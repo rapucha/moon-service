@@ -8,6 +8,8 @@ import org.junit.jupiter.api.Test;
 import java.time.Instant;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class ScoringModelTest {
     @Test
@@ -87,15 +89,47 @@ class ScoringModelTest {
         );
     }
 
+    @Test
+    void computesTopocentricMoonSunSeparationFromAltitudeAndAzimuth() {
+        MoonSample sample = sample(4.0, 0.2, 0.0, 61.0, 63.0);
+
+        assertEquals(4.47, sample.moonSunSeparationDegrees(), 0.01);
+    }
+
+    @Test
+    void rejectsNearConjunctionThinCrescentsButAllowsVisibleCrescentCases() {
+        MoonSample nearConjunction = sample(4.0, 0.2, 0.0, 61.0, 63.0);
+        MoonSample ordinaryCrescent = sample(4.0, 3.0, -3.0, 120.0, 90.0);
+        MoonSample separatedThinCrescent = sample(4.0, 0.2, -3.0, 120.0, 90.0);
+
+        assertEquals(
+                ScoringModel.THIN_CRESCENT_NEAR_CONJUNCTION,
+                ScoringModel.ordinaryVisibilityRejectionReason(nearConjunction).orElseThrow()
+        );
+        assertFalse(ScoringModel.ordinaryVisibilityRejectionReason(ordinaryCrescent).isPresent());
+        assertFalse(ScoringModel.ordinaryVisibilityRejectionReason(separatedThinCrescent).isPresent());
+        assertTrue(ordinaryCrescent.moonSunSeparationDegrees() > ScoringModel.NEAR_CONJUNCTION_MIN_SEPARATION_DEGREES);
+    }
+
     private static MoonSample sample(double moonAltitude, double illumination, double sunAltitude) {
+        return sample(moonAltitude, illumination, sunAltitude, 120.0, 90.0);
+    }
+
+    private static MoonSample sample(
+            double moonAltitude,
+            double illumination,
+            double sunAltitude,
+            double moonAzimuth,
+            double sunAzimuth
+    ) {
         return new MoonSample(
                 Instant.parse("2026-06-29T00:00:00Z"),
                 moonAltitude,
-                120.0,
+                moonAzimuth,
                 illumination,
                 180.0,
                 sunAltitude,
-                90.0
+                sunAzimuth
         );
     }
 }

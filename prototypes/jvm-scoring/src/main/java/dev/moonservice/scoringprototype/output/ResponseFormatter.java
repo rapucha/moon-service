@@ -8,6 +8,7 @@ import dev.moonservice.scoringprototype.fixture.Location;
 import dev.moonservice.scoringprototype.fixture.WeatherFixture;
 import dev.moonservice.scoringprototype.input.PrototypeConfig;
 import dev.moonservice.scoringprototype.scoring.ComponentScores;
+import dev.moonservice.scoringprototype.scoring.RejectedWindow;
 import dev.moonservice.scoringprototype.scoring.ScoredWindow;
 import dev.moonservice.scoringprototype.scoring.ScoringModel;
 import dev.moonservice.scoringprototype.service.PrototypeResult;
@@ -34,7 +35,7 @@ public final class ResponseFormatter {
         root.put("candidateWindowsEvaluated", result.candidateWindowsEvaluated());
         root.put("maxMoonAltitudeDegrees", config.maxMoonAltitudeDegrees());
         writeOpportunities(root, result.opportunities());
-        writeRejected(root);
+        writeRejected(root, result.rejected());
         writeMessages(root);
         writeDiagnostics(root);
         return root.toPrettyString();
@@ -229,8 +230,19 @@ public final class ResponseFormatter {
         return normalized < 0.0 ? normalized + 360.0 : normalized;
     }
 
-    private static void writeRejected(ObjectNode parent) {
-        parent.putArray("rejected");
+    private static void writeRejected(ObjectNode parent, List<RejectedWindow> rejectedWindows) {
+        ArrayNode rejected = parent.putArray("rejected");
+        for (RejectedWindow window : rejectedWindows) {
+            ObjectNode node = rejected.addObject();
+            node.put("startsAt", window.startsAt().toString());
+            node.put("endsAt", window.endsAt().toString());
+            node.put("reasonCode", window.reasonCode());
+            node.put("reason", window.reason());
+            node.put("moonSunSeparationDegrees", round3(window.moonSunSeparationDegrees()));
+            node.put("moonIlluminationPercent", round3(window.moonIlluminationPercent()));
+            node.put("moonAltitudeDegrees", round3(window.moonAltitudeDegrees()));
+            node.put("sunAltitudeDegrees", round3(window.sunAltitudeDegrees()));
+        }
     }
 
     private static void writeMessages(ObjectNode parent) {
@@ -251,6 +263,10 @@ public final class ResponseFormatter {
         ObjectNode diagnostics = parent.putObject("diagnostics");
         diagnostics.put("note", "Prototype only: fixture weather, no persistence, HTTP API, database, or backend framework.");
         diagnostics.put("selectionRule", "Moon passes are bounded by horizon crossings; recommendation windows inside a pass may be split by peak altitude or configured altitude thresholds.");
+        diagnostics.put(
+                "ordinaryVisibilityRule",
+                "Ordinary opportunities with Moon illumination below 1% and Sun-Moon separation below 8 degrees are rejected as near-conjunction thin crescents."
+        );
         diagnostics.put("weatherSource", "fixed_fixture");
         diagnostics.put("weatherResolution", "hourly_fixture");
     }

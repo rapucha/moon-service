@@ -133,7 +133,12 @@ public record OpportunitySearchResponse(
     public record RejectedWindow(
             String startsAt,
             String endsAt,
-            String reason
+            String reasonCode,
+            String reason,
+            double moonSunSeparationDegrees,
+            double moonIlluminationPercent,
+            double moonAltitudeDegrees,
+            double sunAltitudeDegrees
     ) {
     }
 

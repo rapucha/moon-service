@@ -4,12 +4,30 @@ import dev.moonservice.scoringprototype.ephemeris.MoonSample;
 import dev.moonservice.scoringprototype.fixture.WeatherFixture;
 import dev.moonservice.scoringprototype.window.MoonWindow;
 
+import java.util.Optional;
+
 public final class ScoringModel {
+    public static final String THIN_CRESCENT_NEAR_CONJUNCTION = "thin_crescent_near_conjunction";
+    public static final double NEAR_CONJUNCTION_MAX_ILLUMINATION_PERCENT = 1.0;
+    public static final double NEAR_CONJUNCTION_MIN_SEPARATION_DEGREES = 8.0;
+
     private ScoringModel() {
     }
 
     public static int candidateFit(MoonSample sample) {
         return scoreMoonAltitude(sample.moonAltitudeDegrees()) + scoreSunLight(sample.sunAltitudeDegrees());
+    }
+
+    public static Optional<String> ordinaryVisibilityRejectionReason(MoonWindow window) {
+        return ordinaryVisibilityRejectionReason(window.suggested());
+    }
+
+    public static Optional<String> ordinaryVisibilityRejectionReason(MoonSample sample) {
+        if (sample.moonIlluminationPercent() < NEAR_CONJUNCTION_MAX_ILLUMINATION_PERCENT
+                && sample.moonSunSeparationDegrees() < NEAR_CONJUNCTION_MIN_SEPARATION_DEGREES) {
+            return Optional.of(THIN_CRESCENT_NEAR_CONJUNCTION);
+        }
+        return Optional.empty();
     }
 
     public static ComponentScores scoreWindow(MoonWindow window, WeatherFixture weather) {
