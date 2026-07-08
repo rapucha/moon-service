@@ -16,6 +16,7 @@ import dev.moonservice.backend.weather.HourlyWeather;
 import dev.moonservice.backend.weather.WeatherForecastProvider;
 import dev.moonservice.scoringprototype.PreviewEvaluator;
 import dev.moonservice.scoringprototype.fixture.WeatherFixture;
+import dev.moonservice.scoringprototype.scoring.ScoringModel;
 import org.junit.jupiter.api.Test;
 
 import java.time.Instant;
@@ -139,6 +140,18 @@ class ScoringOpportunitySearchEngineTest {
     }
 
     @Test
+    void rejectsNearConjunctionThinCrescentFalsePositiveForPragueAndAbuDhabi() {
+        ScoringOpportunitySearchEngine engine = engineWithPartlyCloudyWeather();
+
+        assertNearConjunctionRejected(engine.search(
+                prague(),
+                new OpportunitySearchRequest("prague-cz", "2026-07-14", 1, 90.0, 100)));
+        assertNearConjunctionRejected(engine.search(
+                abuDhabi(),
+                new OpportunitySearchRequest("abu-dhabi-ae", "2026-07-14", 1, 90.0, 100)));
+    }
+
+    @Test
     void translatesDirectPrototypeValidationFailuresToInvalidRequest() {
         ScoringOpportunitySearchEngine engine = engineWithUnusedWeather();
 
@@ -174,6 +187,18 @@ class ScoringOpportunitySearchEngineTest {
                 "CZ");
     }
 
+    private static ResolvedLocation abuDhabi() {
+        return new ResolvedLocation(
+                "abu-dhabi-ae",
+                new ProviderLocationId(LocationProvider.OPEN_METEO, "292968"),
+                "Abu Dhabi, United Arab Emirates",
+                24.4539,
+                54.3773,
+                27,
+                ZoneId.of("Asia/Dubai"),
+                "AE");
+    }
+
     private static ResolvedLocation amsterdam() {
         return new ResolvedLocation(
                 "amsterdam-nl",
@@ -197,6 +222,20 @@ class ScoringOpportunitySearchEngineTest {
         return new ScoringOpportunitySearchEngine(new PreviewEvaluator(), (location, startsAt, endsAt, days) -> {
             throw new AssertionError("Weather provider should not be called by this test.");
         });
+    }
+
+    private static void assertNearConjunctionRejected(OpportunitySearchResponse response) {
+        assertEquals("ok", response.status());
+        assertTrue(response.opportunities().isEmpty());
+        assertFalse(response.rejected().isEmpty());
+        assertTrue(response.rejected().stream()
+                .allMatch(window -> window.reasonCode().equals(ScoringModel.THIN_CRESCENT_NEAR_CONJUNCTION)));
+        assertTrue(response.rejected().stream()
+                .allMatch(window -> window.moonSunSeparationDegrees()
+                        < ScoringModel.NEAR_CONJUNCTION_MIN_SEPARATION_DEGREES));
+        assertTrue(response.rejected().stream()
+                .allMatch(window -> window.moonIlluminationPercent()
+                        < ScoringModel.NEAR_CONJUNCTION_MAX_ILLUMINATION_PERCENT));
     }
 
     private static HourlyWeather toHourlyWeather(Instant startsAt, WeatherFixture weather) {

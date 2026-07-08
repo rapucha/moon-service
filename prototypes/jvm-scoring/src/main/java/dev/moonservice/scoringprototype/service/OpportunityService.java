@@ -4,6 +4,7 @@ import dev.moonservice.scoringprototype.ephemeris.EphemerisSampler;
 import dev.moonservice.scoringprototype.fixture.WeatherFixture;
 import dev.moonservice.scoringprototype.input.PrototypeConfig;
 import dev.moonservice.scoringprototype.scoring.ComponentScores;
+import dev.moonservice.scoringprototype.scoring.RejectedWindow;
 import dev.moonservice.scoringprototype.scoring.ScoredWindow;
 import dev.moonservice.scoringprototype.scoring.ScoringModel;
 import dev.moonservice.scoringprototype.window.MoonWindow;
@@ -57,13 +58,20 @@ public final class OpportunityService {
         WindowGenerator.SampleProvider samples = instant -> sampler.sampleAt(config.location(), instant);
         List<MoonWindow> windows = windowGenerator.findWindows(config, samples);
         List<ScoredWindow> scored = new ArrayList<>();
+        List<RejectedWindow> rejected = new ArrayList<>();
 
         for (MoonWindow window : windows) {
             Optional<MoonWindow> adjusted = windowAdjustment.adjust(window, samples);
             if (adjusted.isPresent()) {
-                WeatherFixture weather = weatherProvider.weatherFor(adjusted.get());
-                ComponentScores components = ScoringModel.scoreWindow(adjusted.get(), weather);
-                scored.add(new ScoredWindow(adjusted.get(), weather, components));
+                MoonWindow adjustedWindow = adjusted.get();
+                Optional<String> visibilityRejection = ScoringModel.ordinaryVisibilityRejectionReason(adjustedWindow);
+                if (visibilityRejection.isPresent()) {
+                    rejected.add(RejectedWindow.visibility(adjustedWindow, visibilityRejection.get()));
+                    continue;
+                }
+                WeatherFixture weather = weatherProvider.weatherFor(adjustedWindow);
+                ComponentScores components = ScoringModel.scoreWindow(adjustedWindow, weather);
+                scored.add(new ScoredWindow(adjustedWindow, weather, components));
             }
         }
 
@@ -73,6 +81,6 @@ public final class OpportunityService {
             scored = scored.subList(0, config.limit());
         }
 
-        return new PrototypeResult(config, windows.size(), scored);
+        return new PrototypeResult(config, windows.size(), scored, rejected);
     }
 }

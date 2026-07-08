@@ -532,6 +532,18 @@ Response rules:
       }
     }
   ],
+  "rejected": [
+    {
+      "startsAt": "2026-07-14T03:45:00Z",
+      "endsAt": "2026-07-14T18:26:00Z",
+      "reasonCode": "thin_crescent_near_conjunction",
+      "reason": "The Moon is an extremely thin crescent too close to the Sun for an ordinary visible Moon opportunity.",
+      "moonSunSeparationDegrees": 4.6,
+      "moonIlluminationPercent": 0.2,
+      "moonAltitudeDegrees": 4.4,
+      "sunAltitudeDegrees": 0.2
+    }
+  ],
   "links": {
     "self": "/search?q=Praha",
     "location": "/l/prague-cz",

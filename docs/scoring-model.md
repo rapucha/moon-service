@@ -75,6 +75,8 @@ Moon geometry:
 - Altitude.
 - Azimuth.
 - Illumination or phase.
+- Sun-Moon angular separation, using topocentric Moon and Sun altitude/azimuth
+  for the selected location.
 - Rise/set timing.
 - Observer elevation when available.
 
@@ -178,6 +180,9 @@ Reject opportunities when:
 
 - Moon is below the horizon.
 - Moon altitude is too high for the low-Moon use case.
+- The ordinary Moon opportunity is an extremely thin near-conjunction crescent:
+  initially, Moon illumination below 1 percent and topocentric Sun-Moon
+  separation below 8 degrees.
 - Weather is clearly hostile across the candidate window.
 - Visibility is below the selected threshold.
 - Forecast confidence is too low to produce an alert, if the provider exposes confidence.
@@ -263,6 +268,11 @@ Moon illumination fit:
 
 - Favor full or near-full Moon when all else is equal.
 - Do not reject crescent Moon opportunities solely because illumination is low.
+- Do reject ordinary opportunities where the crescent is both extremely thin and
+  too close to the Sun to be practically visible. This protects cases such as
+  Prague and Abu Dhabi on 2026-07-14, where low-altitude windows near new Moon
+  can otherwise look attractive despite only about 0.1 to 0.3 percent
+  illumination and a Sun-Moon separation of only a few degrees.
 - Low crescent windows can still be useful when the Moon is close to the horizon, the sky is clear enough, and ambient light supports the intended photograph.
 
 Exposure-balance explanation:
@@ -301,6 +311,9 @@ Required v0 policy expectations:
 - A thin crescent in favorable twilight should remain possible and should use
   subtle-crescent explanation text rather than being rejected only for low
   illumination.
+- A near-conjunction thin crescent should be rejected for ordinary Moon
+  opportunities when Sun-Moon separation is below the documented visibility
+  threshold.
 - Tests should prefer relative ordering and public labels over brittle exact
   total-score assertions.
 
@@ -414,6 +427,11 @@ Include the raw facts needed for a photographer to make a decision:
 
 V0 ignores:
 
+- Eclipse event opportunities. Solar and lunar eclipses need an explicit
+  event-aware result path with their own safety, phase timing, visibility, feed,
+  and calendar rules. Do not weaken the ordinary near-conjunction filter to make
+  eclipse cases fit normal Moon-pass scoring; that work is tracked separately by
+  [#80](https://github.com/rapucha/moon-service/issues/80).
 - Terrain horizon elevation and local obstruction.
 - Buildings, trees, skylines, and local obstructions.
 - Exact subject alignment.

@@ -281,7 +281,12 @@ public class ScoringOpportunitySearchEngine implements OpportunitySearchEngine {
             rejected.add(new OpportunitySearchResponse.RejectedWindow(
                     text(node, "startsAt"),
                     text(node, "endsAt"),
-                    text(node, "reason")
+                    text(node, "reasonCode"),
+                    text(node, "reason"),
+                    doubleValue(node, "moonSunSeparationDegrees"),
+                    doubleValue(node, "moonIlluminationPercent"),
+                    doubleValue(node, "moonAltitudeDegrees"),
+                    doubleValue(node, "sunAltitudeDegrees")
             ));
         }
         return rejected;
