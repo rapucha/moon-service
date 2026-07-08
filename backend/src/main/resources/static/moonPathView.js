@@ -8,6 +8,7 @@ import {
   readableToken,
   round1
 } from "./format.js";
+import { lightBandSegments } from "./moonPathLightBands.js";
 import { moonPhaseImageDataUrl } from "./moonPhaseView.js";
 import { altitudeForegroundArtwork } from "./moonPathSilhouettes.js";
 
@@ -237,34 +238,6 @@ function moonPathSamples(path) {
   return samples.filter(hasPosition).slice().sort(function (a, b) {
     return new Date(a.at).getTime() - new Date(b.at).getTime();
   });
-}
-
-function lightBandSegments(points) {
-  return points.slice(0, -1).reduce(function (bands, point, index) {
-    var next = points[index + 1];
-    var bucket = point.lightBucket || next.lightBucket || "unknown";
-    var segment = {
-      x: point.x,
-      endX: next.x,
-      width: Math.max(0, next.x - point.x),
-      startsAt: point.at,
-      endsAt: next.at,
-      lightBucket: bucket
-    };
-    if (segment.width <= 0) {
-      return bands;
-    }
-
-    var previous = bands[bands.length - 1];
-    if (previous && previous.lightBucket === bucket) {
-      previous.endX = segment.endX;
-      previous.width = Math.max(0, previous.endX - previous.x);
-      previous.endsAt = segment.endsAt;
-    } else {
-      bands.push(segment);
-    }
-    return bands;
-  }, []);
 }
 
 function altitudeHourTicks(points, timezone, labelY) {
