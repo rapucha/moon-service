@@ -97,6 +97,7 @@ class OpportunitySearchControllerTest {
                     assertTrue(body.contains("About Moon Service"));
                     assertTrue(body.contains("Why It Exists"));
                     assertTrue(body.contains("Search opportunities"));
+                    assertTrue(body.contains("NASA's Scientific Visualization Studio"));
                 });
     }
 

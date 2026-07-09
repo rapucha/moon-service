@@ -31,6 +31,9 @@ Moon Pass Card
   variants sized closer to the Alternative Moon marker.
 - `docs/design/assets/sun-marker-aperture-flare.svg`: selected D3 Sun marker
   resource for the Sun path implementation.
+- `docs/design/sun-moon-sky-position-mockups.html`: mockups for separating the
+  Moon timeline from true Sun/Moon azimuth-altitude sky position, including
+  quasi-3D horizon dome variants.
 
 Current Direction
 - Use compact recommendation rows instead of repeated prose summaries.

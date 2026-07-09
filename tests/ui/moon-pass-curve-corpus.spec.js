@@ -17,6 +17,8 @@ test.beforeEach(async ({ page }) => {
 });
 
 test("renders provider-free curve corpus for review", async ({ page }, testInfo) => {
+  test.setTimeout(60_000);
+
   await page.goto("/search?locationId=curve-corpus-prague");
 
   const cards = page.locator(".moon-pass-card");
@@ -28,13 +30,64 @@ test("renders provider-free curve corpus for review", async ({ page }, testInfo)
     const expected = markerExpectations.get(curveCase.passId);
 
     await expect(card.locator(".chart-path")).toHaveCount(0);
-    await expect(card.locator(".altitude-chart-desktop .moon-sample-marker")).toHaveCount(expected.desktopVisibleCount);
-    await expect(card.locator(".altitude-chart-mobile .moon-sample-marker")).toHaveCount(expected.mobileVisibleCount);
-    await expect(card.locator(".altitude-chart-desktop .sun-sample-marker")).toHaveCount(expected.desktopSunVisibleCount);
-    await expect(card.locator(".altitude-chart-mobile .sun-sample-marker")).toHaveCount(expected.mobileSunVisibleCount);
-    await expect(card.locator(".altitude-chart-desktop .moon-sample-marker.is-suggested")).toHaveCount(curveCase.recommendationCount);
-    await expect(card.locator(".altitude-chart-desktop .moon-sample-marker-label")).toHaveText(expected.labels);
+    await expect(card.locator(".moon-altitude-chart.altitude-chart-desktop .moon-sample-marker")).toHaveCount(expected.desktopVisibleCount);
+    await expect(card.locator(".moon-altitude-chart.altitude-chart-mobile .moon-sample-marker")).toHaveCount(expected.mobileVisibleCount);
+    await expect(card.locator(".moon-altitude-chart.altitude-chart-desktop .sun-sample-marker")).toHaveCount(0);
+    await expect(card.locator(".moon-altitude-chart.altitude-chart-mobile .sun-sample-marker")).toHaveCount(0);
+    await expect(card.locator(".sun-altitude-chart.altitude-chart-desktop .sun-path-marker")).toHaveCount(expected.desktopSunVisibleCount);
+    await expect(card.locator(".sun-altitude-chart.altitude-chart-mobile .sun-path-marker")).toHaveCount(expected.mobileSunVisibleCount);
+    await expect(card.locator(".moon-altitude-chart.altitude-chart-desktop .moon-sample-marker.is-suggested")).toHaveCount(curveCase.recommendationCount);
+    await expect(card.locator(".moon-altitude-chart.altitude-chart-desktop .moon-sample-marker-label")).toHaveText(expected.labels);
+    await expect(card.locator(".sky-picture-details")).toHaveCount(expected.skyDomeVisible ? 2 : 1);
+    await expect(card.locator(".sky-dome-chart")).toHaveCount(expected.skyDomeVisible ? 1 : 0);
     await expect(card.locator(".pass-choice-card")).toHaveCount(curveCase.recommendationCount);
+
+    if (expected.skyDomeVisible) {
+      const domeGeometry = await card.locator(".sky-dome-chart").evaluate(chart => {
+        const observer = chart.querySelector(".sky-observer-dot");
+        const horizon = chart.querySelector(".sky-dome-horizon");
+        const shell = chart.querySelector(".sky-dome-shell");
+        const centerX = Number(observer?.getAttribute("cx"));
+        const centerY = Number(observer?.getAttribute("cy"));
+        const radiusX = Number(horizon?.getAttribute("rx"));
+        const radiusY = Number(horizon?.getAttribute("ry"));
+        return ["sun", "moon"].map(role => {
+          const body = chart.querySelector(`.sky-body.is-${role}`);
+          const transform = body?.getAttribute("transform") || "";
+          const position = transform.match(/translate\(([-0-9.]+)\s+([-0-9.]+)\)/);
+          const x = Number(position?.[1]);
+          const y = Number(position?.[2]);
+          const altitudeRatio = Number(body?.getAttribute("data-altitude-degrees")) / 90;
+          const line = chart.querySelector(`.sky-azimuth-projection.is-${role} .sky-azimuth-projection-line`);
+          const guide = chart.querySelector(`.sky-azimuth-projection.is-${role} .sky-azimuth-projection-guide`);
+          const endX = Number(line?.getAttribute("x2"));
+          const endY = Number(line?.getAttribute("y2"));
+          const guideEndX = Number(guide?.getAttribute("x2"));
+          const guideEndY = Number(guide?.getAttribute("y2"));
+          const point = new DOMPoint(x, y);
+          const insideHorizon = ((x - centerX) / radiusX) ** 2 + ((y - centerY) / radiusY) ** 2 <= 1;
+          return {
+            bodyOnDome: (shell instanceof SVGGeometryElement && shell.isPointInFill(point)) || insideHorizon,
+            bodyPositionError: Math.max(
+              Math.abs(x - (endX + (centerX - endX) * altitudeRatio)),
+              Math.abs(y - (endY + (48 - endY) * altitudeRatio))
+            ),
+            guideIsVertical: Number(guide?.getAttribute("x1")) === guideEndX,
+            guideEndEllipseDistance: ((guideEndX - centerX) / radiusX) ** 2
+              + ((guideEndY - centerY) / radiusY) ** 2,
+            arrowEndEllipseDistance: ((endX - centerX) / radiusX) ** 2
+              + ((endY - centerY) / radiusY) ** 2
+          };
+        });
+      });
+      for (const body of domeGeometry) {
+        expect(body.bodyOnDome, curveCase.passId).toBe(true);
+        expect(body.bodyPositionError, curveCase.passId).toBeLessThanOrEqual(0.25);
+        expect(body.guideIsVertical, curveCase.passId).toBe(true);
+        expect(body.guideEndEllipseDistance, curveCase.passId).toBeLessThan(1);
+        expect(body.arrowEndEllipseDistance, curveCase.passId).toBeCloseTo(1, 2);
+      }
+    }
 
     if (process.env.MOON_SERVICE_CAPTURE_CURVE_REVIEW === "true") {
       await card.screenshot({
@@ -49,8 +102,16 @@ test("keeps corpus dot markers within basic SVG invariants", async ({ page }) =>
 
   const diagnostics = await page.locator(".moon-pass-card").evaluateAll((cards, cases) => {
     return cards.map((card, index) => {
-      const desktop = chartDiagnostics(card, ".altitude-chart-desktop", cases[index]);
-      const mobile = chartDiagnostics(card, ".altitude-chart-mobile", cases[index]);
+      const desktop = chartDiagnostics(
+        card,
+        ".moon-altitude-chart.altitude-chart-desktop",
+        ".sun-altitude-chart.altitude-chart-desktop",
+        cases[index]);
+      const mobile = chartDiagnostics(
+        card,
+        ".moon-altitude-chart.altitude-chart-mobile",
+        ".sun-altitude-chart.altitude-chart-mobile",
+        cases[index]);
       return {
         id: cases[index].id,
         passId: cases[index].passId,
@@ -60,9 +121,9 @@ test("keeps corpus dot markers within basic SVG invariants", async ({ page }) =>
       };
     });
 
-    function chartDiagnostics(card, chartSelector, curveCase) {
+    function chartDiagnostics(card, chartSelector, sunChartSelector, curveCase) {
       const markers = Array.from(card.querySelectorAll(chartSelector + " .moon-sample-marker"));
-      const sunMarkers = Array.from(card.querySelectorAll(chartSelector + " .sun-sample-marker"));
+      const sunMarkers = Array.from(card.querySelectorAll(sunChartSelector + " .sun-path-marker"));
       if (markers.length === 0) {
         throw new Error("Missing dot markers for " + curveCase.id + " " + chartSelector);
       }
@@ -98,7 +159,11 @@ test("keeps corpus dot markers within basic SVG invariants", async ({ page }) =>
           y: Number(match[2]),
           altitudeDegrees: Number(marker.getAttribute("data-sun-altitude-degrees")),
           azimuthDegrees: Number(marker.getAttribute("data-sun-azimuth-degrees")),
-          imageHref: markerImage?.getAttribute("href") || ""
+          imageHref: markerImage?.getAttribute("href") || "",
+          imageWidth: Number(markerImage?.getAttribute("width")),
+          markerSize: Number(marker.getAttribute("data-marker-size")),
+          suggested: marker.classList.contains("is-suggested"),
+          best: marker.classList.contains("is-best")
         };
       }).sort((a, b) => a.sequence - b.sequence);
       return {
@@ -110,11 +175,16 @@ test("keeps corpus dot markers within basic SVG invariants", async ({ page }) =>
         sunBacktracks: xBacktrackCount(sunSamples),
         ordinaryClosePairs: closePairCount(ordinarySamples, ordinarySamples, chartSelector.includes("mobile") ? 13 : 18),
         ordinaryNearProtected: closePairCount(ordinarySamples, protectedSamples, chartSelector.includes("mobile") ? 17 : 24),
-        sunClosePairs: closePairCount(sunSamples, sunSamples, chartSelector.includes("mobile") ? 32 : 40),
         outOfBounds: samples.filter(point => point.x < bounds.minX || point.x > bounds.maxX || point.y < bounds.minY || point.y > bounds.maxY).length,
         sunOutOfBounds: sunSamples.filter(point => point.x < bounds.minX || point.x > bounds.maxX || point.y < bounds.minY || point.y > bounds.maxY).length,
         sunMissingData: sunSamples.filter(point => !Number.isFinite(point.altitudeDegrees) || !Number.isFinite(point.azimuthDegrees)).length,
-        sunMissingImage: sunSamples.filter(point => point.imageHref !== "/sun-marker-aperture-flare.svg").length
+        sunMissingImage: sunSamples.filter(point => point.imageHref !== "/sun-marker-aperture-flare.svg").length,
+        sunMarkerSizeMismatch: sunSamples.filter(point => {
+          const expectedSize = point.best ? 42 : (point.suggested ? 28 : 14);
+          return point.markerSize !== expectedSize || point.imageWidth !== expectedSize;
+        }).length,
+        sunOverlapCount: markerOverlapCount(sunSamples),
+        sunAlternateCount: sunSamples.filter(point => point.suggested && !point.best).length
       };
     }
 
@@ -137,6 +207,21 @@ test("keeps corpus dot markers within basic SVG invariants", async ({ page }) =>
         }
       }
       return closePairs;
+    }
+
+    function markerOverlapCount(points) {
+      let overlaps = 0;
+      for (const [pointIndex, point] of points.entries()) {
+        for (const other of points.slice(pointIndex + 1)) {
+          const dx = point.x - other.x;
+          const dy = point.y - other.y;
+          const minimumDistance = (point.markerSize + other.markerSize) / 2;
+          if (Math.sqrt((dx * dx) + (dy * dy)) < minimumDistance) {
+            overlaps += 1;
+          }
+        }
+      }
+      return overlaps;
     }
 
     function xBacktrackCount(points) {
@@ -170,8 +255,6 @@ test("keeps corpus dot markers within basic SVG invariants", async ({ page }) =>
     expect(item.mobile.ordinaryClosePairs, item.id).toBe(0);
     expect(item.desktop.ordinaryNearProtected, item.id).toBe(0);
     expect(item.mobile.ordinaryNearProtected, item.id).toBe(0);
-    expect(item.desktop.sunClosePairs, item.id).toBe(0);
-    expect(item.mobile.sunClosePairs, item.id).toBe(0);
     expect(item.desktop.outOfBounds, item.id).toBe(0);
     expect(item.mobile.outOfBounds, item.id).toBe(0);
     expect(item.desktop.sunOutOfBounds, item.id).toBe(0);
@@ -180,7 +263,13 @@ test("keeps corpus dot markers within basic SVG invariants", async ({ page }) =>
     expect(item.mobile.sunMissingData, item.id).toBe(0);
     expect(item.desktop.sunMissingImage, item.id).toBe(0);
     expect(item.mobile.sunMissingImage, item.id).toBe(0);
+    expect(item.desktop.sunMarkerSizeMismatch, item.id).toBe(0);
+    expect(item.mobile.sunMarkerSizeMismatch, item.id).toBe(0);
+    expect(item.desktop.sunOverlapCount, item.id).toBe(0);
+    expect(item.mobile.sunOverlapCount, item.id).toBe(0);
   }
+
+  expect(diagnostics.reduce((count, item) => count + item.desktop.sunAlternateCount, 0)).toBeGreaterThan(0);
 });
 
 function markerExpectationsByPassId(payload) {
@@ -236,8 +325,8 @@ function markerExpectationsByPassId(payload) {
       .map(sample => sample.markerLabel);
     const desktopVisible = visibleMarkers(samples, "desktop", mobileReferenceDurationMs);
     const mobileVisible = visibleMarkers(samples, "mobile", mobileReferenceDurationMs);
-    const desktopSunVisible = visibleSunMarkers(samples, "desktop", mobileReferenceDurationMs);
-    const mobileSunVisible = visibleSunMarkers(samples, "mobile", mobileReferenceDurationMs);
+    const desktopSunVisible = visibleMarkers(sunPathSamples(samples), "desktop", mobileReferenceDurationMs, samples, "sun");
+    const mobileSunVisible = visibleMarkers(sunPathSamples(samples), "mobile", mobileReferenceDurationMs, samples, "sun");
     const lastSequence = Math.max(0, samples.length - 1);
 
     return [passId, {
@@ -246,6 +335,9 @@ function markerExpectationsByPassId(payload) {
       mobileVisibleCount: mobileVisible.length,
       desktopSunVisibleCount: desktopSunVisible.length,
       mobileSunVisibleCount: mobileSunVisible.length,
+      skyDomeVisible: Number.isFinite(primarySuggested.sunAltitudeDegrees)
+        && Number.isFinite(primarySuggested.sunAzimuthDegrees)
+        && primarySuggested.sunAltitudeDegrees >= 0,
       protectedSequences: samples
         .map((sample, index) => ({ sample, index }))
         .filter(({ sample, index }) => sample.role === "suggested" || index === 0 || index === lastSequence)
@@ -255,38 +347,11 @@ function markerExpectationsByPassId(payload) {
   }));
 }
 
-function visibleSunMarkers(samples, mode, mobileReferenceDurationMs) {
-  const points = chartPoints(samples, mode, mobileReferenceDurationMs);
-  const maxMoonAltitude = points.reduce((max, point) => Math.max(max, point.altitudeDegrees), 0);
-  const ceiling = Math.min(90, Math.max(12, Math.ceil((maxMoonAltitude + 1) / 5) * 5));
-  const minimumDistance = mode === "mobile" ? 32 : 40;
-  const visible = [];
-
-  for (const point of points) {
-    if (!Number.isFinite(point.sunAltitudeDegrees)
-      || !Number.isFinite(point.sunAzimuthDegrees)
-      || point.sunAltitudeDegrees < 0) {
-      continue;
-    }
-
-    const marker = {
-      ...point,
-      y: sunMarkerY(point.sunAltitudeDegrees, ceiling)
-    };
-    if (!isTooCloseToAny(marker, visible, minimumDistance)) {
-      visible.push(marker);
-    }
+function visibleMarkers(samples, mode, mobileReferenceDurationMs, timeDomainSamples = samples, body = "moon") {
+  const points = chartPoints(samples, mode, mobileReferenceDurationMs, timeDomainSamples);
+  if (body === "sun") {
+    return visibleSunMarkers(points);
   }
-
-  return visible;
-}
-
-function sunMarkerY(sunAltitudeDegrees, ceiling) {
-  return 326 - (Math.min(Math.max(sunAltitudeDegrees, 0), ceiling) / ceiling) * (326 - 70);
-}
-
-function visibleMarkers(samples, mode, mobileReferenceDurationMs) {
-  const points = chartPoints(samples, mode, mobileReferenceDurationMs);
   const ordinaryMinimumDistance = mode === "mobile" ? 13 : 18;
   const protectedMinimumDistance = mode === "mobile" ? 17 : 24;
   const lastSequence = points.length - 1;
@@ -307,7 +372,43 @@ function visibleMarkers(samples, mode, mobileReferenceDurationMs) {
   return visible.sort((a, b) => a.sequence - b.sequence);
 }
 
-function chartPoints(samples, mode, mobileReferenceDurationMs) {
+function visibleSunMarkers(points) {
+  const visible = points.filter(point => point.role === "suggested");
+
+  for (const point of points) {
+    if (point.role === "suggested" || visible.some(other => sunMarkersOverlap(point, other))) {
+      continue;
+    }
+    visible.push(point);
+  }
+
+  return visible.sort((a, b) => a.sequence - b.sequence);
+}
+
+function sunMarkersOverlap(first, second) {
+  const firstSize = first.markerLabel === "Best" ? 42 : (first.role === "suggested" ? 28 : 14);
+  const secondSize = second.markerLabel === "Best" ? 42 : (second.role === "suggested" ? 28 : 14);
+  return markerDistance(first, second) < (firstSize + secondSize) / 2;
+}
+
+function sunPathSamples(samples) {
+  return samples.filter(sample => sample
+    && sample.at
+    && Number.isFinite(sample.sunAltitudeDegrees)
+    && Number.isFinite(sample.sunAzimuthDegrees)
+    && sample.sunAltitudeDegrees >= 0
+  ).map(sample => ({
+    at: sample.at,
+    altitudeDegrees: sample.sunAltitudeDegrees,
+    azimuthDegrees: sample.sunAzimuthDegrees,
+    sunAltitudeDegrees: sample.sunAltitudeDegrees,
+    sunAzimuthDegrees: sample.sunAzimuthDegrees,
+    role: sample.role || "path",
+    markerLabel: sample.markerLabel
+  }));
+}
+
+function chartPoints(samples, mode, mobileReferenceDurationMs, timeDomainSamples) {
   const sourcePoints = samples.map(sample => ({
     at: sample.at,
     time: new Date(sample.at).getTime(),
@@ -315,12 +416,16 @@ function chartPoints(samples, mode, mobileReferenceDurationMs) {
     azimuthDegrees: sample.azimuthDegrees,
     sunAltitudeDegrees: sample.sunAltitudeDegrees,
     sunAzimuthDegrees: sample.sunAzimuthDegrees,
-    role: sample.role || "path"
+    role: sample.role || "path",
+    markerLabel: sample.markerLabel
   })).filter(sample => Number.isFinite(sample.time)
     && Number.isFinite(sample.altitudeDegrees)
     && Number.isFinite(sample.azimuthDegrees));
-  const firstTime = sourcePoints[0].time;
-  const lastTime = sourcePoints[sourcePoints.length - 1].time;
+  const domainTimes = timeDomainSamples
+    .map(sample => new Date(sample.at).getTime())
+    .filter(Number.isFinite);
+  const firstTime = Math.min(sourcePoints[0].time, ...domainTimes);
+  const lastTime = Math.max(sourcePoints[sourcePoints.length - 1].time, ...domainTimes);
   const timeSpan = Math.max(1, lastTime - firstTime);
   const maxAltitude = sourcePoints.reduce((max, point) => Math.max(max, point.altitudeDegrees), 0);
   const ceiling = Math.min(90, Math.max(12, Math.ceil((maxAltitude + 1) / 5) * 5));

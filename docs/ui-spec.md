@@ -79,7 +79,7 @@ The frontend module split is intended to keep future UI changes manageable:
 - `recentSearches.js`: localStorage behavior;
 - `responseView.js`: response states and result rendering;
 - `opportunityCard.js`: opportunity card layout;
-- `moonPathView.js`: Moon path summary and combined altitude/azimuth chart;
+- `moonPathView.js`: Moon path, separate Sun pass, and suggested-time sky-position views;
 - `moonPhaseView.js`: Moon phase rendering;
 - `scoreView.js`: score block and score details.
 
@@ -143,11 +143,17 @@ The panel should show:
 - start, suggested, and end time;
 - start, suggested, and end altitude;
 - start, suggested, and end azimuth;
-- a combined chart over the opportunity window or pass, with altitude plotted
-  over time and azimuth shown as a top rail on the same time axis.
-- secondary Sun markers when sample Sun altitude is zero or positive. These
-  markers should expose Sun altitude and azimuth without competing visually with
-  the Moon path.
+- a Moon-first chart over the opportunity window or pass, with Moon altitude
+  plotted over time and Moon azimuth shown as a top rail on the same time axis;
+- a separate collapsible Sun-pass chart when at least one sample has a Sun
+  altitude of zero or above. It uses the same full-pass time axis and light
+  bands as the Moon chart, keeps below-horizon body markers hidden, and retains
+  the Sun direction rail across all samples with valid Sun position data;
+- a separate collapsible quasi-dome at the selected suggested time when the Sun
+  is above the horizon. It plots the Sun and Moon using their true altitude and
+  azimuth, states their angular separation, and must expose those same values in
+  its accessible name. The dome is a static planning diagram, not an
+  interactive or terrain-aware 3D view.
 
 The suggested marker must sit on the displayed path at the suggested moment. The
 preferred way to do this is to construct the path so it passes through the real
@@ -185,11 +191,12 @@ Agreed behavior:
 - The suggested marker may show a compact, recognizable Moon phase. V0 may use a
   schematic phase based on `phaseAngleDegrees`; true observer-oriented Moon
   rotation can wait until the backend provides a deliberate orientation value.
-- Sun samples may be drawn as smaller amber markers on the same time and
-  altitude chart when the Sun altitude is zero or positive. Do not raise the
-  chart ceiling for the Sun; when a Sun sample is higher than the displayed
-  chart ceiling, draw it at the saturated top position while preserving the real
-  Sun altitude and azimuth in metadata and tooltip text.
+- The Moon altitude chart does not overlay Sun markers. The separate Sun-pass
+  chart draws Sun samples only when Sun altitude is zero or positive and sizes
+  recommendation markers by priority. It must cull lower-priority path,
+  start, or end markers when their body images would overlap a recommendation
+  marker. Do not raise its chart ceiling above 90 degrees; preserve real Sun
+  altitude and azimuth in marker metadata and tooltip text.
 - Light bucket bands may appear behind the altitude path.
 - A subtle animated generic foreground silhouette layer may appear behind the
   chart markers and labels to help users build intuition for low Moon altitude.

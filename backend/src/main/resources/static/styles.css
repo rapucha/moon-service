@@ -16,6 +16,8 @@
   --amber-soft: #fff5de;
   --danger: #9d352b;
   --danger-soft: #fff0ee;
+  --sky-sun-vector: #b87814;
+  --sky-moon-vector: #5f568a;
   --shadow: 0 14px 34px rgba(27, 37, 42, 0.08);
 }
 
@@ -936,6 +938,45 @@ dd {
   overflow: visible;
 }
 
+.sky-picture-list {
+  display: grid;
+  gap: 8px;
+}
+
+.sky-picture-details {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface-subtle);
+}
+
+.sky-picture-details summary {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 42px;
+  padding: 9px 12px;
+}
+
+.sky-picture-title {
+  color: var(--accent-strong);
+  font-size: 0.86rem;
+  font-weight: 800;
+}
+
+.sky-picture-description {
+  color: var(--muted);
+  font-size: 0.8rem;
+  font-weight: 650;
+  text-align: right;
+}
+
+.sky-picture-content {
+  display: grid;
+  gap: 10px;
+  padding: 0 12px 12px;
+}
+
 .altitude-chart,
 .azimuth-chart {
   display: block;
@@ -975,6 +1016,10 @@ dd {
   fill: var(--ink);
   font-size: 0.72rem;
   font-weight: 820;
+}
+
+.azimuth-rail-arrow {
+  fill: var(--accent-strong);
 }
 
 .light-band {
@@ -1083,6 +1128,15 @@ dd {
   stroke-width: 3px;
 }
 
+.sun-path-marker-label {
+  fill: #714b0f;
+  font-size: 0.72rem;
+  font-weight: 820;
+  paint-order: stroke;
+  stroke: rgba(255, 255, 255, 0.72);
+  stroke-width: 3px;
+}
+
 .chart-axis-label,
 .chart-time-label,
 .compass-label {
@@ -1097,6 +1151,174 @@ dd {
 
 .chart-time-label.is-suggested {
   fill: var(--amber);
+  font-weight: 820;
+}
+
+.sky-dome-frame {
+  max-width: 100%;
+  overflow: hidden;
+}
+
+.sky-dome-chart {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+.sky-dome-background {
+  fill: #f8faf9;
+}
+
+.sky-dome-shell {
+  fill: #edf5f4;
+  stroke: var(--line);
+  stroke-width: 1.2;
+}
+
+.sky-dome-horizon {
+  fill: #e4eeec;
+  stroke: var(--line-strong);
+  stroke-width: 1.2;
+}
+
+.sky-dome-ring,
+.sky-dome-meridian {
+  fill: none;
+  stroke: rgba(94, 104, 109, 0.28);
+  stroke-width: 1;
+}
+
+.sky-dome-meridian {
+  stroke-dasharray: 4 4;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.sky-cardinal-label {
+  fill: var(--accent-strong);
+  font-size: 0.74rem;
+  font-weight: 860;
+  paint-order: stroke;
+  stroke: rgba(255, 255, 255, 0.82);
+  stroke-width: 3px;
+}
+
+.sky-cardinal-arrow {
+  fill: var(--accent-strong);
+  opacity: 0.78;
+}
+
+.sky-separation-ray {
+  stroke: var(--sky-moon-vector);
+  stroke-width: 1.3;
+  opacity: 0.62;
+}
+
+.sky-separation-arc {
+  fill: none;
+  stroke: var(--sky-moon-vector);
+  stroke-width: 1.8;
+}
+
+.sky-observer-dot {
+  fill: var(--sky-moon-vector);
+  opacity: 0.72;
+}
+
+.sky-azimuth-projection-line,
+.sky-azimuth-projection-guide {
+  fill: none;
+  stroke-width: 1.5;
+}
+
+.sky-azimuth-projection-line {
+  stroke-width: 1.8;
+}
+
+.sky-azimuth-projection-guide {
+  stroke-dasharray: 4 3;
+  opacity: 0.52;
+}
+
+.sky-azimuth-projection-arrow {
+  stroke: none;
+}
+
+.sky-azimuth-projection.is-sun .sky-azimuth-projection-line,
+.sky-azimuth-projection.is-sun .sky-azimuth-projection-guide {
+  stroke: var(--sky-sun-vector);
+}
+
+.sky-azimuth-projection.is-sun .sky-azimuth-projection-arrow {
+  fill: var(--sky-sun-vector);
+}
+
+.sky-azimuth-projection.is-moon .sky-azimuth-projection-line,
+.sky-azimuth-projection.is-moon .sky-azimuth-projection-guide {
+  stroke: var(--sky-moon-vector);
+}
+
+.sky-azimuth-projection.is-moon .sky-azimuth-projection-arrow {
+  fill: var(--sky-moon-vector);
+}
+
+.sky-separation-label-arrows {
+  opacity: 0.9;
+}
+
+.sky-separation-label-arc {
+  fill: none;
+  stroke: var(--sky-moon-vector);
+  stroke-width: 1.15;
+  stroke-linecap: round;
+}
+
+.sky-separation-label-arrow-line {
+  fill: none;
+  stroke-width: 1.6;
+  stroke-linecap: round;
+}
+
+.sky-separation-label-arrow-head {
+  stroke: none;
+}
+
+.sky-separation-label-arrow.is-sun .sky-separation-label-arrow-line {
+  stroke: var(--sky-sun-vector);
+}
+
+.sky-separation-label-arrow.is-sun .sky-separation-label-arrow-head {
+  fill: var(--sky-sun-vector);
+}
+
+.sky-separation-label-arrow.is-moon .sky-separation-label-arrow-line {
+  stroke: var(--sky-moon-vector);
+}
+
+.sky-separation-label-arrow.is-moon .sky-separation-label-arrow-head {
+  fill: var(--sky-moon-vector);
+}
+
+.sky-separation-label-body.is-moon {
+  filter: drop-shadow(0 0.5px 0.7px rgba(16, 31, 36, 0.28));
+}
+
+.sky-body-image {
+  filter: drop-shadow(0 2px 3px rgba(16, 31, 36, 0.24));
+}
+
+.sky-dome-label,
+.sky-separation-label {
+  fill: var(--muted);
+  font-size: 0.68rem;
+  font-weight: 760;
+}
+
+.sky-separation-label {
+  fill: var(--ink);
+  paint-order: stroke;
+  stroke: rgba(255, 255, 255, 0.74);
+  stroke-width: 3px;
   font-weight: 820;
 }
 
@@ -1365,6 +1587,15 @@ summary {
   .moon-path-header {
     display: grid;
     gap: 3px;
+  }
+
+  .sky-picture-details summary {
+    display: grid;
+    gap: 2px;
+  }
+
+  .sky-picture-description {
+    text-align: left;
   }
 
   .moon-path-summary.is-pass {

@@ -1,0 +1,746 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Sun and Moon Sky Position Mockups</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --bg: #f4f6f7;
+      --surface: #ffffff;
+      --surface-subtle: #f8faf9;
+      --surface-muted: #eef3f1;
+      --ink: #202426;
+      --muted: #5e686d;
+      --line: #d8e0df;
+      --line-strong: #b9c7c4;
+      --accent: #216f68;
+      --accent-strong: #154f4a;
+      --blue: #315f92;
+      --blue-soft: #eaf2fb;
+      --amber: #8b641f;
+      --amber-soft: #fff5de;
+      --violet: #5f568a;
+      --violet-soft: #efedf8;
+      --sun: #d28a1d;
+      --sun-soft: #fff0c2;
+      --moon: #f6f0d8;
+      --moon-edge: #7a704f;
+      --shadow: 0 14px 34px rgba(27, 37, 42, 0.08);
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--ink);
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      line-height: 1.5;
+    }
+
+    main {
+      width: min(1160px, calc(100% - 32px));
+      margin: 0 auto;
+      padding: 28px 0 44px;
+    }
+
+    .intro {
+      margin-bottom: 18px;
+      padding-bottom: 16px;
+      border-bottom: 1px solid var(--line);
+    }
+
+    .eyebrow,
+    .mockup-label {
+      margin: 0 0 6px;
+      color: var(--blue);
+      font-size: 0.76rem;
+      font-weight: 800;
+      letter-spacing: 0;
+      text-transform: uppercase;
+    }
+
+    h1 {
+      margin: 0 0 8px;
+      font-size: 1.55rem;
+      letter-spacing: 0;
+      line-height: 1.16;
+    }
+
+    .intro p {
+      max-width: 900px;
+      margin: 0;
+      color: var(--muted);
+    }
+
+    .mockup-stack {
+      display: grid;
+      gap: 20px;
+    }
+
+    .mockup-card {
+      display: grid;
+      gap: 14px;
+      padding: 16px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--surface);
+      box-shadow: var(--shadow);
+    }
+
+    .mockup-heading {
+      display: flex;
+      align-items: start;
+      justify-content: space-between;
+      gap: 16px;
+    }
+
+    .mockup-heading h2 {
+      margin: 0;
+      font-size: 1.04rem;
+      letter-spacing: 0;
+      line-height: 1.25;
+    }
+
+    .mockup-heading p:last-child,
+    .mockup-card > p {
+      margin: 4px 0 0;
+      color: var(--muted);
+      font-size: 0.9rem;
+    }
+
+    .badge-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 7px;
+    }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      min-height: 26px;
+      padding: 3px 8px;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      background: var(--surface-muted);
+      color: var(--ink);
+      font-size: 0.8rem;
+      font-weight: 740;
+      white-space: nowrap;
+    }
+
+    .badge.is-best {
+      border-color: rgba(139, 100, 31, 0.38);
+      background: var(--amber-soft);
+      color: #5b4216;
+    }
+
+    .badge.is-moon {
+      border-color: #a8955a;
+      background: #fff9e7;
+      color: #55471e;
+    }
+
+    .badge.is-sun {
+      border-color: #d09b3e;
+      background: var(--sun-soft);
+      color: #714b0f;
+    }
+
+    .badge.is-separation {
+      border-color: #9a91c2;
+      background: var(--violet-soft);
+      color: #443b6a;
+    }
+
+    .layout-split {
+      display: grid;
+      grid-template-columns: minmax(0, 1.45fr) minmax(300px, 0.85fr);
+      gap: 14px;
+      align-items: stretch;
+    }
+
+    .layout-even {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 14px;
+      align-items: stretch;
+    }
+
+    .diagram-frame {
+      min-width: 0;
+      overflow: hidden;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--surface-subtle);
+    }
+
+    .facts-panel {
+      display: grid;
+      align-content: start;
+      gap: 10px;
+      padding: 12px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--surface-subtle);
+    }
+
+    .facts-panel h3 {
+      margin: 0;
+      font-size: 0.98rem;
+      letter-spacing: 0;
+    }
+
+    .fact-grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 8px;
+    }
+
+    .fact {
+      min-width: 0;
+      padding: 8px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--surface);
+    }
+
+    .fact span {
+      display: block;
+      color: var(--muted);
+      font-size: 0.72rem;
+      font-weight: 780;
+      text-transform: uppercase;
+    }
+
+    .fact strong {
+      display: block;
+      margin-top: 2px;
+      font-size: 0.94rem;
+      line-height: 1.2;
+    }
+
+    svg {
+      display: block;
+      width: 100%;
+      height: auto;
+    }
+
+    .svg-label {
+      fill: var(--muted);
+      font-size: 12px;
+      font-weight: 700;
+    }
+
+    .svg-label-strong {
+      fill: var(--ink);
+      font-size: 13px;
+      font-weight: 820;
+    }
+
+    .axis,
+    .grid-line,
+    .dome-ring,
+    .dome-meridian {
+      fill: none;
+      stroke: var(--line);
+      stroke-width: 1;
+    }
+
+    .axis {
+      stroke: var(--line-strong);
+      stroke-width: 1.2;
+    }
+
+    .timeline-path {
+      fill: none;
+      stroke: var(--accent);
+      stroke-linecap: round;
+      stroke-linejoin: round;
+      stroke-width: 3;
+    }
+
+    .sun-altitude-path {
+      fill: none;
+      stroke: var(--sun);
+      stroke-dasharray: 6 5;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+      stroke-width: 2.5;
+    }
+
+    .moon-sky-path {
+      fill: none;
+      stroke: var(--accent);
+      stroke-linecap: round;
+      stroke-linejoin: round;
+      stroke-width: 3;
+    }
+
+    .sun-sky-path {
+      fill: none;
+      stroke: var(--sun);
+      stroke-dasharray: 5 4;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+      stroke-width: 2.4;
+    }
+
+    .sky-inset-path {
+      opacity: 0.36;
+      stroke-width: 2.1;
+    }
+
+    .light-band {
+      opacity: 0.82;
+    }
+
+    .light-band.is-daylight {
+      fill: #f7de91;
+    }
+
+    .light-band.is-golden {
+      fill: #f8c86c;
+    }
+
+    .light-band.is-civil {
+      fill: #b7edf3;
+    }
+
+    .marker-ring {
+      fill: var(--surface);
+      stroke: var(--accent);
+      stroke-width: 2;
+    }
+
+    .marker-moon {
+      fill: var(--moon);
+      stroke: var(--moon-edge);
+      stroke-width: 1.5;
+    }
+
+    .marker-sun {
+      fill: var(--sun-soft);
+      stroke: var(--sun);
+      stroke-width: 2;
+    }
+
+    .separation-line {
+      fill: none;
+      stroke: var(--violet);
+      stroke-dasharray: 5 4;
+      stroke-width: 2;
+    }
+
+    .separation-ray {
+      fill: none;
+      stroke: var(--violet);
+      stroke-width: 1.4;
+      opacity: 0.68;
+    }
+
+    .separation-arc {
+      fill: none;
+      stroke: var(--violet);
+      stroke-width: 2;
+    }
+
+    .camera-body,
+    .camera-top {
+      fill: var(--surface);
+      stroke: var(--violet);
+      stroke-width: 1.6;
+    }
+
+    .camera-lens {
+      fill: var(--violet-soft);
+      stroke: var(--violet);
+      stroke-width: 1.5;
+    }
+
+    .camera-lens-glass {
+      fill: none;
+      stroke: var(--violet);
+      stroke-linecap: round;
+      stroke-width: 1.8;
+      opacity: 0.18;
+    }
+
+    .camera-tripod {
+      fill: none;
+      stroke: var(--violet);
+      stroke-linecap: round;
+      stroke-width: 1.5;
+      opacity: 0.72;
+    }
+
+    .track-dot-moon {
+      fill: var(--accent);
+      opacity: 0.34;
+    }
+
+    .track-dot-sun {
+      fill: var(--sun);
+      opacity: 0.34;
+    }
+
+    .horizon-fill {
+      fill: #e8f0ef;
+    }
+
+    .dome-fill {
+      fill: #f7fbfb;
+    }
+
+    .dome-shadow {
+      fill: rgba(25, 34, 38, 0.05);
+    }
+
+    .caption {
+      color: var(--muted);
+      font-size: 0.88rem;
+    }
+
+    .mini-row {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 10px;
+    }
+
+    .mini-panel {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--surface-subtle);
+      overflow: hidden;
+    }
+
+    .mini-title {
+      margin: 0;
+      padding: 9px 10px 0;
+      color: var(--muted);
+      font-size: 0.72rem;
+      font-weight: 800;
+      text-transform: uppercase;
+    }
+
+    @media (max-width: 820px) {
+      main {
+        width: min(100% - 20px, 640px);
+        padding-top: 18px;
+      }
+
+      .layout-split,
+      .layout-even,
+      .mini-row,
+      .fact-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .mockup-heading {
+        display: grid;
+      }
+    }
+  </style>
+</head>
+<body>
+<main>
+  <section class="intro">
+    <p class="eyebrow">Moon Service Design Study</p>
+    <h1>Sun And Moon Sky Position Mockups</h1>
+    <p>These variants keep the Moon pass timeline readable while adding a true azimuth/altitude view for the Sun and Moon. Example facts use Prague, 9 July 2026, 15:06 local time.</p>
+  </section>
+
+  <div class="mockup-stack">
+    <section class="mockup-card">
+      <div class="mockup-heading">
+        <div>
+          <p class="mockup-label">Option A</p>
+          <h2>Timeline plus sky-position inset</h2>
+          <p>The timeline remains Moon-first. A compact quasi-3D dome shows the actual Sun and Moon positions at the suggested time.</p>
+        </div>
+        <div class="badge-row" aria-label="Example facts">
+          <span class="badge is-best">Suggested 15:06</span>
+          <span class="badge is-moon">Moon WNW 6 deg</span>
+          <span class="badge is-sun">Sun SW 54 deg</span>
+          <span class="badge is-separation">68 deg apart</span>
+        </div>
+      </div>
+
+      <div class="layout-split">
+        <div class="diagram-frame">
+          <svg viewBox="0 0 760 320" role="img" aria-label="Moon timeline with separate Sun light context">
+            <rect x="0" y="0" width="760" height="320" fill="#f8faf9"></rect>
+            <text x="32" y="34" class="svg-label-strong">Moon altitude over time</text>
+            <text x="32" y="55" class="svg-label">Moon direction rail, not Sun direction</text>
+
+            <rect x="82" y="28" width="608" height="24" rx="5" fill="#eef3f1" stroke="#d8e0df"></rect>
+            <text x="102" y="45" class="svg-label">SW</text>
+            <text x="238" y="45" class="svg-label">W</text>
+            <text x="392" y="45" class="svg-label">WNW</text>
+            <text x="548" y="45" class="svg-label">NW</text>
+            <text x="628" y="45" class="svg-label">NNW</text>
+
+            <rect x="82" y="72" width="608" height="178" rx="6" fill="#ffffff" stroke="#d8e0df"></rect>
+            <rect x="83" y="73" width="96" height="176" class="light-band is-daylight"></rect>
+            <rect x="179" y="73" width="128" height="176" class="light-band is-golden"></rect>
+            <rect x="307" y="73" width="154" height="176" class="light-band is-daylight"></rect>
+            <rect x="461" y="73" width="145" height="176" class="light-band is-golden"></rect>
+            <rect x="606" y="73" width="83" height="176" class="light-band is-civil"></rect>
+            <line x1="82" y1="205" x2="690" y2="205" class="grid-line"></line>
+            <line x1="82" y1="160" x2="690" y2="160" class="grid-line"></line>
+            <line x1="82" y1="115" x2="690" y2="115" class="grid-line"></line>
+            <line x1="82" y1="250" x2="690" y2="250" class="axis"></line>
+            <text x="34" y="254" class="svg-label">0 deg</text>
+            <text x="31" y="118" class="svg-label">30 deg</text>
+            <path d="M 86 98 C 158 103, 216 122, 282 152 S 400 222, 462 236 S 588 247, 685 249" class="timeline-path"></path>
+            <circle cx="432" cy="229" r="14" class="marker-ring"></circle>
+            <circle cx="432" cy="229" r="8" class="marker-moon"></circle>
+            <text x="432" y="207" text-anchor="middle" class="svg-label-strong">Best</text>
+            <text x="398" y="281" class="svg-label">15:06</text>
+            <line x1="432" y1="250" x2="432" y2="76" stroke="#7c8a86" stroke-dasharray="3 4"></line>
+
+            <text x="82" y="292" class="svg-label">14:00</text>
+            <text x="290" y="292" class="svg-label">15:00</text>
+            <text x="500" y="292" class="svg-label">16:00</text>
+            <text x="628" y="292" class="svg-label">Moonset</text>
+          </svg>
+        </div>
+
+        <div class="diagram-frame">
+          <svg viewBox="0 0 430 320" role="img" aria-label="Sky dome showing Moon WNW and Sun SW">
+            <rect x="0" y="0" width="430" height="320" fill="#f8faf9"></rect>
+            <text x="24" y="34" class="svg-label-strong">Sky position at 15:06</text>
+            <text x="24" y="55" class="svg-label">Rise-to-set paths, azimuth vs altitude</text>
+            <ellipse cx="215" cy="265" rx="166" ry="28" class="dome-shadow"></ellipse>
+            <path d="M 49 265 C 76 148, 124 82, 215 62 C 306 82, 354 148, 381 265 Z" class="dome-fill" stroke="#d8e0df"></path>
+            <path d="M 49 265 C 112 289, 318 289, 381 265" class="horizon-fill" stroke="#b9c7c4"></path>
+            <path d="M 80 238 C 135 178, 295 178, 350 238" class="dome-ring"></path>
+            <path d="M 112 201 C 156 150, 274 150, 318 201" class="dome-ring"></path>
+            <path d="M 148 158 C 178 126, 252 126, 282 158" class="dome-ring"></path>
+            <path d="M 215 62 C 205 118, 202 196, 215 265" class="dome-meridian"></path>
+            <path d="M 49 265 C 146 217, 280 217, 381 265" class="dome-meridian"></path>
+            <text x="210" y="300" text-anchor="middle" class="svg-label">S</text>
+            <text x="68" y="276" text-anchor="middle" class="svg-label">W</text>
+            <text x="360" y="276" text-anchor="middle" class="svg-label">E</text>
+            <text x="215" y="81" text-anchor="middle" class="svg-label">60 deg</text>
+            <text x="283" y="202" class="svg-label">30 deg</text>
+
+            <path d="M 352 265 C 286 219, 212 168, 145 162 C 137 151, 130 140, 124 128 C 119 118, 110 108, 101 101 C 88 134, 79 199, 74 265" class="sun-sky-path sky-inset-path"></path>
+            <path d="M 76 265 C 116 229, 150 207, 183 215 C 197 223, 211 231, 220 235 C 236 241, 248 245, 257 247 C 274 252, 289 256, 293 257 C 306 260, 319 262, 329 263 C 341 264, 351 264, 360 265" class="moon-sky-path sky-inset-path"></path>
+            <circle cx="145" cy="162" r="3.5" class="track-dot-sun"></circle>
+            <circle cx="135" cy="150" r="3.5" class="track-dot-sun"></circle>
+            <circle cx="124" cy="128" r="3.5" class="track-dot-sun"></circle>
+            <circle cx="112" cy="112" r="3.5" class="track-dot-sun"></circle>
+            <circle cx="101" cy="101" r="3.5" class="track-dot-sun"></circle>
+            <circle cx="183" cy="215" r="3.5" class="track-dot-moon"></circle>
+            <circle cx="220" cy="235" r="3.5" class="track-dot-moon"></circle>
+            <circle cx="257" cy="247" r="3.5" class="track-dot-moon"></circle>
+            <circle cx="293" cy="257" r="3.5" class="track-dot-moon"></circle>
+            <circle cx="329" cy="263" r="3.5" class="track-dot-moon"></circle>
+            <line x1="195" y1="274" x2="124" y2="128" class="separation-ray"></line>
+            <line x1="195" y1="274" x2="257" y2="247" class="separation-ray"></line>
+            <path d="M 170.9 224.5 A 55 55 0 0 1 245.4 252" class="separation-arc"></path>
+            <g transform="translate(215 265) rotate(-23)" role="img" aria-label="Camera observer position aimed toward the Moon">
+              <path d="M -27 11 L -41 31 M -27 11 L -16 32 M -27 11 L -27 34" class="camera-tripod"></path>
+              <rect x="-41" y="-14" width="25" height="24" rx="4" class="camera-body"></rect>
+              <rect x="-35" y="-20" width="14" height="7" rx="2" class="camera-top"></rect>
+              <rect x="-18" y="-7" width="18" height="14" rx="3" class="camera-lens"></rect>
+              <line x1="0" y1="-5" x2="0" y2="5" class="camera-lens-glass"></line>
+              <circle cx="-33" cy="-7" r="2" fill="#5f568a" opacity="0.5"></circle>
+            </g>
+            <circle cx="124" cy="128" r="13" class="marker-sun"></circle>
+            <path d="M 124 107 L 124 93 M 124 163 L 124 177 M 103 128 L 89 128 M 159 128 L 173 128 M 109 113 L 99 103 M 139 113 L 149 103 M 109 143 L 99 153 M 139 143 L 149 153" stroke="#d28a1d" stroke-width="2"></path>
+            <circle cx="257" cy="247" r="10" class="marker-moon"></circle>
+            <path d="M 261 238 C 254 242, 252 251, 259 257" fill="none" stroke="#7a704f" stroke-width="1.5"></path>
+            <text x="95" y="96" class="svg-label-strong">Sun SW 54 deg</text>
+            <text x="266" y="236" class="svg-label-strong">Moon WNW 6 deg</text>
+            <text x="176" y="202" class="svg-label-strong">68 deg separation</text>
+            <text x="236" y="274" class="svg-label">camera position</text>
+          </svg>
+        </div>
+      </div>
+    </section>
+
+    <section class="mockup-card">
+      <div class="mockup-heading">
+        <div>
+          <p class="mockup-label">Option B</p>
+          <h2>Stacked Sun context row plus larger sky dome</h2>
+          <p>The Sun becomes a separate context track under the Moon timeline. The dome owns all azimuth comparison.</p>
+        </div>
+        <div class="badge-row">
+          <span class="badge is-moon">Moon path</span>
+          <span class="badge is-sun">Sun altitude context</span>
+          <span class="badge is-separation">Sky geometry separate</span>
+        </div>
+      </div>
+
+      <div class="layout-even">
+        <div class="diagram-frame">
+          <svg viewBox="0 0 560 390" role="img" aria-label="Moon timeline and separate Sun altitude row">
+            <rect x="0" y="0" width="560" height="390" fill="#f8faf9"></rect>
+            <text x="28" y="32" class="svg-label-strong">Moon pass</text>
+            <text x="28" y="53" class="svg-label">Time axis</text>
+            <rect x="74" y="70" width="430" height="150" rx="6" fill="#ffffff" stroke="#d8e0df"></rect>
+            <line x1="74" y1="188" x2="504" y2="188" class="axis"></line>
+            <line x1="74" y1="145" x2="504" y2="145" class="grid-line"></line>
+            <line x1="74" y1="104" x2="504" y2="104" class="grid-line"></line>
+            <path d="M 80 88 C 134 92, 181 106, 231 134 S 330 202, 500 217" class="timeline-path"></path>
+            <circle cx="319" cy="190" r="13" class="marker-ring"></circle>
+            <circle cx="319" cy="190" r="8" class="marker-moon"></circle>
+            <text x="15" y="192" class="svg-label">0 deg</text>
+            <text x="12" y="108" class="svg-label">30 deg</text>
+            <text x="82" y="241" class="svg-label">Moon azimuth: SW</text>
+            <text x="230" y="241" class="svg-label">W</text>
+            <text x="323" y="241" class="svg-label-strong">WNW</text>
+            <text x="452" y="241" class="svg-label">NW</text>
+
+            <text x="28" y="282" class="svg-label-strong">Sun altitude context</text>
+            <rect x="74" y="300" width="430" height="46" rx="6" fill="#ffffff" stroke="#d8e0df"></rect>
+            <rect x="75" y="301" width="430" height="44" class="light-band is-daylight"></rect>
+            <path d="M 80 308 C 163 306, 238 311, 319 316 S 430 332, 500 340" class="sun-altitude-path"></path>
+            <circle cx="319" cy="316" r="9" class="marker-sun"></circle>
+            <text x="338" y="320" class="svg-label-strong">Sun 54 deg, SW</text>
+            <text x="78" y="371" class="svg-label">14:00</text>
+            <text x="306" y="371" class="svg-label">15:06</text>
+            <text x="455" y="371" class="svg-label">16:00</text>
+          </svg>
+        </div>
+
+        <div class="diagram-frame">
+          <svg viewBox="0 0 560 390" role="img" aria-label="Large horizon dome with Sun and Moon positions">
+            <rect x="0" y="0" width="560" height="390" fill="#f8faf9"></rect>
+            <text x="28" y="32" class="svg-label-strong">Azimuth / altitude dome</text>
+            <ellipse cx="280" cy="322" rx="214" ry="34" class="dome-shadow"></ellipse>
+            <path d="M 66 322 C 98 176, 162 91, 280 64 C 398 91, 462 176, 494 322 Z" class="dome-fill" stroke="#d8e0df"></path>
+            <path d="M 66 322 C 138 350, 422 350, 494 322" class="horizon-fill" stroke="#b9c7c4"></path>
+            <path d="M 108 286 C 178 218, 382 218, 452 286" class="dome-ring"></path>
+            <path d="M 150 238 C 202 178, 358 178, 410 238" class="dome-ring"></path>
+            <path d="M 194 177 C 229 139, 331 139, 366 177" class="dome-ring"></path>
+            <path d="M 280 64 C 270 150, 270 244, 280 322" class="dome-meridian"></path>
+            <path d="M 66 322 C 180 262, 380 262, 494 322" class="dome-meridian"></path>
+            <text x="280" y="374" text-anchor="middle" class="svg-label">S</text>
+            <text x="88" y="334" text-anchor="middle" class="svg-label">W</text>
+            <text x="472" y="334" text-anchor="middle" class="svg-label">E</text>
+            <text x="280" y="82" text-anchor="middle" class="svg-label">60 deg</text>
+            <text x="374" y="239" class="svg-label">30 deg</text>
+            <path d="M 165 142 C 209 194, 253 252, 342 298" class="separation-line"></path>
+            <circle cx="165" cy="142" r="15" class="marker-sun"></circle>
+            <circle cx="342" cy="298" r="11" class="marker-moon"></circle>
+            <text x="132" y="117" class="svg-label-strong">Sun</text>
+            <text x="352" y="291" class="svg-label-strong">Moon</text>
+            <text x="250" y="218" class="svg-label-strong">68 deg apart</text>
+          </svg>
+        </div>
+      </div>
+    </section>
+
+    <section class="mockup-card">
+      <div class="mockup-heading">
+        <div>
+          <p class="mockup-label">Option C</p>
+          <h2>Pass sky-track map with timeline facts</h2>
+          <p>A full-pass azimuth/altitude map shows the Moon and Sun tracks as different paths. This is more explicit, but heavier than a single-moment inset.</p>
+        </div>
+        <div class="badge-row">
+          <span class="badge is-moon">Moon track</span>
+          <span class="badge is-sun">Sun track</span>
+          <span class="badge is-separation">Suggested instant linked</span>
+        </div>
+      </div>
+
+      <div class="layout-split">
+        <div class="diagram-frame">
+          <svg viewBox="0 0 760 420" role="img" aria-label="Sky track map showing Moon and Sun as separate paths">
+            <rect x="0" y="0" width="760" height="420" fill="#f8faf9"></rect>
+            <text x="32" y="34" class="svg-label-strong">Sky tracks during the visible Moon window</text>
+            <text x="32" y="55" class="svg-label">Horizontal position is compass direction, vertical position is altitude</text>
+            <ellipse cx="380" cy="346" rx="286" ry="42" class="dome-shadow"></ellipse>
+            <path d="M 94 346 C 136 188, 230 94, 380 66 C 530 94, 624 188, 666 346 Z" class="dome-fill" stroke="#d8e0df"></path>
+            <path d="M 94 346 C 200 382, 560 382, 666 346" class="horizon-fill" stroke="#b9c7c4"></path>
+            <path d="M 145 306 C 235 228, 525 228, 615 306" class="dome-ring"></path>
+            <path d="M 204 244 C 278 178, 482 178, 556 244" class="dome-ring"></path>
+            <path d="M 275 164 C 318 132, 442 132, 485 164" class="dome-ring"></path>
+            <line x1="380" y1="66" x2="380" y2="346" class="dome-meridian"></line>
+            <path d="M 94 346 C 252 270, 508 270, 666 346" class="dome-meridian"></path>
+            <text x="380" y="398" text-anchor="middle" class="svg-label">S</text>
+            <text x="123" y="360" text-anchor="middle" class="svg-label">W</text>
+            <text x="637" y="360" text-anchor="middle" class="svg-label">E</text>
+            <text x="380" y="85" text-anchor="middle" class="svg-label">60 deg</text>
+            <text x="512" y="245" class="svg-label">30 deg</text>
+            <path d="M 248 204 C 284 188, 320 182, 358 184 S 437 204, 494 234" class="sun-sky-path"></path>
+            <path d="M 268 118 C 326 154, 400 218, 507 326" class="moon-sky-path"></path>
+            <circle cx="284" cy="130" r="8" class="marker-moon"></circle>
+            <circle cx="507" cy="326" r="10" class="marker-moon"></circle>
+            <circle cx="248" cy="204" r="10" class="marker-sun"></circle>
+            <circle cx="358" cy="184" r="12" class="marker-sun"></circle>
+            <circle cx="357" cy="184" r="16" fill="none" stroke="#d28a1d" stroke-width="1.2" opacity="0.45"></circle>
+            <circle cx="452" cy="300" r="14" class="marker-ring"></circle>
+            <circle cx="452" cy="300" r="8" class="marker-moon"></circle>
+            <path d="M 358 184 C 380 224, 410 264, 452 300" class="separation-line"></path>
+            <text x="370" y="176" class="svg-label-strong">Sun at suggested time</text>
+            <text x="462" y="294" class="svg-label-strong">Moon at suggested time</text>
+          </svg>
+        </div>
+
+        <div class="facts-panel">
+          <h3>Suggested time facts</h3>
+          <div class="fact-grid">
+            <div class="fact">
+              <span>Moon</span>
+              <strong>WNW, 6 deg</strong>
+            </div>
+            <div class="fact">
+              <span>Sun</span>
+              <strong>SW, 54 deg</strong>
+            </div>
+            <div class="fact">
+              <span>Separation</span>
+              <strong>68 deg</strong>
+            </div>
+          </div>
+          <p class="caption">This option makes direction truth explicit, but it may be too much geometry for every pass card. It could work as an expanded chart state.</p>
+          <div class="mini-row">
+            <div class="mini-panel">
+              <p class="mini-title">Start</p>
+              <svg viewBox="0 0 160 105" role="img" aria-label="Start sky position thumbnail">
+                <rect width="160" height="105" fill="#f8faf9"></rect>
+                <path d="M 18 86 C 40 34, 120 34, 142 86" fill="#ffffff" stroke="#d8e0df"></path>
+                <path d="M 18 86 C 52 99, 108 99, 142 86" fill="#e8f0ef" stroke="#b9c7c4"></path>
+                <circle cx="54" cy="56" r="8" class="marker-moon"></circle>
+                <circle cx="72" cy="39" r="9" class="marker-sun"></circle>
+              </svg>
+            </div>
+            <div class="mini-panel">
+              <p class="mini-title">Suggested</p>
+              <svg viewBox="0 0 160 105" role="img" aria-label="Suggested sky position thumbnail">
+                <rect width="160" height="105" fill="#f8faf9"></rect>
+                <path d="M 18 86 C 40 34, 120 34, 142 86" fill="#ffffff" stroke="#d8e0df"></path>
+                <path d="M 18 86 C 52 99, 108 99, 142 86" fill="#e8f0ef" stroke="#b9c7c4"></path>
+                <circle cx="116" cy="79" r="8" class="marker-moon"></circle>
+                <circle cx="54" cy="43" r="9" class="marker-sun"></circle>
+                <path d="M 54 43 C 74 57, 96 70, 116 79" class="separation-line"></path>
+              </svg>
+            </div>
+            <div class="mini-panel">
+              <p class="mini-title">Moonset</p>
+              <svg viewBox="0 0 160 105" role="img" aria-label="Moonset sky position thumbnail">
+                <rect width="160" height="105" fill="#f8faf9"></rect>
+                <path d="M 18 86 C 40 34, 120 34, 142 86" fill="#ffffff" stroke="#d8e0df"></path>
+                <path d="M 18 86 C 52 99, 108 99, 142 86" fill="#e8f0ef" stroke="#b9c7c4"></path>
+                <circle cx="132" cy="86" r="8" class="marker-moon"></circle>
+                <circle cx="86" cy="52" r="9" class="marker-sun"></circle>
+              </svg>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+  </div>
+</main>
+</body>
+</html>
