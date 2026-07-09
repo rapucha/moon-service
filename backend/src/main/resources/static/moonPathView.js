@@ -593,7 +593,7 @@ function bodyAltitudeMarker(point, imageUrl, body) {
 }
 
 function moonAltitudeMarkerImageUrl(point, fallbackImageUrl) {
-  if (point.role !== "suggested" || !Number.isFinite(point.moonPhaseAngleDegrees)) {
+  if (!Number.isFinite(point.moonPhaseAngleDegrees)) {
     return fallbackImageUrl;
   }
   return moonPhaseImageDataUrl(

@@ -3,6 +3,9 @@
  * @property {string} at
  * @property {number} altitudeDegrees
  * @property {number} azimuthDegrees
+ * @property {number} moonPhaseAngleDegrees
+ * @property {number|null} [brightLimbTiltDegrees]
+ * @property {number|null} [northPoleTiltDegrees]
  * @property {number} sunAltitudeDegrees
  * @property {number} sunAzimuthDegrees
  * @property {string} lightBucket

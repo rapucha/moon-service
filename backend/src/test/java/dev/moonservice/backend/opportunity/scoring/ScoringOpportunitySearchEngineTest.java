@@ -49,6 +49,30 @@ class ScoringOpportunitySearchEngineTest {
     }
 
     @Test
+    void preservesMoonPathPointOrientationFromPrototypeResponse() throws ReflectiveOperationException {
+        ObjectNode pointNode = new ObjectMapper().createObjectNode();
+        pointNode.put("at", "2026-01-01T00:00:00Z");
+        pointNode.put("altitudeDegrees", 5.0);
+        pointNode.put("azimuthDegrees", 120.0);
+        pointNode.put("moonPhaseAngleDegrees", 91.0);
+        pointNode.putNull("brightLimbTiltDegrees");
+        pointNode.put("northPoleTiltDegrees", 270.0);
+        pointNode.put("sunAltitudeDegrees", -5.0);
+        pointNode.put("sunAzimuthDegrees", 210.0);
+        pointNode.put("lightBucket", "civil_twilight");
+        pointNode.put("role", "path");
+        Method pointMapper = ScoringOpportunitySearchEngine.class.getDeclaredMethod("moonPathPoint", JsonNode.class);
+        pointMapper.setAccessible(true);
+
+        OpportunitySearchResponse.MoonPathPoint point =
+                (OpportunitySearchResponse.MoonPathPoint) pointMapper.invoke(null, pointNode);
+
+        assertEquals(91.0, point.moonPhaseAngleDegrees());
+        assertNull(point.brightLimbTiltDegrees());
+        assertEquals(270.0, point.northPoleTiltDegrees());
+    }
+
+    @Test
     void scoresResolvedLocationCoordinatesWithoutFixtureLocationId() {
         ScoringOpportunitySearchEngine engine = engineWithPartlyCloudyWeather();
 
@@ -70,6 +94,7 @@ class ScoringOpportunitySearchEngineTest {
         assertEquals(first.moonPass().endsAt(), first.moonPass().path().end().at());
         assertTrue(first.moonPass().path().samples().size() >= 5);
         assertFalse(first.moonPass().path().samples().getFirst().lightBucket().isBlank());
+        assertMoonPathPointOrientation(first.moonPass().path().samples().getFirst());
         assertTrue(first.links().get("ics").startsWith("/o/amsterdam-nl-"));
         assertFalse(first.moon().phaseName().isBlank());
         assertTrue(first.moon().phaseAngleDegrees() >= 0.0);
@@ -89,10 +114,22 @@ class ScoringOpportunitySearchEngineTest {
         assertTrue(Double.isFinite(first.sun().azimuthDegrees()));
         assertTrue(first.moonPath().samples().size() >= 5);
         assertFalse(first.moonPath().samples().getFirst().lightBucket().isBlank());
+        assertMoonPathPointOrientation(first.moonPath().suggested());
         assertTrue(response.messages().stream()
                 .noneMatch(message -> message.code().equals("fixture_weather")));
         assertTrue(response.messages().stream()
                 .anyMatch(message -> message.code().equals("local_horizon_not_modelled")));
+    }
+
+    private static void assertMoonPathPointOrientation(OpportunitySearchResponse.MoonPathPoint point) {
+        assertTrue(point.moonPhaseAngleDegrees() >= 0.0);
+        assertTrue(point.moonPhaseAngleDegrees() < 360.0);
+        assertNotNull(point.brightLimbTiltDegrees());
+        assertTrue(point.brightLimbTiltDegrees() >= 0.0);
+        assertTrue(point.brightLimbTiltDegrees() < 360.0);
+        assertNotNull(point.northPoleTiltDegrees());
+        assertTrue(point.northPoleTiltDegrees() >= 0.0);
+        assertTrue(point.northPoleTiltDegrees() < 360.0);
     }
 
     @Test

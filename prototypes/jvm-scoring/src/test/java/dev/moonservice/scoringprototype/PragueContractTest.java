@@ -109,12 +109,16 @@ class PragueContractTest {
         assertFalse(path.path("start").path("lightBucket").asString().isBlank());
         assertFalse(path.path("suggested").path("lightBucket").asString().isBlank());
         assertFalse(path.path("end").path("lightBucket").asString().isBlank());
+        assertMoonOrientationFields(path.path("start"));
+        assertMoonOrientationFields(path.path("suggested"));
+        assertMoonOrientationFields(path.path("end"));
         assertTrue(path.path("suggested").has("sunAltitudeDegrees"));
         assertTrue(path.path("suggested").has("sunAzimuthDegrees"));
         assertTrue(path.path("samples").isArray());
         assertTrue(path.path("samples").size() >= 5);
         assertTrue(path.path("samples").get(0).has("sunAzimuthDegrees"));
         assertFalse(path.path("samples").get(0).path("lightBucket").asString().isBlank());
+        path.path("samples").forEach(PragueContractTest::assertMoonOrientationFields);
     }
 
     private static void assertMoonPassPathMatchesPass(JsonNode opportunity) {
@@ -128,5 +132,27 @@ class PragueContractTest {
         assertTrue(path.path("samples").size() >= 5);
         assertTrue(path.path("samples").get(0).has("sunAzimuthDegrees"));
         assertFalse(path.path("samples").get(0).path("lightBucket").asString().isBlank());
+        assertMoonOrientationFields(path.path("start"));
+        assertMoonOrientationFields(path.path("end"));
+        path.path("samples").forEach(PragueContractTest::assertMoonOrientationFields);
+    }
+
+    private static void assertMoonOrientationFields(JsonNode point) {
+        assertTrue(point.path("moonPhaseAngleDegrees").isNumber());
+        double phaseAngleDegrees = point.path("moonPhaseAngleDegrees").asDouble();
+        assertTrue(phaseAngleDegrees >= 0.0);
+        assertTrue(phaseAngleDegrees < 360.0);
+        assertOptionalAngle(point, "brightLimbTiltDegrees");
+        assertOptionalAngle(point, "northPoleTiltDegrees");
+    }
+
+    private static void assertOptionalAngle(JsonNode point, String field) {
+        assertTrue(point.has(field));
+        JsonNode angle = point.path(field);
+        assertTrue(angle.isNull() || angle.isNumber());
+        if (angle.isNumber()) {
+            assertTrue(angle.asDouble() >= 0.0);
+            assertTrue(angle.asDouble() < 360.0);
+        }
     }
 }
