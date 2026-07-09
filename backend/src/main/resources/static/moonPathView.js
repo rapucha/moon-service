@@ -213,7 +213,10 @@ function altitudeChartSvg(sourcePoints, lightBandSourcePoints, azimuthSourcePoin
   var azimuthLabels = azimuthRailLabels(azimuthPoints, mode);
   var visibleMarkers = visibleAltitudeMarkers(points, mode, options.body);
   var markerImageUrl = options.body === "moon"
-    ? moonPhaseImageDataUrl((options.moon || {}).phaseAngleDegrees, 64)
+    ? moonPhaseImageDataUrl(
+      (options.moon || {}).phaseAngleDegrees,
+      64,
+      (options.moon || {}).brightLimbTiltDegrees)
     : SUN_SAMPLE_MARKER_IMAGE_URL;
 
   return svgElement("svg", {
@@ -585,7 +588,17 @@ function bodyAltitudeMarker(point, imageUrl, body) {
   if (body === "sun") {
     return sunAltitudeMarker(point);
   }
-  return altitudeMarker(point, imageUrl);
+  return altitudeMarker(point, moonAltitudeMarkerImageUrl(point, imageUrl));
+}
+
+function moonAltitudeMarkerImageUrl(point, fallbackImageUrl) {
+  if (point.role !== "suggested" || !Number.isFinite(point.moonPhaseAngleDegrees)) {
+    return fallbackImageUrl;
+  }
+  return moonPhaseImageDataUrl(
+    point.moonPhaseAngleDegrees,
+    64,
+    point.brightLimbTiltDegrees) || fallbackImageUrl;
 }
 
 function sunAltitudeMarker(point) {
@@ -673,7 +686,10 @@ function skyDomeChart(samples, timezone, countryCode, moon) {
     selected.sunAzimuthDegrees);
   var separationArcRadius = skySeparationArcRadius(observer, selectedSun, selectedMoon);
   var separationArc = angleArcPath(observer, selectedSun, selectedMoon, separationArcRadius);
-  var moonImageUrl = moonPhaseImageDataUrl(moon.phaseAngleDegrees, 64);
+  var moonImageUrl = moonPhaseImageDataUrl(
+    moon.phaseAngleDegrees,
+    64,
+    moon.brightLimbTiltDegrees);
   var selectedTime = formatTime(selected.at, timezone, countryCode);
   var accessibleLabel = "Sun and Moon sky position at " + selectedTime
     + "; Sun " + degrees(selected.sunAltitudeDegrees) + " altitude, "
@@ -1050,7 +1066,9 @@ function chartSamples(samples) {
       sunAzimuthDegrees: sample.sunAzimuthDegrees,
       lightBucket: sample.lightBucket,
       role: sample.role || "path",
-      markerLabel: sample.markerLabel
+      markerLabel: sample.markerLabel,
+      moonPhaseAngleDegrees: sample.moonPhaseAngleDegrees,
+      brightLimbTiltDegrees: sample.brightLimbTiltDegrees
     };
   }).filter(function (sample) {
     return Number.isFinite(sample.time)

@@ -93,6 +93,7 @@ EphemerisService
     - Moon azimuth degrees
     - Moon illumination fraction
     - Moon phase angle or named phase
+    - observer-oriented bright-limb tilt at the sampled instant
     - next moonrise time
     - next moonset time
     - Sun altitude degrees
@@ -100,6 +101,25 @@ EphemerisService
 ```
 
 This boundary allows replacing the ephemeris library later without changing scoring or UI code.
+
+### Observer-oriented bright-limb tilt
+
+The suggested-time bright-limb direction is derived from the same apparent
+topocentric horizontal Moon and Sun positions used elsewhere. Let `hm` and `hs`
+be Moon and Sun altitude, and let `Am` and `As` be their azimuths, all in
+radians. Project the Sun direction into the tangent plane at the Moon:
+
+```text
+right = cos(hs) * sin(As - Am)
+up    = sin(hs) * cos(hm) - cos(hs) * sin(hm) * cos(As - Am)
+tilt  = normalizeDegrees(toDegrees(atan2(right, up)))
+```
+
+The public convention is horizon-aligned and directly renderable: zero degrees
+points toward local zenith, 90 degrees points right toward increasing azimuth,
+and angles increase clockwise in `[0, 360)`. If both tangent-plane components
+are negligible, such as exact conjunction or opposition, the direction is
+undefined and the API value is `null`.
 
 ## Validation Source
 

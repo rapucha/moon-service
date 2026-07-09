@@ -28,6 +28,9 @@ feeds, and calendar exports deliberately out of scope.
   inside a single backend process.
 - Coordinate-backed Moon/Sun window generation and scoring through the existing
   `jvm-scoring-prototype` Maven artifact.
+- Opportunity Moon summaries include optional observer-oriented
+  `brightLimbTiltDegrees` data for suggested-time rendering; clients retain the
+  phase-angle fallback when that value is unavailable.
 - Open-Meteo weather forecast adapter code under `backend.weather.openmeteo`,
   covered by saved provider JSON fixtures. It can be selected for live hourly
   forecast lookup with `moon.weather.provider=open-meteo`.

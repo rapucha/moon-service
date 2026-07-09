@@ -3,6 +3,7 @@ package dev.moonservice.backend.opportunity.scoring;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -18,12 +19,33 @@ import dev.moonservice.scoringprototype.PreviewEvaluator;
 import dev.moonservice.scoringprototype.fixture.WeatherFixture;
 import dev.moonservice.scoringprototype.scoring.ScoringModel;
 import org.junit.jupiter.api.Test;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.node.ObjectNode;
 
+import java.lang.reflect.Method;
 import java.time.Instant;
 import java.time.ZoneId;
 import java.util.concurrent.atomic.AtomicReference;
 
 class ScoringOpportunitySearchEngineTest {
+    @Test
+    void preservesNullBrightLimbTiltFromPrototypeResponse() throws ReflectiveOperationException {
+        ObjectNode moonNode = new ObjectMapper().createObjectNode();
+        moonNode.put("altitudeDegrees", 5.0);
+        moonNode.put("azimuthDegrees", 120.0);
+        moonNode.put("illuminationPercent", 100.0);
+        moonNode.put("phaseAngleDegrees", 180.0);
+        moonNode.putNull("brightLimbTiltDegrees");
+        moonNode.put("phaseName", "full_moon");
+        Method moonMapper = ScoringOpportunitySearchEngine.class.getDeclaredMethod("moon", JsonNode.class);
+        moonMapper.setAccessible(true);
+
+        OpportunitySearchResponse.Moon moon = (OpportunitySearchResponse.Moon) moonMapper.invoke(null, moonNode);
+
+        assertNull(moon.brightLimbTiltDegrees());
+    }
+
     @Test
     void scoresResolvedLocationCoordinatesWithoutFixtureLocationId() {
         ScoringOpportunitySearchEngine engine = engineWithPartlyCloudyWeather();
@@ -50,6 +72,9 @@ class ScoringOpportunitySearchEngineTest {
         assertFalse(first.moon().phaseName().isBlank());
         assertTrue(first.moon().phaseAngleDegrees() >= 0.0);
         assertTrue(first.moon().phaseAngleDegrees() < 360.0);
+        assertNotNull(first.moon().brightLimbTiltDegrees());
+        assertTrue(first.moon().brightLimbTiltDegrees() >= 0.0);
+        assertTrue(first.moon().brightLimbTiltDegrees() < 360.0);
         assertEquals(first.startsAt(), first.moonPath().start().at());
         assertEquals(first.suggestedAt(), first.moonPath().suggested().at());
         assertEquals(first.endsAt(), first.moonPath().end().at());

@@ -188,9 +188,11 @@ Agreed behavior:
 - Start, suggested, and end markers should be visually distinct.
 - The suggested marker may be larger than the start/end markers and should read
   as the Moon rather than a generic dot.
-- The suggested marker may show a compact, recognizable Moon phase. V0 may use a
-  schematic phase based on `phaseAngleDegrees`; true observer-oriented Moon
-  rotation can wait until the backend provides a deliberate orientation value.
+- The suggested marker shows a compact, recognizable Moon phase. When
+  `moon.brightLimbTiltDegrees` is present, rotate the illumination toward that
+  observer-oriented direction while keeping the canonical lunar surface texture
+  fixed. When the field is absent or invalid, retain the schematic
+  location-independent rendering based on `phaseAngleDegrees`.
 - The Moon altitude chart does not overlay Sun markers. The separate Sun-pass
   chart draws Sun samples only when Sun altitude is zero or positive and sizes
   recommendation markers by priority. It must cull lower-priority path,

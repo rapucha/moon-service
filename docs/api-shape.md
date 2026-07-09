@@ -315,6 +315,13 @@ Response rules:
   suggested-time summary for compatibility.
 - `moon.phaseAngleDegrees` uses the astronomical lunar phase angle: `0` is new
   Moon, `90` is first quarter, `180` is full Moon, and `270` is last quarter.
+- `moon.brightLimbTiltDegrees` is an optional observer-oriented value at
+  `suggestedAt`. It gives the direction from the Moon center toward the Sun in
+  the local sky tangent plane: `0` points toward local zenith at the top of a
+  horizon-aligned image, `90` points right toward increasing azimuth, and angles
+  increase clockwise in the range `[0, 360)`. A missing or `null` value means
+  clients must retain their location-independent phase fallback. This is not a
+  celestial-north position angle, lunar-axis rotation, or parallactic angle.
 - `moonPath` describes Moon movement across the window. It must include direct
   `start`, `suggested`, and `end` points plus a bounded `samples` array
   suitable for compact UI charts. V0 samples the path at regular 30-minute
@@ -429,6 +436,7 @@ Response rules:
         "azimuthDegrees": 126.5,
         "illuminationPercent": 96,
         "phaseAngleDegrees": 157.1,
+        "brightLimbTiltDegrees": 1.9,
         "phaseName": "waxing_gibbous"
       },
       "moonPath": {

@@ -30,6 +30,7 @@
  * @property {number} azimuthDegrees
  * @property {number} illuminationPercent
  * @property {number} phaseAngleDegrees
+ * @property {number|null} [brightLimbTiltDegrees]
  * @property {string} phaseName
  */
 

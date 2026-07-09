@@ -63,6 +63,9 @@ class PragueContractTest {
         assertFalse(first.path("moon").path("phaseName").asString().isBlank());
         assertTrue(first.path("moon").path("phaseAngleDegrees").asDouble() >= 0.0);
         assertTrue(first.path("moon").path("phaseAngleDegrees").asDouble() < 360.0);
+        assertTrue(first.path("moon").path("brightLimbTiltDegrees").isNumber());
+        assertTrue(first.path("moon").path("brightLimbTiltDegrees").asDouble() >= 0.0);
+        assertTrue(first.path("moon").path("brightLimbTiltDegrees").asDouble() < 360.0);
         assertMoonPathMatchesWindow(first);
         assertTrue(first.has("sun"));
         assertTrue(first.has("weather"));
