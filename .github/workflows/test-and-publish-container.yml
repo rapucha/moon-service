@@ -1,0 +1,361 @@
+name: Test and publish container
+
+on:
+  pull_request:
+    branches:
+      - main
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+concurrency:
+  group: moon-service-ci-${{ github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  IMAGE_NAME: ghcr.io/${{ github.repository }}
+  IMAGE_SOURCE: ${{ github.server_url }}/${{ github.repository }}
+
+jobs:
+  backend-tests:
+    name: Backend tests
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - name: Check out source
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          persist-credentials: false
+
+      - name: Set up Java
+        uses: actions/setup-java@0f481fcb613427c0f801b606911222b5b6f3083a # v5.5.0
+        with:
+          distribution: temurin
+          java-version: '25.0.3+9'
+          cache: maven
+          cache-dependency-path: |
+            pom.xml
+            backend/pom.xml
+            prototypes/jvm-scoring/pom.xml
+
+      - name: Run backend tests
+        run: mvn --batch-mode --no-transfer-progress test -pl backend -am
+
+  frontend-tests:
+    name: Frontend tests
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - name: Check out source
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          persist-credentials: false
+
+      - name: Set up Java for the Playwright server
+        uses: actions/setup-java@0f481fcb613427c0f801b606911222b5b6f3083a # v5.5.0
+        with:
+          distribution: temurin
+          java-version: '25.0.3+9'
+          cache: maven
+          cache-dependency-path: |
+            pom.xml
+            backend/pom.xml
+            prototypes/jvm-scoring/pom.xml
+
+      - name: Set up Node.js
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: package-lock.json
+
+      - name: Install frontend dependencies
+        run: npm ci
+
+      - name: Verify hosted Chrome
+        run: test -x /usr/bin/google-chrome
+
+      - name: Run frontend checks
+        run: npm run frontend:check
+
+  publish-image:
+    name: Publish immutable image
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs:
+      - backend-tests
+      - frontend-tests
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    permissions:
+      contents: read
+      packages: write
+    concurrency:
+      group: moon-service-ghcr-${{ github.sha }}
+      cancel-in-progress: false
+    outputs:
+      digest: ${{ steps.verify-image.outputs.digest }}
+    steps:
+      - name: Check out source
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          persist-credentials: false
+
+      - name: Log in to GHCR
+        uses: docker/login-action@af1e73f918a031802d376d3c8bbc3fe56130a9b0 # v4.4.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ github.token }}
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@96fe6ef7f33517b61c61be40b68a1882f3264fb8 # v4.2.0
+        with:
+          platforms: arm64
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@bb05f3f5519dd87d3ba754cc423b652a5edd6d2c # v4.2.0
+
+      - name: Check immutable revision tag
+        id: existing-image
+        env:
+          IMAGE_REF: ${{ env.IMAGE_NAME }}:${{ github.sha }}
+        run: |
+          set -euo pipefail
+          error_file="$(mktemp)"
+          trap 'rm -f "$error_file"' EXIT
+
+          if manifest_json="$(docker buildx imagetools inspect \
+              "$IMAGE_REF" --format '{{json .Manifest}}' 2>"$error_file")"; then
+            digest="$(jq -er '.digest | select(test("^sha256:[0-9a-f]{64}$"))' <<<"$manifest_json")"
+            revision="$(jq -er '.annotations["org.opencontainers.image.revision"]' <<<"$manifest_json")"
+            source="$(jq -er '.annotations["org.opencontainers.image.source"]' <<<"$manifest_json")"
+            [[ "$revision" == "$GITHUB_SHA" ]]
+            [[ "$source" == "$IMAGE_SOURCE" ]]
+            echo "exists=true" >>"$GITHUB_OUTPUT"
+            echo "digest=$digest" >>"$GITHUB_OUTPUT"
+            echo "Reusing existing immutable image $IMAGE_REF@$digest"
+          elif grep -Eqi '(manifest unknown|not found)' "$error_file"; then
+            echo "exists=false" >>"$GITHUB_OUTPUT"
+            echo "No immutable image exists yet for $GITHUB_SHA"
+          else
+            cat "$error_file" >&2
+            exit 1
+          fi
+
+      - name: Build AMD64 smoke image
+        if: steps.existing-image.outputs.exists != 'true'
+        uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7.3.0
+        with:
+          context: .
+          file: backend/Dockerfile
+          platforms: linux/amd64
+          load: true
+          tags: moon-service-ci:${{ github.sha }}-amd64
+          build-args: |
+            MOON_BUILD_REVISION=${{ github.sha }}
+            MOON_IMAGE_SOURCE=${{ env.IMAGE_SOURCE }}
+          cache-from: type=gha,scope=moon-service-container
+          cache-to: type=gha,mode=max,scope=moon-service-container
+          provenance: false
+
+      - name: Smoke-test AMD64 image
+        if: steps.existing-image.outputs.exists != 'true'
+        env:
+          MOON_SERVICE_CONTAINER_PLATFORM: linux/amd64
+        run: scripts/smoke_container_image.sh "moon-service-ci:$GITHUB_SHA-amd64" "$GITHUB_SHA"
+
+      - name: Build ARM64 smoke image
+        if: steps.existing-image.outputs.exists != 'true'
+        uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7.3.0
+        with:
+          context: .
+          file: backend/Dockerfile
+          platforms: linux/arm64
+          load: true
+          tags: moon-service-ci:${{ github.sha }}-arm64
+          build-args: |
+            MOON_BUILD_REVISION=${{ github.sha }}
+            MOON_IMAGE_SOURCE=${{ env.IMAGE_SOURCE }}
+          cache-from: type=gha,scope=moon-service-container
+          cache-to: type=gha,mode=max,scope=moon-service-container
+          provenance: false
+
+      - name: Smoke-test ARM64 image
+        if: steps.existing-image.outputs.exists != 'true'
+        env:
+          MOON_SERVICE_CONTAINER_PLATFORM: linux/arm64
+          MOON_SERVICE_CONTAINER_START_TIMEOUT_SECONDS: '180'
+        run: scripts/smoke_container_image.sh "moon-service-ci:$GITHUB_SHA-arm64" "$GITHUB_SHA"
+
+      - name: Publish immutable multi-architecture image
+        id: publish-image
+        if: steps.existing-image.outputs.exists != 'true'
+        uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7.3.0
+        with:
+          context: .
+          file: backend/Dockerfile
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ env.IMAGE_NAME }}:${{ github.sha }}
+          build-args: |
+            MOON_BUILD_REVISION=${{ github.sha }}
+            MOON_IMAGE_SOURCE=${{ env.IMAGE_SOURCE }}
+          annotations: |
+            index:org.opencontainers.image.revision=${{ github.sha }}
+            index:org.opencontainers.image.source=${{ env.IMAGE_SOURCE }}
+          cache-from: type=gha,scope=moon-service-container
+          cache-to: type=gha,mode=max,scope=moon-service-container
+          provenance: false
+
+      - name: Verify published image
+        id: verify-image
+        env:
+          IMAGE_REF: ${{ env.IMAGE_NAME }}:${{ github.sha }}
+          PUBLISHED_DIGEST: ${{ steps.publish-image.outputs.digest }}
+        run: |
+          set -euo pipefail
+          manifest_json="$(docker buildx imagetools inspect \
+            "$IMAGE_REF" --format '{{json .Manifest}}')"
+          digest="$(jq -er '.digest | select(test("^sha256:[0-9a-f]{64}$"))' <<<"$manifest_json")"
+          revision="$(jq -er '.annotations["org.opencontainers.image.revision"]' <<<"$manifest_json")"
+          source="$(jq -er '.annotations["org.opencontainers.image.source"]' <<<"$manifest_json")"
+
+          [[ "$revision" == "$GITHUB_SHA" ]]
+          [[ "$source" == "$IMAGE_SOURCE" ]]
+          if [[ -n "$PUBLISHED_DIGEST" ]]; then
+            [[ "$digest" == "$PUBLISHED_DIGEST" ]]
+          else
+            [[ "$digest" == "${{ steps.existing-image.outputs.digest }}" ]]
+          fi
+
+          jq -e '
+            [.manifests[].platform
+              | select(.os == "linux")
+              | .architecture]
+            | sort == ["amd64", "arm64"]
+          ' <<<"$manifest_json" >/dev/null
+
+          for platform in linux/amd64 linux/arm64; do
+            image_json="$(docker buildx imagetools inspect "$IMAGE_REF" \
+              --format "{{json (index .Image \"$platform\")}}")"
+            jq -e --arg revision "$GITHUB_SHA" --arg source "$IMAGE_SOURCE" '
+              .config.Labels["org.opencontainers.image.revision"] == $revision
+              and .config.Labels["org.opencontainers.image.source"] == $source
+              and ((.config.Env // [])
+                | index("MOON_BUILD_REVISION=" + $revision) != null)
+            ' <<<"$image_json" >/dev/null
+          done
+
+          docker pull --platform linux/amd64 "$IMAGE_NAME@$digest"
+          docker pull --platform linux/arm64 "$IMAGE_NAME@$digest"
+
+          echo "digest=$digest" >>"$GITHUB_OUTPUT"
+          echo "Verified $IMAGE_REF@$digest for linux/amd64 and linux/arm64"
+
+  promote-main:
+    name: Promote main image
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs:
+      - publish-image
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      packages: write
+    concurrency:
+      group: moon-service-ghcr-main-promotion
+      cancel-in-progress: false
+    steps:
+      - name: Check out complete history
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Log in to GHCR
+        uses: docker/login-action@af1e73f918a031802d376d3c8bbc3fe56130a9b0 # v4.4.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ github.token }}
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@bb05f3f5519dd87d3ba754cc423b652a5edd6d2c # v4.2.0
+
+      - name: Decide whether main can advance
+        id: promotion
+        env:
+          CANDIDATE_DIGEST: ${{ needs.publish-image.outputs.digest }}
+          MAIN_REF: ${{ env.IMAGE_NAME }}:main
+        run: |
+          set -euo pipefail
+          [[ "$CANDIDATE_DIGEST" =~ ^sha256:[0-9a-f]{64}$ ]]
+          error_file="$(mktemp)"
+          trap 'rm -f "$error_file"' EXIT
+
+          if manifest_json="$(docker buildx imagetools inspect \
+              "$MAIN_REF" --format '{{json .Manifest}}' 2>"$error_file")"; then
+            current_digest="$(jq -er '.digest | select(test("^sha256:[0-9a-f]{64}$"))' <<<"$manifest_json")"
+            current_revision="$(jq -er '.annotations["org.opencontainers.image.revision"]' <<<"$manifest_json")"
+            current_source="$(jq -er '.annotations["org.opencontainers.image.source"]' <<<"$manifest_json")"
+            [[ "$current_revision" =~ ^[0-9a-f]{40}$ ]]
+            [[ "$current_source" == "$IMAGE_SOURCE" ]]
+
+            if [[ "$current_revision" == "$GITHUB_SHA" ]] \
+                || git merge-base --is-ancestor "$current_revision" "$GITHUB_SHA"; then
+              {
+                echo "promote=true"
+                echo "expected_digest=$CANDIDATE_DIGEST"
+                echo "expected_revision=$GITHUB_SHA"
+              } >>"$GITHUB_OUTPUT"
+            elif git merge-base --is-ancestor "$GITHUB_SHA" "$current_revision"; then
+              {
+                echo "promote=false"
+                echo "expected_digest=$current_digest"
+                echo "expected_revision=$current_revision"
+              } >>"$GITHUB_OUTPUT"
+              echo "main already points to newer successful revision $current_revision"
+            else
+              echo "Current and candidate image revisions are not on one main history" >&2
+              exit 1
+            fi
+          elif grep -Eqi '(manifest unknown|not found)' "$error_file"; then
+            {
+              echo "promote=true"
+              echo "expected_digest=$CANDIDATE_DIGEST"
+              echo "expected_revision=$GITHUB_SHA"
+            } >>"$GITHUB_OUTPUT"
+            echo "main image tag does not exist yet"
+          else
+            cat "$error_file" >&2
+            exit 1
+          fi
+
+      - name: Advance main to the verified digest
+        if: steps.promotion.outputs.promote == 'true'
+        env:
+          CANDIDATE_DIGEST: ${{ needs.publish-image.outputs.digest }}
+        run: |
+          set -euo pipefail
+          docker buildx imagetools create \
+            --tag "$IMAGE_NAME:main" \
+            "$IMAGE_NAME@$CANDIDATE_DIGEST"
+
+      - name: Verify main image
+        env:
+          EXPECTED_DIGEST: ${{ steps.promotion.outputs.expected_digest }}
+          EXPECTED_REVISION: ${{ steps.promotion.outputs.expected_revision }}
+        run: |
+          set -euo pipefail
+          manifest_json="$(docker buildx imagetools inspect \
+            "$IMAGE_NAME:main" --format '{{json .Manifest}}')"
+          digest="$(jq -er '.digest' <<<"$manifest_json")"
+          revision="$(jq -er '.annotations["org.opencontainers.image.revision"]' <<<"$manifest_json")"
+          source="$(jq -er '.annotations["org.opencontainers.image.source"]' <<<"$manifest_json")"
+          [[ "$digest" == "$EXPECTED_DIGEST" ]]
+          [[ "$revision" == "$EXPECTED_REVISION" ]]
+          [[ "$source" == "$IMAGE_SOURCE" ]]
+          echo "main points to $revision at $digest"

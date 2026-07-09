@@ -55,6 +55,7 @@ process, but they are cleared on restart and are not shared across instances.
 - `docs/ephemeris-research.md`: ephemeris decision and validation notes.
 - `docs/weather-provider-research.md`: weather provider decision and validation notes.
 - `docs/geocoding-research.md`: geocoding provider decision and validation notes.
+- `docs/container-image-publication.md`: tested GHCR image publication, identity, and recovery contract.
 - `docs/mvp-roadmap.md`: milestone plan and next steps.
 - `scripts/geocoding_contract_spike.py`: retained Python spike for checking the v0 geocoding contract.
 - `scripts/scoring_contract_spike.py`: retained Python spike for checking the v0 scoring contract with fixture data.
