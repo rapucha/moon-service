@@ -168,6 +168,19 @@ public final class ResponseFormatter {
         node.put("at", sample.instant().toString());
         node.put("altitudeDegrees", round3(sample.moonAltitudeDegrees()));
         node.put("azimuthDegrees", round3(sample.moonAzimuthDegrees()));
+        node.put("moonPhaseAngleDegrees", round3(sample.moonPhaseAngleDegrees()));
+        Double brightLimbTiltDegrees = sample.brightLimbTiltDegrees();
+        if (brightLimbTiltDegrees == null) {
+            node.putNull("brightLimbTiltDegrees");
+        } else {
+            node.put("brightLimbTiltDegrees", round3(brightLimbTiltDegrees));
+        }
+        Double northPoleTiltDegrees = sample.northPoleTiltDegrees();
+        if (northPoleTiltDegrees == null) {
+            node.putNull("northPoleTiltDegrees");
+        } else {
+            node.put("northPoleTiltDegrees", round3(northPoleTiltDegrees));
+        }
         node.put("sunAltitudeDegrees", round3(sample.sunAltitudeDegrees()));
         node.put("sunAzimuthDegrees", round3(sample.sunAzimuthDegrees()));
         node.put("lightBucket", ScoringModel.lightBucket(sample.sunAltitudeDegrees()));

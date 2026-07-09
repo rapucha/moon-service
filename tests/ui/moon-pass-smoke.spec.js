@@ -484,6 +484,123 @@ test("renders a point-only Sun pass when one above-horizon sample is available",
     .not.toHaveCount(0);
 });
 
+test("uses each pass sample Moon orientation for start, path, and end markers", async ({ page }) => {
+  const response = structuredClone(fixture);
+  const primary = response.opportunities[0];
+  const passId = primary.moonPass.id;
+  const targetOrientations = [
+    {
+      at: primary.moonPass.path.start.at,
+      moonPhaseAngleDegrees: 45,
+      brightLimbTiltDegrees: 90,
+      northPoleTiltDegrees: 30
+    },
+    {
+      at: primary.moonPass.path.samples.find(point => point.role === "path").at,
+      moonPhaseAngleDegrees: 120,
+      brightLimbTiltDegrees: 180,
+      northPoleTiltDegrees: 140
+    },
+    {
+      at: primary.moonPass.path.end.at,
+      moonPhaseAngleDegrees: 250,
+      brightLimbTiltDegrees: 270,
+      northPoleTiltDegrees: 260
+    }
+  ];
+  const orientationByTime = new Map(targetOrientations.map(orientation => [orientation.at, orientation]));
+  primary.moon.phaseAngleDegrees = 90;
+  primary.moon.brightLimbTiltDegrees = 0;
+  primary.moon.northPoleTiltDegrees = 0;
+
+  for (const opportunity of response.opportunities.filter(item => item.moonPass.id === passId)) {
+    const path = opportunity.moonPass.path;
+    for (const point of [path.start, path.end, ...(path.samples || [])]) {
+      Object.assign(point, orientationByTime.get(point.at));
+    }
+  }
+
+  await page.unroute("**/api/opportunities**");
+  await page.route("**/api/opportunities**", async route => {
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify(response)
+    });
+  });
+  await page.goto("/search?locationId=pass-sample-orientation-fixture");
+
+  const card = page.locator(".moon-pass-card").first();
+  const imageUrls = await card.evaluate(async (node, input) => {
+    const modulePath = "/moonPhaseView.js";
+    const { moonPhaseImageDataUrl } = await import(modulePath);
+    const markerUrl = (mode, at) => node.querySelector(
+      `.moon-altitude-chart.altitude-chart-${mode} .moon-sample-marker[data-at='${at}'] .moon-sample-marker-image`
+    )?.getAttribute("href");
+    return Object.fromEntries(["desktop", "mobile"].map(mode => [mode, {
+      best: markerUrl(mode, input.bestAt),
+      samples: input.orientations.map(orientation => ({
+        at: orientation.at,
+        actual: markerUrl(mode, orientation.at),
+        expected: moonPhaseImageDataUrl(
+          orientation.moonPhaseAngleDegrees,
+          64,
+          orientation.brightLimbTiltDegrees,
+          orientation.northPoleTiltDegrees)
+      }))
+    }]));
+  }, { bestAt: primary.moonPath.suggested.at, orientations: targetOrientations });
+
+  for (const mode of ["desktop", "mobile"]) {
+    expect(imageUrls[mode].best).toMatch(/^data:image\/png;base64,/);
+    for (const sample of imageUrls[mode].samples) {
+      expect(sample.actual, `${mode} marker at ${sample.at}`).toBe(sample.expected);
+      expect(sample.actual, `${mode} marker at ${sample.at}`).not.toBe(imageUrls[mode].best);
+    }
+  }
+});
+
+test("uses the Best Moon image when pass sample phase is missing or invalid", async ({ page }) => {
+  const response = structuredClone(fixture);
+  const passId = response.opportunities[0].moonPass.id;
+  const startAt = response.opportunities[0].moonPass.path.start.at;
+  for (const opportunity of response.opportunities.filter(item => item.moonPass.id === passId)) {
+    const path = opportunity.moonPass.path;
+    for (const point of [path.start, ...(path.samples || [])].filter(point => point.at === startAt)) {
+      point.moonPhaseAngleDegrees = "invalid";
+    }
+  }
+
+  await page.unroute("**/api/opportunities**");
+  await page.route("**/api/opportunities**", async route => {
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify(response)
+    });
+  });
+  await page.goto("/search?locationId=missing-pass-sample-orientation-fixture");
+
+  const card = page.locator(".moon-pass-card").first();
+  const imageUrls = await card.evaluate(node => {
+    const markerUrls = mode => Array.from(node.querySelectorAll(
+      `.moon-altitude-chart.altitude-chart-${mode} .moon-sample-marker:not(.is-suggested) .moon-sample-marker-image`
+    )).map(image => image.getAttribute("href"));
+    const bestUrl = mode => node.querySelector(
+      `.moon-altitude-chart.altitude-chart-${mode} .moon-sample-marker.is-best .moon-sample-marker-image`
+    )?.getAttribute("href");
+    return Object.fromEntries(["desktop", "mobile"].map(mode => [mode, {
+      best: bestUrl(mode),
+      samples: markerUrls(mode)
+    }]));
+  });
+
+  for (const mode of ["desktop", "mobile"]) {
+    expect(imageUrls[mode].samples.length).toBeGreaterThanOrEqual(3);
+    expect(imageUrls[mode].samples.every(url => url === imageUrls[mode].best)).toBe(true);
+  }
+});
+
 test("uses each recommendation bright-limb tilt and shares the best Moon image", async ({ page }) => {
   const response = structuredClone(fixture);
   response.opportunities[0].moon.brightLimbTiltDegrees = 0;

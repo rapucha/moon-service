@@ -71,7 +71,10 @@ class OpportunitySearchControllerTest {
                 .jsonPath("$.maxMoonAltitudeDegrees").isEqualTo(90.0)
                 .jsonPath("$.opportunities[0].suggestedAt").exists()
                 .jsonPath("$.opportunities[0].moon.brightLimbTiltDegrees").isNumber()
-                .jsonPath("$.opportunities[0].moon.northPoleTiltDegrees").isNumber();
+                .jsonPath("$.opportunities[0].moon.northPoleTiltDegrees").isNumber()
+                .jsonPath("$.opportunities[0].moonPass.path.samples[0].moonPhaseAngleDegrees").isNumber()
+                .jsonPath("$.opportunities[0].moonPass.path.samples[0].brightLimbTiltDegrees").isNumber()
+                .jsonPath("$.opportunities[0].moonPass.path.samples[0].northPoleTiltDegrees").isNumber();
     }
 
     @ParameterizedTest
