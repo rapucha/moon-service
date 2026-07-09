@@ -74,23 +74,32 @@ complexity.
 Implementation work:
 
 - Keep using `backend/Dockerfile` as the package boundary.
-- Finish or run the containerized smoke-test issue before cluster deployment
-  work. This is tracked by
-  [#27](https://github.com/rapucha/moon-service/issues/27).
+- Keep using the opt-in containerized smoke check delivered by
+  [#27](https://github.com/rapucha/moon-service/issues/27) after runtime image
+  or startup changes.
 - Define the required runtime environment variables:
   - `MOON_LOCATION_RESOLVER=open-meteo`
   - `MOON_WEATHER_PROVIDER=open-meteo`
   - `MOON_ADMIN_TOKEN=<secret>`
+  - `MOON_BUILD_REVISION=<git-commit-sha>` (embedded by the image build)
   - optional `MOON_PROVIDER_QUOTAS_OPERATIONS_*` values when provider limits are
     known.
-- Decide whether a minimal unauthenticated health endpoint is needed, or whether
-  Kubernetes readiness can use an existing lightweight route.
+- Use unauthenticated `GET /healthz` for process liveness and `GET /readyz` for
+  traffic readiness. Both are provider-independent and expose only status plus
+  the public source revision.
+- Keep the image's built-in readiness check and fixed non-root UID/GID `10001`.
+- Send `SIGTERM` and allow more than the configured 30-second graceful-shutdown
+  phase before forcing container termination.
 
 Exit criteria:
 
 - A backend image can start with live Open-Meteo configuration.
 - A smoke check can call `GET /api/opportunities?q=Zakopane` or another real
   city through the container.
+- Docker reports the container healthy from `/readyz`, and the reported
+  revision matches the image revision.
+- The runtime Java process is non-root and an in-flight request can complete
+  during graceful shutdown.
 - `/admin/status` works only with the configured admin token.
 
 ## Phase 1: SD-Card-Aware k3s Baseline

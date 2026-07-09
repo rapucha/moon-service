@@ -1,10 +1,12 @@
 package dev.moonservice.backend;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import dev.moonservice.backend.location.LocationResolver;
 import dev.moonservice.backend.location.openmeteo.TestOpenMeteoLocationResolver;
 import dev.moonservice.backend.observability.RequestLoggingFilter;
+import dev.moonservice.backend.observability.OpenMeteoObservability;
 import dev.moonservice.backend.weather.TestWeatherForecastProvider;
 import dev.moonservice.backend.weather.WeatherForecastProvider;
 import org.junit.jupiter.api.Test;
@@ -25,12 +27,16 @@ import org.springframework.test.web.reactive.server.WebTestClient;
         properties = {
                 "moon.location.resolver=open-meteo",
                 "moon.weather.provider=open-meteo",
-                "moon.admin.token=test-admin-token"
+                "moon.admin.token=test-admin-token",
+                "moon.build.revision=test-revision"
         })
 @AutoConfigureWebTestClient
 class OpportunitySearchControllerTest {
     @Autowired
     private WebTestClient webTestClient;
+
+    @Autowired
+    private OpenMeteoObservability openMeteoObservability;
 
     @TestConfiguration
     static class TestOpenMeteoLocationResolverConfiguration {
@@ -104,6 +110,27 @@ class OpportunitySearchControllerTest {
     }
 
     @Test
+    void exposesProviderIndependentOperationalHealth() {
+        long geocodingCalls = openMeteoObservability.geocodingSnapshot().calls();
+        long weatherCalls = openMeteoObservability.weatherSnapshot().calls();
+
+        for (String path : new String[]{"/healthz", "/readyz"}) {
+            webTestClient.get()
+                    .uri(path)
+                    .exchange()
+                    .expectStatus().isOk()
+                    .expectHeader().valueEquals("Cache-Control", "no-store")
+                    .expectHeader().contentTypeCompatibleWith(MediaType.APPLICATION_JSON)
+                    .expectBody()
+                    .jsonPath("$.status").isEqualTo("ok")
+                    .jsonPath("$.revision").isEqualTo("test-revision");
+        }
+
+        assertEquals(geocodingCalls, openMeteoObservability.geocodingSnapshot().calls());
+        assertEquals(weatherCalls, openMeteoObservability.weatherSnapshot().calls());
+    }
+
+    @Test
     void servesBrowserLookupAssets() {
         webTestClient.get()
                 .uri("/app.js")
@@ -174,6 +201,7 @@ class OpportunitySearchControllerTest {
                 .expectHeader().contentTypeCompatibleWith(MediaType.APPLICATION_JSON)
                 .expectBody()
                 .jsonPath("$.app.status").isEqualTo("ok")
+                .jsonPath("$.app.revision").isEqualTo("test-revision")
                 .jsonPath("$.providers.openMeteoGeocoding.calls").isNumber()
                 .jsonPath("$.providers.openMeteoWeather.calls").isNumber()
                 .jsonPath("$.providers.operations['open-meteo-geocoding'].provider").isEqualTo("open-meteo")

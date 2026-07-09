@@ -30,4 +30,32 @@ class RequestLoggingFilterTest {
         assertThat(output).doesNotContain("Sensitive");
         assertThat(output).doesNotContain("q=");
     }
+
+    @Test
+    void keepsSuccessfulOperationalProbeOutOfInfoLogs(CapturedOutput output) throws Exception {
+        RequestLoggingFilter filter = new RequestLoggingFilter();
+        MockHttpServletRequest request = new MockHttpServletRequest("GET", "/readyz");
+        MockHttpServletResponse response = new MockHttpServletResponse();
+        FilterChain chain = (servletRequest, servletResponse) -> ((MockHttpServletResponse) servletResponse)
+                .setStatus(200);
+
+        filter.doFilter(request, response, chain);
+
+        assertNotNull(response.getHeader(RequestLoggingFilter.REQUEST_ID_HEADER));
+        assertThat(output).doesNotContain("path=/readyz");
+    }
+
+    @Test
+    void logsFailedOperationalProbe(CapturedOutput output) throws Exception {
+        RequestLoggingFilter filter = new RequestLoggingFilter();
+        MockHttpServletRequest request = new MockHttpServletRequest("GET", "/readyz");
+        MockHttpServletResponse response = new MockHttpServletResponse();
+        FilterChain chain = (servletRequest, servletResponse) -> ((MockHttpServletResponse) servletResponse)
+                .setStatus(503);
+
+        filter.doFilter(request, response, chain);
+
+        assertThat(output).contains("path=/readyz");
+        assertThat(output).contains("status=503");
+    }
 }

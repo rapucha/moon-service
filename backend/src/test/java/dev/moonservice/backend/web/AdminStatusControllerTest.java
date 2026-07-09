@@ -39,10 +39,12 @@ class AdminStatusControllerTest {
         AdminStatusController.AdminStatusResponse response = new AdminStatusController(
                 observability,
                 quotaMonitor,
-                List.of(cache))
+                List.of(cache),
+                new BuildRevision("test-revision"))
                 .status();
 
         assertEquals("ok", response.app().status());
+        assertEquals("test-revision", response.app().revision());
         assertEquals(1, response.providers().openMeteoGeocoding().calls());
         assertEquals(1, response.providers().openMeteoGeocoding().resolved());
         assertEquals(1, response.providers().openMeteoWeather().calls());

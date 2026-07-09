@@ -42,15 +42,50 @@ public final class RequestLoggingFilter extends OncePerRequestFilter {
             throw ex;
         } finally {
             long durationMillis = Math.round((System.nanoTime() - started) / 1_000_000.0);
-            LOGGER.info(
-                    "request completed method={} path={} status={} durationMs={} requestId={}",
+            logCompletedRequest(request, response, durationMillis, requestId);
+            MDC.remove("requestId");
+        }
+    }
+
+    private static void logCompletedRequest(
+            HttpServletRequest request,
+            HttpServletResponse response,
+            long durationMillis,
+            String requestId
+    ) {
+        if (isSuccessfulOperationalProbe(request, response)) {
+            LOGGER.debug(
+                    "operational probe completed method={} path={} status={} durationMs={} requestId={}",
                     request.getMethod(),
                     request.getRequestURI(),
                     response.getStatus(),
                     durationMillis,
                     requestId);
-            MDC.remove("requestId");
+            return;
         }
+        LOGGER.info(
+                "request completed method={} path={} status={} durationMs={} requestId={}",
+                request.getMethod(),
+                request.getRequestURI(),
+                response.getStatus(),
+                durationMillis,
+                requestId);
+    }
+
+    private static boolean isSuccessfulOperationalProbe(
+            HttpServletRequest request,
+            HttpServletResponse response
+    ) {
+        if (response.getStatus() >= 400
+                || !(request.getMethod().equals("GET") || request.getMethod().equals("HEAD"))) {
+            return false;
+        }
+        String path = request.getRequestURI();
+        String contextPath = request.getContextPath();
+        if (contextPath != null && !contextPath.isEmpty() && path.startsWith(contextPath)) {
+            path = path.substring(contextPath.length());
+        }
+        return path.equals("/healthz") || path.equals("/readyz");
     }
 
     private static String requestId(String rawRequestId) {
