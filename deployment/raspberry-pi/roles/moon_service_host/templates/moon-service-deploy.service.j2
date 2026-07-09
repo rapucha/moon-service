@@ -1,0 +1,32 @@
+[Unit]
+Description=Discover and deploy the published Moon Service image
+Documentation=https://github.com/rapucha/moon-service/blob/main/deployment/raspberry-pi/README.md
+Requires=docker.service
+After=docker.service network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/moon-service-deploy update
+TimeoutStartSec=10min
+UMask=0027
+EnvironmentFile={{ moon_service_config_dir }}/host.env
+NoNewPrivileges=true
+PrivateDevices=true
+PrivateTmp=true
+ProtectClock=true
+ProtectControlGroups=true
+ProtectHome=read-only
+ProtectHostname=true
+ProtectKernelLogs=true
+ProtectKernelModules=true
+ProtectKernelTunables=true
+ProtectSystem=strict
+ReadWritePaths={{ moon_service_state_dir }} /root/.docker
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+RestrictNamespaces=true
+RestrictRealtime=true
+LockPersonality=true
+
+[Install]
+WantedBy=multi-user.target

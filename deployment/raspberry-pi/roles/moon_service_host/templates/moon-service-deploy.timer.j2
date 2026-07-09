@@ -1,0 +1,12 @@
+[Unit]
+Description=Poll GHCR for a new tested Moon Service image
+
+[Timer]
+OnBootSec=45s
+OnUnitInactiveSec={{ moon_service_poll_interval }}
+AccuracySec=15s
+Persistent=true
+Unit=moon-service-deploy.service
+
+[Install]
+WantedBy=timers.target

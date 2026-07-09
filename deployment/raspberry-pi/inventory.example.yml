@@ -1,0 +1,8 @@
+---
+all:
+  hosts:
+    moon-pi:
+      ansible_host: REPLACE_WITH_PI_LAN_ADDRESS
+      ansible_user: REPLACE_WITH_BOOTSTRAP_ADMIN
+      moon_service_operator_user: moonops
+      moon_service_operator_public_key_file: REPLACE_WITH_ABSOLUTE_LOCAL_PUBLIC_KEY_PATH

@@ -1,0 +1,455 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+
+umask 027
+PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+export PATH
+
+CONFIG_DIR="${MOON_CONFIG_DIR:-/etc/moon-service}"
+if [[ -r "$CONFIG_DIR/host.env" ]]; then
+    # This file is rendered by Ansible, owned by root, and contains no secrets.
+    # shellcheck disable=SC1091
+    source "$CONFIG_DIR/host.env"
+fi
+
+IMAGE_REPOSITORY="${MOON_IMAGE_REPOSITORY:-ghcr.io/rapucha/moon-service}"
+IMAGE_CHANNEL="${MOON_IMAGE_CHANNEL:-main}"
+IMAGE_SOURCE="${MOON_IMAGE_SOURCE:-https://github.com/rapucha/moon-service}"
+COMPOSE_FILE="${MOON_COMPOSE_FILE:-/opt/moon-service/compose.yml}"
+STATE_DIR="${MOON_STATE_DIR:-/var/lib/moon-service}"
+READY_URL="${MOON_READY_URL:-http://127.0.0.1:8080/readyz}"
+READY_TIMEOUT_SECONDS="${MOON_READY_TIMEOUT_SECONDS:-90}"
+READY_INTERVAL_SECONDS="${MOON_READY_INTERVAL_SECONDS:-2}"
+OPERATOR_LOCK_TIMEOUT_SECONDS="${MOON_OPERATOR_LOCK_TIMEOUT_SECONDS:-30}"
+DOCKER_BIN="${MOON_DOCKER_BIN:-docker}"
+CURL_BIN="${MOON_CURL_BIN:-curl}"
+JQ_BIN="${MOON_JQ_BIN:-jq}"
+SLEEP_BIN="${MOON_SLEEP_BIN:-sleep}"
+DATE_BIN="${MOON_DATE_BIN:-date}"
+
+CURRENT_STATE="$STATE_DIR/current.env"
+PREVIOUS_STATE="$STATE_DIR/previous.env"
+REJECTED_STATE="$STATE_DIR/rejected.env"
+CANDIDATE_STATE="$STATE_DIR/candidate.env"
+HOLD_FILE="$STATE_DIR/automatic-updates-held"
+LOCK_FILE="$STATE_DIR/deploy.lock"
+CONTAINER_NAME=moon-service
+COMPOSE_PROJECT=moon-service
+RECOVERED_CURRENT=false
+
+log() {
+    printf '%s moon-service-deploy: %s\n' "$("$DATE_BIN" -u +%Y-%m-%dT%H:%M:%SZ)" "$*"
+}
+
+usage() {
+    printf 'Usage: %s {update|cleanup|restart|rollback|resume}\n' "$0" >&2
+    exit 64
+}
+
+[[ $# -eq 1 ]] || usage
+MODE="$1"
+case "$MODE" in
+    update|cleanup|restart|rollback|resume) ;;
+    *) usage ;;
+esac
+
+[[ "$IMAGE_REPOSITORY" =~ ^ghcr\.io/[a-z0-9][a-z0-9._/-]*$ ]] || {
+    log "refusing invalid image repository"
+    exit 65
+}
+[[ "$IMAGE_CHANNEL" =~ ^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$ ]] || {
+    log "refusing invalid image channel"
+    exit 65
+}
+[[ "$READY_TIMEOUT_SECONDS" =~ ^[0-9]+$ ]] || exit 65
+[[ "$READY_INTERVAL_SECONDS" =~ ^[0-9]+$ ]] || exit 65
+[[ "$OPERATOR_LOCK_TIMEOUT_SECONDS" =~ ^[0-9]+$ ]] || exit 65
+
+mkdir -p "$STATE_DIR"
+chmod 0700 "$STATE_DIR"
+exec 9>"$LOCK_FILE"
+if [[ "$MODE" == update || "$MODE" == cleanup ]]; then
+    if ! flock -n 9; then
+        log "another deployment operation holds the lock; timer run is skipping"
+        exit 0
+    fi
+elif ! flock -w "$OPERATOR_LOCK_TIMEOUT_SECONDS" 9; then
+    log "could not acquire the deployment lock for operator action $MODE"
+    exit 75
+fi
+
+state_value() {
+    local file="$1"
+    local key="$2"
+    awk -F= -v wanted="$key" '$1 == wanted { sub(/^[^=]*=/, ""); print; exit }' "$file"
+}
+
+valid_state() {
+    local file="$1"
+    local repository digest revision
+    [[ -f "$file" ]] || return 1
+    repository="$(state_value "$file" MOON_IMAGE_REPOSITORY)"
+    digest="$(state_value "$file" MOON_IMAGE_DIGEST)"
+    revision="$(state_value "$file" MOON_IMAGE_REVISION)"
+    [[ "$repository" == "$IMAGE_REPOSITORY" ]] || return 1
+    [[ "$digest" =~ ^sha256:[0-9a-f]{64}$ ]] || return 1
+    [[ "$revision" =~ ^[0-9a-f]{40}$ ]] || return 1
+}
+
+write_state() {
+    local target="$1"
+    local digest="$2"
+    local revision="$3"
+    local temporary
+    temporary="$(mktemp "$STATE_DIR/.state.XXXXXX")"
+    {
+        printf 'MOON_IMAGE_REPOSITORY=%s\n' "$IMAGE_REPOSITORY"
+        printf 'MOON_IMAGE_DIGEST=%s\n' "$digest"
+        printf 'MOON_IMAGE_REVISION=%s\n' "$revision"
+        printf 'MOON_DEPLOYED_AT=%s\n' "$("$DATE_BIN" -u +%Y-%m-%dT%H:%M:%SZ)"
+    } >"$temporary"
+    chmod 0600 "$temporary"
+    mv -f "$temporary" "$target"
+}
+
+copy_state() {
+    local source="$1"
+    local target="$2"
+    local temporary
+    temporary="$(mktemp "$STATE_DIR/.state-copy.XXXXXX")"
+    cp "$source" "$temporary"
+    chmod 0600 "$temporary"
+    mv -f "$temporary" "$target"
+}
+
+record_file() {
+    local target="$1"
+    local result="$2"
+    local detail="$3"
+    local digest="${4:-none}"
+    local revision="${5:-none}"
+    local temporary
+    temporary="$(mktemp "$STATE_DIR/.result.XXXXXX")"
+    {
+        printf 'RESULT=%s\n' "$result"
+        printf 'DETAIL=%s\n' "$detail"
+        printf 'AT=%s\n' "$("$DATE_BIN" -u +%Y-%m-%dT%H:%M:%SZ)"
+        printf 'DIGEST=%s\n' "$digest"
+        printf 'REVISION=%s\n' "$revision"
+    } >"$temporary"
+    chmod 0600 "$temporary"
+    mv -f "$temporary" "$target"
+}
+
+record_result() {
+    record_file "$STATE_DIR/last-result.env" "$@"
+}
+
+compose_up() {
+    local state_file="$1"
+    local recreate="${2:-false}"
+    local -a command
+    command=(
+        "$DOCKER_BIN" compose
+        --project-name "$COMPOSE_PROJECT"
+        --file "$COMPOSE_FILE"
+        --env-file "$state_file"
+        up --detach --remove-orphans --pull never
+    )
+    if [[ "$recreate" == true ]]; then
+        command+=(--force-recreate)
+    fi
+    "${command[@]}"
+}
+
+compose_down() {
+    local state_file="$1"
+    "$DOCKER_BIN" compose \
+        --project-name "$COMPOSE_PROJECT" \
+        --file "$COMPOSE_FILE" \
+        --env-file "$state_file" \
+        down --remove-orphans
+}
+
+ready_once() {
+    local expected_revision="$1"
+    local container_status health_status response
+    container_status="$(
+        "$DOCKER_BIN" inspect --format '{{.State.Status}}' "$CONTAINER_NAME" 2>/dev/null || true
+    )"
+    health_status="$(
+        "$DOCKER_BIN" inspect --format '{{if .State.Health}}{{.State.Health.Status}}{{end}}' \
+            "$CONTAINER_NAME" 2>/dev/null || true
+    )"
+    [[ "$container_status" == running && "$health_status" == healthy ]] || return 1
+    response="$("$CURL_BIN" --fail --silent --show-error --max-time 3 "$READY_URL" 2>/dev/null)" \
+        || return 1
+    "$JQ_BIN" -e --arg revision "$expected_revision" \
+        '.status == "ok" and .revision == $revision' <<<"$response" >/dev/null
+}
+
+wait_until_ready() {
+    local expected_revision="$1"
+    local deadline=$((SECONDS + READY_TIMEOUT_SECONDS))
+    while true; do
+        if ready_once "$expected_revision"; then
+            return 0
+        fi
+        if (( SECONDS >= deadline )); then
+            return 1
+        fi
+        "$SLEEP_BIN" "$READY_INTERVAL_SECONDS"
+    done
+}
+
+restore_previous_after_current_failure() {
+    local failed_digest failed_revision previous_revision
+    valid_state "$PREVIOUS_STATE" || return 1
+    failed_digest="$(state_value "$CURRENT_STATE" MOON_IMAGE_DIGEST)"
+    failed_revision="$(state_value "$CURRENT_STATE" MOON_IMAGE_REVISION)"
+    previous_revision="$(state_value "$PREVIOUS_STATE" MOON_IMAGE_REVISION)"
+    log "current revision $failed_revision is not ready; trying previous revision $previous_revision"
+    compose_up "$PREVIOUS_STATE" true || return 1
+    wait_until_ready "$previous_revision" || return 1
+    copy_state "$CURRENT_STATE" "$REJECTED_STATE"
+    mv -f "$PREVIOUS_STATE" "$CURRENT_STATE"
+    record_result boot-rollback current-unhealthy "$failed_digest" "$failed_revision"
+    RECOVERED_CURRENT=true
+    log "restored previous revision $previous_revision"
+}
+
+ensure_current_running() {
+    local revision digest
+    if [[ ! -e "$CURRENT_STATE" ]]; then
+        return 0
+    fi
+    if ! valid_state "$CURRENT_STATE"; then
+        record_result failed invalid-current-state
+        log "current deployment state is invalid; refusing to overwrite it"
+        return 1
+    fi
+    revision="$(state_value "$CURRENT_STATE" MOON_IMAGE_REVISION)"
+    digest="$(state_value "$CURRENT_STATE" MOON_IMAGE_DIGEST)"
+    # Reconcile the exact recorded digest and the current Ansible-managed
+    # Compose configuration before doing network work. This also restores the
+    # last known-good revision when an update was interrupted after container
+    # replacement but before state commit.
+    if compose_up "$CURRENT_STATE" false && wait_until_ready "$revision"; then
+        return 0
+    fi
+    if restore_previous_after_current_failure; then
+        return 0
+    fi
+    record_result failed current-and-previous-unhealthy "$digest" "$revision"
+    log "neither the recorded current nor previous deployment became ready"
+    return 1
+}
+
+restore_current_after_candidate_failure() {
+    local candidate_digest="$1"
+    local candidate_revision="$2"
+    if valid_state "$CURRENT_STATE"; then
+        local current_revision
+        current_revision="$(state_value "$CURRENT_STATE" MOON_IMAGE_REVISION)"
+        log "candidate $candidate_revision failed readiness; restoring $current_revision"
+        if compose_up "$CURRENT_STATE" true && wait_until_ready "$current_revision"; then
+            record_result rolled-back candidate-unhealthy "$candidate_digest" "$candidate_revision"
+            return 0
+        fi
+        record_result failed automatic-rollback-failed "$candidate_digest" "$candidate_revision"
+        return 1
+    fi
+    compose_down "$CANDIDATE_STATE" >/dev/null 2>&1 || true
+    record_result failed first-candidate-unhealthy "$candidate_digest" "$candidate_revision"
+    return 1
+}
+
+cleanup_images() {
+    local current_ref="" previous_ref="" current_id="" previous_id="" ref image_id
+    if valid_state "$CURRENT_STATE"; then
+        current_ref="$IMAGE_REPOSITORY@$(state_value "$CURRENT_STATE" MOON_IMAGE_DIGEST)"
+        current_id="$(
+            "$DOCKER_BIN" image inspect "$current_ref" --format '{{.Id}}' 2>/dev/null || true
+        )"
+    fi
+    if valid_state "$PREVIOUS_STATE"; then
+        previous_ref="$IMAGE_REPOSITORY@$(state_value "$PREVIOUS_STATE" MOON_IMAGE_DIGEST)"
+        previous_id="$(
+            "$DOCKER_BIN" image inspect "$previous_ref" --format '{{.Id}}' 2>/dev/null || true
+        )"
+    fi
+
+    while read -r ref image_id; do
+        [[ "$ref" == "$IMAGE_REPOSITORY@sha256:"* ]] || continue
+        [[ "$ref" == "$current_ref" || "$ref" == "$previous_ref" ]] && continue
+        [[ -n "$current_id" && "$image_id" == "$current_id" ]] && continue
+        [[ -n "$previous_id" && "$image_id" == "$previous_id" ]] && continue
+        "$DOCKER_BIN" image rm "$ref" >/dev/null 2>&1 || true
+    done < <("$DOCKER_BIN" image ls --digests --no-trunc \
+        --format '{{.Repository}}@{{.Digest}} {{.ID}}' 2>/dev/null || true)
+
+    # The host is dedicated to Moon Service. Remove dangling layers older than
+    # one week while the explicit digest references above retain both rollback
+    # generations.
+    "$DOCKER_BIN" image prune --force --filter until=168h >/dev/null
+}
+
+restart_current() {
+    local digest revision
+    if ! valid_state "$CURRENT_STATE"; then
+        record_result failed no-current-deployment
+        log "no valid current deployment exists"
+        return 1
+    fi
+    digest="$(state_value "$CURRENT_STATE" MOON_IMAGE_DIGEST)"
+    revision="$(state_value "$CURRENT_STATE" MOON_IMAGE_REVISION)"
+    if compose_up "$CURRENT_STATE" true && wait_until_ready "$revision"; then
+        record_result restarted operator-request "$digest" "$revision"
+        return 0
+    fi
+    record_result failed restart-unhealthy "$digest" "$revision"
+    return 1
+}
+
+manual_rollback() {
+    local current_revision previous_digest previous_revision old_current
+    valid_state "$CURRENT_STATE" || {
+        record_result failed no-current-deployment
+        return 1
+    }
+    valid_state "$PREVIOUS_STATE" || {
+        record_result failed no-previous-deployment
+        return 1
+    }
+    current_revision="$(state_value "$CURRENT_STATE" MOON_IMAGE_REVISION)"
+    previous_digest="$(state_value "$PREVIOUS_STATE" MOON_IMAGE_DIGEST)"
+    previous_revision="$(state_value "$PREVIOUS_STATE" MOON_IMAGE_REVISION)"
+
+    if ! compose_up "$PREVIOUS_STATE" true || ! wait_until_ready "$previous_revision"; then
+        log "manual rollback target failed; restoring current revision $current_revision"
+        compose_up "$CURRENT_STATE" true >/dev/null 2>&1 || true
+        wait_until_ready "$current_revision" >/dev/null 2>&1 || true
+        record_result failed manual-rollback-target-unhealthy "$previous_digest" "$previous_revision"
+        return 1
+    fi
+
+    old_current="$(mktemp "$STATE_DIR/.old-current.XXXXXX")"
+    cp "$CURRENT_STATE" "$old_current"
+    chmod 0600 "$old_current"
+    mv -f "$PREVIOUS_STATE" "$CURRENT_STATE"
+    mv -f "$old_current" "$PREVIOUS_STATE"
+    printf '%s\n' "$("$DATE_BIN" -u +%Y-%m-%dT%H:%M:%SZ)" >"$HOLD_FILE"
+    chmod 0600 "$HOLD_FILE"
+    record_result rolled-back operator-request "$previous_digest" "$previous_revision"
+    log "manual rollback selected $previous_revision; automatic updates are held"
+}
+
+case "$MODE" in
+    cleanup)
+        cleanup_images
+        record_file "$STATE_DIR/last-cleanup.env" complete bounded-image-cleanup
+        exit 0
+        ;;
+    restart)
+        restart_current
+        exit $?
+        ;;
+    rollback)
+        manual_rollback
+        exit $?
+        ;;
+    resume)
+        rm -f "$HOLD_FILE" "$REJECTED_STATE"
+        log "automatic updates resumed"
+        ;;
+esac
+
+if ! ensure_current_running; then
+    exit 1
+fi
+
+if [[ "$RECOVERED_CURRENT" == true ]]; then
+    # Preserve the boot-recovery result for inspection. The next timer run will
+    # discover that the former current digest is quarantined.
+    exit 0
+fi
+
+if [[ -e "$HOLD_FILE" ]]; then
+    record_result held operator-rollback
+    log "automatic updates are held after an operator rollback"
+    exit 0
+fi
+
+manifest_json=""
+if ! manifest_json="$(
+    "$DOCKER_BIN" buildx imagetools inspect "$IMAGE_REPOSITORY:$IMAGE_CHANNEL" \
+        --format '{{json .Manifest}}'
+)"; then
+    record_result deferred registry-unavailable
+    log "registry discovery failed; leaving the current deployment unchanged"
+    exit 0
+fi
+
+candidate_digest="$(
+    "$JQ_BIN" -er '.digest | select(test("^sha256:[0-9a-f]{64}$"))' <<<"$manifest_json"
+)" || {
+    record_result failed invalid-candidate-digest
+    exit 1
+}
+candidate_revision="$(
+    "$JQ_BIN" -er '.annotations["org.opencontainers.image.revision"] | select(test("^[0-9a-f]{40}$"))' \
+        <<<"$manifest_json"
+)" || {
+    record_result failed invalid-candidate-revision "$candidate_digest"
+    exit 1
+}
+candidate_source="$(
+    "$JQ_BIN" -er '.annotations["org.opencontainers.image.source"]' <<<"$manifest_json"
+)" || {
+    record_result failed missing-candidate-source "$candidate_digest" "$candidate_revision"
+    exit 1
+}
+if [[ "$candidate_source" != "$IMAGE_SOURCE" ]] || ! "$JQ_BIN" -e '
+    any(.manifests[]?; .platform.os == "linux" and .platform.architecture == "arm64")
+' <<<"$manifest_json" >/dev/null; then
+    record_result failed invalid-candidate-contract "$candidate_digest" "$candidate_revision"
+    log "candidate does not match the expected source and ARM64 manifest contract"
+    exit 1
+fi
+
+if valid_state "$REJECTED_STATE" \
+    && [[ "$(state_value "$REJECTED_STATE" MOON_IMAGE_DIGEST)" == "$candidate_digest" ]]; then
+    record_result skipped rejected-candidate "$candidate_digest" "$candidate_revision"
+    log "candidate $candidate_revision already failed readiness; waiting for a new digest or operator resume"
+    exit 0
+fi
+
+if valid_state "$CURRENT_STATE" \
+    && [[ "$(state_value "$CURRENT_STATE" MOON_IMAGE_DIGEST)" == "$candidate_digest" ]]; then
+    record_result unchanged already-current "$candidate_digest" "$candidate_revision"
+    exit 0
+fi
+
+log "pulling candidate $candidate_revision at $candidate_digest"
+if ! "$DOCKER_BIN" pull "$IMAGE_REPOSITORY@$candidate_digest"; then
+    record_result deferred candidate-pull-failed "$candidate_digest" "$candidate_revision"
+    log "candidate pull failed; leaving the current deployment unchanged"
+    exit 0
+fi
+
+write_state "$CANDIDATE_STATE" "$candidate_digest" "$candidate_revision"
+if ! compose_up "$CANDIDATE_STATE" true || ! wait_until_ready "$candidate_revision"; then
+    copy_state "$CANDIDATE_STATE" "$REJECTED_STATE"
+    restore_current_after_candidate_failure "$candidate_digest" "$candidate_revision" || true
+    rm -f "$CANDIDATE_STATE"
+    exit 1
+fi
+
+if valid_state "$CURRENT_STATE"; then
+    copy_state "$CURRENT_STATE" "$PREVIOUS_STATE"
+fi
+mv -f "$CANDIDATE_STATE" "$CURRENT_STATE"
+rm -f "$REJECTED_STATE"
+record_result deployed candidate-ready "$candidate_digest" "$candidate_revision"
+log "deployed revision $candidate_revision at $candidate_digest"
+cleanup_images || log "post-deployment image cleanup failed; daily cleanup will retry"

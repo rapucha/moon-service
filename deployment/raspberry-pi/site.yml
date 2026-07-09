@@ -1,0 +1,7 @@
+---
+- name: Provision the Moon Service Raspberry Pi host
+  hosts: all
+  become: true
+  gather_facts: true
+  roles:
+    - moon_service_host

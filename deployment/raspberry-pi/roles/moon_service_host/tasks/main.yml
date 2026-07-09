@@ -1,0 +1,326 @@
+---
+- name: Validate the supported host boundary
+  ansible.builtin.assert:
+    that:
+      - ansible_facts.distribution == "Debian"
+      - ansible_facts.distribution_major_version == "13"
+      - ansible_facts.distribution_release == "trixie"
+      - ansible_facts.architecture == "aarch64"
+    fail_msg: >-
+      This role supports Raspberry Pi OS Lite 64-bit based on Debian 13
+      (Trixie) on ARM64 only.
+
+- name: Validate required local inventory variables
+  ansible.builtin.assert:
+    that:
+      - ansible_user is defined
+      - (moon_service_operator_user | default('')) is match('^moonops[a-z0-9_-]{0,24}$')
+      - (ansible_user | default('')) != moon_service_operator_user
+      - moon_service_ops_group == "moon-service-ops"
+      - moon_service_operator_public_key_file is defined
+      - (moon_service_operator_public_key_file | default('')) is match('^/')
+      - moon_service_image_repository == "ghcr.io/rapucha/moon-service"
+      - moon_service_image_channel == "main"
+      - moon_service_image_source == "https://github.com/rapucha/moon-service"
+      - moon_service_compose_dir == "/opt/moon-service"
+      - moon_service_config_dir == "/etc/moon-service"
+      - moon_service_state_dir == "/var/lib/moon-service"
+      - moon_service_bind_address == "127.0.0.1"
+      - moon_service_host_port | int >= 1024
+      - moon_service_host_port | int <= 65535
+    fail_msg: >-
+      Set distinct bootstrap-admin and operator users plus an absolute local
+      SSH public-key path in the ignored inventory. Issue #95 uses the fixed
+      Moon Service repository, group, host paths, and loopback-only listener.
+
+- name: Load the dedicated operator public key from the controller
+  ansible.builtin.set_fact:
+    moon_service_operator_public_key: >-
+      {{ lookup('ansible.builtin.file', moon_service_operator_public_key_file) | trim }}
+  no_log: true
+
+- name: Validate the dedicated operator public key
+  ansible.builtin.assert:
+    that:
+      - >-
+        moon_service_operator_public_key is match(
+          '^(ssh-(ed25519|rsa)|ecdsa-sha2-nistp(256|384|521)|sk-(ssh-ed25519|ecdsa-sha2-nistp256)@openssh\.com) [A-Za-z0-9+/]+={0,3}( .*)?$'
+        )
+    fail_msg: The configured controller file must contain exactly one OpenSSH public key.
+  no_log: true
+
+- name: Install repository prerequisites
+  ansible.builtin.apt:
+    name:
+      - ca-certificates
+      - curl
+      - gnupg
+      - jq
+      - python3-apt
+      - util-linux
+    state: present
+    update_cache: true
+    cache_valid_time: 3600
+
+- name: Create APT keyring directory
+  ansible.builtin.file:
+    path: /etc/apt/keyrings
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Install Docker repository signing key
+  ansible.builtin.get_url:
+    url: https://download.docker.com/linux/debian/gpg
+    dest: /etc/apt/keyrings/docker.asc
+    owner: root
+    group: root
+    mode: "0644"
+  register: docker_repository_key
+
+- name: Configure Docker's Debian Trixie ARM64 repository
+  ansible.builtin.apt_repository:
+    repo: >-
+      deb [arch=arm64 signed-by=/etc/apt/keyrings/docker.asc]
+      https://download.docker.com/linux/debian trixie stable
+    filename: docker
+    state: present
+    update_cache: false
+  register: docker_repository
+
+- name: Remove packages that conflict with Docker Engine
+  ansible.builtin.apt:
+    name:
+      - containerd
+      - docker.io
+      - docker-compose
+      - docker-compose-v2
+      - docker-doc
+      - podman-docker
+      - runc
+    state: absent
+
+- name: Install Docker Engine and CLI plugins
+  ansible.builtin.apt:
+    name:
+      - containerd.io
+      - docker-buildx-plugin
+      - docker-ce
+      - docker-ce-cli
+      - docker-compose-plugin
+    state: present
+    update_cache: "{{ docker_repository.changed or docker_repository_key.changed }}"
+
+- name: Install Tailscale repository signing key
+  ansible.builtin.get_url:
+    url: https://pkgs.tailscale.com/stable/debian/trixie.noarmor.gpg
+    dest: /usr/share/keyrings/tailscale-archive-keyring.gpg
+    owner: root
+    group: root
+    mode: "0644"
+  register: tailscale_repository_key
+
+- name: Configure Tailscale's Debian Trixie repository
+  ansible.builtin.apt_repository:
+    repo: >-
+      deb [signed-by=/usr/share/keyrings/tailscale-archive-keyring.gpg]
+      https://pkgs.tailscale.com/stable/debian trixie main
+    filename: tailscale
+    state: present
+    update_cache: false
+  register: tailscale_repository
+
+- name: Install Tailscale without enrolling the host
+  ansible.builtin.apt:
+    name: tailscale
+    state: present
+    update_cache: "{{ tailscale_repository.changed or tailscale_repository_key.changed }}"
+
+- name: Create constrained operator group
+  ansible.builtin.group:
+    name: "{{ moon_service_ops_group }}"
+    system: true
+    state: present
+
+- name: Create and constrain the dedicated SSH operator
+  ansible.builtin.user:
+    name: "{{ moon_service_operator_user }}"
+    comment: Moon Service constrained operator
+    group: "{{ moon_service_ops_group }}"
+    groups: ""
+    append: false
+    create_home: true
+    home: "/home/{{ moon_service_operator_user }}"
+    move_home: true
+    shell: /bin/bash
+    password_lock: true
+    state: present
+
+- name: Create the dedicated operator SSH directory
+  ansible.builtin.file:
+    path: "/home/{{ moon_service_operator_user }}/.ssh"
+    state: directory
+    owner: "{{ moon_service_operator_user }}"
+    group: "{{ moon_service_ops_group }}"
+    mode: "0700"
+
+- name: Install the dedicated operator SSH public key
+  ansible.builtin.copy:
+    content: "{{ moon_service_operator_public_key }}\n"
+    dest: "/home/{{ moon_service_operator_user }}/.ssh/authorized_keys"
+    owner: "{{ moon_service_operator_user }}"
+    group: "{{ moon_service_ops_group }}"
+    mode: "0600"
+  no_log: true
+
+- name: Create deployment directories
+  ansible.builtin.file:
+    path: "{{ item.path }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "{{ item.mode }}"
+  loop:
+    - path: "{{ moon_service_compose_dir }}"
+      mode: "0755"
+    - path: "{{ moon_service_config_dir }}"
+      mode: "0700"
+    - path: "{{ moon_service_state_dir }}"
+      mode: "0700"
+
+- name: Create service configuration drop-in directories
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+  loop:
+    - /etc/docker
+    - /etc/systemd/journald.conf.d
+
+- name: Create the root Docker client configuration directory
+  ansible.builtin.file:
+    path: /root/.docker
+    state: directory
+    owner: root
+    group: root
+    mode: "0700"
+
+- name: Configure bounded Docker daemon logging
+  ansible.builtin.template:
+    src: docker-daemon.json.j2
+    dest: /etc/docker/daemon.json
+    owner: root
+    group: root
+    mode: "0644"
+    validate: /usr/bin/dockerd --validate --config-file %s
+  notify: Restart Docker
+
+- name: Configure bounded system journal storage
+  ansible.builtin.template:
+    src: journald-moon-service.conf.j2
+    dest: /etc/systemd/journald.conf.d/60-moon-service.conf
+    owner: root
+    group: root
+    mode: "0644"
+  notify: Restart systemd-journald
+
+- name: Install Compose definition
+  ansible.builtin.template:
+    src: compose.yml.j2
+    dest: "{{ moon_service_compose_dir }}/compose.yml"
+    owner: root
+    group: root
+    mode: "0644"
+
+- name: Seed local application configuration without overwriting secrets
+  ansible.builtin.template:
+    src: application.env.j2
+    dest: "{{ moon_service_config_dir }}/application.env"
+    owner: root
+    group: root
+    mode: "0600"
+    force: false
+
+- name: Enforce local application configuration permissions
+  ansible.builtin.file:
+    path: "{{ moon_service_config_dir }}/application.env"
+    state: file
+    owner: root
+    group: root
+    mode: "0600"
+
+- name: Install non-secret deployment configuration
+  ansible.builtin.template:
+    src: host.env.j2
+    dest: "{{ moon_service_config_dir }}/host.env"
+    owner: root
+    group: root
+    mode: "0644"
+
+- name: Install deployment command
+  ansible.builtin.copy:
+    src: moon-service-deploy
+    dest: /usr/local/sbin/moon-service-deploy
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Install constrained operator command
+  ansible.builtin.copy:
+    src: moon-service-control
+    dest: /usr/local/sbin/moon-service-control
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Install constrained sudo policy
+  ansible.builtin.template:
+    src: moon-service-sudoers.j2
+    dest: /etc/sudoers.d/moon-service-ops
+    owner: root
+    group: root
+    mode: "0440"
+    validate: /usr/sbin/visudo -cf %s
+
+- name: Install deployment and cleanup units
+  ansible.builtin.template:
+    src: "{{ item }}.j2"
+    dest: "/etc/systemd/system/{{ item }}"
+    owner: root
+    group: root
+    mode: "0644"
+  loop:
+    - moon-service-deploy.service
+    - moon-service-deploy.timer
+    - moon-service-cleanup.service
+    - moon-service-cleanup.timer
+  notify: Reload systemd
+
+- name: Apply service configuration before enabling automation
+  ansible.builtin.meta: flush_handlers
+
+- name: Enable Docker and the unenrolled Tailscale daemon
+  ansible.builtin.systemd_service:
+    name: "{{ item }}"
+    enabled: true
+    state: started
+  loop:
+    - docker.service
+    - tailscaled.service
+
+- name: Enable deployment on boot
+  ansible.builtin.systemd_service:
+    name: moon-service-deploy.service
+    enabled: true
+
+- name: Enable automatic deployment and cleanup timers
+  ansible.builtin.systemd_service:
+    name: "{{ item }}"
+    enabled: true
+    state: started
+  loop:
+    - moon-service-deploy.timer
+    - moon-service-cleanup.timer

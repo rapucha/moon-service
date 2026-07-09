@@ -1,0 +1,29 @@
+services:
+  app:
+    image: "${MOON_IMAGE_REPOSITORY:?missing repository}@${MOON_IMAGE_DIGEST:?missing digest}"
+    container_name: moon-service
+    restart: unless-stopped
+    init: true
+    read_only: true
+    env_file:
+      - {{ moon_service_config_dir }}/application.env
+    ports:
+      - "{{ moon_service_bind_address }}:{{ moon_service_host_port }}:8080"
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,nodev,size=64m
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    pids_limit: {{ moon_service_container_pids }}
+    mem_limit: {{ moon_service_container_memory }}
+    cpus: "{{ moon_service_container_cpus }}"
+    stop_grace_period: 40s
+    labels:
+      dev.moonservice.image-digest: "${MOON_IMAGE_DIGEST}"
+      dev.moonservice.revision: "${MOON_IMAGE_REVISION}"
+    logging:
+      driver: local
+      options:
+        max-size: "{{ moon_service_docker_log_max_size }}"
+        max-file: "{{ moon_service_docker_log_max_files }}"

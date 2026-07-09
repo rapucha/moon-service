@@ -105,8 +105,11 @@ Exit criteria:
 
 ## Phase 4: Alpha Operations
 
-Status: not started as a user alpha. Logging, provider quota monitoring, and
-self-hosting planning are already available as foundations.
+Status: infrastructure implementation is in progress under
+[#93](https://github.com/rapucha/moon-service/issues/93). Logging, provider
+quota monitoring, tested multi-architecture image publication, and the
+declarative Docker Compose host boundary are available; physical-Pi validation
+and public exposure remain.
 
 Goal: run a small private alpha.
 
@@ -114,13 +117,15 @@ Tasks:
 
 - Add basic logging and error reporting.
 - Add provider quota monitoring if using a backend.
-- Choose alpha hosting: laptop, NUC, mini PC, Raspberry Pi, or VPS.
-- Prefer Cloudflare Tunnel if home-hosted.
-- Document backup and restore behavior.
-- For Raspberry Pi hosting without SSDs, assume 32 GB SD cards plus roughly
-  64-80 GB of NFS-backed storage. Keep the SD-card-backed cluster rebuildable
-  and do not introduce durable application data until off-card backup and
-  restore are documented.
+- Provision the dedicated Raspberry Pi 4 reproducibly from Raspberry Pi OS
+  Lite 64-bit/Trixie with Ansible, Docker Engine, and Compose.
+- Pull successfully published ARM64 images by immutable digest, verify
+  revision-aware readiness, and automatically retain/restore a known-good
+  rollback generation.
+- Keep the private service loopback-only and use Tailscale Funnel for the first
+  tester-facing HTTPS boundary under #97; do not forward a raw router port.
+- Keep the 32 GB SD-card host rebuildable with bounded logs/images and no
+  durable application data. Document off-host secret and host recovery.
 
 Exit criteria:
 
