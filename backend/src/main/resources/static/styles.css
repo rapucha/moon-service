@@ -16,6 +16,8 @@
   --amber-soft: #fff5de;
   --danger: #9d352b;
   --danger-soft: #fff0ee;
+  --sky-sun-vector: #b87814;
+  --sky-moon-vector: #5f568a;
   --shadow: 0 14px 34px rgba(27, 37, 42, 0.08);
 }
 
@@ -1207,19 +1209,19 @@ dd {
 }
 
 .sky-separation-ray {
-  stroke: #5f568a;
+  stroke: var(--sky-moon-vector);
   stroke-width: 1.3;
   opacity: 0.62;
 }
 
 .sky-separation-arc {
   fill: none;
-  stroke: #5f568a;
+  stroke: var(--sky-moon-vector);
   stroke-width: 1.8;
 }
 
 .sky-observer-dot {
-  fill: #5f568a;
+  fill: var(--sky-moon-vector);
   opacity: 0.72;
 }
 
@@ -1244,20 +1246,61 @@ dd {
 
 .sky-azimuth-projection.is-sun .sky-azimuth-projection-line,
 .sky-azimuth-projection.is-sun .sky-azimuth-projection-guide {
-  stroke: #b87814;
+  stroke: var(--sky-sun-vector);
 }
 
 .sky-azimuth-projection.is-sun .sky-azimuth-projection-arrow {
-  fill: #b87814;
+  fill: var(--sky-sun-vector);
 }
 
 .sky-azimuth-projection.is-moon .sky-azimuth-projection-line,
 .sky-azimuth-projection.is-moon .sky-azimuth-projection-guide {
-  stroke: #5f568a;
+  stroke: var(--sky-moon-vector);
 }
 
 .sky-azimuth-projection.is-moon .sky-azimuth-projection-arrow {
-  fill: #5f568a;
+  fill: var(--sky-moon-vector);
+}
+
+.sky-separation-label-arrows {
+  opacity: 0.9;
+}
+
+.sky-separation-label-arc {
+  fill: none;
+  stroke: var(--sky-moon-vector);
+  stroke-width: 1.15;
+  stroke-linecap: round;
+}
+
+.sky-separation-label-arrow-line {
+  fill: none;
+  stroke-width: 1.6;
+  stroke-linecap: round;
+}
+
+.sky-separation-label-arrow-head {
+  stroke: none;
+}
+
+.sky-separation-label-arrow.is-sun .sky-separation-label-arrow-line {
+  stroke: var(--sky-sun-vector);
+}
+
+.sky-separation-label-arrow.is-sun .sky-separation-label-arrow-head {
+  fill: var(--sky-sun-vector);
+}
+
+.sky-separation-label-arrow.is-moon .sky-separation-label-arrow-line {
+  stroke: var(--sky-moon-vector);
+}
+
+.sky-separation-label-arrow.is-moon .sky-separation-label-arrow-head {
+  fill: var(--sky-moon-vector);
+}
+
+.sky-separation-label-body.is-moon {
+  filter: drop-shadow(0 0.5px 0.7px rgba(16, 31, 36, 0.28));
 }
 
 .sky-body-image {

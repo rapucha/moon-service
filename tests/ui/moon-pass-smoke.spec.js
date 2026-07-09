@@ -76,6 +76,36 @@ test("renders grouped Moon pass cards", async ({ page }) => {
     .toHaveText("Best Sun position, 32.0° altitude, 102.0° azimuth ESE");
   await expect(page.locator(".moon-pass-card").first().locator(".sun-altitude-chart.altitude-chart-desktop .sun-path-marker[data-at='2026-07-04T02:12:00Z']"))
     .toHaveCount(0);
+  const sunAzimuthRailCoverage = await page.locator(".moon-pass-card").first().evaluate(card => {
+    return ["desktop", "mobile"].map(mode => {
+      const chart = card.querySelector(`.sun-altitude-chart.altitude-chart-${mode}`);
+      const rail = chart?.querySelector(".azimuth-rail-bg");
+      const labels = Array.from(chart?.querySelectorAll(".azimuth-rail-label") || []);
+      const labelX = label => {
+        const transform = label?.getAttribute("transform") || "";
+        const match = transform.match(/translate\(([-0-9.]+)\s+[-0-9.]+\)/);
+        return match ? Number(match[1]) : Number.NaN;
+      };
+      return {
+        railX: Number(rail?.getAttribute("x")),
+        railWidth: Number(rail?.getAttribute("width")),
+        firstX: labelX(labels[0]),
+        lastX: labelX(labels.at(-1)),
+        firstText: labels[0]?.querySelector("text")?.textContent,
+        lastText: labels.at(-1)?.querySelector("text")?.textContent,
+        firstArrowTransform: labels[0]?.querySelector(".azimuth-rail-arrow")?.getAttribute("transform"),
+        lastArrowTransform: labels.at(-1)?.querySelector(".azimuth-rail-arrow")?.getAttribute("transform")
+      };
+    });
+  });
+  for (const rail of sunAzimuthRailCoverage) {
+    expect(rail.firstX - rail.railX).toBe(10);
+    expect((rail.railX + rail.railWidth) - rail.lastX).toBe(10);
+    expect(rail.firstText).toBe("NNE");
+    expect(rail.lastText).toBe("ESE");
+    expect(rail.firstArrowTransform).toContain("rotate(24)");
+    expect(rail.lastArrowTransform).toContain("rotate(114)");
+  }
   await expect(page.locator(".moon-pass-card").nth(1).locator(".sun-altitude-chart.altitude-chart-desktop .sun-path-marker[data-at='2026-07-10T08:00:00Z']"))
     .toHaveAttribute("data-sun-azimuth-degrees", "145");
   await expect(page.locator(".moon-pass-card").nth(1).locator(".sun-altitude-chart.altitude-chart-desktop .sun-path-marker[data-at='2026-07-10T08:00:00Z']"))
@@ -127,10 +157,24 @@ test("renders grouped Moon pass cards", async ({ page }) => {
     expect(charts.sunLightBands).toEqual(charts.moonLightBands);
   }
 
-  await expect(page.locator(".moon-pass-card").first().locator(".sky-dome-chart")).toHaveCount(1);
+  const skyDome = page.locator(".moon-pass-card").first().locator(".sky-dome-chart");
+  await expect(skyDome).toHaveCount(1);
+  await page.locator(".moon-pass-card").first().locator(".sky-picture-details").nth(1).locator("summary").click();
+  await expect(skyDome).toBeVisible();
+  await expect(skyDome)
+    .toHaveAccessibleName(/Sun .* altitude, .* azimuth .*; Moon .* altitude, .* azimuth .*; .* angular separation/);
   await expect(page.locator(".moon-pass-card").first().locator(".sky-track")).toHaveCount(0);
   await expect(page.locator(".moon-pass-card").first().locator(".sky-track-dot")).toHaveCount(0);
   await expect(page.locator(".moon-pass-card").first().locator(".sky-separation-ray")).toHaveCount(2);
+  await expect(page.locator(".moon-pass-card").first().locator(".sky-separation-label-arrow")).toHaveCount(2);
+  await expect(page.locator(".moon-pass-card").first().locator(".sky-separation-label-arrow-head")).toHaveCount(2);
+  await expect(page.locator(".moon-pass-card").first().locator(".sky-separation-label-arc"))
+    .toHaveAttribute("d", / A /);
+  await expect(page.locator(".moon-pass-card").first().locator(".sky-separation-label-body")).toHaveCount(2);
+  await expect(page.locator(".moon-pass-card").first().locator(".sky-separation-label-body.is-sun"))
+    .toHaveAttribute("href", "/sun-marker-aperture-flare.svg");
+  await expect(page.locator(".moon-pass-card").first().locator(".sky-separation-label-body.is-moon"))
+    .toHaveAttribute("href", /^data:image\/png;base64,/);
   await expect(page.locator(".moon-pass-card").first().locator(".sky-body.is-sun")).toHaveCount(1);
   await expect(page.locator(".moon-pass-card").first().locator(".sky-body.is-moon")).toHaveCount(1);
   await expect(page.locator(".moon-pass-card").first().locator(".sky-cardinal-marker .sky-cardinal-label"))
@@ -164,9 +208,42 @@ test("renders grouped Moon pass cards", async ({ page }) => {
   await expect(page.locator(".moon-pass-card").first().locator(".sky-body.is-moon .sky-body-image"))
     .toHaveAttribute("href", /^data:image\/png;base64,/);
 
+  const moonImageShading = await page.locator(".moon-pass-card").first().evaluate(async card => {
+    const markerUrl = card.querySelector(".moon-altitude-chart.altitude-chart-desktop .moon-sample-marker-image")
+      ?.getAttribute("href");
+    const domeUrl = card.querySelector(".sky-body.is-moon .sky-body-image")?.getAttribute("href");
+    const labelUrl = card.querySelector(".sky-separation-label-body.is-moon")?.getAttribute("href");
+    const image = new Image();
+    image.src = markerUrl || "";
+    await image.decode();
+    const canvas = document.createElement("canvas");
+    canvas.width = 64;
+    canvas.height = 64;
+    const context = canvas.getContext("2d");
+    context?.drawImage(image, 0, 0);
+    return {
+      sharedImage: markerUrl === domeUrl && domeUrl === labelUrl,
+      shadedPixel: Array.from(context?.getImageData(14, 32, 1, 1).data || []),
+      litPixel: Array.from(context?.getImageData(49, 32, 1, 1).data || []),
+      northernTexturePixel: Array.from(context?.getImageData(42, 20, 1, 1).data || []),
+      southernTexturePixel: Array.from(context?.getImageData(42, 43, 1, 1).data || [])
+    };
+  });
+  expect(moonImageShading.sharedImage).toBe(true);
+  expect(Math.min(...moonImageShading.shadedPixel.slice(0, 3))).toBeGreaterThanOrEqual(60);
+  expect(moonImageShading.shadedPixel[3]).toBe(255);
+  expect(moonImageShading.shadedPixel.slice(0, 3).reduce((sum, value) => sum + value, 0))
+    .toBeLessThan(moonImageShading.litPixel.slice(0, 3).reduce((sum, value) => sum + value, 0));
+  const northernTextureBrightness = moonImageShading.northernTexturePixel.slice(0, 3)
+    .reduce((sum, value) => sum + value, 0);
+  const southernTextureBrightness = moonImageShading.southernTexturePixel.slice(0, 3)
+    .reduce((sum, value) => sum + value, 0);
+  expect(Math.abs(northernTextureBrightness - southernTextureBrightness)).toBeGreaterThan(30);
+
   const domeGeometry = await page.locator(".moon-pass-card").first().locator(".sky-dome-chart").evaluate(chart => {
     const separationLabel = chart.querySelector(".sky-separation-label");
     const separationArc = chart.querySelector(".sky-separation-arc");
+    const separationLabelArc = chart.querySelector(".sky-separation-label-arc");
     const timeLabel = chart.querySelector(".sky-dome-label");
     const observer = chart.querySelector(".sky-observer-dot");
     const horizon = chart.querySelector(".sky-dome-horizon");
@@ -230,6 +307,44 @@ test("renders grouped Moon pass cards", async ({ page }) => {
           - Math.hypot(endX - 210, endY - 48)
       };
     });
+    const labelArrows = ["sun", "moon"].map(role => {
+      const fullRay = chart.querySelector(`.sky-separation-ray.is-${role}`);
+      const compactLine = chart.querySelector(`.sky-separation-label-arrow.is-${role} .sky-separation-label-arrow-line`);
+      const projectionLine = chart.querySelector(`.sky-azimuth-projection.is-${role} .sky-azimuth-projection-line`);
+      const compactBody = chart.querySelector(`.sky-separation-label-body.is-${role}`);
+      const vector = line => ({
+        x: Number(line?.getAttribute("x2")) - Number(line?.getAttribute("x1")),
+        y: Number(line?.getAttribute("y2")) - Number(line?.getAttribute("y1"))
+      });
+      const fullVector = vector(fullRay);
+      const compactVector = vector(compactLine);
+      const fullLength = Math.hypot(fullVector.x, fullVector.y);
+      const compactLength = Math.hypot(compactVector.x, compactVector.y);
+      const bodyWidth = Number(compactBody?.getAttribute("width"));
+      const bodyCenter = {
+        x: Number(compactBody?.getAttribute("x")) + bodyWidth / 2,
+        y: Number(compactBody?.getAttribute("y")) + Number(compactBody?.getAttribute("height")) / 2
+      };
+      const bodyVector = {
+        x: bodyCenter.x - Number(compactLine?.getAttribute("x1")),
+        y: bodyCenter.y - Number(compactLine?.getAttribute("y1"))
+      };
+      const bodyDistance = Math.hypot(bodyVector.x, bodyVector.y);
+      return {
+        role,
+        compactLength,
+        directionDot: (
+          fullVector.x * compactVector.x + fullVector.y * compactVector.y
+        ) / (fullLength * compactLength),
+        bodyDirectionDot: (
+          fullVector.x * bodyVector.x + fullVector.y * bodyVector.y
+        ) / (fullLength * bodyDistance),
+        bodyDistance,
+        colorMatchesProjection: getComputedStyle(compactLine).stroke === getComputedStyle(projectionLine).stroke,
+        originX: Number(compactLine?.getAttribute("x1")),
+        originY: Number(compactLine?.getAttribute("y1"))
+      };
+    });
     return {
       observerX,
       observerY,
@@ -238,6 +353,7 @@ test("renders grouped Moon pass cards", async ({ page }) => {
       separationX: Number(separationLabel?.getAttribute("x")),
       separationY: Number(separationLabel?.getAttribute("y")),
       separationArcRadius: Number(separationArc?.getAttribute("data-radius")),
+      separationLabelArcRadius: Number(separationLabelArc?.getAttribute("data-radius")),
       timeX: Number(timeLabel?.getAttribute("x")),
       timeY: Number(timeLabel?.getAttribute("y")),
       cardinalGaps: {
@@ -247,7 +363,8 @@ test("renders grouped Moon pass cards", async ({ page }) => {
         west: Number(horizonBounds?.left) - Number(cardinalBounds.w?.right)
       },
       projections,
-      meridians
+      meridians,
+      labelArrows
     };
   });
   expect(domeGeometry.observerX).toBe(domeGeometry.horizonX);
@@ -259,6 +376,17 @@ test("renders grouped Moon pass cards", async ({ page }) => {
   expect(domeGeometry.separationArcRadius).toBeGreaterThan(44);
   expect(domeGeometry.separationArcRadius / nearestBodyDistance).toBeGreaterThanOrEqual(0.67);
   expect(domeGeometry.separationArcRadius).toBeLessThan(nearestBodyDistance);
+  expect(domeGeometry.separationLabelArcRadius).toBe(7);
+  expect(domeGeometry.labelArrows.map(arrow => arrow.role)).toEqual(["sun", "moon"]);
+  for (const arrow of domeGeometry.labelArrows) {
+    expect(arrow.compactLength).toBeCloseTo(13, 1);
+    expect(arrow.directionDot).toBeGreaterThan(0.999);
+    expect(arrow.bodyDirectionDot).toBeGreaterThan(0.999);
+    expect(arrow.bodyDistance).toBeCloseTo(19, 1);
+    expect(arrow.colorMatchesProjection).toBe(true);
+    expect(arrow.originX).toBe(152);
+    expect(arrow.originY).toBe(30);
+  }
   for (const gap of Object.values(domeGeometry.cardinalGaps)) {
     expect(gap).toBeGreaterThan(0.5);
   }
@@ -318,4 +446,40 @@ test("renders grouped Moon pass cards", async ({ page }) => {
     expect(chart.labelCount).toBeGreaterThan(0);
     expect(chart.rotations.every(transform => /rotate\([-0-9.]+\)/.test(transform))).toBe(true);
   }
+});
+
+test("renders a point-only Sun pass when one above-horizon sample is available", async ({ page }) => {
+  const response = structuredClone(fixture);
+  const passId = response.opportunities[0].moonPass.id;
+  response.opportunities = response.opportunities.filter(opportunity => opportunity.moonPass.id === passId);
+
+  for (const opportunity of response.opportunities) {
+    const paths = [opportunity.moonPass.path, opportunity.moonPath];
+    for (const path of paths) {
+      for (const point of [path.start, path.suggested, path.end, ...(path.samples || [])]) {
+        if (point && Number.isFinite(point.sunAltitudeDegrees)) {
+          point.sunAltitudeDegrees = -5;
+        }
+      }
+    }
+  }
+  response.opportunities[0].moonPath.suggested.sunAltitudeDegrees = 5;
+
+  await page.unroute("**/api/opportunities**");
+  await page.route("**/api/opportunities**", async route => {
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify(response)
+    });
+  });
+  await page.goto("/search?locationId=single-sun-sample");
+
+  const card = page.locator(".moon-pass-card").first();
+  await expect(card.locator(".sun-altitude-chart.altitude-chart-desktop .sun-path-marker")).toHaveCount(1);
+  await expect(card.locator(".sun-altitude-chart.altitude-chart-mobile .sun-path-marker")).toHaveCount(1);
+  await expect(card.locator(".sun-altitude-chart.altitude-chart-desktop .sun-path-marker"))
+    .toHaveAttribute("data-at", response.opportunities[0].moonPath.suggested.at);
+  await expect(card.locator(".sun-altitude-chart.altitude-chart-desktop .azimuth-rail-label"))
+    .not.toHaveCount(0);
 });

@@ -46,7 +46,7 @@ export function moonPathPanel(opportunity, timezone, countryCode, chartContext) 
       }));
   var passTimeDomain = timeDomainForSamples(samples);
   var sunSamples = sunPathSamples(samples);
-  var sunPassDetails = sunSamples.length < 2
+  var sunPassDetails = sunSamples.length < 1
     ? null
     : expandablePicture(
       "Sun pass",
@@ -125,13 +125,18 @@ function sunAltitudeChart(samples, timezone, countryCode, chartContext, chartSub
     chartSubject: chartSubject,
     timeDomain: timeDomain,
     lightBandSamples: lightBandSamples,
+    azimuthSamples: sunAzimuthSamples(lightBandSamples),
     includeForeground: false
   });
 }
 
 function bodyAltitudeChart(samples, timezone, countryCode, chartContext, options) {
   var points = chartSamples(samples);
-  if (points.length < 2) {
+  var hasExternalTimeDomain = options.timeDomain
+    && Number.isFinite(options.timeDomain.firstTime)
+    && Number.isFinite(options.timeDomain.lastTime)
+    && options.timeDomain.lastTime > options.timeDomain.firstTime;
+  if (points.length < 2 && !(points.length === 1 && hasExternalTimeDomain)) {
     return null;
   }
   var lightBandPoints = Array.isArray(options.lightBandSamples)
@@ -140,13 +145,19 @@ function bodyAltitudeChart(samples, timezone, countryCode, chartContext, options
   if (lightBandPoints.length < 2) {
     lightBandPoints = points;
   }
+  var azimuthPoints = Array.isArray(options.azimuthSamples)
+    ? chartSamples(options.azimuthSamples)
+    : points;
+  if (azimuthPoints.length < 2) {
+    azimuthPoints = points;
+  }
 
   return element("div", { className: "moon-chart-scroll" },
-    altitudeChartSvg(points, lightBandPoints, timezone, countryCode, "desktop", chartContext, options),
-    altitudeChartSvg(points, lightBandPoints, timezone, countryCode, "mobile", chartContext, options));
+    altitudeChartSvg(points, lightBandPoints, azimuthPoints, timezone, countryCode, "desktop", chartContext, options),
+    altitudeChartSvg(points, lightBandPoints, azimuthPoints, timezone, countryCode, "mobile", chartContext, options));
 }
 
-function altitudeChartSvg(sourcePoints, lightBandSourcePoints, timezone, countryCode, mode, chartContext, options) {
+function altitudeChartSvg(sourcePoints, lightBandSourcePoints, azimuthSourcePoints, timezone, countryCode, mode, chartContext, options) {
   var height = 390;
   var left = 34;
   var railTop = 20;
@@ -189,11 +200,18 @@ function altitudeChartSvg(sourcePoints, lightBandSourcePoints, timezone, country
         x: left + ((sourcePoint.time - firstTime) / timeSpan) * chartWidth
       });
     });
+  var azimuthPoints = azimuthSourcePoints === sourcePoints
+    ? points
+    : azimuthSourcePoints.map(function (sourcePoint) {
+      return Object.assign({}, sourcePoint, {
+        x: left + ((sourcePoint.time - firstTime) / timeSpan) * chartWidth
+      });
+    });
 
   var bands = lightBandSegments(lightBandPoints);
   var timeTicks = altitudeHourTicks(firstTime, lastTime, left, chartWidth, timezone, bottom + 29);
-  var azimuthLabels = azimuthRailLabels(points, mode);
-  var visibleMarkers = visibleAltitudeMarkers(points, mode);
+  var azimuthLabels = azimuthRailLabels(azimuthPoints, mode);
+  var visibleMarkers = visibleAltitudeMarkers(points, mode, options.body);
   var markerImageUrl = options.body === "moon"
     ? moonPhaseImageDataUrl((options.moon || {}).phaseAngleDegrees, 64)
     : SUN_SAMPLE_MARKER_IMAGE_URL;
@@ -257,7 +275,11 @@ function altitudeChartSvg(sourcePoints, lightBandSourcePoints, timezone, country
   );
 }
 
-function visibleAltitudeMarkers(points, mode) {
+function visibleAltitudeMarkers(points, mode, body) {
+  if (body === "sun") {
+    return visibleSunAltitudeMarkers(points);
+  }
+
   var ordinaryMinimumDistance = mode === "mobile" ? 13 : 18;
   var protectedMinimumDistance = mode === "mobile" ? 17 : 24;
   var lastSequence = points.length - 1;
@@ -287,6 +309,31 @@ function visibleAltitudeMarkers(points, mode) {
   });
 }
 
+function visibleSunAltitudeMarkers(points) {
+  var suggestedMarkers = points.filter(function (point) {
+    return point.role === "suggested";
+  });
+  var visible = suggestedMarkers.slice();
+
+  points.forEach(function (point) {
+    if (point.role === "suggested" || isTooCloseToAnySunMarker(point, visible)) {
+      return;
+    }
+    visible.push(point);
+  });
+
+  return visible.sort(function (a, b) {
+    return a.sequence - b.sequence;
+  });
+}
+
+function isTooCloseToAnySunMarker(point, others) {
+  return others.some(function (other) {
+    var minimumDistance = (sunAltitudeMarkerSize(point) + sunAltitudeMarkerSize(other)) / 2;
+    return point !== other && markerDistance(point, other) < minimumDistance;
+  });
+}
+
 function isProtectedAltitudeMarker(point, lastSequence) {
   return point.role === "suggested" || point.sequence === 0 || point.sequence === lastSequence;
 }
@@ -306,18 +353,24 @@ function markerDistance(a, b) {
 function sunPathSamples(samples) {
   return samples.filter(function (sample) {
     return hasSunPathPosition(sample) && sample.sunAltitudeDegrees >= 0;
-  }).map(function (sample) {
-    return {
-      at: sample.at,
-      altitudeDegrees: sample.sunAltitudeDegrees,
-      azimuthDegrees: sample.sunAzimuthDegrees,
-      sunAltitudeDegrees: sample.sunAltitudeDegrees,
-      sunAzimuthDegrees: sample.sunAzimuthDegrees,
-      lightBucket: sample.lightBucket,
-      role: sample.role,
-      markerLabel: sample.markerLabel
-    };
-  });
+  }).map(sunPathSample);
+}
+
+function sunAzimuthSamples(samples) {
+  return (Array.isArray(samples) ? samples : []).filter(hasSunPathPosition).map(sunPathSample);
+}
+
+function sunPathSample(sample) {
+  return {
+    at: sample.at,
+    altitudeDegrees: sample.sunAltitudeDegrees,
+    azimuthDegrees: sample.sunAzimuthDegrees,
+    sunAltitudeDegrees: sample.sunAltitudeDegrees,
+    sunAzimuthDegrees: sample.sunAzimuthDegrees,
+    lightBucket: sample.lightBucket,
+    role: sample.role,
+    markerLabel: sample.markerLabel
+  };
 }
 
 function moonPathSamples(path) {
@@ -538,9 +591,7 @@ function bodyAltitudeMarker(point, imageUrl, body) {
 function sunAltitudeMarker(point) {
   var suggested = point.role === "suggested";
   var best = point.markerLabel === "Best";
-  var size = best
-    ? SUN_BEST_MARKER_SIZE
-    : (suggested ? SUN_ALTERNATE_MARKER_SIZE : SUN_PATH_MARKER_SIZE);
+  var size = sunAltitudeMarkerSize(point);
   var className = "sun-path-marker sun-sample-marker is-" + roleClass(point.role) + (best ? " is-best" : "");
   var positionText = degrees(point.altitudeDegrees)
     + " altitude, "
@@ -577,6 +628,13 @@ function sunAltitudeMarker(point) {
       preserveAspectRatio: "xMidYMid meet"
     })
   );
+}
+
+function sunAltitudeMarkerSize(point) {
+  if (point.markerLabel === "Best") {
+    return SUN_BEST_MARKER_SIZE;
+  }
+  return point.role === "suggested" ? SUN_ALTERNATE_MARKER_SIZE : SUN_PATH_MARKER_SIZE;
 }
 
 function skyDomeChart(samples, timezone, countryCode, moon) {
@@ -616,13 +674,20 @@ function skyDomeChart(samples, timezone, countryCode, moon) {
   var separationArcRadius = skySeparationArcRadius(observer, selectedSun, selectedMoon);
   var separationArc = angleArcPath(observer, selectedSun, selectedMoon, separationArcRadius);
   var moonImageUrl = moonPhaseImageDataUrl(moon.phaseAngleDegrees, 64);
+  var selectedTime = formatTime(selected.at, timezone, countryCode);
+  var accessibleLabel = "Sun and Moon sky position at " + selectedTime
+    + "; Sun " + degrees(selected.sunAltitudeDegrees) + " altitude, "
+    + degrees(selected.sunAzimuthDegrees) + " azimuth " + compassDirection(selected.sunAzimuthDegrees)
+    + "; Moon " + degrees(selected.moonAltitudeDegrees) + " altitude, "
+    + degrees(selected.moonAzimuthDegrees) + " azimuth " + compassDirection(selected.moonAzimuthDegrees)
+    + "; " + degrees(separation) + " angular separation";
 
   return element("div", { className: "sky-dome-frame" },
     svgElement("svg", {
       className: "sky-dome-chart",
       viewBox: "0 0 420 280",
       role: "img",
-      ariaLabel: "Quasi-dome sky position chart for the Sun and Moon at " + formatTime(selected.at, timezone, countryCode)
+      ariaLabel: accessibleLabel
     },
       svgElement("rect", { className: "sky-dome-background", x: 0, y: 0, width: 420, height: 280, rx: 8 }),
       svgElement("path", { className: "sky-dome-shell", d: "M 48 226 C 75 119, 126 58, 210 48 C 294 58, 345 119, 372 226 Z" }),
@@ -646,8 +711,8 @@ function skyDomeChart(samples, timezone, countryCode, moon) {
       skyCardinalMarker("E", 381, 226, 90, 12, 4, "start"),
       skyCardinalMarker("S", 210, 260, 180, 0, 18, "middle"),
       skyCardinalMarker("W", 39, 226, 270, -12, 4, "end"),
-      svgElement("line", { className: "sky-separation-ray", x1: observer.x, y1: observer.y, x2: round1(selectedSun.x), y2: round1(selectedSun.y) }),
-      svgElement("line", { className: "sky-separation-ray", x1: observer.x, y1: observer.y, x2: round1(selectedMoon.x), y2: round1(selectedMoon.y) }),
+      svgElement("line", { className: "sky-separation-ray is-sun", x1: observer.x, y1: observer.y, x2: round1(selectedSun.x), y2: round1(selectedSun.y) }),
+      svgElement("line", { className: "sky-separation-ray is-moon", x1: observer.x, y1: observer.y, x2: round1(selectedMoon.x), y2: round1(selectedMoon.y) }),
       svgElement("path", {
         className: "sky-separation-arc",
         d: separationArc,
@@ -658,6 +723,7 @@ function skyDomeChart(samples, timezone, countryCode, moon) {
         x: 24,
         y: 30
       }, degrees(separation) + " separation"),
+      skySeparationLabelArrows(observer, selectedSun, selectedMoon, moonImageUrl),
       skyAzimuthProjection(observer, selectedSun, sunPlanePoint, sunAzimuthPoint, "sun", "Sun azimuth direction on the horizon"),
       skyAzimuthProjection(observer, selectedMoon, moonPlanePoint, moonAzimuthPoint, "moon", "Moon azimuth direction on the horizon"),
       svgElement("circle", { className: "sky-observer-dot", cx: observer.x, cy: observer.y, r: 3.5 }),
@@ -673,7 +739,7 @@ function skyDomeChart(samples, timezone, countryCode, moon) {
         28,
         "moon",
         "Moon, " + degrees(selected.moonAltitudeDegrees) + " altitude, " + degrees(selected.moonAzimuthDegrees) + " azimuth"),
-      svgElement("text", { className: "sky-dome-label", x: 24, y: 52 }, formatTime(selected.at, timezone, countryCode))
+      svgElement("text", { className: "sky-dome-label", x: 24, y: 52 }, selectedTime)
     ));
 }
 
@@ -834,6 +900,65 @@ function arrowHeadPoints(start, end, size) {
   return round1(end.x) + "," + round1(end.y)
     + " " + round1(baseX + sideX) + "," + round1(baseY + sideY)
     + " " + round1(baseX - sideX) + "," + round1(baseY - sideY);
+}
+
+function skySeparationLabelArrows(sourceOrigin, sunPoint, moonPoint, moonImageUrl) {
+  var labelOrigin = { x: 152, y: 30 };
+  var sunEnd = compactVectorEnd(sourceOrigin, sunPoint, labelOrigin, 13);
+  var moonEnd = compactVectorEnd(sourceOrigin, moonPoint, labelOrigin, 13);
+  var sunBodyCenter = compactVectorEnd(sourceOrigin, sunPoint, labelOrigin, 19);
+  var moonBodyCenter = compactVectorEnd(sourceOrigin, moonPoint, labelOrigin, 19);
+  var arcRadius = 7;
+  return svgElement("g", {
+    className: "sky-separation-label-arrows",
+    "aria-hidden": "true"
+  },
+    svgElement("path", {
+      className: "sky-separation-label-arc",
+      d: angleArcPath(labelOrigin, sunEnd, moonEnd, arcRadius),
+      "data-radius": arcRadius
+    }),
+    skySeparationLabelArrow(labelOrigin, sunEnd, "sun"),
+    skySeparationLabelArrow(labelOrigin, moonEnd, "moon"),
+    skySeparationLabelBody(sunBodyCenter, SUN_SAMPLE_MARKER_IMAGE_URL, 9, "sun"),
+    skySeparationLabelBody(moonBodyCenter, moonImageUrl, 8, "moon"));
+}
+
+function compactVectorEnd(sourceOrigin, sourcePoint, targetOrigin, targetLength) {
+  var sourceDx = sourcePoint.x - sourceOrigin.x;
+  var sourceDy = sourcePoint.y - sourceOrigin.y;
+  var sourceLength = Math.max(1, Math.hypot(sourceDx, sourceDy));
+  return {
+    x: targetOrigin.x + (sourceDx / sourceLength) * targetLength,
+    y: targetOrigin.y + (sourceDy / sourceLength) * targetLength
+  };
+}
+
+function skySeparationLabelArrow(labelOrigin, end, role) {
+  return svgElement("g", { className: "sky-separation-label-arrow is-" + role },
+    svgElement("line", {
+      className: "sky-separation-label-arrow-line",
+      x1: labelOrigin.x,
+      y1: labelOrigin.y,
+      x2: round1(end.x),
+      y2: round1(end.y)
+    }),
+    svgElement("polygon", {
+      className: "sky-separation-label-arrow-head",
+      points: arrowHeadPoints(labelOrigin, end, 4)
+    }));
+}
+
+function skySeparationLabelBody(center, imageUrl, size, role) {
+  return svgElement("image", {
+    className: "sky-separation-label-body is-" + role,
+    href: imageUrl,
+    x: round1(center.x - size / 2),
+    y: round1(center.y - size / 2),
+    width: size,
+    height: size,
+    preserveAspectRatio: "xMidYMid meet"
+  });
 }
 
 function skySeparationArcRadius(origin, firstPoint, secondPoint) {

@@ -1,5 +1,9 @@
 import { element } from "./dom.js";
 import { normalizeDegrees, percent, readableToken } from "./format.js";
+import { moonSurfaceAlbedo } from "./moonTexture.js";
+
+var MOON_LIT_COLOR = [244, 238, 206];
+var MOON_SHADED_COLOR = [92, 98, 104];
 
 export function moonPhaseSummary(moon) {
   if (!Number.isFinite(moon.illuminationPercent) && !moon.phaseName) {
@@ -64,11 +68,12 @@ export function drawMoonPhase(canvas, phaseAngleDegrees) {
 
       var z = Math.sqrt(1 - distanceSquared);
       var lit = dx * sunX + z * sunZ > 0;
-      var shade = 0.72 + 0.28 * z;
-      var color = lit ? [244, 238, 206] : [42, 47, 52];
-      image.data[index] = Math.round(color[0] * shade);
-      image.data[index + 1] = Math.round(color[1] * shade);
-      image.data[index + 2] = Math.round(color[2] * shade);
+      var limbShade = 0.72 + 0.28 * z;
+      var textureFactor = 0.52 + 0.65 * moonSurfaceAlbedo(dx, dy, z);
+      var color = lit ? MOON_LIT_COLOR : MOON_SHADED_COLOR;
+      image.data[index] = texturedChannel(color[0], limbShade, textureFactor);
+      image.data[index + 1] = texturedChannel(color[1], limbShade, textureFactor);
+      image.data[index + 2] = texturedChannel(color[2], limbShade, textureFactor);
       image.data[index + 3] = 255;
     }
   }
@@ -79,4 +84,8 @@ export function drawMoonPhase(canvas, phaseAngleDegrees) {
   context.strokeStyle = "#d8e0df";
   context.lineWidth = 1.5;
   context.stroke();
+}
+
+function texturedChannel(color, limbShade, textureFactor) {
+  return Math.round(Math.min(255, color * limbShade * textureFactor));
 }

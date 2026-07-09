@@ -183,6 +183,7 @@ test("keeps corpus dot markers within basic SVG invariants", async ({ page }) =>
           const expectedSize = point.best ? 42 : (point.suggested ? 28 : 14);
           return point.markerSize !== expectedSize || point.imageWidth !== expectedSize;
         }).length,
+        sunOverlapCount: markerOverlapCount(sunSamples),
         sunAlternateCount: sunSamples.filter(point => point.suggested && !point.best).length
       };
     }
@@ -206,6 +207,21 @@ test("keeps corpus dot markers within basic SVG invariants", async ({ page }) =>
         }
       }
       return closePairs;
+    }
+
+    function markerOverlapCount(points) {
+      let overlaps = 0;
+      for (const [pointIndex, point] of points.entries()) {
+        for (const other of points.slice(pointIndex + 1)) {
+          const dx = point.x - other.x;
+          const dy = point.y - other.y;
+          const minimumDistance = (point.markerSize + other.markerSize) / 2;
+          if (Math.sqrt((dx * dx) + (dy * dy)) < minimumDistance) {
+            overlaps += 1;
+          }
+        }
+      }
+      return overlaps;
     }
 
     function xBacktrackCount(points) {
@@ -249,6 +265,8 @@ test("keeps corpus dot markers within basic SVG invariants", async ({ page }) =>
     expect(item.mobile.sunMissingImage, item.id).toBe(0);
     expect(item.desktop.sunMarkerSizeMismatch, item.id).toBe(0);
     expect(item.mobile.sunMarkerSizeMismatch, item.id).toBe(0);
+    expect(item.desktop.sunOverlapCount, item.id).toBe(0);
+    expect(item.mobile.sunOverlapCount, item.id).toBe(0);
   }
 
   expect(diagnostics.reduce((count, item) => count + item.desktop.sunAlternateCount, 0)).toBeGreaterThan(0);
@@ -307,8 +325,8 @@ function markerExpectationsByPassId(payload) {
       .map(sample => sample.markerLabel);
     const desktopVisible = visibleMarkers(samples, "desktop", mobileReferenceDurationMs);
     const mobileVisible = visibleMarkers(samples, "mobile", mobileReferenceDurationMs);
-    const desktopSunVisible = visibleMarkers(sunPathSamples(samples), "desktop", mobileReferenceDurationMs, samples);
-    const mobileSunVisible = visibleMarkers(sunPathSamples(samples), "mobile", mobileReferenceDurationMs, samples);
+    const desktopSunVisible = visibleMarkers(sunPathSamples(samples), "desktop", mobileReferenceDurationMs, samples, "sun");
+    const mobileSunVisible = visibleMarkers(sunPathSamples(samples), "mobile", mobileReferenceDurationMs, samples, "sun");
     const lastSequence = Math.max(0, samples.length - 1);
 
     return [passId, {
@@ -329,8 +347,11 @@ function markerExpectationsByPassId(payload) {
   }));
 }
 
-function visibleMarkers(samples, mode, mobileReferenceDurationMs, timeDomainSamples = samples) {
+function visibleMarkers(samples, mode, mobileReferenceDurationMs, timeDomainSamples = samples, body = "moon") {
   const points = chartPoints(samples, mode, mobileReferenceDurationMs, timeDomainSamples);
+  if (body === "sun") {
+    return visibleSunMarkers(points);
+  }
   const ordinaryMinimumDistance = mode === "mobile" ? 13 : 18;
   const protectedMinimumDistance = mode === "mobile" ? 17 : 24;
   const lastSequence = points.length - 1;
@@ -349,6 +370,25 @@ function visibleMarkers(samples, mode, mobileReferenceDurationMs, timeDomainSamp
   }
 
   return visible.sort((a, b) => a.sequence - b.sequence);
+}
+
+function visibleSunMarkers(points) {
+  const visible = points.filter(point => point.role === "suggested");
+
+  for (const point of points) {
+    if (point.role === "suggested" || visible.some(other => sunMarkersOverlap(point, other))) {
+      continue;
+    }
+    visible.push(point);
+  }
+
+  return visible.sort((a, b) => a.sequence - b.sequence);
+}
+
+function sunMarkersOverlap(first, second) {
+  const firstSize = first.markerLabel === "Best" ? 42 : (first.role === "suggested" ? 28 : 14);
+  const secondSize = second.markerLabel === "Best" ? 42 : (second.role === "suggested" ? 28 : 14);
+  return markerDistance(first, second) < (firstSize + secondSize) / 2;
 }
 
 function sunPathSamples(samples) {
@@ -376,7 +416,8 @@ function chartPoints(samples, mode, mobileReferenceDurationMs, timeDomainSamples
     azimuthDegrees: sample.azimuthDegrees,
     sunAltitudeDegrees: sample.sunAltitudeDegrees,
     sunAzimuthDegrees: sample.sunAzimuthDegrees,
-    role: sample.role || "path"
+    role: sample.role || "path",
+    markerLabel: sample.markerLabel
   })).filter(sample => Number.isFinite(sample.time)
     && Number.isFinite(sample.altitudeDegrees)
     && Number.isFinite(sample.azimuthDegrees));
