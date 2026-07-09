@@ -473,9 +473,9 @@ mvn test -pl backend -am
 The repository includes `backend/Dockerfile` for packaging the backend runtime.
 It uses a Maven/JDK 25 builder stage and a Java 25 JRE runtime stage; Maven is
 not present in the final image. The runtime uses fixed UID/GID `10001`, embeds
-the source revision as `MOON_BUILD_REVISION` and the OCI revision label, and
-checks `/readyz` from the built-in Docker health check. Pass a source revision
-when building locally with:
+the source revision as `MOON_BUILD_REVISION` and OCI revision/source labels,
+and checks `/readyz` from the built-in Docker health check. Pass a source
+revision when building locally with:
 
 ```bash
 docker build \
@@ -483,6 +483,10 @@ docker build \
   -t moon-service-backend:local \
   -f backend/Dockerfile .
 ```
+
+Successful `main` builds publish tested AMD64/ARM64 manifests to GHCR. The
+tag, digest, permission, visibility, verification, and recovery contracts are
+documented in [`docs/container-image-publication.md`](../docs/container-image-publication.md).
 
 Run the opt-in containerized live smoke check with:
 

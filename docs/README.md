@@ -15,6 +15,7 @@ Start Here
   - `docs/architecture.md`
   - `docs/api-shape.md`
   - `docs/self-hosting-alpha-plan.md`
+  - `docs/container-image-publication.md`
 - Domain decisions:
   - `docs/scoring-model.md`
   - `docs/ephemeris-research.md`

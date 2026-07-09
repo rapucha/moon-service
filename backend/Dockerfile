@@ -20,8 +20,10 @@ FROM eclipse-temurin:25.0.3_9-jre-noble
 WORKDIR /app
 
 ARG MOON_BUILD_REVISION=local
+ARG MOON_IMAGE_SOURCE=https://github.com/rapucha/moon-service
 ENV MOON_BUILD_REVISION=${MOON_BUILD_REVISION}
 LABEL org.opencontainers.image.revision=${MOON_BUILD_REVISION}
+LABEL org.opencontainers.image.source=${MOON_IMAGE_SOURCE}
 
 RUN groupadd --gid 10001 moonservice \
     && useradd --uid 10001 --gid moonservice --no-create-home \
