@@ -76,11 +76,11 @@ Provider selection remains explicit. Missing or unsupported
 runtime backend currently supports only `open-meteo` for both. The settings
 below tune that Open-Meteo runtime path and keep their defaults in code, so
 local runs work without an external config file after provider selection is
-set. No checked-in `.properties` file is required for these typed settings;
-Spring binds them from command-line arguments, environment variables, or an
-`application.properties`/`application.yml` file if one is added later. Duration
-values accept Spring duration syntax such as `3s` or ISO-8601 values such as
-`PT3S`.
+set. Spring binds them from command-line arguments, environment variables, or
+configuration files. The checked-in `application.properties` defines only the
+shared deployment lifecycle defaults: graceful shutdown and its timeout.
+Duration values accept Spring duration syntax such as `3s` or ISO-8601 values
+such as `PT3S`.
 
 For the current local app, configure these values the same way as the run
 commands in this README: pass command-line arguments through
@@ -92,6 +92,7 @@ environment variables. For example:
 MOON_LOCATION_RESOLVER=open-meteo
 MOON_WEATHER_PROVIDER=open-meteo
 MOON_ADMIN_GENERATE_TOKEN=true
+MOON_BUILD_REVISION=<git-commit-sha>
 ```
 
 For alpha hosting, prefer environment variables or the hosting platform's app
@@ -104,6 +105,7 @@ reason to tune them.
 | --- | --- | --- |
 | `moon.location.resolver` | unset | Must be `open-meteo` for runtime geocoding. |
 | `moon.weather.provider` | unset | Must be `open-meteo` for runtime weather. |
+| `moon.build.revision` | `local` | Safe revision identifier returned by operational health and protected admin status. Container builds set this from `MOON_BUILD_REVISION`. |
 | `moon.open-meteo.timeout` | `3s` | Open-Meteo connect and read timeout. |
 | `moon.open-meteo.max-transport-retries` | `1` | Maximum retries after the first Open-Meteo attempt. |
 | `moon.open-meteo.max-retry-after` | `1s` | Largest provider `Retry-After` delay accepted for retry. |
@@ -301,6 +303,29 @@ The request log records method, path, status, duration, and request ID. It uses
 the route path only, not the raw query string, so location queries such as
 `q=...` are not written to application logs by this filter.
 
+### Operational health
+
+The deployment-facing health endpoints are unauthenticated and intentionally
+small:
+
+```http
+GET /healthz
+GET /readyz
+```
+
+`/healthz` returns HTTP `200` only while Spring Boot reports a correct internal
+liveness state. `/readyz` returns HTTP `200` only while the application accepts
+traffic, including after startup work has completed; it returns `503` while
+traffic is refused during lifecycle transitions. Both return only `status` and
+`revision`, set `Cache-Control: no-store`, and never call geocoding, weather, or
+other external providers. The deterministic local-build revision is `local`.
+Container and CI builds should set it to the source commit.
+
+Successful `GET`/`HEAD` probes are logged at DEBUG instead of INFO so a regular
+container health check does not create continuous SD-card log traffic. Failed
+probes remain visible at INFO. These routes are operational endpoints, not part
+of the location/opportunity product API.
+
 The operator status endpoint is:
 
 ```http
@@ -345,7 +370,7 @@ token wins and no generated token is logged.
 
 It returns process-local aggregate JSON:
 
-- `app.status`
+- `app.status` and `app.revision`
 - `providers.operations.<id>`: provider name, operation name, hourly/daily/
   monthly usage windows, configured limits, percent used when a limit is known,
   and warning state
@@ -397,6 +422,11 @@ would reduce cache effectiveness. Public request rate limiting is not currently
 backend-owned; use edge or ingress limits before public exposure, then add
 application-level `429` JSON when the product API contract requires it.
 
+Spring Boot shutdown is explicitly graceful with a 30-second per-phase
+timeout. Container orchestration must send `SIGTERM` and allow more than 30
+seconds before forcing termination so an in-flight provider-backed lookup can
+finish.
+
 For the current Raspberry Pi self-hosting plan, treat SD-card-backed nodes as
 rebuildable. Do not add a local Postgres deployment, durable shared cache, or
 long-retention logs only to support alpha hosting. Public RSS/Atom and `.ics`
@@ -442,7 +472,17 @@ mvn test -pl backend -am
 
 The repository includes `backend/Dockerfile` for packaging the backend runtime.
 It uses a Maven/JDK 25 builder stage and a Java 25 JRE runtime stage; Maven is
-not present in the final image.
+not present in the final image. The runtime uses fixed UID/GID `10001`, embeds
+the source revision as `MOON_BUILD_REVISION` and the OCI revision label, and
+checks `/readyz` from the built-in Docker health check. Pass a source revision
+when building locally with:
+
+```bash
+docker build \
+  --build-arg MOON_BUILD_REVISION="$(git rev-parse HEAD)" \
+  -t moon-service-backend:local \
+  -f backend/Dockerfile .
+```
 
 Run the opt-in containerized live smoke check with:
 
@@ -450,10 +490,12 @@ Run the opt-in containerized live smoke check with:
 live-tests/run_container_smoke_tests.sh
 ```
 
-The script builds the image, starts the container on a random localhost port
-with Open-Meteo geocoding and weather enabled, waits for the app to listen,
-calls `GET /api/opportunities?q=Zakopane`, verifies required API fields, writes
-an HTML report under `live-tests/reports/`, and removes the container.
+The script builds the image with a known revision, starts the container on a
+random localhost port with Open-Meteo geocoding and weather enabled, waits for
+Docker readiness, verifies the revision and runtime UID, calls
+`GET /api/opportunities?q=Zakopane`, verifies required API fields, stops the
+container with a 35-second grace period, and writes an HTML report under
+`live-tests/reports/`.
 
 This smoke check is intentionally outside Maven because it requires Docker,
 network access, and live providers.

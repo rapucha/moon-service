@@ -17,21 +17,24 @@ class AdminStatusController {
     private final OpenMeteoObservability openMeteoObservability;
     private final ProviderQuotaMonitor providerQuotaMonitor;
     private final List<CacheMetricsSource> cacheMetricsSources;
+    private final BuildRevision buildRevision;
 
     AdminStatusController(
             OpenMeteoObservability openMeteoObservability,
             ProviderQuotaMonitor providerQuotaMonitor,
-            List<CacheMetricsSource> cacheMetricsSources
+            List<CacheMetricsSource> cacheMetricsSources,
+            BuildRevision buildRevision
     ) {
         this.openMeteoObservability = openMeteoObservability;
         this.providerQuotaMonitor = providerQuotaMonitor;
         this.cacheMetricsSources = List.copyOf(cacheMetricsSources);
+        this.buildRevision = buildRevision;
     }
 
     @GetMapping("/admin/status")
     AdminStatusResponse status() {
         return new AdminStatusResponse(
-                new AppStatus("ok"),
+                new AppStatus("ok", buildRevision.value()),
                 new ProviderStatus(
                         openMeteoObservability.geocodingSnapshot(),
                         openMeteoObservability.weatherSnapshot(),
@@ -54,7 +57,7 @@ class AdminStatusController {
     ) {
     }
 
-    record AppStatus(String status) {
+    record AppStatus(String status, String revision) {
     }
 
     record ProviderStatus(

@@ -19,10 +19,11 @@ pytestmark = [
 TIMEOUT_SECONDS = 30
 
 
-def fetch_json(base_url, path, params):
-    query = urlencode(params)
+def fetch_json(base_url, path, params=None):
+    query = urlencode(params or {})
+    suffix = f"?{query}" if query else ""
     request = Request(
-        f"{base_url}{path}?{query}",
+        f"{base_url}{path}{suffix}",
         headers={"User-Agent": "moon-service-container-smoke/0.1"},
     )
     try:
@@ -31,6 +32,18 @@ def fetch_json(base_url, path, params):
     except HTTPError as ex:
         body = ex.read().decode("utf-8", errors="replace")
         raise AssertionError(f"request failed with HTTP {ex.code}: {body}") from ex
+
+
+def test_containerized_backend_reports_operational_health():
+    base_url = os.environ["MOON_SERVICE_BASE_URL"]
+    expected_revision = os.environ.get("MOON_SERVICE_EXPECTED_REVISION")
+
+    for path in ("/healthz", "/readyz"):
+        payload = fetch_json(base_url, path)
+        assert set(payload) == {"status", "revision"}
+        assert payload["status"] == "ok"
+        if expected_revision is not None:
+            assert payload["revision"] == expected_revision
 
 
 def test_containerized_backend_serves_live_opportunity_lookup():
@@ -44,7 +57,7 @@ def test_containerized_backend_serves_live_opportunity_lookup():
     assert payload["endsAt"]
     assert isinstance(payload["candidateWindowsEvaluated"], int)
     assert payload["location"]["kind"] == "real_location"
-    assert payload["location"]["id"].startswith("openmeteo:")
+    assert payload["location"]["id"].startswith("moon-service-")
     assert payload["location"]["displayName"]
     assert payload["location"]["timezone"] == "Europe/Warsaw"
     assert isinstance(payload["location"]["latitude"], (int, float))
@@ -57,7 +70,7 @@ def test_containerized_backend_serves_live_opportunity_lookup():
         return
 
     first = opportunities[0]
-    assert first["id"].startswith("openmeteo-")
+    assert first["id"].startswith("moon-service-")
     assert first["suggestedAt"]
     assert isinstance(first["score"], int)
     assert first["links"]["ics"].endswith(".ics")

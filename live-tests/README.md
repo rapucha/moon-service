@@ -185,11 +185,14 @@ The script:
 - builds the backend image from `backend/Dockerfile`;
 - uses `maven:3.9.16-eclipse-temurin-25-noble` only as the builder stage;
 - uses `eclipse-temurin:25.0.3_9-jre-noble` as the final runtime image;
+- builds with a known source revision and verifies `/healthz` and `/readyz`;
+- waits for the Docker health check and verifies runtime UID `10001`;
 - runs the app with `moon.location.resolver=open-meteo` and
   `moon.weather.provider=open-meteo`;
 - calls the containerized app at `GET /api/opportunities?q=Zakopane`;
 - asserts status semantics and required response fields;
-- removes the container on success or failure.
+- sends a graceful stop with a timeout longer than the application's
+  30-second shutdown phase, then removes the container on success or failure.
 
 Manual pytest invocation is also possible against an already-running app:
 
