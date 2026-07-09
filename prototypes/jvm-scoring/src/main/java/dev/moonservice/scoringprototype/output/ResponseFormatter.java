@@ -94,6 +94,12 @@ public final class ResponseFormatter {
         } else {
             moon.put("brightLimbTiltDegrees", round3(brightLimbTiltDegrees));
         }
+        Double northPoleTiltDegrees = window.suggested().northPoleTiltDegrees();
+        if (northPoleTiltDegrees == null) {
+            moon.putNull("northPoleTiltDegrees");
+        } else {
+            moon.put("northPoleTiltDegrees", round3(northPoleTiltDegrees));
+        }
         moon.put("phaseName", phaseName(window.suggested()));
 
         writeMoonPath(opportunity, window);

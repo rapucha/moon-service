@@ -216,7 +216,8 @@ function altitudeChartSvg(sourcePoints, lightBandSourcePoints, azimuthSourcePoin
     ? moonPhaseImageDataUrl(
       (options.moon || {}).phaseAngleDegrees,
       64,
-      (options.moon || {}).brightLimbTiltDegrees)
+      (options.moon || {}).brightLimbTiltDegrees,
+      (options.moon || {}).northPoleTiltDegrees)
     : SUN_SAMPLE_MARKER_IMAGE_URL;
 
   return svgElement("svg", {
@@ -598,7 +599,8 @@ function moonAltitudeMarkerImageUrl(point, fallbackImageUrl) {
   return moonPhaseImageDataUrl(
     point.moonPhaseAngleDegrees,
     64,
-    point.brightLimbTiltDegrees) || fallbackImageUrl;
+    point.brightLimbTiltDegrees,
+    point.northPoleTiltDegrees) || fallbackImageUrl;
 }
 
 function sunAltitudeMarker(point) {
@@ -689,7 +691,8 @@ function skyDomeChart(samples, timezone, countryCode, moon) {
   var moonImageUrl = moonPhaseImageDataUrl(
     moon.phaseAngleDegrees,
     64,
-    moon.brightLimbTiltDegrees);
+    moon.brightLimbTiltDegrees,
+    moon.northPoleTiltDegrees);
   var selectedTime = formatTime(selected.at, timezone, countryCode);
   var accessibleLabel = "Sun and Moon sky position at " + selectedTime
     + "; Sun " + degrees(selected.sunAltitudeDegrees) + " altitude, "
@@ -1068,7 +1071,8 @@ function chartSamples(samples) {
       role: sample.role || "path",
       markerLabel: sample.markerLabel,
       moonPhaseAngleDegrees: sample.moonPhaseAngleDegrees,
-      brightLimbTiltDegrees: sample.brightLimbTiltDegrees
+      brightLimbTiltDegrees: sample.brightLimbTiltDegrees,
+      northPoleTiltDegrees: sample.northPoleTiltDegrees
     };
   }).filter(function (sample) {
     return Number.isFinite(sample.time)

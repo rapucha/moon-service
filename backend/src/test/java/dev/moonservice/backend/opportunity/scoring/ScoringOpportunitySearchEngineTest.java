@@ -30,13 +30,14 @@ import java.util.concurrent.atomic.AtomicReference;
 
 class ScoringOpportunitySearchEngineTest {
     @Test
-    void preservesNullBrightLimbTiltFromPrototypeResponse() throws ReflectiveOperationException {
+    void preservesNullMoonOrientationFromPrototypeResponse() throws ReflectiveOperationException {
         ObjectNode moonNode = new ObjectMapper().createObjectNode();
         moonNode.put("altitudeDegrees", 5.0);
         moonNode.put("azimuthDegrees", 120.0);
         moonNode.put("illuminationPercent", 100.0);
         moonNode.put("phaseAngleDegrees", 180.0);
         moonNode.putNull("brightLimbTiltDegrees");
+        moonNode.putNull("northPoleTiltDegrees");
         moonNode.put("phaseName", "full_moon");
         Method moonMapper = ScoringOpportunitySearchEngine.class.getDeclaredMethod("moon", JsonNode.class);
         moonMapper.setAccessible(true);
@@ -44,6 +45,7 @@ class ScoringOpportunitySearchEngineTest {
         OpportunitySearchResponse.Moon moon = (OpportunitySearchResponse.Moon) moonMapper.invoke(null, moonNode);
 
         assertNull(moon.brightLimbTiltDegrees());
+        assertNull(moon.northPoleTiltDegrees());
     }
 
     @Test
@@ -75,6 +77,9 @@ class ScoringOpportunitySearchEngineTest {
         assertNotNull(first.moon().brightLimbTiltDegrees());
         assertTrue(first.moon().brightLimbTiltDegrees() >= 0.0);
         assertTrue(first.moon().brightLimbTiltDegrees() < 360.0);
+        assertNotNull(first.moon().northPoleTiltDegrees());
+        assertTrue(first.moon().northPoleTiltDegrees() >= 0.0);
+        assertTrue(first.moon().northPoleTiltDegrees() < 360.0);
         assertEquals(first.startsAt(), first.moonPath().start().at());
         assertEquals(first.suggestedAt(), first.moonPath().suggested().at());
         assertEquals(first.endsAt(), first.moonPath().end().at());

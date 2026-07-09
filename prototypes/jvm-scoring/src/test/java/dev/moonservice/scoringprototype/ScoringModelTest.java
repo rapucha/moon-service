@@ -128,6 +128,7 @@ class ScoringModelTest {
                 moonAzimuth,
                 illumination,
                 180.0,
+                null,
                 sunAltitude,
                 sunAzimuth
         );

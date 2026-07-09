@@ -211,6 +211,7 @@ public class ScoringOpportunitySearchEngine implements OpportunitySearchEngine {
                 doubleValue(node, "illuminationPercent"),
                 doubleValue(node, "phaseAngleDegrees"),
                 nullableDouble(node, "brightLimbTiltDegrees"),
+                nullableDouble(node, "northPoleTiltDegrees"),
                 text(node, "phaseName")
         );
     }

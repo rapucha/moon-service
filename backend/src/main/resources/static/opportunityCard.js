@@ -81,7 +81,8 @@ function combinedPassSamples(passPath, orderedEntries, primary) {
       suggestedLabelsByTime.set(path.suggested.at, path.suggested.at === primarySuggested.at ? "Best" : "Alt");
       addPathSample(samplesByTime, Object.assign({}, path.suggested, {
         moonPhaseAngleDegrees: moon.phaseAngleDegrees,
-        brightLimbTiltDegrees: moon.brightLimbTiltDegrees
+        brightLimbTiltDegrees: moon.brightLimbTiltDegrees,
+        northPoleTiltDegrees: moon.northPoleTiltDegrees
       }));
     }
   });

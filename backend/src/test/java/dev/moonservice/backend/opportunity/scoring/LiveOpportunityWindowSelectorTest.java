@@ -71,15 +71,15 @@ class LiveOpportunityWindowSelectorTest {
 
     private MoonSample sampleAt(Instant instant) {
         if (instant.equals(Instant.parse("2026-06-20T21:10:00Z"))) {
-            return new MoonSample(instant, 4.0, 120.0, 80.0, 120.0, -2.0, 82.0);
+            return new MoonSample(instant, 4.0, 120.0, 80.0, 120.0, null, -2.0, 82.0);
         }
-        return new MoonSample(instant, 50.0, 120.0, 80.0, 120.0, -20.0, 62.0);
+        return new MoonSample(instant, 50.0, 120.0, 80.0, 120.0, null, -20.0, 62.0);
     }
 
     private static MoonWindow window(String startsAt, String suggestedAt, String endsAt) {
-        MoonSample start = new MoonSample(Instant.parse(startsAt), 3.0, 116.0, 80.0, 120.0, -2.0, 78.0);
-        MoonSample suggested = new MoonSample(Instant.parse(suggestedAt), 4.0, 120.0, 80.0, 120.0, -2.0, 82.0);
-        MoonSample end = new MoonSample(Instant.parse(endsAt), 5.0, 124.0, 80.0, 120.0, -2.0, 86.0);
+        MoonSample start = new MoonSample(Instant.parse(startsAt), 3.0, 116.0, 80.0, 120.0, null, -2.0, 78.0);
+        MoonSample suggested = new MoonSample(Instant.parse(suggestedAt), 4.0, 120.0, 80.0, 120.0, null, -2.0, 82.0);
+        MoonSample end = new MoonSample(Instant.parse(endsAt), 5.0, 124.0, 80.0, 120.0, null, -2.0, 86.0);
         return new MoonWindow(
                 LOCATION,
                 "moonrise_low",
