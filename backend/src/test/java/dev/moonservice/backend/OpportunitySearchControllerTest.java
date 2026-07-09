@@ -63,7 +63,9 @@ class OpportunitySearchControllerTest {
                 .jsonPath("$.forecastHorizonDays").isEqualTo(7)
                 .jsonPath("$.startsAt").exists()
                 .jsonPath("$.maxMoonAltitudeDegrees").isEqualTo(90.0)
-                .jsonPath("$.opportunities[0].suggestedAt").exists();
+                .jsonPath("$.opportunities[0].suggestedAt").exists()
+                .jsonPath("$.opportunities[0].moon.brightLimbTiltDegrees").isNumber()
+                .jsonPath("$.opportunities[0].moon.northPoleTiltDegrees").isNumber();
     }
 
     @ParameterizedTest

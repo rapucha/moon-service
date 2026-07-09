@@ -210,6 +210,8 @@ public class ScoringOpportunitySearchEngine implements OpportunitySearchEngine {
                 doubleValue(node, "azimuthDegrees"),
                 doubleValue(node, "illuminationPercent"),
                 doubleValue(node, "phaseAngleDegrees"),
+                nullableDouble(node, "brightLimbTiltDegrees"),
+                nullableDouble(node, "northPoleTiltDegrees"),
                 text(node, "phaseName")
         );
     }
@@ -317,5 +319,10 @@ public class ScoringOpportunitySearchEngine implements OpportunitySearchEngine {
 
     private static double doubleValue(JsonNode node, String field) {
         return node.path(field).asDouble();
+    }
+
+    private static Double nullableDouble(JsonNode node, String field) {
+        JsonNode value = node.path(field);
+        return value.isNumber() ? value.asDouble() : null;
     }
 }

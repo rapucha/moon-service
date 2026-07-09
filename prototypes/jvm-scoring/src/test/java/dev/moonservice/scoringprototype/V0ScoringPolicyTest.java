@@ -91,6 +91,7 @@ class V0ScoringPolicyTest {
                 120.0,
                 moonIlluminationPercent,
                 180.0,
+                null,
                 sunAltitudeDegrees,
                 90.0
         );
@@ -100,6 +101,7 @@ class V0ScoringPolicyTest {
                 116.0,
                 moonIlluminationPercent,
                 180.0,
+                null,
                 sunAltitudeDegrees,
                 86.0
         );
@@ -109,6 +111,7 @@ class V0ScoringPolicyTest {
                 124.0,
                 moonIlluminationPercent,
                 180.0,
+                null,
                 sunAltitudeDegrees,
                 94.0
         );

@@ -77,8 +77,13 @@ function combinedPassSamples(passPath, orderedEntries, primary) {
   orderedEntries.forEach(function (entry) {
     var path = entry.opportunity.moonPath || {};
     if (hasPathPosition(path.suggested)) {
+      var moon = entry.opportunity.moon || {};
       suggestedLabelsByTime.set(path.suggested.at, path.suggested.at === primarySuggested.at ? "Best" : "Alt");
-      addPathSample(samplesByTime, path.suggested);
+      addPathSample(samplesByTime, Object.assign({}, path.suggested, {
+        moonPhaseAngleDegrees: moon.phaseAngleDegrees,
+        brightLimbTiltDegrees: moon.brightLimbTiltDegrees,
+        northPoleTiltDegrees: moon.northPoleTiltDegrees
+      }));
     }
   });
 

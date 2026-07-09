@@ -88,6 +88,18 @@ public final class ResponseFormatter {
         moon.put("azimuthDegrees", round3(window.suggested().moonAzimuthDegrees()));
         moon.put("illuminationPercent", round3(window.suggested().moonIlluminationPercent()));
         moon.put("phaseAngleDegrees", round3(window.suggested().moonPhaseAngleDegrees()));
+        Double brightLimbTiltDegrees = window.suggested().brightLimbTiltDegrees();
+        if (brightLimbTiltDegrees == null) {
+            moon.putNull("brightLimbTiltDegrees");
+        } else {
+            moon.put("brightLimbTiltDegrees", round3(brightLimbTiltDegrees));
+        }
+        Double northPoleTiltDegrees = window.suggested().northPoleTiltDegrees();
+        if (northPoleTiltDegrees == null) {
+            moon.putNull("northPoleTiltDegrees");
+        } else {
+            moon.put("northPoleTiltDegrees", round3(northPoleTiltDegrees));
+        }
         moon.put("phaseName", phaseName(window.suggested()));
 
         writeMoonPath(opportunity, window);

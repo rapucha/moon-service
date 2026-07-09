@@ -483,3 +483,77 @@ test("renders a point-only Sun pass when one above-horizon sample is available",
   await expect(card.locator(".sun-altitude-chart.altitude-chart-desktop .azimuth-rail-label"))
     .not.toHaveCount(0);
 });
+
+test("uses each recommendation bright-limb tilt and shares the best Moon image", async ({ page }) => {
+  const response = structuredClone(fixture);
+  response.opportunities[0].moon.brightLimbTiltDegrees = 0;
+  response.opportunities[1].moon.brightLimbTiltDegrees = 180;
+
+  await page.unroute("**/api/opportunities**");
+  await page.route("**/api/opportunities**", async route => {
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify(response)
+    });
+  });
+  await page.goto("/search?locationId=tilted-moon-fixture");
+
+  const card = page.locator(".moon-pass-card").first();
+  const bestAt = response.opportunities[0].moonPath.suggested.at;
+  const alternativeAt = response.opportunities[1].moonPath.suggested.at;
+  const imageUrls = await card.evaluate((node, instants) => {
+    const markerUrl = at => node.querySelector(`.moon-sample-marker[data-at='${at}'] .moon-sample-marker-image`)
+      ?.getAttribute("href");
+    return {
+      best: markerUrl(instants.bestAt),
+      alternative: markerUrl(instants.alternativeAt),
+      dome: node.querySelector(".sky-body.is-moon .sky-body-image")?.getAttribute("href"),
+      label: node.querySelector(".sky-separation-label-body.is-moon")?.getAttribute("href")
+    };
+  }, { bestAt, alternativeAt });
+
+  expect(imageUrls.best).toMatch(/^data:image\/png;base64,/);
+  expect(imageUrls.alternative).toMatch(/^data:image\/png;base64,/);
+  expect(imageUrls.alternative).not.toBe(imageUrls.best);
+  expect(imageUrls.dome).toBe(imageUrls.best);
+  expect(imageUrls.label).toBe(imageUrls.best);
+});
+
+test("uses each recommendation north-pole tilt and shares the best Moon image", async ({ page }) => {
+  const response = structuredClone(fixture);
+  response.opportunities[0].moon.brightLimbTiltDegrees = 0;
+  response.opportunities[1].moon.brightLimbTiltDegrees = 0;
+  response.opportunities[0].moon.northPoleTiltDegrees = 0;
+  response.opportunities[1].moon.northPoleTiltDegrees = 180;
+
+  await page.unroute("**/api/opportunities**");
+  await page.route("**/api/opportunities**", async route => {
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify(response)
+    });
+  });
+  await page.goto("/search?locationId=axis-rotated-moon-fixture");
+
+  const card = page.locator(".moon-pass-card").first();
+  const bestAt = response.opportunities[0].moonPath.suggested.at;
+  const alternativeAt = response.opportunities[1].moonPath.suggested.at;
+  const imageUrls = await card.evaluate((node, instants) => {
+    const markerUrl = at => node.querySelector(`.moon-sample-marker[data-at='${at}'] .moon-sample-marker-image`)
+      ?.getAttribute("href");
+    return {
+      best: markerUrl(instants.bestAt),
+      alternative: markerUrl(instants.alternativeAt),
+      dome: node.querySelector(".sky-body.is-moon .sky-body-image")?.getAttribute("href"),
+      label: node.querySelector(".sky-separation-label-body.is-moon")?.getAttribute("href")
+    };
+  }, { bestAt, alternativeAt });
+
+  expect(imageUrls.best).toMatch(/^data:image\/png;base64,/);
+  expect(imageUrls.alternative).toMatch(/^data:image\/png;base64,/);
+  expect(imageUrls.alternative).not.toBe(imageUrls.best);
+  expect(imageUrls.dome).toBe(imageUrls.best);
+  expect(imageUrls.label).toBe(imageUrls.best);
+});

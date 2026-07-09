@@ -93,6 +93,8 @@ EphemerisService
     - Moon azimuth degrees
     - Moon illumination fraction
     - Moon phase angle or named phase
+    - observer-oriented bright-limb tilt at the sampled instant
+    - observer-oriented lunar north-pole tilt at the sampled instant
     - next moonrise time
     - next moonset time
     - Sun altitude degrees
@@ -100,6 +102,58 @@ EphemerisService
 ```
 
 This boundary allows replacing the ephemeris library later without changing scoring or UI code.
+
+### Observer-oriented bright-limb tilt
+
+The suggested-time bright-limb direction is derived from the same apparent
+topocentric horizontal Moon and Sun positions used elsewhere. Let `hm` and `hs`
+be Moon and Sun altitude, and let `Am` and `As` be their azimuths, all in
+radians. Project the Sun direction into the tangent plane at the Moon:
+
+```text
+right = cos(hs) * sin(As - Am)
+up    = sin(hs) * cos(hm) - cos(hs) * sin(hm) * cos(As - Am)
+tilt  = normalizeDegrees(toDegrees(atan2(right, up)))
+```
+
+The public convention is horizon-aligned and directly renderable: zero degrees
+points toward local zenith, 90 degrees points right toward increasing azimuth,
+and angles increase clockwise in `[0, 360)`. If both tangent-plane components
+are negligible, such as exact conjunction or opposition, the direction is
+undefined and the API value is `null`.
+
+### Observer-oriented lunar north-pole tilt
+
+The suggested-time lunar-axis direction uses Astronomy Engine's J2000 lunar
+north-pole vector and its corrected topocentric J2000 Moon vector. Rotate both
+vectors into the local horizontal frame, where `x` is north, `y` is west, and
+`z` is zenith. After normalizing the Moon line-of-sight vector `m`, form a
+tangent-plane basis:
+
+```text
+zenith = (0, 0, 1)
+right  = normalize(cross(m, zenith))
+up     = normalize(zenith - dot(zenith, m) * m)
+
+poleRight = dot(lunarNorthPole, right)
+poleUp    = dot(lunarNorthPole, up)
+tilt      = normalizeDegrees(toDegrees(atan2(poleRight, poleUp)))
+```
+
+`right` points toward increasing azimuth even though the horizontal frame uses
+a west-positive `y` axis. The public convention matches the bright-limb field:
+zero degrees points toward local zenith, 90 degrees points right toward
+increasing azimuth, and angles increase clockwise in `[0, 360)`. Non-finite or
+degenerate projections produce `null`.
+
+This value describes only the lunar north rotational pole direction on the
+observer's screen. It does not include libration or provide the sub-observer
+lunar longitude and latitude needed to shift texture sampling across the disk.
+The rigid pole projection is geometric and airless even though reported Moon
+and Sun altitudes use normal refraction; differential refraction across the
+lunar disk would be a small distortion rather than a single rotation angle.
+Do not use Astronomy Engine's prime-meridian `spin` value for this field: doing
+so would incorrectly make the Earth-facing texture spin through each month.
 
 ## Validation Source
 

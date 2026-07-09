@@ -18,7 +18,11 @@ export function moonPhaseSummary(moon) {
     ariaLabel: phaseName,
     title: phaseName + ", " + percent(moon.illuminationPercent) + " lit"
   });
-  drawMoonPhase(canvas, moon.phaseAngleDegrees);
+  drawMoonPhase(
+    canvas,
+    moon.phaseAngleDegrees,
+    moon.brightLimbTiltDegrees,
+    moon.northPoleTiltDegrees);
 
   return element("span", { className: "phase-summary" },
     canvas,
@@ -27,12 +31,17 @@ export function moonPhaseSummary(moon) {
       element("span", {}, percent(moon.illuminationPercent) + " lit")));
 }
 
-export function moonPhaseImageDataUrl(phaseAngleDegrees, size) {
+export function moonPhaseImageDataUrl(
+  phaseAngleDegrees,
+  size,
+  brightLimbTiltDegrees,
+  northPoleTiltDegrees
+) {
   var canvas = element("canvas", {
     width: size || 56,
     height: size || 56
   });
-  drawMoonPhase(canvas, phaseAngleDegrees);
+  drawMoonPhase(canvas, phaseAngleDegrees, brightLimbTiltDegrees, northPoleTiltDegrees);
   try {
     return canvas.toDataURL("image/png");
   } catch (error) {
@@ -40,7 +49,7 @@ export function moonPhaseImageDataUrl(phaseAngleDegrees, size) {
   }
 }
 
-export function drawMoonPhase(canvas, phaseAngleDegrees) {
+export function drawMoonPhase(canvas, phaseAngleDegrees, brightLimbTiltDegrees, northPoleTiltDegrees) {
   var context = canvas.getContext && canvas.getContext("2d");
   if (!context) {
     return;
@@ -53,7 +62,24 @@ export function drawMoonPhase(canvas, phaseAngleDegrees) {
   var phase = Number.isFinite(phaseAngleDegrees) ? normalizeDegrees(phaseAngleDegrees) : 180;
   var radians = phase * Math.PI / 180;
   var sunX = Math.sin(radians);
+  var sunY = 0;
   var sunZ = -Math.cos(radians);
+  if (Number.isFinite(brightLimbTiltDegrees)) {
+    var projectedMagnitude = Math.abs(Math.sin(radians));
+    if (projectedMagnitude < 1.0e-12) {
+      projectedMagnitude = 0;
+    }
+    var tiltRadians = normalizeDegrees(brightLimbTiltDegrees) * Math.PI / 180;
+    sunX = projectedMagnitude * Math.sin(tiltRadians);
+    sunY = -projectedMagnitude * Math.cos(tiltRadians);
+  }
+  var textureCos = 1;
+  var textureSin = 0;
+  if (Number.isFinite(northPoleTiltDegrees)) {
+    var poleTiltRadians = normalizeDegrees(northPoleTiltDegrees) * Math.PI / 180;
+    textureCos = Math.cos(poleTiltRadians);
+    textureSin = Math.sin(poleTiltRadians);
+  }
 
   for (var y = 0; y < size; y += 1) {
     for (var x = 0; x < size; x += 1) {
@@ -67,9 +93,11 @@ export function drawMoonPhase(canvas, phaseAngleDegrees) {
       }
 
       var z = Math.sqrt(1 - distanceSquared);
-      var lit = dx * sunX + z * sunZ > 0;
+      var lit = dx * sunX + dy * sunY + z * sunZ > 0;
       var limbShade = 0.72 + 0.28 * z;
-      var textureFactor = 0.52 + 0.65 * moonSurfaceAlbedo(dx, dy, z);
+      var textureX = dx * textureCos + dy * textureSin;
+      var textureY = -dx * textureSin + dy * textureCos;
+      var textureFactor = 0.52 + 0.65 * moonSurfaceAlbedo(textureX, textureY, z);
       var color = lit ? MOON_LIT_COLOR : MOON_SHADED_COLOR;
       image.data[index] = texturedChannel(color[0], limbShade, textureFactor);
       image.data[index + 1] = texturedChannel(color[1], limbShade, textureFactor);
