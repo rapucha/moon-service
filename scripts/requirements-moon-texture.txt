@@ -1,0 +1,2 @@
+# Asset-generation tooling only; normal application builds do not install this.
+Pillow==12.3.0
