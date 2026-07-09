@@ -111,15 +111,23 @@ docker buildx imagetools inspect "$IMAGE:$REVISION" \
   --format '{{json .Manifest}}' | jq
 ```
 
-Record the digest printed by the manifest inspection and verify that both
-architectures can be resolved without rebuilding:
+Record the digest printed by the manifest inspection. On each matching host,
+pull the same deployment digest; Docker selects the host's platform from the
+index without rebuilding:
 
 ```bash
 DIGEST=sha256:<digest>
 
-docker pull --platform linux/amd64 "$IMAGE@$DIGEST"
-docker pull --platform linux/arm64 "$IMAGE@$DIGEST"
+docker pull "$IMAGE@$DIGEST"
 ```
+
+Run that command on both the AMD64 host and the ARM64 Pi. Do not force both
+platforms sequentially under the same index-digest reference in Docker's
+classic image store: it can hold only one selected variant for that reference.
+The hosted workflow instead derives each platform's child-manifest digest from
+the verified index and pulls the two distinct child references. Those child
+digests are verification details; deployment and rollback continue to use the
+multi-architecture index digest recorded above.
 
 On a matching host, verify the runtime contract without making a geocoding or
 weather request:

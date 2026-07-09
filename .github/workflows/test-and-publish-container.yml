@@ -239,6 +239,12 @@ jobs:
           ' <<<"$manifest_json" >/dev/null
 
           for platform in linux/amd64 linux/arm64; do
+            platform_digest="$(jq -er --arg platform "$platform" '
+              .manifests[]
+              | select((.platform.os + "/" + .platform.architecture) == $platform)
+              | .digest
+              | select(test("^sha256:[0-9a-f]{64}$"))
+            ' <<<"$manifest_json")"
             image_json="$(docker buildx imagetools inspect "$IMAGE_REF" \
               --format "{{json (index .Image \"$platform\")}}")"
             jq -e --arg revision "$GITHUB_SHA" --arg source "$IMAGE_SOURCE" '
@@ -247,10 +253,8 @@ jobs:
               and ((.config.Env // [])
                 | index("MOON_BUILD_REVISION=" + $revision) != null)
             ' <<<"$image_json" >/dev/null
+            docker pull --platform "$platform" "$IMAGE_NAME@$platform_digest"
           done
-
-          docker pull --platform linux/amd64 "$IMAGE_NAME@$digest"
-          docker pull --platform linux/arm64 "$IMAGE_NAME@$digest"
 
           echo "digest=$digest" >>"$GITHUB_OUTPUT"
           echo "Verified $IMAGE_REF@$digest for linux/amd64 and linux/arm64"
