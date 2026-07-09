@@ -23,6 +23,12 @@ Pull requests and `main` pushes run these deterministic checks in parallel:
 - `Backend tests`: Java 25 and `mvn test -pl backend -am`.
 - `Frontend tests`: Node.js, static checks, and fixture-backed Playwright tests.
 
+Hosted CI runs every Playwright test with `--ignore-snapshots`. The current
+pixel baselines depend on the workstation browser, fonts, and renderer, so
+enforcing them on GitHub's Ubuntu image would produce environment-only failures.
+`npm run frontend:check` remains the full local command for pixel comparisons;
+`npm run frontend:ci` keeps all non-pixel assertions in the publication gate.
+
 These jobs do not call live Open-Meteo endpoints. On `main`, image publication
 depends on both jobs. Before pushing, the workflow builds and starts both the
 AMD64 and ARM64 images, waits for `/readyz`, and verifies the embedded source

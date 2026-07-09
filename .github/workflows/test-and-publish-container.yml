@@ -79,7 +79,7 @@ jobs:
         run: test -x /usr/bin/google-chrome
 
       - name: Run frontend checks
-        run: npm run frontend:check
+        run: npm run frontend:ci
 
   publish-image:
     name: Publish immutable image
