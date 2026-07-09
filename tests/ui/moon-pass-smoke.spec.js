@@ -128,11 +128,158 @@ test("renders grouped Moon pass cards", async ({ page }) => {
   }
 
   await expect(page.locator(".moon-pass-card").first().locator(".sky-dome-chart")).toHaveCount(1);
-  await expect(page.locator(".moon-pass-card").first().locator(".sky-track.is-sun")).toHaveCount(1);
-  await expect(page.locator(".moon-pass-card").first().locator(".sky-track.is-moon")).toHaveCount(1);
+  await expect(page.locator(".moon-pass-card").first().locator(".sky-track")).toHaveCount(0);
+  await expect(page.locator(".moon-pass-card").first().locator(".sky-track-dot")).toHaveCount(0);
   await expect(page.locator(".moon-pass-card").first().locator(".sky-separation-ray")).toHaveCount(2);
   await expect(page.locator(".moon-pass-card").first().locator(".sky-body.is-sun")).toHaveCount(1);
   await expect(page.locator(".moon-pass-card").first().locator(".sky-body.is-moon")).toHaveCount(1);
+  await expect(page.locator(".moon-pass-card").first().locator(".sky-cardinal-marker .sky-cardinal-label"))
+    .toHaveText(["N", "E", "S", "W"]);
+  await expect(page.locator(".moon-pass-card").first().locator(".sky-cardinal-arrow")).toHaveCount(4);
+  expect(await page.locator(".moon-pass-card").first().locator(".sky-cardinal-arrow")
+    .evaluateAll(arrows => arrows.map(arrow => arrow.getAttribute("transform"))))
+    .toEqual(["rotate(0)", "rotate(90)", "rotate(180)", "rotate(270)"]);
+  await expect(page.locator(".moon-pass-card").first().locator(".sky-north-axis")).toHaveCount(0);
+  await expect(page.locator(".moon-pass-card").first().locator(".sky-north-arrow")).toHaveCount(0);
+  await expect(page.locator(".moon-pass-card").first().locator(".sky-dome-meridian")).toHaveCount(2);
+  await expect(page.locator(".moon-pass-card").first().locator(".sky-dome-meridian.is-grid-a"))
+    .toHaveAttribute("data-start-azimuth", "142");
+  await expect(page.locator(".moon-pass-card").first().locator(".sky-dome-meridian.is-grid-a"))
+    .toHaveAttribute("data-end-azimuth", "322");
+  await expect(page.locator(".moon-pass-card").first().locator(".sky-dome-meridian.is-grid-b"))
+    .toHaveAttribute("data-start-azimuth", "232");
+  await expect(page.locator(".moon-pass-card").first().locator(".sky-dome-meridian.is-grid-b"))
+    .toHaveAttribute("data-end-azimuth", "52");
+  await expect(page.locator(".moon-pass-card").first().locator(".sky-dome-meridian.is-grid-a"))
+    .toHaveAttribute("d", / C /);
+  await expect(page.locator(".moon-pass-card").first().locator(".sky-dome-meridian.is-grid-b"))
+    .toHaveAttribute("d", / C /);
+  await expect(page.locator(".moon-pass-card").first().locator(".sky-azimuth-projection")).toHaveCount(2);
+  await expect(page.locator(".moon-pass-card").first().locator(".sky-azimuth-projection-line")).toHaveCount(2);
+  await expect(page.locator(".moon-pass-card").first().locator(".sky-azimuth-projection-guide")).toHaveCount(2);
+  await expect(page.locator(".moon-pass-card").first().locator(".sky-azimuth-projection-arrow")).toHaveCount(2);
+  await expect(page.locator(".moon-pass-card").first().locator(".sky-body-label")).toHaveCount(0);
+  await expect(page.locator(".moon-pass-card").first().locator(".sky-body.is-sun .sky-body-image"))
+    .toHaveAttribute("href", "/sun-marker-aperture-flare.svg");
+  await expect(page.locator(".moon-pass-card").first().locator(".sky-body.is-moon .sky-body-image"))
+    .toHaveAttribute("href", /^data:image\/png;base64,/);
+
+  const domeGeometry = await page.locator(".moon-pass-card").first().locator(".sky-dome-chart").evaluate(chart => {
+    const separationLabel = chart.querySelector(".sky-separation-label");
+    const separationArc = chart.querySelector(".sky-separation-arc");
+    const timeLabel = chart.querySelector(".sky-dome-label");
+    const observer = chart.querySelector(".sky-observer-dot");
+    const horizon = chart.querySelector(".sky-dome-horizon");
+    const observerX = Number(observer?.getAttribute("cx"));
+    const observerY = Number(observer?.getAttribute("cy"));
+    const radiusX = Number(horizon?.getAttribute("rx"));
+    const radiusY = Number(horizon?.getAttribute("ry"));
+    const horizonBounds = horizon?.getBoundingClientRect();
+    const cardinalBounds = Object.fromEntries(["n", "e", "s", "w"].map(direction => {
+      const bounds = chart.querySelector(`.sky-cardinal-marker.is-${direction} .sky-cardinal-arrow`)
+        ?.getBoundingClientRect();
+      return [direction, bounds];
+    }));
+    const projections = ["sun", "moon"].map(role => {
+      const group = chart.querySelector(`.sky-azimuth-projection.is-${role}`);
+      const line = group?.querySelector(".sky-azimuth-projection-line");
+      const guide = group?.querySelector(".sky-azimuth-projection-guide");
+      const body = chart.querySelector(`.sky-body.is-${role}`);
+      const transform = body?.getAttribute("transform") || "";
+      const bodyPosition = transform.match(/translate\(([-0-9.]+)\s+([-0-9.]+)\)/);
+      const endX = Number(line?.getAttribute("x2"));
+      const endY = Number(line?.getAttribute("y2"));
+      return {
+        altitudeDegrees: Number(body?.getAttribute("data-altitude-degrees")),
+        distanceFromObserver: Math.hypot(
+          Number(bodyPosition?.[1]) - observerX,
+          Number(bodyPosition?.[2]) - observerY),
+        startsAtObserver: Number(line?.getAttribute("x1")) === observerX
+          && Number(line?.getAttribute("y1")) === observerY,
+        guideStartsAtBody: Number(guide?.getAttribute("x1")) === Number(bodyPosition?.[1])
+          && Number(guide?.getAttribute("y1")) === Number(bodyPosition?.[2]),
+        guideIsVertical: Number(guide?.getAttribute("x1")) === Number(guide?.getAttribute("x2")),
+        guideEndEllipseDistance: (
+          (Number(guide?.getAttribute("x2")) - observerX) / radiusX
+        ) ** 2 + (
+          (Number(guide?.getAttribute("y2")) - observerY) / radiusY
+        ) ** 2,
+        normalizedLength: Math.sqrt(
+          ((endX - observerX) / radiusX) ** 2
+          + ((endY - observerY) / radiusY) ** 2)
+      };
+    });
+    const meridians = Array.from(chart.querySelectorAll(".sky-dome-meridian")).map(path => {
+      const coordinates = (path.getAttribute("d")?.match(/-?\d+(?:\.\d+)?/g) || []).map(Number);
+      const startX = coordinates[0];
+      const startY = coordinates[1];
+      const endX = coordinates[coordinates.length - 2];
+      const endY = coordinates[coordinates.length - 1];
+      const ellipseDistance = (x, y) => ((x - observerX) / radiusX) ** 2
+        + ((y - observerY) / radiusY) ** 2;
+      const curveLength = path instanceof SVGGeometryElement ? path.getTotalLength() : 0;
+      return {
+        startX,
+        endX,
+        startEllipseDistance: ellipseDistance(startX, startY),
+        endEllipseDistance: ellipseDistance(endX, endY),
+        startsAtObserver: startX === observerX && startY === observerY,
+        passesZenith: coordinates.some((coordinate, index) => coordinate === 210 && coordinates[index + 1] === 48),
+        curveLengthExcess: curveLength
+          - Math.hypot(startX - 210, startY - 48)
+          - Math.hypot(endX - 210, endY - 48)
+      };
+    });
+    return {
+      observerX,
+      observerY,
+      horizonX: Number(horizon?.getAttribute("cx")),
+      horizonY: Number(horizon?.getAttribute("cy")),
+      separationX: Number(separationLabel?.getAttribute("x")),
+      separationY: Number(separationLabel?.getAttribute("y")),
+      separationArcRadius: Number(separationArc?.getAttribute("data-radius")),
+      timeX: Number(timeLabel?.getAttribute("x")),
+      timeY: Number(timeLabel?.getAttribute("y")),
+      cardinalGaps: {
+        north: Number(horizonBounds?.top) - Number(cardinalBounds.n?.bottom),
+        east: Number(cardinalBounds.e?.left) - Number(horizonBounds?.right),
+        south: Number(cardinalBounds.s?.top) - Number(horizonBounds?.bottom),
+        west: Number(horizonBounds?.left) - Number(cardinalBounds.w?.right)
+      },
+      projections,
+      meridians
+    };
+  });
+  expect(domeGeometry.observerX).toBe(domeGeometry.horizonX);
+  expect(domeGeometry.observerY).toBe(domeGeometry.horizonY);
+  expect(domeGeometry.separationX).toBe(domeGeometry.timeX);
+  expect(domeGeometry.separationY).toBeLessThan(domeGeometry.timeY);
+  expect(domeGeometry.separationY).toBeLessThan(48);
+  const nearestBodyDistance = Math.min(...domeGeometry.projections.map(body => body.distanceFromObserver));
+  expect(domeGeometry.separationArcRadius).toBeGreaterThan(44);
+  expect(domeGeometry.separationArcRadius / nearestBodyDistance).toBeGreaterThanOrEqual(0.67);
+  expect(domeGeometry.separationArcRadius).toBeLessThan(nearestBodyDistance);
+  for (const gap of Object.values(domeGeometry.cardinalGaps)) {
+    expect(gap).toBeGreaterThan(0.5);
+  }
+  for (const meridian of domeGeometry.meridians) {
+    expect(meridian.startEllipseDistance).toBeCloseTo(1, 2);
+    expect(meridian.endEllipseDistance).toBeCloseTo(1, 2);
+    expect(meridian.startsAtObserver).toBe(false);
+    expect(meridian.passesZenith).toBe(true);
+    expect(meridian.curveLengthExcess).toBeGreaterThan(5);
+  }
+  expect(Math.abs(domeGeometry.meridians[0].startX - domeGeometry.meridians[1].endX))
+    .toBeGreaterThan(10);
+  expect(Math.abs(domeGeometry.meridians[0].endX - domeGeometry.meridians[1].startX))
+    .toBeGreaterThan(10);
+  for (const projection of domeGeometry.projections) {
+    expect(projection.startsAtObserver).toBe(true);
+    expect(projection.guideStartsAtBody).toBe(true);
+    expect(projection.guideIsVertical).toBe(true);
+    expect(projection.guideEndEllipseDistance).toBeLessThan(1);
+    expect(projection.normalizedLength).toBeCloseTo(1, 2);
+  }
 
   const azimuthRail = await page.locator(".moon-pass-card").first().locator(".moon-altitude-chart.altitude-chart-desktop").evaluate(chart => {
     const rail = chart.querySelector(".azimuth-rail-bg");

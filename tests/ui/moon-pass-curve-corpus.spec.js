@@ -38,9 +38,56 @@ test("renders provider-free curve corpus for review", async ({ page }, testInfo)
     await expect(card.locator(".sun-altitude-chart.altitude-chart-mobile .sun-path-marker")).toHaveCount(expected.mobileSunVisibleCount);
     await expect(card.locator(".moon-altitude-chart.altitude-chart-desktop .moon-sample-marker.is-suggested")).toHaveCount(curveCase.recommendationCount);
     await expect(card.locator(".moon-altitude-chart.altitude-chart-desktop .moon-sample-marker-label")).toHaveText(expected.labels);
-    await expect(card.locator(".sky-picture-details")).toHaveCount(2);
-    await expect(card.locator(".sky-dome-chart")).toHaveCount(1);
+    await expect(card.locator(".sky-picture-details")).toHaveCount(expected.skyDomeVisible ? 2 : 1);
+    await expect(card.locator(".sky-dome-chart")).toHaveCount(expected.skyDomeVisible ? 1 : 0);
     await expect(card.locator(".pass-choice-card")).toHaveCount(curveCase.recommendationCount);
+
+    if (expected.skyDomeVisible) {
+      const domeGeometry = await card.locator(".sky-dome-chart").evaluate(chart => {
+        const observer = chart.querySelector(".sky-observer-dot");
+        const horizon = chart.querySelector(".sky-dome-horizon");
+        const shell = chart.querySelector(".sky-dome-shell");
+        const centerX = Number(observer?.getAttribute("cx"));
+        const centerY = Number(observer?.getAttribute("cy"));
+        const radiusX = Number(horizon?.getAttribute("rx"));
+        const radiusY = Number(horizon?.getAttribute("ry"));
+        return ["sun", "moon"].map(role => {
+          const body = chart.querySelector(`.sky-body.is-${role}`);
+          const transform = body?.getAttribute("transform") || "";
+          const position = transform.match(/translate\(([-0-9.]+)\s+([-0-9.]+)\)/);
+          const x = Number(position?.[1]);
+          const y = Number(position?.[2]);
+          const altitudeRatio = Number(body?.getAttribute("data-altitude-degrees")) / 90;
+          const line = chart.querySelector(`.sky-azimuth-projection.is-${role} .sky-azimuth-projection-line`);
+          const guide = chart.querySelector(`.sky-azimuth-projection.is-${role} .sky-azimuth-projection-guide`);
+          const endX = Number(line?.getAttribute("x2"));
+          const endY = Number(line?.getAttribute("y2"));
+          const guideEndX = Number(guide?.getAttribute("x2"));
+          const guideEndY = Number(guide?.getAttribute("y2"));
+          const point = new DOMPoint(x, y);
+          const insideHorizon = ((x - centerX) / radiusX) ** 2 + ((y - centerY) / radiusY) ** 2 <= 1;
+          return {
+            bodyOnDome: (shell instanceof SVGGeometryElement && shell.isPointInFill(point)) || insideHorizon,
+            bodyPositionError: Math.max(
+              Math.abs(x - (endX + (centerX - endX) * altitudeRatio)),
+              Math.abs(y - (endY + (48 - endY) * altitudeRatio))
+            ),
+            guideIsVertical: Number(guide?.getAttribute("x1")) === guideEndX,
+            guideEndEllipseDistance: ((guideEndX - centerX) / radiusX) ** 2
+              + ((guideEndY - centerY) / radiusY) ** 2,
+            arrowEndEllipseDistance: ((endX - centerX) / radiusX) ** 2
+              + ((endY - centerY) / radiusY) ** 2
+          };
+        });
+      });
+      for (const body of domeGeometry) {
+        expect(body.bodyOnDome, curveCase.passId).toBe(true);
+        expect(body.bodyPositionError, curveCase.passId).toBeLessThanOrEqual(0.25);
+        expect(body.guideIsVertical, curveCase.passId).toBe(true);
+        expect(body.guideEndEllipseDistance, curveCase.passId).toBeLessThan(1);
+        expect(body.arrowEndEllipseDistance, curveCase.passId).toBeCloseTo(1, 2);
+      }
+    }
 
     if (process.env.MOON_SERVICE_CAPTURE_CURVE_REVIEW === "true") {
       await card.screenshot({
@@ -270,6 +317,9 @@ function markerExpectationsByPassId(payload) {
       mobileVisibleCount: mobileVisible.length,
       desktopSunVisibleCount: desktopSunVisible.length,
       mobileSunVisibleCount: mobileSunVisible.length,
+      skyDomeVisible: Number.isFinite(primarySuggested.sunAltitudeDegrees)
+        && Number.isFinite(primarySuggested.sunAzimuthDegrees)
+        && primarySuggested.sunAltitudeDegrees >= 0,
       protectedSequences: samples
         .map((sample, index) => ({ sample, index }))
         .filter(({ sample, index }) => sample.role === "suggested" || index === 0 || index === lastSequence)

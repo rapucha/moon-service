@@ -1188,33 +1188,22 @@ dd {
 
 .sky-dome-meridian {
   stroke-dasharray: 4 4;
-}
-
-.sky-track {
-  fill: none;
   stroke-linecap: round;
   stroke-linejoin: round;
-  stroke-width: 2.3;
-  opacity: 0.48;
 }
 
-.sky-track.is-sun {
-  stroke: #d28a1d;
-  stroke-dasharray: 5 4;
+.sky-cardinal-label {
+  fill: var(--accent-strong);
+  font-size: 0.74rem;
+  font-weight: 860;
+  paint-order: stroke;
+  stroke: rgba(255, 255, 255, 0.82);
+  stroke-width: 3px;
 }
 
-.sky-track.is-moon {
-  stroke: var(--accent);
-}
-
-.sky-track-dot.is-sun {
-  fill: #d28a1d;
-  opacity: 0.5;
-}
-
-.sky-track-dot.is-moon {
-  fill: var(--accent);
-  opacity: 0.46;
+.sky-cardinal-arrow {
+  fill: var(--accent-strong);
+  opacity: 0.78;
 }
 
 .sky-separation-ray {
@@ -1234,36 +1223,59 @@ dd {
   opacity: 0.72;
 }
 
-.sky-body.is-sun {
-  fill: #fff1aa;
-  stroke: #d28a1d;
-  stroke-width: 2;
-}
-
-.sky-body.is-moon {
-  fill: #f6f0d8;
-  stroke: #7a704f;
+.sky-azimuth-projection-line,
+.sky-azimuth-projection-guide {
+  fill: none;
   stroke-width: 1.5;
 }
 
+.sky-azimuth-projection-line {
+  stroke-width: 1.8;
+}
+
+.sky-azimuth-projection-guide {
+  stroke-dasharray: 4 3;
+  opacity: 0.52;
+}
+
+.sky-azimuth-projection-arrow {
+  stroke: none;
+}
+
+.sky-azimuth-projection.is-sun .sky-azimuth-projection-line,
+.sky-azimuth-projection.is-sun .sky-azimuth-projection-guide {
+  stroke: #b87814;
+}
+
+.sky-azimuth-projection.is-sun .sky-azimuth-projection-arrow {
+  fill: #b87814;
+}
+
+.sky-azimuth-projection.is-moon .sky-azimuth-projection-line,
+.sky-azimuth-projection.is-moon .sky-azimuth-projection-guide {
+  stroke: #5f568a;
+}
+
+.sky-azimuth-projection.is-moon .sky-azimuth-projection-arrow {
+  fill: #5f568a;
+}
+
+.sky-body-image {
+  filter: drop-shadow(0 2px 3px rgba(16, 31, 36, 0.24));
+}
+
 .sky-dome-label,
-.sky-body-label,
 .sky-separation-label {
   fill: var(--muted);
   font-size: 0.68rem;
   font-weight: 760;
 }
 
-.sky-body-label,
 .sky-separation-label {
   fill: var(--ink);
   paint-order: stroke;
   stroke: rgba(255, 255, 255, 0.74);
   stroke-width: 3px;
-}
-
-.sky-separation-label {
-  fill: #443b6a;
   font-weight: 820;
 }
 

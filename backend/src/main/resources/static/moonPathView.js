@@ -59,12 +59,10 @@ export function moonPathPanel(opportunity, timezone, countryCode, chartContext) 
         "Moon pass",
         passTimeDomain,
         samples)));
-  var skyDomeDetails = hasSkyDomeSamples(samples)
-    ? expandablePicture(
-      "Sky dome",
-      "Sun and Moon positions at the suggested time",
-      skyDomeChart(samples, timezone, countryCode))
-    : null;
+  var skyDomeDetails = expandablePicture(
+    "Sky dome",
+    "Sun and Moon positions at the suggested time",
+    skyDomeChart(samples, timezone, countryCode, opportunity.moon || {}));
 
   return element("section", { className: "moon-path-panel" },
     element("div", { className: "moon-path-header" },
@@ -581,29 +579,43 @@ function sunAltitudeMarker(point) {
   );
 }
 
-function skyDomeChart(samples, timezone, countryCode) {
+function skyDomeChart(samples, timezone, countryCode, moon) {
   var points = skyDomeSamples(samples);
   if (points.length < 1) {
     return null;
   }
 
   var selected = selectedSkyPoint(points);
-  var centerAzimuth = angularMidpoint(selected.moonAzimuthDegrees, selected.sunAzimuthDegrees);
-  var projection = skyProjection(centerAzimuth);
-  var moonTrack = points.map(function (point) {
-    return Object.assign({}, point, projection(point.moonAltitudeDegrees, point.moonAzimuthDegrees));
-  });
-  var sunTrack = points.map(function (point) {
-    return Object.assign({}, point, projection(point.sunAltitudeDegrees, point.sunAzimuthDegrees));
-  });
-  var selectedMoon = projection(selected.moonAltitudeDegrees, selected.moonAzimuthDegrees);
-  var selectedSun = projection(selected.sunAltitudeDegrees, selected.sunAzimuthDegrees);
-  var observer = { x: 210, y: 232 };
+  if (selected.sunAltitudeDegrees < 0) {
+    return null;
+  }
+
+  var projection = skyProjection();
+  var selectedMoon = Object.assign(
+    {
+      altitudeDegrees: selected.moonAltitudeDegrees,
+      azimuthDegrees: selected.moonAzimuthDegrees
+    },
+    projection(selected.moonAltitudeDegrees, selected.moonAzimuthDegrees));
+  var selectedSun = Object.assign(
+    {
+      altitudeDegrees: selected.sunAltitudeDegrees,
+      azimuthDegrees: selected.sunAzimuthDegrees
+    },
+    projection(selected.sunAltitudeDegrees, selected.sunAzimuthDegrees));
+  var moonPlanePoint = { x: selectedMoon.planeX, y: selectedMoon.planeY };
+  var sunPlanePoint = { x: selectedSun.planeX, y: selectedSun.planeY };
+  var moonAzimuthPoint = { x: selectedMoon.horizonX, y: selectedMoon.horizonY };
+  var sunAzimuthPoint = { x: selectedSun.horizonX, y: selectedSun.horizonY };
+  var observer = { x: 210, y: 226 };
   var separation = angularSeparationDegrees(
     selected.moonAltitudeDegrees,
     selected.moonAzimuthDegrees,
     selected.sunAltitudeDegrees,
     selected.sunAzimuthDegrees);
+  var separationArcRadius = skySeparationArcRadius(observer, selectedSun, selectedMoon);
+  var separationArc = angleArcPath(observer, selectedSun, selectedMoon, separationArcRadius);
+  var moonImageUrl = moonPhaseImageDataUrl(moon.phaseAngleDegrees, 64);
 
   return element("div", { className: "sky-dome-frame" },
     svgElement("svg", {
@@ -618,34 +630,51 @@ function skyDomeChart(samples, timezone, countryCode) {
       svgElement("path", { className: "sky-dome-ring", d: "M 80 202 C 135 150, 285 150, 340 202" }),
       svgElement("path", { className: "sky-dome-ring", d: "M 116 164 C 156 122, 264 122, 304 164" }),
       svgElement("path", { className: "sky-dome-ring", d: "M 154 123 C 179 99, 241 99, 266 123" }),
-      svgElement("path", { className: "sky-dome-meridian", d: "M 210 48 C 199 107, 198 174, 210 226" }),
-      svgElement("path", { className: "sky-dome-meridian", d: "M 48 226 C 145 183, 275 183, 372 226" }),
-      svgElement("text", { className: "sky-dome-label", x: 210, y: 253, textAnchor: "middle" }, compassDirection(centerAzimuth)),
-      svgElement("text", { className: "sky-dome-label", x: 72, y: 237, textAnchor: "middle" }, compassDirection(centerAzimuth - 75)),
-      svgElement("text", { className: "sky-dome-label", x: 348, y: 237, textAnchor: "middle" }, compassDirection(centerAzimuth + 75)),
-      svgElement("path", { className: "sky-track is-sun", d: skyTrackPath(sunTrack) }),
-      svgElement("path", { className: "sky-track is-moon", d: skyTrackPath(moonTrack) }),
-      sunTrack.map(function (point) {
-        return svgElement("circle", { className: "sky-track-dot is-sun", cx: round1(point.x), cy: round1(point.y), r: 3 });
+      svgElement("path", {
+        className: "sky-dome-meridian is-grid-a",
+        "data-start-azimuth": 142,
+        "data-end-azimuth": 322,
+        d: skyMeridianPath(projection, 142)
       }),
-      moonTrack.map(function (point) {
-        return svgElement("circle", { className: "sky-track-dot is-moon", cx: round1(point.x), cy: round1(point.y), r: 3 });
+      svgElement("path", {
+        className: "sky-dome-meridian is-grid-b",
+        "data-start-azimuth": 232,
+        "data-end-azimuth": 52,
+        d: skyMeridianPath(projection, 232)
       }),
+      skyCardinalMarker("N", 210, 192, 0, 0, -12, "middle"),
+      skyCardinalMarker("E", 381, 226, 90, 12, 4, "start"),
+      skyCardinalMarker("S", 210, 260, 180, 0, 18, "middle"),
+      skyCardinalMarker("W", 39, 226, 270, -12, 4, "end"),
       svgElement("line", { className: "sky-separation-ray", x1: observer.x, y1: observer.y, x2: round1(selectedSun.x), y2: round1(selectedSun.y) }),
       svgElement("line", { className: "sky-separation-ray", x1: observer.x, y1: observer.y, x2: round1(selectedMoon.x), y2: round1(selectedMoon.y) }),
-      svgElement("path", { className: "sky-separation-arc", d: angleArcPath(observer, selectedSun, selectedMoon, 46) }),
+      svgElement("path", {
+        className: "sky-separation-arc",
+        d: separationArc,
+        "data-radius": round1(separationArcRadius)
+      }),
+      svgElement("text", {
+        className: "sky-separation-label",
+        x: 24,
+        y: 30
+      }, degrees(separation) + " separation"),
+      skyAzimuthProjection(observer, selectedSun, sunPlanePoint, sunAzimuthPoint, "sun", "Sun azimuth direction on the horizon"),
+      skyAzimuthProjection(observer, selectedMoon, moonPlanePoint, moonAzimuthPoint, "moon", "Moon azimuth direction on the horizon"),
       svgElement("circle", { className: "sky-observer-dot", cx: observer.x, cy: observer.y, r: 3.5 }),
-      svgElement("circle", { className: "sky-body is-sun", cx: round1(selectedSun.x), cy: round1(selectedSun.y), r: 10 }),
-      svgElement("circle", { className: "sky-body is-moon", cx: round1(selectedMoon.x), cy: round1(selectedMoon.y), r: 8 }),
-      svgElement("text", { className: "sky-body-label is-sun", x: round1(selectedSun.x) + 12, y: round1(selectedSun.y) - 10 }, "Sun " + compassDirection(selected.sunAzimuthDegrees) + " " + degrees(selected.sunAltitudeDegrees)),
-      svgElement("text", { className: "sky-body-label is-moon", x: round1(selectedMoon.x) + 12, y: round1(selectedMoon.y) - 10 }, "Moon " + compassDirection(selected.moonAzimuthDegrees) + " " + degrees(selected.moonAltitudeDegrees)),
-      svgElement("text", { className: "sky-separation-label", x: 24, y: 30 }, degrees(separation) + " separation"),
+      skyBodyImage(
+        selectedSun,
+        SUN_SAMPLE_MARKER_IMAGE_URL,
+        42,
+        "sun",
+        "Sun, " + degrees(selected.sunAltitudeDegrees) + " altitude, " + degrees(selected.sunAzimuthDegrees) + " azimuth"),
+      skyBodyImage(
+        selectedMoon,
+        moonImageUrl,
+        28,
+        "moon",
+        "Moon, " + degrees(selected.moonAltitudeDegrees) + " altitude, " + degrees(selected.moonAzimuthDegrees) + " azimuth"),
       svgElement("text", { className: "sky-dome-label", x: 24, y: 52 }, formatTime(selected.at, timezone, countryCode))
     ));
-}
-
-function hasSkyDomeSamples(samples) {
-  return skyDomeSamples(samples).length > 0;
 }
 
 function skyDomeSamples(samples) {
@@ -675,33 +704,142 @@ function selectedSkyPoint(points) {
   }) || points[Math.floor(points.length / 2)];
 }
 
-function skyProjection(centerAzimuth) {
+function skyProjection() {
   var centerX = 210;
   var horizonY = 226;
   var radiusX = 162;
-  var domeHeight = 178;
+  var radiusY = 25;
+  var zenithY = 48;
 
   return function (altitudeDegrees, azimuthDegrees) {
-    var relativeAzimuth = shortestAngleDelta(centerAzimuth, azimuthDegrees);
-    var clampedAzimuth = clamp(relativeAzimuth, -90, 90);
-    var clampedAltitude = clamp(altitudeDegrees, 0, 90);
-    var altitudeRatio = clampedAltitude / 90;
-    var narrowing = 0.48 + ((1 - altitudeRatio) * 0.52);
-    var azimuthRadians = toRadians(clampedAzimuth);
+    var altitudeRatio = clamp(altitudeDegrees, 0, 90) / 90;
+    var azimuthRadians = toRadians(normalizeDegrees(azimuthDegrees));
+    var horizonX = centerX + Math.sin(azimuthRadians) * radiusX;
+    var horizonPointY = horizonY - Math.cos(azimuthRadians) * radiusY;
+    var radialRatio = 1 - altitudeRatio;
+    var planeX = centerX + (horizonX - centerX) * radialRatio;
+    var planeY = horizonY + (horizonPointY - horizonY) * radialRatio;
     return {
-      x: centerX + Math.sin(azimuthRadians) * radiusX * narrowing,
-      y: horizonY - (altitudeRatio * domeHeight) + ((1 - Math.cos(azimuthRadians)) * 13)
+      x: planeX,
+      y: planeY + (zenithY - horizonY) * altitudeRatio,
+      planeX: planeX,
+      planeY: planeY,
+      horizonX: horizonX,
+      horizonY: horizonPointY
     };
   };
 }
 
-function skyTrackPath(points) {
-  if (points.length === 0) {
-    return "";
-  }
-  return points.map(function (point, index) {
-    return (index === 0 ? "M " : "L ") + round1(point.x) + " " + round1(point.y);
-  }).join(" ");
+function skyAzimuthProjection(origin, body, planePoint, horizonPoint, role, title) {
+  return svgElement("g", {
+    className: "sky-azimuth-projection is-" + role,
+    role: "img",
+    ariaLabel: title
+  },
+    svgElement("title", {}, title),
+    svgElement("line", {
+      className: "sky-azimuth-projection-guide",
+      x1: round1(body.x),
+      y1: round1(body.y),
+      x2: round1(planePoint.x),
+      y2: round1(planePoint.y)
+    }),
+    svgElement("line", {
+      className: "sky-azimuth-projection-line",
+      x1: round1(origin.x),
+      y1: round1(origin.y),
+      x2: round1(horizonPoint.x),
+      y2: round1(horizonPoint.y)
+    }),
+    svgElement("polygon", {
+      className: "sky-azimuth-projection-arrow",
+      points: arrowHeadPoints(origin, horizonPoint, 7)
+    }));
+}
+
+function skyMeridianPath(projection, startAzimuthDegrees) {
+  var start = projection(0, startAzimuthDegrees);
+  var zenith = projection(90, startAzimuthDegrees);
+  var end = projection(0, startAzimuthDegrees + 180);
+  var startSide = start.x < zenith.x ? -1 : 1;
+  var endSide = end.x < zenith.x ? -1 : 1;
+  var startOuterControl = {
+    x: start.x + startSide * 10,
+    y: start.y + (zenith.y - start.y) * 0.35
+  };
+  var startZenithControl = { x: zenith.x + startSide * 40, y: zenith.y };
+  var endZenithControl = { x: zenith.x + endSide * 40, y: zenith.y };
+  var endOuterControl = {
+    x: end.x + endSide * 10,
+    y: end.y + (zenith.y - end.y) * 0.35
+  };
+  return "M " + round1(start.x) + " " + round1(start.y)
+    + " C " + round1(startOuterControl.x) + " " + round1(startOuterControl.y)
+    + " " + round1(startZenithControl.x) + " " + round1(startZenithControl.y)
+    + " " + round1(zenith.x) + " " + round1(zenith.y)
+    + " C " + round1(endZenithControl.x) + " " + round1(endZenithControl.y)
+    + " " + round1(endOuterControl.x) + " " + round1(endOuterControl.y)
+    + " " + round1(end.x) + " " + round1(end.y);
+}
+
+function skyCardinalMarker(label, x, y, azimuthDegrees, textX, textY, textAnchor) {
+  return svgElement("g", {
+    className: "sky-cardinal-marker is-" + label.toLowerCase(),
+    transform: "translate(" + x + " " + y + ")"
+  },
+    svgElement("g", {
+      className: "sky-cardinal-arrow",
+      transform: "rotate(" + azimuthDegrees + ")"
+    },
+      svgElement("polygon", { points: "0,-8 5,6 0,3 -5,6" })),
+    svgElement("text", {
+      className: "sky-cardinal-label",
+      x: textX,
+      y: textY,
+      textAnchor: textAnchor
+    }, label));
+}
+
+function skyBodyImage(point, imageUrl, size, role, title) {
+  return svgElement("g", {
+    className: "sky-body is-" + role,
+    role: "img",
+    ariaLabel: title,
+    "data-altitude-degrees": round1(point.altitudeDegrees),
+    "data-azimuth-degrees": round1(point.azimuthDegrees),
+    transform: "translate(" + round1(point.x) + " " + round1(point.y) + ")"
+  },
+    svgElement("title", {}, title),
+    svgElement("image", {
+      className: "sky-body-image",
+      href: imageUrl,
+      x: -size / 2,
+      y: -size / 2,
+      width: size,
+      height: size,
+      preserveAspectRatio: "xMidYMid meet"
+    }));
+}
+
+function arrowHeadPoints(start, end, size) {
+  var dx = end.x - start.x;
+  var dy = end.y - start.y;
+  var length = Math.sqrt((dx * dx) + (dy * dy));
+  var unitX = length < 1 ? 0 : dx / length;
+  var unitY = length < 1 ? 1 : dy / length;
+  var baseX = end.x - unitX * size;
+  var baseY = end.y - unitY * size;
+  var sideX = -unitY * size * 0.55;
+  var sideY = unitX * size * 0.55;
+  return round1(end.x) + "," + round1(end.y)
+    + " " + round1(baseX + sideX) + "," + round1(baseY + sideY)
+    + " " + round1(baseX - sideX) + "," + round1(baseY - sideY);
+}
+
+function skySeparationArcRadius(origin, firstPoint, secondPoint) {
+  var firstDistance = Math.hypot(firstPoint.x - origin.x, firstPoint.y - origin.y);
+  var secondDistance = Math.hypot(secondPoint.x - origin.x, secondPoint.y - origin.y);
+  return clamp(Math.min(firstDistance, secondDistance) * 0.68, 58, 104);
 }
 
 function angleArcPath(origin, firstPoint, secondPoint, radius) {
@@ -720,10 +858,6 @@ function pointAtAngle(origin, angle, radius) {
     x: origin.x + Math.cos(angle) * radius,
     y: origin.y + Math.sin(angle) * radius
   };
-}
-
-function angularMidpoint(startDegrees, endDegrees) {
-  return normalizeDegrees(startDegrees + shortestAngleDelta(startDegrees, endDegrees) / 2);
 }
 
 function shortestAngleDelta(startDegrees, endDegrees) {
