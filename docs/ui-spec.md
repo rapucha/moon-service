@@ -118,8 +118,9 @@ showing every backend fact at equal visual weight.
 Each user-facing result card should represent one Moon pass, even when that pass
 has only one ranked recommendation window. The card should be ranked by the best
 recommendation in that pass. The card title should state whether there is one
-or multiple ranked Moon candidates, while compact recommendation cards show
-the candidate window or windows inside the pass. The full pass start and end should be
+or multiple candidate windows in that Moon pass, while the page-level summary
+states both the ranked Moon-pass count and the total candidate-window count.
+The full pass start and end should be
 shown as lower-priority Moon pass context below the recommendation cards, with
 exact dates and a short location timezone label. Each recommendation card should show a
 `Best` or `Alternative` badge, its raw candidate rank and score, suggested time,

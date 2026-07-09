@@ -22,7 +22,9 @@ test("renders ten ranked candidates as responsive pass groups", async ({ page })
 
   await expect(page.locator(".pass-choice-card")).toHaveCount(10);
   await expect(page.locator(".moon-pass-card")).toHaveCount(5);
-  await expect(page.locator(".summary-count")).toHaveText("5 ranked Moon passes");
+  await expect(page.locator(".summary-count")).toHaveText(
+    "5 ranked Moon passes · 10 candidate windows"
+  );
   await expect(page.locator(".rank-label")).toHaveText([
     "Best match",
     "Option 2",
@@ -31,7 +33,7 @@ test("renders ten ranked candidates as responsive pass groups", async ({ page })
     "Option 5"
   ]);
   await expect(page.locator(".opportunity-title h3")).toHaveText(
-    Array(5).fill("Two ranked Moon candidates")
+    Array(5).fill("2 candidate windows in this Moon pass")
   );
   await expect(page.locator(".score-value")).toHaveText(["90", "89", "88", "87", "86"]);
   await expect(page.locator(".choice-rank")).toHaveText([

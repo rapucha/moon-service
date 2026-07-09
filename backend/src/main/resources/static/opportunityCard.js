@@ -212,12 +212,9 @@ function metricSpacer() {
 
 function passSummaryText(count) {
   if (count === 1) {
-    return "One ranked Moon candidate";
+    return "1 candidate window in this Moon pass";
   }
-  if (count === 2) {
-    return "Two ranked Moon candidates";
-  }
-  return count + " ranked Moon candidates";
+  return count + " candidate windows in this Moon pass";
 }
 
 function metricFact(label, value) {

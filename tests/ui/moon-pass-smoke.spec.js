@@ -18,9 +18,9 @@ test("renders grouped Moon pass cards", async ({ page }) => {
 
   await expect(page.locator(".moon-pass-card")).toHaveCount(2);
   await expect(page.locator(".moon-pass-card").first().locator(".opportunity-title h3"))
-    .toHaveText("Two ranked Moon candidates");
+    .toHaveText("2 candidate windows in this Moon pass");
   await expect(page.locator(".moon-pass-card").nth(1).locator(".opportunity-title h3"))
-    .toHaveText("One ranked Moon candidate");
+    .toHaveText("1 candidate window in this Moon pass");
   await expect(page.locator(".moon-pass-card").first().locator(".pass-context-row"))
     .toContainText("Moon pass");
   await expect(page.locator(".moon-pass-card").first().locator(".pass-context-row"))
