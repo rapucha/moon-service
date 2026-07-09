@@ -676,6 +676,19 @@ dd {
   letter-spacing: 0;
 }
 
+.choice-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+}
+
+.choice-rank {
+  color: var(--muted);
+  font-size: 0.76rem;
+  font-weight: 760;
+}
+
 .pass-choice-kind {
   flex: 0 0 auto;
   color: var(--amber);
@@ -796,6 +809,18 @@ dd {
   margin: 0;
   padding-top: 8px;
   border-top: 1px solid var(--line);
+}
+
+.pass-choice-explanation {
+  padding-top: 8px;
+  border-top: 1px solid var(--line);
+  font-size: 0.84rem;
+}
+
+.pass-choice-explanation p {
+  margin: 8px 0 0;
+  color: var(--muted);
+  line-height: 1.4;
 }
 
 .fact-grid.compact {

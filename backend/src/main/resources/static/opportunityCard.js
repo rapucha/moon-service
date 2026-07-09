@@ -161,11 +161,13 @@ function passRecommendations(entries, timezone, countryCode) {
   var className = "pass-choices" + (entries.length === 1 ? " is-single" : "");
   return element("section", { className: className, ariaLabel: "Recommendations in this Moon pass" },
     entries.map(function (entry, index) {
-      return passRecommendation(entry.opportunity, index === 0, entries.length === 1, timezone, countryCode);
+      return passRecommendation(entry, index === 0, entries.length === 1, timezone, countryCode);
     }));
 }
 
-function passRecommendation(opportunity, isBest, isSingleRecommendation, timezone, countryCode) {
+function passRecommendation(entry, isBest, isSingleRecommendation, timezone, countryCode) {
+  var opportunity = entry.opportunity;
+  var rawRank = entry.index + 1;
   var moon = opportunity.moon || {};
   var sun = opportunity.sun || {};
   var weather = opportunity.weather || {};
@@ -174,7 +176,9 @@ function passRecommendation(opportunity, isBest, isSingleRecommendation, timezon
   return element("article", { className: "pass-choice-card" + (isBest ? " is-best" : "") },
     element("header", { className: "pass-choice-header" },
       element("div", {},
-        element("span", { className: "choice-badge" + (isBest ? " is-best" : " is-alt") }, isBest ? "Best" : "Alternative"),
+        element("div", { className: "choice-meta" },
+          element("span", { className: "choice-badge" + (isBest ? " is-best" : " is-alt") }, isBest ? "Best" : "Alternative"),
+          element("span", { className: "choice-rank" }, candidateRankText(rawRank, opportunity.score))),
         element("h4", {}, formatDateTimeWithZone(opportunity.suggestedAt, timezone, countryCode))),
       element("span", { className: "pass-choice-kind" }, recommendationLabel(opportunity.windowKind))),
     element("dl", { className: "pass-metric-grid" },
@@ -190,7 +194,16 @@ function passRecommendation(opportunity, isBest, isSingleRecommendation, timezon
         element("dd", {}, exposureBalance.label
           ? readableToken(exposureBalance.label) + ": " + exposureBalance.text
           : exposureBalance.text))
+      : null,
+    opportunity.reason
+      ? element("details", { className: "pass-choice-explanation" },
+        element("summary", {}, "Why this candidate ranked here"),
+        element("p", {}, opportunity.reason))
       : null);
+}
+
+function candidateRankText(rank, score) {
+  return "Rank " + rank + " · " + (Number.isFinite(score) ? "score " + score : "score unavailable");
 }
 
 function metricSpacer() {
@@ -199,12 +212,12 @@ function metricSpacer() {
 
 function passSummaryText(count) {
   if (count === 1) {
-    return "One useful low-Moon window";
+    return "One ranked Moon candidate";
   }
   if (count === 2) {
-    return "Two useful low-Moon windows";
+    return "Two ranked Moon candidates";
   }
-  return count + " useful low-Moon windows";
+  return count + " ranked Moon candidates";
 }
 
 function metricFact(label, value) {

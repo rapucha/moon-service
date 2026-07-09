@@ -300,11 +300,20 @@ Response rules:
 - The current response remains a flat `opportunities` array. Follow-up #53
   tracks whether the API should later become pass-centric, with Moon passes as
   the primary ranked objects and recommendation windows nested inside them.
+- The anonymous `GET /api/opportunities` lookup requests up to ten raw
+  recommendation windows by default, ordered by the existing score and
+  tie-break rules. Ten is a provisional discovery safeguard while the scoring
+  model is being evaluated under #33, not a claim that every returned candidate
+  will produce an objectively good photograph.
+- The direct `POST /api/opportunities/search` scoring contract keeps its
+  caller-supplied `limit`; increasing the anonymous lookup default does not
+  change that explicit request control.
 - `startsAt` and `endsAt` define the useful opportunity window.
 - `moonPass` identifies the containing physical Moon pass. Clients may use
   `moonPass.id` to group ascending and descending recommendations from the
-  same pass. `moonPass.startsAt` and `moonPass.endsAt` describe the whole pass,
-  which may cross local midnight.
+  same pass, so ten raw candidates may render as fewer than ten pass cards.
+  `moonPass.startsAt` and `moonPass.endsAt` describe the whole pass, which may
+  cross local midnight.
 - `moonPass.path` describes Moon movement across the whole physical pass. The
   current flat response repeats this bounded pass path on each opportunity so a
   grouped client can draw one continuous pass chart; follow-up #53 can remove

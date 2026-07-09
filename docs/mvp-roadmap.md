@@ -1,8 +1,16 @@
 # MVP Roadmap
 
+Current status: Phase 3, the MVP app loop. The anonymous web lookup, live
+geocoding and weather path, natural Moon-window scoring, shareable results, and
+responsive opportunity UI are implemented. The current product focus is to
+show enough ranked candidates for human evaluation, calibrate the provisional
+scoring model with photographers under [#33](https://github.com/rapucha/moon-service/issues/33),
+and then complete public feeds and calendar exports under
+[#16](https://github.com/rapucha/moon-service/issues/16).
+
 ## Phase 0: Planning Baseline
 
-Status: current phase.
+Status: completed.
 
 Deliverables:
 
@@ -18,6 +26,8 @@ Exit criteria:
 - The first implementation step is small and reversible.
 
 ## Phase 1: Research Spikes
+
+Status: completed for the current MVP provider and architecture choices.
 
 Goal: resolve the minimum unknowns before scaffolding heavy code.
 
@@ -41,6 +51,9 @@ Exit criteria:
 - MVP architecture choice documented in `docs/architecture.md`.
 
 ## Phase 2: Thin Scoring Prototype
+
+Status: completed. The retained prototypes now support and validate the real
+backend rather than representing the active product phase.
 
 Goal: prove the scoring model behind a minimal backend contract without committing to the full app stack.
 
@@ -67,6 +80,9 @@ Exit criteria:
 
 ## Phase 3: MVP App Loop
 
+Status: in progress. The anonymous lookup loop is implemented; empirical
+ranking validation plus feeds and calendar exports remain.
+
 Goal: make the simplest useful public loop work.
 
 Tasks:
@@ -89,6 +105,9 @@ Exit criteria:
 
 ## Phase 4: Alpha Operations
 
+Status: not started as a user alpha. Logging, provider quota monitoring, and
+self-hosting planning are already available as foundations.
+
 Goal: run a small private alpha.
 
 Tasks:
@@ -108,38 +127,45 @@ Exit criteria:
 - Alpha can run for a few users without manual daily intervention.
 - Known privacy and operational risks are documented.
 
-## Tracked MVP Backlog
+## Remaining MVP Work
 
 Near-term implementation and decision work is tracked in GitHub issues rather
 than only in this roadmap:
 
-- [#14](https://github.com/rapucha/moon-service/issues/14): integrate
-  Open-Meteo weather forecasts into opportunity scoring.
-- [#15](https://github.com/rapucha/moon-service/issues/15): build the first
-  web lookup flow and shareable result page.
+- [#33](https://github.com/rapucha/moon-service/issues/33): empirically
+  calibrate scoring with photographer judgments and real observations.
 - [#16](https://github.com/rapucha/moon-service/issues/16): add public feeds
   and iCalendar exports for real opportunities.
 - [#17](https://github.com/rapucha/moon-service/issues/17): decide whether
-  Astronomy Engine through JitPack is acceptable before real backend adoption.
-- [#18](https://github.com/rapucha/moon-service/issues/18): define and test v0
-  scoring policy.
-- [#19](https://github.com/rapucha/moon-service/issues/19): choose the alpha
-  hosting and backup boundary before deployment-specific work.
-- [#27](https://github.com/rapucha/moon-service/issues/27): add a
-  containerized backend live smoke test.
+  continued Astronomy Engine use through JitPack is acceptable before public
+  deployment.
 
-Existing supporting follow-ups:
+Open supporting follow-ups:
 
 - [#3](https://github.com/rapucha/moon-service/issues/3): extensible scoring
   context for future interests and recurring events.
 - [#5](https://github.com/rapucha/moon-service/issues/5): decouple controller
   tests from provider identity details.
+
+Completed MVP foundations include:
+
+- [#14](https://github.com/rapucha/moon-service/issues/14): Open-Meteo weather
+  integration.
+- [#15](https://github.com/rapucha/moon-service/issues/15): web lookup and
+  shareable results.
+- [#18](https://github.com/rapucha/moon-service/issues/18): v0 scoring policy.
+- [#19](https://github.com/rapucha/moon-service/issues/19): alpha hosting and
+  backup boundary.
+- [#27](https://github.com/rapucha/moon-service/issues/27): containerized live
+  smoke test.
 - [#7](https://github.com/rapucha/moon-service/issues/7): decide bot identity
   policy for agent-created pull requests.
 - [#8](https://github.com/rapucha/moon-service/issues/8): add basic
   provider-call scalability protections.
 - [#9](https://github.com/rapucha/moon-service/issues/9): add basic backend
   observability.
+- [#87](https://github.com/rapucha/moon-service/issues/87): return up to ten
+  anonymous ranked candidates while scoring remains uncalibrated.
 
 ## Deferred Features
 
@@ -148,7 +174,7 @@ Existing supporting follow-ups:
 - Cross-device sync.
 - Push notifications.
 - Email alerts.
-- Calendar integration.
+- Calendar OAuth and private calendar integration.
 - Recurring event-aware scoring and subscriptions, including specific flights,
   transport routes, public event patterns, or user-defined weekly schedules.
 - Automated Reddit posting.
@@ -158,7 +184,21 @@ Existing supporting follow-ups:
 - Landmark alignment and saved compositions.
 - Billing.
 
-## Smallest Next Implementation Step
+## Current Next Product Step
+
+The anonymous web loop now returns up to ten raw ranked candidates while
+preserving explicit caller control on the direct scoring contract. This is a
+discovery safeguard, not a scoring calibration.
+
+The next product step is [#33](https://github.com/rapucha/moon-service/issues/33):
+collect a small, inspectable set of photographer judgments and real observation
+cases, then change scoring only where that evidence supports it. After the core
+recommendations prove useful, complete public feeds and calendar exports under
+[#16](https://github.com/rapucha/moon-service/issues/16). Resolve the JitPack
+dependency decision in [#17](https://github.com/rapucha/moon-service/issues/17)
+before public deployment.
+
+## Implemented Backend And Prototype History
 
 The geocoding/API contract mismatch found during provider validation is now resolved in documentation:
 

@@ -45,7 +45,7 @@ export function createResponseView(results, callbacks) {
         element("div", { className: "state-header" },
           element("p", { className: "eyebrow" }, "Ready"),
           element("h3", {}, "Search a city or town"),
-          element("p", {}, "Ranked windows will appear here with Moon position, ambient light, weather, and caveats.")),
+          element("p", {}, "Top-ranked forecast candidates will appear here with Moon position, ambient light, weather, and caveats.")),
         element("dl", { className: "intro-grid" },
           fact("Location", "City or town"),
           fact("Storage", "Browser recent list only"),
@@ -152,7 +152,7 @@ export function createResponseView(results, callbacks) {
     var forecastText = payload.forecastHorizonDays ? payload.forecastHorizonDays + "-day forecast" : "Forecast window";
     var evaluatedText = Number.isFinite(payload.candidateWindowsEvaluated)
       ? payload.candidateWindowsEvaluated + " windows evaluated"
-      : "Ranked opportunities";
+      : "Top-ranked forecast candidates";
 
     return element("section", { className: "result-panel result-summary", ariaLabelledby: "result-title" },
       element("div", { className: "summary-topline" },

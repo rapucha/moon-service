@@ -62,7 +62,12 @@ With that setting, the same query endpoint uses Open-Meteo Geocoding for
 location resolution and can return resolved, ambiguous, not found, or
 temporarily unavailable location states from the provider path. A resolved city
 uses its backend location ID, provider ID, coordinates, elevation, timezone, and
-country code for opportunity generation and hourly weather lookup.
+country code for opportunity generation and hourly weather lookup. Anonymous
+query and selected-location lookups request up to ten raw ranked recommendation
+windows by default. The browser groups windows from the same physical Moon pass,
+so it may show fewer than ten pass cards. This broader result set is provisional
+while scoring is evaluated under issue #33; the direct fixture endpoint below
+continues to honor its explicit caller-supplied `limit`.
 
 ## Runtime Configuration
 
