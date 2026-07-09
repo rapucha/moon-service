@@ -79,7 +79,7 @@ class OpportunitySearchServiceTest {
                 assertEquals("2026-06-21", request.start());
                 assertEquals(7, request.forecastHorizonDays());
                 assertEquals(90.0, request.maxMoonAltitudeDegrees());
-                assertEquals(5, request.limit());
+                assertEquals(10, request.limit());
                 return okResponse();
             }
         }, query -> {

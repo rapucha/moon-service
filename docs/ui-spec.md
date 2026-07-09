@@ -56,6 +56,11 @@ terrain horizon, obstruction, and shooting-position limitations.
   for example one while the Moon is ascending and another while it is
   descending. The UI should render recommendations with the same `moonPass.id`
   inside one pass card, not as separate top-level cards.
+- Anonymous lookup currently receives up to ten raw ranked recommendation
+  windows as a provisional safeguard while scoring is being calibrated. The UI
+  should describe them as top-ranked forecast candidates rather than ten
+  objectively good photographs; grouping by `moonPass.id` may produce fewer
+  than ten top-level pass cards.
 - Use the degree symbol, for example `7.8°`, instead of `deg`.
 - Dates, times, numbers, percentages, and units should go through formatting
   helpers so future localization does not require rewriting card structure.
@@ -111,17 +116,20 @@ move secondary diagnostics into a lower-priority presentation rather than
 showing every backend fact at equal visual weight.
 
 Each user-facing result card should represent one Moon pass, even when that pass
-has only one useful recommendation window. The card should be ranked by the best
+has only one ranked recommendation window. The card should be ranked by the best
 recommendation in that pass. The card title should state whether there is one
-or multiple useful low-Moon windows, while compact recommendation cards show the
-useful window or windows inside the pass. The full pass start and end should be
+or multiple candidate windows in that Moon pass, while the page-level summary
+states both the ranked Moon-pass count and the total candidate-window count.
+The full pass start and end should be
 shown as lower-priority Moon pass context below the recommendation cards, with
 exact dates and a short location timezone label. Each recommendation card should show a
-`Best` or `Alternative` badge, suggested time, window side, Moon altitude and
-direction, window duration, light bucket, Sun altitude, a coarse sky/weather
-label, and a short photo hint. Avoid showing exact cloud-cover percentages in
-the compact card; keep raw weather numbers in lower-priority details or API
-data where they do not imply false precision.
+`Best` or `Alternative` badge, its raw candidate rank and score, suggested time,
+window side, Moon altitude and direction, window duration, light bucket, Sun
+altitude, a coarse sky/weather label, and a short photo hint. Keep the API
+ranking explanation available in a collapsed candidate-level detail. Avoid
+showing exact cloud-cover percentages in the compact card; keep raw weather
+numbers in lower-priority details or API data where they do not imply false
+precision.
 The Moon path panel should be one pass-level chart that shows the path across
 the pass and marks each recommendation's suggested position, rather than
 showing a separate chart per recommendation.

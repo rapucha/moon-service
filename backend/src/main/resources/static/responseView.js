@@ -45,7 +45,7 @@ export function createResponseView(results, callbacks) {
         element("div", { className: "state-header" },
           element("p", { className: "eyebrow" }, "Ready"),
           element("h3", {}, "Search a city or town"),
-          element("p", {}, "Ranked windows will appear here with Moon position, ambient light, weather, and caveats.")),
+          element("p", {}, "Top-ranked forecast candidates will appear here with Moon position, ambient light, weather, and caveats.")),
         element("dl", { className: "intro-grid" },
           fact("Location", "City or town"),
           fact("Storage", "Browser recent list only"),
@@ -76,7 +76,7 @@ export function createResponseView(results, callbacks) {
     var opportunities = Array.isArray(payload.opportunities) ? payload.opportunities : [];
     var groups = opportunityGroups(opportunities);
     var children = [
-      resultSummary(payload, request, groups.length)
+      resultSummary(payload, request, groups.length, opportunities.length)
     ];
 
     if (location.kind === "real_location" && location.displayName && callbacks.onResolvedLocation) {
@@ -145,21 +145,23 @@ export function createResponseView(results, callbacks) {
     }, 0);
   }
 
-  function resultSummary(payload, request, passCount) {
+  function resultSummary(payload, request, passCount, candidateCount) {
     var location = payload.location || {};
     var sharePath = sharePathFor(request);
     var shareUrl = window.location.origin + sharePath;
     var forecastText = payload.forecastHorizonDays ? payload.forecastHorizonDays + "-day forecast" : "Forecast window";
     var evaluatedText = Number.isFinite(payload.candidateWindowsEvaluated)
       ? payload.candidateWindowsEvaluated + " windows evaluated"
-      : "Ranked opportunities";
+      : "Top-ranked forecast candidates";
+    var passText = passCount === 1 ? "1 ranked Moon pass" : passCount + " ranked Moon passes";
+    var candidateText = candidateCount === 1 ? "1 candidate window" : candidateCount + " candidate windows";
 
     return element("section", { className: "result-panel result-summary", ariaLabelledby: "result-title" },
       element("div", { className: "summary-topline" },
         element("div", {},
           element("p", { className: "eyebrow" }, "Resolved location"),
           element("h3", { id: "result-title" }, location.displayName || "Resolved location"),
-          element("p", { className: "summary-count" }, passCount === 1 ? "1 ranked Moon pass" : passCount + " ranked Moon passes")),
+          element("p", { className: "summary-count" }, passText + " · " + candidateText)),
         element("div", { className: "share-tools" },
           element("button", { type: "button", className: "copy-button", "data-share-url": shareUrl }, "Copy link"),
           element("a", { href: sharePath }, "Open share link"))
