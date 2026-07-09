@@ -35,6 +35,7 @@ class MoonSampleTest {
                 moonAzimuthDegrees,
                 50.0,
                 90.0,
+                null,
                 sunAltitudeDegrees,
                 sunAzimuthDegrees);
     }

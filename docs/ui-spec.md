@@ -190,9 +190,13 @@ Agreed behavior:
   as the Moon rather than a generic dot.
 - The suggested marker shows a compact, recognizable Moon phase. When
   `moon.brightLimbTiltDegrees` is present, rotate the illumination toward that
-  observer-oriented direction while keeping the canonical lunar surface texture
-  fixed. When the field is absent or invalid, retain the schematic
-  location-independent rendering based on `phaseAngleDegrees`.
+  observer-oriented direction. When `moon.northPoleTiltDegrees` is present,
+  rotate only the canonical lunar surface texture so its north pole points in
+  that observer-oriented direction; do not rotate the phase mask with it. The
+  fields have independent fallbacks: an absent or invalid bright-limb value
+  retains the schematic location-independent phase rendering, while an absent
+  or invalid north-pole value retains the canonical north-up texture. Texture
+  rotation does not yet model libration in longitude or latitude.
 - The Moon altitude chart does not overlay Sun markers. The separate Sun-pass
   chart draws Sun samples only when Sun altitude is zero or positive and sizes
   recommendation markers by priority. It must cull lower-priority path,

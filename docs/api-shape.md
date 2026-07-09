@@ -322,6 +322,14 @@ Response rules:
   increase clockwise in the range `[0, 360)`. A missing or `null` value means
   clients must retain their location-independent phase fallback. This is not a
   celestial-north position angle, lunar-axis rotation, or parallactic angle.
+- `moon.northPoleTiltDegrees` is an optional observer-oriented value at
+  `suggestedAt`. It gives the direction from the Moon center toward the lunar
+  north rotational pole in the same local tangent-plane convention: `0` points
+  toward local zenith, `90` points right toward increasing azimuth, and angles
+  increase clockwise in `[0, 360)`. A missing or `null` value means clients
+  retain the canonical north-up surface texture. This field rotates surface
+  sampling only; it does not change the phase silhouette or bright-limb
+  direction and does not model libration.
 - `moonPath` describes Moon movement across the window. It must include direct
   `start`, `suggested`, and `end` points plus a bounded `samples` array
   suitable for compact UI charts. V0 samples the path at regular 30-minute
@@ -437,6 +445,7 @@ Response rules:
         "illuminationPercent": 96,
         "phaseAngleDegrees": 157.1,
         "brightLimbTiltDegrees": 1.9,
+        "northPoleTiltDegrees": 57.4,
         "phaseName": "waxing_gibbous"
       },
       "moonPath": {

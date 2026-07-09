@@ -79,6 +79,7 @@ public record OpportunitySearchResponse(
             double illuminationPercent,
             double phaseAngleDegrees,
             Double brightLimbTiltDegrees,
+            Double northPoleTiltDegrees,
             String phaseName
     ) {
     }

@@ -32,7 +32,7 @@ class ResponseFormatterTest {
             "ZZ");
 
     @Test
-    void preservesUndefinedBrightLimbTiltAsNull() {
+    void preservesUndefinedMoonOrientationAsNull() {
         Instant startsAt = Instant.parse("2026-01-01T00:00:00Z");
         Instant suggestedAt = Instant.parse("2026-01-01T01:00:00Z");
         Instant endsAt = Instant.parse("2026-01-01T02:00:00Z");
@@ -68,6 +68,8 @@ class ResponseFormatterTest {
 
         assertTrue(moon.has("brightLimbTiltDegrees"));
         assertTrue(moon.path("brightLimbTiltDegrees").isNull());
+        assertTrue(moon.has("northPoleTiltDegrees"));
+        assertTrue(moon.path("northPoleTiltDegrees").isNull());
     }
 
     private static MoonSample sample(Instant instant, double sunAltitudeDegrees, double sunAzimuthDegrees) {
@@ -77,6 +79,7 @@ class ResponseFormatterTest {
                 0.0,
                 100.0,
                 180.0,
+                null,
                 sunAltitudeDegrees,
                 sunAzimuthDegrees);
     }
