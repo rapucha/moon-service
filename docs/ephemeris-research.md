@@ -2,13 +2,18 @@
 
 ## Decision
 
-Use Astronomy Engine as the first ephemeris candidate for Moon Service. It has passed the first validation spike for the thin scoring prototype.
+Use Astronomy Engine `2.1.19` for the JVM backend during the MVP and tester
+alpha. Its Kotlin/JVM artifact is accepted from JitPack under the explicit
+build, integrity, upgrade, and fallback constraints below. This resolves
+[#17](https://github.com/rapucha/moon-service/issues/17) without vendoring,
+forking, or mirroring the library now.
 
 Repository and docs: <https://github.com/cosinekitty/astronomy>
 
 Rationale:
 
-- It has Kotlin/JVM support with Java examples, so it can run in Android Kotlin and a future JVM backend.
+- Its Kotlin/JVM API is callable from the Java backend and all direct upstream
+  types are currently localized in one adapter.
 - It calculates apparent horizon-based positions for an observer on Earth, including altitude and azimuth.
 - It supports rise and set searches for the Moon, Sun, and planets.
 - It exposes Moon phase and illumination data needed by the scoring model.
@@ -16,16 +21,81 @@ Rationale:
 - It is designed to be small and dependency-light.
 - The project documents validation against NOVAS, JPL Horizons, and other ephemeris sources, with a target accuracy suitable for amateur astronomy use.
 
-Remaining caveat:
+### Build and provenance constraints
 
-- The Kotlin/JVM package is distributed through JitPack in the upstream README, not Maven Central. Before committing to it permanently, verify that this is acceptable for Android and backend builds, or vendor/fork only if there is a strong reason.
-  Tracked by [#17](https://github.com/rapucha/moon-service/issues/17).
+- Keep the exact Maven coordinate
+  `io.github.cosinekitty:astronomy:2.1.19`. Do not use a branch, snapshot,
+  version range, `latest`, or a silently substituted artifact.
+- Upstream release tag [`v2.1.19`](https://github.com/cosinekitty/astronomy/releases/tag/v2.1.19)
+  resolves to commit `61dc07020aaa6885d2c7f688a4d82beaf6edb9ef`.
+  The tag and JitPack artifact are not cryptographically signed. JitPack's
+  public build log also shows that its publication command excluded upstream
+  tests, so Moon Service's regression and reference validation remain part of
+  accepting the binary.
+- The independently observed JAR SHA-256 on 2026-07-10 is
+  `d2ec1432e2d280e3bff7f776c884260bae64d0bc53c8d117b8e65a3d9cfc6646`.
+  The corresponding POM SHA-256 is
+  `b998a89e2177d06005e7135ac50eb730ca11cdc28f3961d9984d50b3067573c6`.
+  A fresh JitPack download and the existing Maven cache matched. Both trusted
+  checksums are committed under `.mvn/checksums`; Maven verifies downloaded and
+  already-cached project artifacts against them. The scoring module's
+  `validate` phase also re-hashes the resolved JAR and POM and requires exact
+  entries for `astronomy.version` in that manifest, independent of the remote
+  repository ID. Treat a missing entry or mismatch as a failed dependency
+  review, not as an automatic upgrade.
+- The artifact is not available from Maven Central. JitPack documents public
+  artifacts as immutable after seven days and continues serving an existing
+  build if its source tag or repository disappears. This artifact was built
+  from the recorded commit on 2023-12-31, so it is frozen under that policy.
+- Project Maven configuration enables the group-ID remote-repository filter so
+  JitPack may serve only `io.github.cosinekitty` and its subgroups. Trusted
+  SHA-256 values independently pin the Astronomy Engine JAR and POM. The POM
+  disables JitPack snapshots and requires repository checksum validation to
+  succeed as an additional transport check. These controls require Maven 3.9
+  or newer, which the root build enforces; the container build and current
+  development environment use Maven `3.9.16`.
+- The upstream POM requests Kotlin stdlib `1.6.10`; the pinned Spring Boot
+  parent currently mediates the packaged backend to Kotlin stdlib `2.3.21`.
+  Review the resolved dependency tree whenever the Spring Boot parent or
+  Astronomy Engine changes rather than assuming only `astronomy.version`
+  controls the runtime.
+
+### Failure and upgrade policy
+
+- JitPack is a build-time dependency only. A cold-resolution outage must fail
+  a new build; it must never replace the artifact or bypass tests. Published
+  digest-pinned images, the running Pi, and its retained rollback image do not
+  contact JitPack at runtime.
+- Maven and container-build caches improve availability but are not the source
+  of truth. If repeated JitPack outages block cold builds, the checksum changes
+  unexpectedly, or stronger offline provenance becomes necessary, open a
+  focused follow-up to mirror the verified artifact or vendor the exact
+  MIT-licensed source. Do not improvise a different library during an outage.
+- Any version upgrade must deliberately update the version, upstream commit,
+  observed checksum, and license notice; inspect the resolved Kotlin runtime;
+  then rerun backend tests, prototype parity, and the documented JPL reference
+  checks before promotion.
+- The backend artifact carries Astronomy Engine's full MIT notice at
+  `META-INF/LICENSE-Astronomy-Engine.txt`.
+
+### Future client boundary
+
+This is a JVM backend decision, not a mobile-framework decision. A future
+installed client should consume the backend's canonical opportunity results by
+default and therefore needs no JitPack dependency. This decision does not
+approve JitPack for a future Gradle or installed-client build. React Native with
+Expo is now the leading cross-platform client candidate to evaluate under
+[#109](https://github.com/rapucha/moon-service/issues/109), but it has not been
+selected or scaffolded. If an offline client-side ephemeris preview later has
+proven user value, evaluate and validate Astronomy Engine's separately
+published JavaScript/npm implementation as its own dependency decision.
 
 ## Candidate Comparison
 
 ### Astronomy Engine
 
-Status: recommended first candidate.
+Status: accepted for the JVM backend MVP and tester alpha under the constraints
+above.
 
 Source: <https://github.com/cosinekitty/astronomy>
 
@@ -39,8 +109,11 @@ Relevant capabilities:
 
 Tradeoffs:
 
-- JitPack dependency source needs build-policy review, tracked by
-  [#17](https://github.com/rapucha/moon-service/issues/17).
+- The Kotlin/JVM artifact is available through JitPack rather than Maven
+  Central, so cold builds retain a third-party availability dependency.
+- The pinned tag and artifact are unsigned, and JitPack excluded upstream tests
+  while building it. Exact pinning, repository filtering, checksum failure,
+  Moon Service regression tests, and the documented fallback bound that risk.
 - API is astronomy-oriented rather than photography-oriented, so Moon Service still needs its own candidate-window and scoring layer.
 
 ### Time4J / Time4A
@@ -76,9 +149,19 @@ Tradeoffs:
 - The AGPL path is not a good fit for this project unless the whole distribution and service model intentionally adopts AGPL.
 - The precision and data footprint are unnecessary for alert-level Moon photography planning.
 
-## Recommended Abstraction
+## Current Adapter Boundary
 
-When implementation starts, keep project code independent of the library API:
+The current code does not implement a public `EphemerisService` interface, and
+issue #17 does not add one only for hypothetical replacement. Direct Astronomy
+Engine types and calls are concentrated in `EphemerisSampler`, which emits
+Moon Service's own `MoonSample` values. `WindowGenerator.SampleProvider` keeps
+window/scoring algorithms testable without upstream types, and the backend HTTP
+surface receives product-shaped results through `PreviewEvaluator`.
+
+That localized adapter is sufficient for the MVP. Introduce a formal provider
+interface only when a second implementation, a move out of the retained
+prototype module, or a concrete production test seam requires it. Preserve the
+following project-owned data boundary during that change:
 
 ```text
 EphemerisService
@@ -101,7 +184,8 @@ EphemerisService
     - Sun azimuth degrees
 ```
 
-This boundary allows replacing the ephemeris library later without changing scoring or UI code.
+This boundary allows replacing the ephemeris library later without changing
+scoring, HTTP contracts, or client code.
 
 ### Observer-oriented bright-limb tilt
 

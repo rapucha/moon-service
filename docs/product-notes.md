@@ -26,7 +26,10 @@ imperfectly timed events.
 
 ## MVP User Promise
 
-No account required. Enter a city or location and see the next promising Moon opportunity. Use RSS/Atom feeds or `.ics` export for low-friction follow-up. Add email or Android later only if recurring personal alerts become useful.
+No account required. Enter a city or location and see the next promising Moon
+opportunity. Use RSS/Atom feeds or `.ics` export for low-friction follow-up.
+Add email or an installed client later only if recurring personal alerts become
+useful.
 
 The first useful result can include:
 
@@ -67,7 +70,7 @@ Out of scope for the first MVP:
 
 - Mandatory accounts.
 - Cookies for remembering users.
-- Native Android app as the required first surface.
+- An installed iOS or Android app as the required first surface.
 - Exact address autocomplete.
 - Full map planning.
 - Exact house/church/landmark alignment.
@@ -191,10 +194,10 @@ We could not find that place on Earth or in the usual imaginary maps. Try a city
 
 Avoid mandatory accounts initially.
 
-Preferred future identity model, if Android or recurring personal alerts are added:
+Preferred future identity model, if an installed client or recurring personal alerts are added:
 
 - Anonymous device identity created at install.
-- Local credential storage on Android.
+- Local credential storage using the selected platform's protected storage.
 - Optional recovery code.
 - Optional email magic link for backup, email notifications, or calendar features.
 - Push token registration can be associated with the anonymous identity later.
@@ -203,7 +206,9 @@ Device-only identity must not become a trap. Recovery should be designed early, 
 
 ## Later Product Ideas
 
-- Android app with saved locations and reliable local notifications.
+- Possible cross-platform installed client with saved locations and reliable
+  local notifications; React Native/Expo is the leading candidate to evaluate
+  under [#109](https://github.com/rapucha/moon-service/issues/109).
 - Map view with Moon azimuth corridor.
 - Shooting-position to subject-position planning.
 - Focal length and composition hints.

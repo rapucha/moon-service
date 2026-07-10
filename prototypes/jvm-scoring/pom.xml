@@ -35,6 +35,49 @@
     <plugins>
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-antrun-plugin</artifactId>
+        <executions>
+          <execution>
+            <id>verify-astronomy-trusted-checksums</id>
+            <phase>validate</phase>
+            <goals>
+              <goal>run</goal>
+            </goals>
+            <configuration>
+              <target>
+                <property name="astronomy.repository.path"
+                          value="io/github/cosinekitty/astronomy/${astronomy.version}"/>
+                <property name="astronomy.checksum.manifest"
+                          value="${maven.multiModuleProjectDirectory}/.mvn/checksums/checksums-jitpack.io.sha256"/>
+                <checksum
+                    file="${settings.localRepository}/${astronomy.repository.path}/astronomy-${astronomy.version}.jar"
+                    algorithm="SHA-256"
+                    property="astronomy.jar.sha256"/>
+                <checksum
+                    file="${settings.localRepository}/${astronomy.repository.path}/astronomy-${astronomy.version}.pom"
+                    algorithm="SHA-256"
+                    property="astronomy.pom.sha256"/>
+                <loadfile property="astronomy.trusted.checksums"
+                          srcFile="${astronomy.checksum.manifest}"/>
+                <condition property="astronomy.jar.checksum.committed">
+                  <contains string="${astronomy.trusted.checksums}"
+                            substring="${astronomy.jar.sha256}  ${astronomy.repository.path}/astronomy-${astronomy.version}.jar"/>
+                </condition>
+                <condition property="astronomy.pom.checksum.committed">
+                  <contains string="${astronomy.trusted.checksums}"
+                            substring="${astronomy.pom.sha256}  ${astronomy.repository.path}/astronomy-${astronomy.version}.pom"/>
+                </condition>
+                <fail unless="astronomy.jar.checksum.committed"
+                      message="The resolved Astronomy Engine JAR is not pinned in ${astronomy.checksum.manifest}."/>
+                <fail unless="astronomy.pom.checksum.committed"
+                      message="The resolved Astronomy Engine POM is not pinned in ${astronomy.checksum.manifest}."/>
+              </target>
+            </configuration>
+          </execution>
+        </executions>
+      </plugin>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-compiler-plugin</artifactId>
       </plugin>
       <plugin>

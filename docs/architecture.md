@@ -2,7 +2,13 @@
 
 ## Current Product Shape
 
-The leading architecture is now backend-backed with a web-first discovery surface. The first useful product can be a simple webpage where a user enters a city/location and sees the next promising Moon opportunity. Android remains important later for saved locations and reliable recurring alerts, but it no longer has to be the first surface.
+The leading architecture is backend-backed with a web-first discovery surface.
+The first useful product lets a user enter a city/location and see the next
+promising Moon opportunity. A later installed client may add saved locations
+and reliable local alerts, but its framework is deliberately unresolved.
+React Native with Expo is the leading cross-platform candidate to evaluate in
+[#109](https://github.com/rapucha/moon-service/issues/109), not a current
+implementation commitment.
 
 ```text
 Web MVP
@@ -23,12 +29,12 @@ Small backend
   - later terrain horizon support for exact shooting positions
   - later saved alerts and email delivery
 
-Android app later
+Installed client later
   - saved locations
   - preferences
   - opportunity list UI
   - local notifications
-  - optional local ephemeris preview
+  - optional local ephemeris preview only if offline value is proven
 ```
 
 The backend should not require accounts for the first lookup endpoint.
@@ -47,13 +53,14 @@ Benefits:
 
 Costs:
 
-- Web notifications are less reliable than Android local notifications.
+- Web notifications are less reliable than installed-client local notifications.
 - Requires hosting from the beginning.
 - If email or recurring personal alerts are added, identity, consent, unsubscribe, deletion, and data-retention choices return.
 
-## Option 2: Backendless Android App
+## Option 2: Backendless Installed Client
 
-The Android app calculates ephemeris, fetches weather, scores opportunities, stores locations locally, and schedules local notifications.
+An installed client calculates ephemeris, fetches weather, scores
+opportunities, stores locations locally, and schedules local notifications.
 
 Benefits:
 
@@ -66,10 +73,10 @@ Costs:
 
 - Weather API keys cannot be protected if a keyed provider is required.
 - Scoring and provider fixes require app releases.
-- Android background work may be delayed by battery restrictions.
+- iOS and Android background work may be delayed by platform restrictions.
 - Sync, push, email, calendar, and web access are harder later.
 
-## Option 3: Android Plus Small Backend
+## Option 3: Installed Client Plus Small Backend
 
 The app remains local-first, but sends locations and preferences to a backend scoring API. The backend returns ranked Moon opportunities.
 
@@ -86,7 +93,7 @@ Benefits:
 - Weather credentials stay server-side.
 - Scoring fixes and weather provider migrations can happen without app releases.
 - Backend can later add push, email, calendar, remote config, and feature flags.
-- Android app can stay thinner.
+- Installed clients can stay thinner.
 
 Costs:
 
@@ -113,7 +120,7 @@ Recommended boundary:
   patterns, is deferred until the base city lookup and Moon/weather score are
   useful.
 - Email alerts remain later because they require storing email plus location preferences.
-- Android local notifications remain a later milestone for recurring personal alerts.
+- Installed-client local notifications remain a later milestone for recurring personal alerts.
 
 Tracked issues now cover the first missing pieces of this boundary:
 coordinate-backed opportunities
@@ -195,27 +202,33 @@ Backend:
 - Weather provider client.
 - Ephemeris and scoring engine.
 
-Android:
+Installed client, decision pending under #109:
 
-- Kotlin.
-- Jetpack Compose.
-- Room or DataStore.
-- WorkManager.
-- Local notifications.
-- Optional Firebase Cloud Messaging later.
-- Optional Android Auto Backup.
+- Evaluate React Native with Expo for shared web, iOS, and Android application
+  code without assuming every view or platform service will be shared.
+- Keep canonical geocoding, weather, ephemeris, and scoring in the backend by
+  default.
+- Treat local notifications, background work, secure storage, permissions,
+  backup, and distribution as explicit platform seams.
+- Retain the current responsive web UI unless a separately reviewed migration
+  demonstrates enough value.
 
 ## Key Unresolved Architecture Choices
 
 - First MVP boundary: web-first backend lookup is now favored; first API shape is documented in `docs/api-shape.md`.
 - Geocoding provider: Open-Meteo Geocoding is the first candidate for city/town lookup; exact-address autocomplete remains out of scope.
 - Internationalized search: raw Unicode input must work even when browser locale is generic or English.
-- Ephemeris implementation: Kotlin/JVM library shared with Android, Java backend library, or separate implementations.
+- Ephemeris implementation: Astronomy Engine `2.1.19` is accepted for the JVM
+  backend under `docs/ephemeris-research.md`; a future client consumes backend
+  results unless offline calculations earn a separate decision.
 - Weather provider: Open-Meteo is the first candidate; still validate forecast quality and whether alpha use is strictly non-commercial.
 - Weather cache: whether to use Postgres immediately or begin with a simpler cache during the first scoring prototype.
 - Admin/ops storage: where provider call counters, cache metrics, and recent errors live before a full database exists.
 - Identity timing: no identity for one-off lookup; add optional email or anonymous identity only when saved alerts require it.
-- Notification timing: RSS/Atom and `.ics` first; email later; Android local notifications later.
+- Client delivery: whether React Native/Expo should replace or coexist with the
+  current web UI is tracked by #109.
+- Notification timing: RSS/Atom and `.ics` first; email and installed-client
+  local notifications later.
 - Recurring event context: whether to begin with user-entered approximate
   patterns, curated public patterns, or provider-backed schedules; how to
   represent timing uncertainty, cancellations, and route changes.

@@ -1,5 +1,10 @@
 # Weather Provider Research
 
+Client-direction note (2026-07-10): the native-Android stack is no longer
+assumed; React Native/Expo is the leading installed-client candidate to
+evaluate under [#109](https://github.com/rapucha/moon-service/issues/109). The
+provider privacy, credential, caching, and quota conclusions remain unchanged.
+
 ## Decision
 
 Use Open-Meteo as the first weather provider candidate for the MVP. It has passed the first field-coverage validation spike for the thin scoring prototype.
@@ -27,7 +32,7 @@ Use a small backend/proxy for weather access in the MVP, even if the first endpo
 Recommended shape:
 
 ```text
-Android app
+Installed client
   - stores exact saved locations locally
   - sends selected locations/preferences to Moon Service backend for refresh
   - receives scored opportunities and schedules local notifications
@@ -59,14 +64,14 @@ Provider-call protection and backend observability are tracked separately by
 live smoke testing is tracked by
 [#27](https://github.com/rapucha/moon-service/issues/27).
 
-Why not direct Android calls as the default:
+Why not direct installed-client calls as the default:
 
 - Direct calls expose user IP addresses and exact requested coordinates to the weather provider.
 - Provider migration would require app changes.
-- Paid/commercial Open-Meteo use introduces an API key that should not be embedded in Android.
+- Paid/commercial Open-Meteo use introduces an API key that should not be embedded in an installed client.
 - MET Norway explicitly recommends a proxy/backend for browser and mobile apps when traffic grows, and Open-Meteo paid plans also make a backend cleaner.
 
-Direct Android calls remain acceptable for a throwaway prototype if there is no API key and no production users.
+Direct installed-client calls remain acceptable for a throwaway prototype if there is no API key and no production users.
 
 ## Provider Comparison
 
@@ -212,7 +217,7 @@ Caching terms:
 
 Privacy:
 
-- Direct Android use would expose the API key and user coordinates to the provider.
+- Direct installed-client use would expose the API key and user coordinates to the provider.
 - Use backend if selected.
 
 Fit:
@@ -251,7 +256,7 @@ Caching terms:
 
 Privacy:
 
-- Direct Android use exposes API key and coordinates.
+- Direct installed-client use exposes API key and coordinates.
 - Backend required for real use.
 
 Fit:
@@ -289,7 +294,7 @@ Caching terms:
 
 Privacy:
 
-- Direct Android use exposes API key and coordinates.
+- Direct installed-client use exposes API key and coordinates.
 - Backend required for real use.
 
 Fit:
@@ -332,7 +337,7 @@ Privacy:
 Fit:
 
 - Interesting if an iOS app is added later.
-- Poor first choice for a web-first Kotlin/Spring project because it adds Apple account and service setup without clear MVP value.
+- Poor first choice for a web-first Java/Spring backend because it adds Apple account and service setup without clear MVP value.
 
 ### National Weather Service API
 
@@ -504,7 +509,7 @@ Prefer backend-mediated weather calls because saved locations are sensitive.
 
 Privacy defaults:
 
-- Android keeps exact saved locations local.
+- An installed client keeps exact saved locations local.
 - Backend receives exact coordinates only for the active refresh request.
 - Backend rounds coordinates before provider lookup where acceptable.
 - Backend logs should avoid full request URLs containing exact coordinates.
@@ -515,7 +520,7 @@ Privacy defaults:
 
 Weather provider research pushes the MVP toward the hybrid architecture:
 
-- Direct Android-only weather lookup is possible with Open-Meteo free non-commercial use, but it weakens privacy and future provider flexibility.
+- Direct installed-client-only weather lookup is possible with Open-Meteo free non-commercial use, but it weakens privacy and future provider flexibility.
 - A small backend gives immediate value: provider abstraction, cache, coordinate rounding, API-key protection, attribution handling, and scoring updates without app releases.
 - The first backend can remain stateless with respect to users, while still caching weather by rounded coordinate/time bucket.
 

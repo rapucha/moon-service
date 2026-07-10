@@ -6,8 +6,9 @@ Purpose
 
 Scope Discipline
 - Keep implementation centered on a small web-first backend.
-- Do not add production database, deployment, Android, account, email alert, or
-  live provider infrastructure unless the user explicitly asks for that step.
+- Do not add production database, deployment, installed-client, account, email
+  alert, or live provider infrastructure unless the user explicitly asks for
+  that step.
 - Do not permanently store user locations or preferences unless the privacy
   model and product value are documented first.
 - Keep prototypes useful as references until backend equivalents exist, but do

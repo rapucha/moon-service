@@ -36,9 +36,14 @@ mvn -q test-compile org.codehaus.mojo:exec-maven-plugin:3.3.0:java \
 
 The runner lives under `src/test` because it is a functional fixture harness,
 not a production command-line surface. The `start` date is interpreted as a
-local date in the fixture location's timezone. Maven resolves
-`io.github.cosinekitty:astronomy:2.1.19` from JitPack; do not vendor dependency
-jars into this repo.
+local date in the fixture location's timezone. Maven resolves the exact
+`io.github.cosinekitty:astronomy:2.1.19` release from JitPack. Root Maven
+configuration restricts that repository to the Astronomy Engine group and
+verifies the release POM and JAR against committed SHA-256 checksums. This
+module's `validate` phase independently re-hashes both resolved files and fails
+if the declared version has no matching manifest entries. Do not vendor
+dependency jars into this repo. See `../../docs/ephemeris-research.md` for the
+acceptance, upgrade, and failure policy.
 
 The request fixture is intentionally explicit:
 

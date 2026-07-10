@@ -445,9 +445,10 @@ These are acceptable limitations for an alert-first MVP, but the UI should avoid
 
 ## Research Needed
 
-- Initial Astronomy Engine validation is recorded in
-  `docs/ephemeris-research.md`; the remaining build-policy decision is tracked
-  by [#17](https://github.com/rapucha/moon-service/issues/17).
+- Initial Astronomy Engine validation and the accepted `2.1.19` build policy
+  are recorded in `docs/ephemeris-research.md`. Rerun the documented reference
+  validation before any dependency upgrade; the MVP policy was resolved by
+  [#17](https://github.com/rapucha/moon-service/issues/17).
 - Validate the recommended weather provider integration against local forecast
   examples and map its fields into the model as part of
   [#14](https://github.com/rapucha/moon-service/issues/14).

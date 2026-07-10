@@ -25,8 +25,8 @@ Scaffolding
 
 Implementation
 - [ ] Uses existing project Java/Spring/Maven patterns.
-- [ ] Does not introduce database, deployment, account, Android, or live
-      provider infrastructure unless explicitly requested.
+- [ ] Does not introduce database, deployment, account, installed-client, or
+      live provider infrastructure unless explicitly requested.
 - [ ] Keeps fixture/fake behavior obvious when real providers are not wired.
 
 Testing

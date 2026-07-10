@@ -36,8 +36,8 @@ Standard Workflow
 5. Implement narrowly.
    - Prefer existing project patterns.
    - Keep changes scoped to the request.
-   - Do not introduce persistence, accounts, Android, deployment, or live
-     providers unless explicitly requested and documented.
+   - Do not introduce persistence, accounts, installed-client scaffolding,
+     deployment, or live providers unless explicitly requested and documented.
    - For behavior changes, update tests or explain why tests are not useful yet.
 
 6. Validate.

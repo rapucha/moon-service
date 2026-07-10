@@ -12,10 +12,10 @@ This repo is moving from planning/prototype mode into a thin real backend
 spine. Narrow prototypes remain under `prototypes/`, and the first real Spring
 Boot backend module lives under `backend/`.
 
-Do not scaffold Android, database, deployment, accounts, or live provider
+Do not scaffold an installed client, database, accounts, or new live provider
 integration code until the relevant MVP boundaries are documented. The backend
-should remain small and web-first: start by replacing fixture-backed seams with
-geocoding, weather, caching, feeds, and `.ics` behavior deliberately.
+should remain small and web-first: replace fixture-backed seams with geocoding,
+weather, caching, feeds, and `.ics` behavior deliberately.
 
 ## Product Direction
 
@@ -34,7 +34,10 @@ The current likely direction is:
 
 - Web MVP: city/location entry, next opportunity display, shareable result page, RSS/Atom feeds, and `.ics` export.
 - Small backend: geocoding, weather integration, scoring rules, weather cache, candidate Moon opportunity generation, and provider abstraction.
-- Android later: saved locations, local preferences, local notifications, and possibly local preview calculations.
+- Installed client later: saved locations, local preferences, and local
+  notifications only after the web value is proven. React Native with Expo is
+  the leading cross-platform candidate to evaluate, not a selected stack;
+  track the decision in [#109](https://github.com/rapucha/moon-service/issues/109).
 
 The main unresolved choice is now the exact first web/API contract for city lookup, opportunity results, RSS/Atom feeds, and `.ics` export.
 
@@ -65,7 +68,8 @@ The main unresolved choice is now the exact first web/API contract for city look
 - Do not introduce mandatory accounts without documenting user value and recovery behavior.
 - Do not permanently store user locations server-side unless saved alerts require it and the privacy model is updated.
 - Design device identity recovery before relying on anonymous device-bound accounts.
-- Treat Android Auto Backup and Firebase Cloud Messaging as conveniences with platform assumptions, not universal guarantees.
+- Treat platform backup, background scheduling, and push services as
+  conveniences with iOS/Android assumptions, not universal guarantees.
 - If subagents, delegation, or parallel agent work may help a session, ask the
   user near the beginning of that session for explicit permission to use
   subagents. Treat this as a request for active-session authorization, not as
@@ -103,14 +107,15 @@ The main unresolved choice is now the exact first web/API contract for city look
 
 ## Suggested Tooling Direction
 
-As implementation begins, the expected stack remains:
+As implementation continues, the expected stack remains:
 
 - Backend: Java, Spring Boot, Postgres, Flyway or Liquibase.
-- Android: Kotlin, Jetpack Compose, Room or DataStore, WorkManager, local notifications.
+- Installed client: undecided. Evaluate React Native/Expo against the existing
+  web UI and native-platform requirements under issue #109 before scaffolding.
 - Local infrastructure: Docker Compose for Postgres and integration dependencies.
 
-Do not add Postgres, migrations, Android, or local infrastructure until the
-next implementation step explicitly calls for them.
+Do not add Postgres, migrations, an installed client, or local infrastructure
+until the next implementation step explicitly calls for them.
 
 ## Verification
 

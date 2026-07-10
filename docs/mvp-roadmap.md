@@ -33,11 +33,14 @@ Goal: resolve the minimum unknowns before scaffolding heavy code.
 
 Tasks:
 
-- Research ephemeris libraries for Kotlin/JVM and Java backend use. Initial recommendation is documented in `docs/ephemeris-research.md`.
+- Research ephemeris libraries for JVM backend use. The accepted MVP/alpha
+  dependency and build policy are documented in `docs/ephemeris-research.md`.
 - Validate Astronomy Engine against known Moonrise/Moon altitude/azimuth examples before scaffolding app/backend code. Completed for the thin scoring prototype; results are recorded in `docs/ephemeris-research.md`.
 - Research weather providers, including terms, forecast horizon, rate limits, cost, and API key requirements. Initial recommendation is documented in `docs/weather-provider-research.md`.
 - Validate Open-Meteo weather field coverage for the scoring model. Completed for the thin scoring prototype; results are recorded in `docs/weather-provider-research.md`.
-- Decide whether provider requirements force a backend for the MVP. Current answer: yes for real MVP/alpha, though direct Android calls are acceptable for a throwaway prototype.
+- Decide whether provider requirements force a backend for the MVP. Current
+  answer: yes for real MVP/alpha; a throwaway installed-client prototype could
+  call a keyless provider directly, but that is not the product boundary.
 - Research geocoding options for city/location input. Initial recommendation is documented in `docs/geocoding-research.md`.
 - Validate Open-Meteo geocoding against ambiguous and internationalized city queries. Initial validation is recorded in `docs/geocoding-research.md`; the v0 response to known native-script misses is a curated alias/transliteration fallback before a secondary provider or narrowed v0 promise.
 - Draft the first web/API lookup shape for city/location input and opportunity output. Initial shape is documented in `docs/api-shape.md`.
@@ -65,9 +68,10 @@ Recommended web-first path:
 - Use fixture weather data before integrating a live provider if useful.
 - Add a tiny web page only after the endpoint shape is clear.
 
-Possible Android path:
+Possible installed-client path:
 
-- Create a minimal Android prototype later with one saved location.
+- Create a minimal iOS/Android prototype later with one saved location only if
+  the client-platform decision in #109 calls for it.
 - Compute or request natural low-Moon windows.
 - Display ranked opportunities.
 - Skip account, push, and sync.
@@ -143,9 +147,9 @@ than only in this roadmap:
   calibrate scoring with photographer judgments and real observations.
 - [#16](https://github.com/rapucha/moon-service/issues/16): add public feeds
   and iCalendar exports for real opportunities.
-- [#17](https://github.com/rapucha/moon-service/issues/17): decide whether
-  continued Astronomy Engine use through JitPack is acceptable before public
-  deployment.
+- [#17](https://github.com/rapucha/moon-service/issues/17): accept Astronomy
+  Engine `2.1.19` from JitPack for the JVM backend alpha under exact pinning,
+  trusted checksum, repository filtering, license, and fallback constraints.
 
 Open supporting follow-ups:
 
@@ -153,6 +157,9 @@ Open supporting follow-ups:
   context for future interests and recurring events.
 - [#5](https://github.com/rapucha/moon-service/issues/5): decouple controller
   tests from provider identity details.
+- [#109](https://github.com/rapucha/moon-service/issues/109): decide whether a
+  future React Native/Expo client should replace or coexist with the current
+  responsive web UI.
 
 Completed MVP foundations include:
 
@@ -177,7 +184,7 @@ Completed MVP foundations include:
 ## Deferred Features
 
 - Mandatory accounts.
-- Native Android app.
+- Installed iOS/Android client.
 - Cross-device sync.
 - Push notifications.
 - Email alerts.
@@ -201,9 +208,9 @@ The next product step is [#33](https://github.com/rapucha/moon-service/issues/33
 collect a small, inspectable set of photographer judgments and real observation
 cases, then change scoring only where that evidence supports it. After the core
 recommendations prove useful, complete public feeds and calendar exports under
-[#16](https://github.com/rapucha/moon-service/issues/16). Resolve the JitPack
-dependency decision in [#17](https://github.com/rapucha/moon-service/issues/17)
-before public deployment.
+[#16](https://github.com/rapucha/moon-service/issues/16). The JitPack dependency
+decision and safeguards required before public deployment are recorded in
+[#17](https://github.com/rapucha/moon-service/issues/17).
 
 ## Implemented Backend And Prototype History
 

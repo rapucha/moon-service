@@ -5,8 +5,8 @@ Moon Service is an early-stage discovery and alert tool for photographers. The g
 The project has moved from documentation-led prototypes into a thin real
 backend and deployment spine. The anonymous lookup uses live provider adapters,
 and tested multi-architecture images can run on the declaratively provisioned
-Raspberry Pi host. Android, a database, accounts, and saved alerts remain
-deferred until their boundaries are proven.
+Raspberry Pi host. An installed client, a database, accounts, and saved alerts
+remain deferred until their boundaries are proven.
 
 ## MVP Direction
 
@@ -19,7 +19,11 @@ The favored first product is a zero-install web flow:
 - Provide Atom/RSS feeds and `.ics` exports.
 - Avoid mandatory accounts, cookies, saved server-side user profiles, and email alerts in v0.
 
-Email alerts, native Android, saved personal preferences, terrain horizon modeling, and exact landmark alignment are deferred.
+Email alerts, installed iOS/Android clients, saved personal preferences,
+terrain horizon modeling, and exact landmark alignment are deferred. React
+Native/Expo is the leading client candidate to evaluate under
+[#109](https://github.com/rapucha/moon-service/issues/109), not a selected or
+scaffolded stack.
 
 ## Current Decisions
 
@@ -27,7 +31,9 @@ Email alerts, native Android, saved personal preferences, terrain horizon modeli
 - Open-Meteo Geocoding as the first geocoding provider candidate.
 - Raw Unicode location input, with curated alias/transliteration fallback for known provider gaps.
 - Open-Meteo Weather as the first weather provider candidate.
-- Astronomy Engine as the first ephemeris candidate for the thin scoring prototype.
+- Astronomy Engine `2.1.19` as the accepted JVM backend ephemeris dependency
+  for the MVP/alpha under the pinning and fallback policy in
+  `docs/ephemeris-research.md`.
 - Browser `localStorage` may hold recent searches; the backend should not permanently store user locations in v0.
 
 ## Provider-Call Protections
