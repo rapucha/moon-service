@@ -49,6 +49,18 @@
     fail_msg: The configured controller file must contain exactly one OpenSSH public key.
   no_log: true
 
+- name: Remove Docker's legacy one-line repository definition
+  ansible.builtin.file:
+    path: /etc/apt/sources.list.d/docker.list
+    state: absent
+  register: docker_legacy_repository
+
+- name: Remove Tailscale's legacy one-line repository definition
+  ansible.builtin.file:
+    path: /etc/apt/sources.list.d/tailscale.list
+    state: absent
+  register: tailscale_legacy_repository
+
 - name: Install repository prerequisites
   ansible.builtin.apt:
     name:
@@ -57,6 +69,7 @@
       - gnupg
       - jq
       - python3-apt
+      - python3-debian
       - util-linux
     state: present
     update_cache: true
@@ -80,13 +93,20 @@
   register: docker_repository_key
 
 - name: Configure Docker's Debian Trixie ARM64 repository
-  ansible.builtin.apt_repository:
-    repo: >-
-      deb [arch=arm64 signed-by=/etc/apt/keyrings/docker.asc]
-      https://download.docker.com/linux/debian trixie stable
-    filename: docker
+  ansible.builtin.deb822_repository:
+    name: docker
+    types:
+      - deb
+    uris:
+      - https://download.docker.com/linux/debian
+    suites:
+      - trixie
+    components:
+      - stable
+    architectures:
+      - arm64
+    signed_by: /etc/apt/keyrings/docker.asc
     state: present
-    update_cache: false
   register: docker_repository
 
 - name: Remove packages that conflict with Docker Engine
@@ -110,7 +130,10 @@
       - docker-ce-cli
       - docker-compose-plugin
     state: present
-    update_cache: "{{ docker_repository.changed or docker_repository_key.changed }}"
+    update_cache: >-
+      {{ docker_repository.changed
+         or docker_repository_key.changed
+         or docker_legacy_repository.changed }}
 
 - name: Install Tailscale repository signing key
   ansible.builtin.get_url:
@@ -122,20 +145,28 @@
   register: tailscale_repository_key
 
 - name: Configure Tailscale's Debian Trixie repository
-  ansible.builtin.apt_repository:
-    repo: >-
-      deb [signed-by=/usr/share/keyrings/tailscale-archive-keyring.gpg]
-      https://pkgs.tailscale.com/stable/debian trixie main
-    filename: tailscale
+  ansible.builtin.deb822_repository:
+    name: tailscale
+    types:
+      - deb
+    uris:
+      - https://pkgs.tailscale.com/stable/debian
+    suites:
+      - trixie
+    components:
+      - main
+    signed_by: /usr/share/keyrings/tailscale-archive-keyring.gpg
     state: present
-    update_cache: false
   register: tailscale_repository
 
 - name: Install Tailscale without enrolling the host
   ansible.builtin.apt:
     name: tailscale
     state: present
-    update_cache: "{{ tailscale_repository.changed or tailscale_repository_key.changed }}"
+    update_cache: >-
+      {{ tailscale_repository.changed
+         or tailscale_repository_key.changed
+         or tailscale_legacy_repository.changed }}
 
 - name: Create constrained operator group
   ansible.builtin.group:
