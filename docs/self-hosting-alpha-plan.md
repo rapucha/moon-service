@@ -22,7 +22,9 @@ only to make the first public lookup, RSS, or calendar behavior deployable.
 The original hosting boundary was tracked in
 [#19](https://github.com/rapucha/moon-service/issues/19). The current delivery
 is tracked by [#93](https://github.com/rapucha/moon-service/issues/93) and its
-host child [#95](https://github.com/rapucha/moon-service/issues/95).
+host child [#95](https://github.com/rapucha/moon-service/issues/95). Reliable
+timer rearming and exact GitHub deployment confirmation are follow-up
+[#107](https://github.com/rapucha/moon-service/issues/107).
 
 ## Decision Snapshot
 
@@ -37,9 +39,15 @@ host child [#95](https://github.com/rapucha/moon-service/issues/95).
   opt-in may bind the Pi's primary IPv4 address for direct access from the
   trusted home LAN. Use SSH or the existing MikroTik WireGuard path for
   administration; do not forward a router port.
+- Treat a successful image publication and a successful physical deployment as
+  separate states. The Pi must report the exact healthy revision and immutable
+  digest back to its GitHub Deployment before the main workflow calls the
+  deployment successful.
 - Install Tailscale without enrollment during host provisioning. Issue
   [#97](https://github.com/rapucha/moon-service/issues/97) owns the later
-  Tailscale Funnel public HTTPS boundary.
+  Tailscale Funnel public HTTPS boundary. Preserve direct LAN access by adding
+  an exact loopback listener or loopback proxy for Funnel rather than replacing
+  the LAN listener with a wildcard bind.
 - Keep one backend instance at first because provider counters and caches are
   currently process-local. Public request rate limiting is planned for the edge
   or ingress first, with app-level rate limiting added when the product response
@@ -67,14 +75,47 @@ operator browser
 
 GitHub-hosted Actions
   -> tested AMD64/ARM64 image in GHCR
-  -> Pi systemd timer resolves main to an immutable index digest
+  -> serialized main promotion to an immutable index digest
+  -> GitHub Deployment records the expected revision and digest
+
+Raspberry Pi systemd timer
+  -> resolves GHCR main as desired state without depending on GitHub API
+  -> pulls the immutable main digest
   -> readiness/revision check
   -> commit current/previous state or restore current
+  -> finds only matching Deployment payloads
+  -> outbound HTTPS deployment status to GitHub when available
+
+GitHub-hosted Actions
+  -> waits for the matching Pi status with a bounded timeout
 ```
 
 The home router does not forward application, SSH, Docker, admin, database, or
 other Pi ports. Public tester access is a later outbound Tailscale Funnel under
 #97; the Funnel URL is public ingress, not an authentication boundary.
+
+The callback path is independent of application ingress: the Pi initiates
+outbound HTTPS to GitHub after checking Docker health, the recorded digest, and
+the `/readyz` revision locally. LAN failure, Funnel configuration, or a public
+DNS name is therefore not required for deployment acknowledgement. GHCR `main`
+remains the host's desired-state source, so a GitHub App or Deployments API
+outage cannot block an otherwise healthy local update; it instead makes the
+external workflow time out without confirmation.
+
+Issue #97 will add a separate public-ingress shape without opening a router
+port:
+
+```text
+trusted LAN client -> exact primary-LAN-IPv4:8080 ----+
+                                                       +-> one Compose container
+Tailscale Funnel -> exact 127.0.0.1:8080 or local proxy+
+```
+
+The current deployment intentionally has one exact host listener. Funnel's
+loopback target requires #97 to teach Compose and binding verification about
+the two explicit endpoints, or to introduce a small loopback-only proxy. It
+must not broaden either path to `0.0.0.0`, and deployment confirmation must
+continue to use a local endpoint rather than depend on the public Funnel URL.
 
 The admin path remains private:
 
@@ -158,8 +199,8 @@ Exit criteria:
 - A fresh Pi can be rebuilt from documented steps.
 - Losing the SD card loses only rebuildable cluster state, not unrecoverable
   product data.
-- The cluster has enough memory headroom for k3s, Traefik, cloudflared, and one
-  Java backend Pod.
+- The cluster has enough memory headroom for k3s, its selected ingress
+  components, and one Java backend Pod.
 
 Backup matrix before public alpha:
 
@@ -169,30 +210,33 @@ Backup matrix before public alpha:
 | k3s manifests or deployment commands | Yes | Keep outside the SD card. |
 | Runtime configuration and secret names | Yes | Do not commit secret values. |
 | Admin token source | Yes | Store in the chosen secret manager or offline notes. |
-| Cloudflare Tunnel and access configuration | Yes | Needed to restore public routing. |
+| Tailscale node identity and Funnel configuration | Yes | Needed to restore public routing. |
 | NFS export path and server configuration | Yes | Needed to remount alpha persistent volumes. |
 | Process-local caches | No | Rebuildable from provider calls. |
 | Process-local provider counters | No | Useful live visibility, not durable truth. |
 | Disposable logs | No | Keep short retention unless debugging a specific issue. |
 | Future Postgres data | Yes | Only after a restore drill exists. |
 
-## Deferred Phase 2: Public Edge And Reverse Proxy
+## Deferred Phase 2: Tailscale Funnel Public Edge
 
 Goal: expose only the public app surface and keep hostile traffic away from the
 home network where possible.
 
 Recommended shape:
 
-- Cloudflare DNS and TLS terminate public HTTPS.
-- Cloudflare Tunnel connects outbound from the home network or cluster.
-- Traefik remains the in-cluster reverse proxy and ingress router.
+- Tailscale Funnel terminates public HTTPS and reaches the Pi over Tailscale's
+  outbound-established connectivity; the home router has no HTTP port forward.
+- Funnel proxies to an exact loopback listener or a loopback-only local reverse
+  proxy. The existing exact primary-IPv4 listener remains available only to the
+  trusted LAN.
 - Public routes are limited to the web app, `/search`, `/api/opportunities`,
   future public feed routes, and future public calendar export routes.
 - The current prototype fixture endpoint, `POST /api/opportunities/search`,
   must be explicitly blocked, protected, or retired before public alpha unless
   a follow-up decision keeps it public.
-- `/admin/**` is private at both the edge and backend token layer.
-- No raw router port forward is required for HTTP(S) when the tunnel is used.
+- `/admin/**` is disabled or blocked before the Funnel boundary as well as
+  protected by the backend token if enabled for private operation.
+- No raw router port forward is required for HTTP(S) when Funnel is used.
 
 Ingress controls to plan:
 
@@ -203,8 +247,8 @@ Ingress controls to plan:
   routes if they become abuse targets.
 - Basic security headers for browser responses.
 - Forwarded-client-IP handling that matches the chosen edge path. Rate limits
-  are only useful if Traefik sees the correct client identity or the edge applies
-  the limit first.
+  are only useful if Funnel or the loopback proxy preserves the intended client
+  identity, or the public edge applies the limit first.
 
 Initial alpha rate-limit targets, to tune after real traffic:
 
@@ -365,6 +409,8 @@ Do not add these until a follow-up issue makes them necessary:
   Compose tester-alpha infrastructure milestone.
 - [#95](https://github.com/rapucha/moon-service/issues/95): Raspberry Pi
   provisioning and health-checked host-pull deployment.
+- [#107](https://github.com/rapucha/moon-service/issues/107): reliable timer
+  rearming and exact physical-deployment confirmation through GitHub.
 - [#97](https://github.com/rapucha/moon-service/issues/97): public HTTPS
   exposure and hardening through Tailscale Funnel.
 - [#8](https://github.com/rapucha/moon-service/issues/8): add basic
@@ -383,9 +429,9 @@ Do not add these until a follow-up issue makes them necessary:
 - [K3s requirements](https://docs.k3s.io/installation/requirements)
 - [K3s cluster datastore](https://docs.k3s.io/datastore)
 - [K3s networking services](https://docs.k3s.io/networking/networking-services)
-- [Cloudflare Tunnel on Kubernetes](https://developers.cloudflare.com/cloudflare-one/networks/connectors/cloudflare-tunnel/deployment-guides/kubernetes/)
+- [Tailscale Funnel](https://tailscale.com/docs/features/tailscale-funnel)
+- [Tailscale Funnel CLI](https://tailscale.com/docs/reference/tailscale-cli/funnel)
 - [Kubernetes Ingress](https://kubernetes.io/docs/concepts/services-networking/ingress/)
 - [Kubernetes Network Policies](https://kubernetes.io/docs/concepts/services-networking/network-policies/)
 - [Kubernetes NFS volumes](https://kubernetes.io/docs/concepts/storage/volumes/#nfs)
-- [Traefik RateLimit middleware](https://doc.traefik.io/traefik/reference/routing-configuration/http/middlewares/ratelimit/)
 - [OWASP API4:2023 Unrestricted Resource Consumption](https://owasp.org/API-Security/editions/2023/en/0xa4-unrestricted-resource-consumption/)

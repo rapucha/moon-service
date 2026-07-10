@@ -12,6 +12,17 @@ moon_service_container_cpus: "2.0"
 moon_service_container_pids: 256
 moon_service_readiness_timeout_seconds: 90
 moon_service_poll_interval: 2min
+moon_service_github_report_timeout_seconds: 20
+
+# Optional outbound deployment acknowledgement. Enable all three App values
+# together after installing a repo-only GitHub App with Deployments read/write.
+moon_service_github_repository: rapucha/moon-service
+moon_service_github_deployment_task: deploy:raspberry-pi
+moon_service_github_deployment_environment: raspberry-pi
+moon_service_github_app_id: ""
+moon_service_github_app_installation_id: ""
+moon_service_github_app_private_key_file: ""
+moon_service_github_app_private_key_path: /etc/moon-service/github-app-private-key.pem
 
 moon_service_ops_group: moon-service-ops
 moon_service_operator_user: moonops

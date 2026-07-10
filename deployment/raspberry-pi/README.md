@@ -4,7 +4,9 @@ This directory implements issue
 [#95](https://github.com/rapucha/moon-service/issues/95): a reproducible,
 single-instance Docker Compose host on Raspberry Pi OS Lite 64-bit (Debian 13
 Trixie). The Pi pulls the already-tested ARM64 image from GHCR. It never builds
-Java or container images.
+Java or container images. Follow-up
+[#107](https://github.com/rapucha/moon-service/issues/107) makes timer rearming
+reliable and adds exact physical-deployment acknowledgement to GitHub.
 
 This is the private deployment layer. It binds the application to
 `127.0.0.1:8080` by default and supports an explicit primary-IPv4 listener for
@@ -36,6 +38,9 @@ The Ansible role:
 - keeps a current and previous known-good digest, verifies `/readyz` and its Git
   revision, rolls back unhealthy candidates, and serializes operations with
   `flock`;
+- when a repository-only GitHub App is configured, reports the exact healthy
+  revision and immutable digest to the matching GitHub Deployment over outbound
+  HTTPS;
 - creates a dedicated SSH-key-only operator with fixed `sudo` commands and no
   Docker, sudo, or other supplementary group membership.
 
@@ -61,7 +66,7 @@ Prepare these before the controlled physical-host run:
 5. The Pi's LAN hostname or address, reachable from the Ansible controller.
    WireGuard is unnecessary while controller and Pi share the LAN.
 6. Correct system time and outbound DNS/HTTPS access to Debian, Docker,
-   Tailscale, GHCR, and Open-Meteo endpoints.
+   Tailscale, GHCR, the GitHub API, and Open-Meteo endpoints.
 7. Ansible Core 2.21.1 on the controller, matching the CI pin in
    `ci-requirements.txt`. No Ansible software is installed on the Pi; the Pi
    only needs its default Python 3 and SSH server.
@@ -69,9 +74,17 @@ Prepare these before the controlled physical-host run:
    - a public package needs no registry credential;
    - a private package needs a separate read-only package token installed only
      in root's Docker credential store on the Pi.
+9. For exact deployment acknowledgement, a deployment-reporter GitHub App
+   installed only on `rapucha/moon-service`, with webhooks disabled and only
+   repository metadata read plus Deployments read/write. Record its App ID and
+   installation ID, and keep its generated PEM private key in a controller file
+   outside the repository. Set repository Actions variable
+   `MOON_PI_DEPLOYMENT_REPORTER_LOGIN` to the App bot login in the form
+   `<app-slug>[bot]`; success from any other actor is rejected.
 
 Do not put the host address, SSH key path, GHCR token, Tailscale key, admin
-token, or another private-network identifier in a tracked file.
+token, GitHub App private key or path, or another private-network identifier in
+a tracked file.
 
 ## Configure local inventory
 
@@ -91,6 +104,23 @@ Replace all placeholders in `inventory.yml`:
   administrator or system account.
 - `moon_service_operator_public_key_file` is the absolute controller path to
   exactly one OpenSSH public key for that account.
+- The optional GitHub App values are kept only in this ignored inventory.
+  Configure all three together, quote the numeric IDs, and use an absolute
+  controller path to the PEM private key:
+
+```yaml
+moon_service_github_app_id: "REPLACE_WITH_APP_ID"
+moon_service_github_app_installation_id: "REPLACE_WITH_INSTALLATION_ID"
+moon_service_github_app_private_key_file: /absolute/controller/path/to/private-key.pem
+```
+
+Protect the controller PEM with mode `0600`. When all three values are present,
+the role copies it to `/etc/moon-service/github-app-private-key.pem` as
+`root:root` mode `0600` and renders only the two IDs, fixed
+repository/task/environment values, and that host path into `host.env`. It
+never stores the PEM contents or an installation token in inventory or
+`host.env`. Omit all three only when external acknowledgement is deliberately
+disabled; a partial configuration must fail provisioning.
 
 The safe listener default is `127.0.0.1`. For direct access from a trusted LAN,
 add the Pi's active primary IPv4 address to ignored `inventory.yml`:
@@ -176,6 +206,18 @@ The deploy timer starts after provisioning. A missing registry credential or
 temporary network failure is safe: the updater records a deferred attempt and
 keeps the recorded local image running.
 
+Both timers use `OnActiveSec` activation-relative first triggers. This matters
+because provisioning deliberately stops them during listener or memory-limit
+reconciliation and may start them again long after boot: the deploy timer must
+receive a new trigger approximately 45 seconds after activation, and the
+cleanup timer approximately 20 minutes after activation. An active timer with
+no finite next monotonic trigger is not converged host state.
+
+When provisioning repairs a changed or already-elapsed deployment schedule, it
+also starts `moon-service-deploy.service` once immediately. This closes the
+missed-publication gap without waiting for the newly rearmed timer's first
+deadline; subsequent discovery remains timer-driven.
+
 ### Private GHCR package only
 
 Create a personal access token (classic) with only `read:packages`; GitHub
@@ -224,6 +266,36 @@ are explicit bootstrap-administrator actions for #97. Existing MikroTik
 WireGuard remains the remote-administration path and does not need any software
 on this Pi.
 
+The current private deployment intentionally publishes one exact host address.
+Tailscale's HTTP proxy requires a loopback backend, so #97 must either publish
+the same container on both the exact primary LAN IPv4 address and
+`127.0.0.1`, or add a loopback-only local proxy in front of the LAN-bound app.
+The binding validator must then require that exact two-address set; it must not
+accept `0.0.0.0`. The GitHub deployment callback remains outbound and local-
+health-based, so this later ingress change does not alter its trust boundary.
+
+### GitHub deployment reporter boundary
+
+GitHub Actions creates a Deployment containing the exact revision and immutable
+multi-platform digest selected by serialized `main` promotion. The Pi's normal
+update cycle still resolves GHCR `main` as its independent desired-state source,
+deploys that immutable digest, then finds and updates only Deployment payloads
+whose repository, revision, and digest match the local result. A GitHub App or
+Deployments API outage therefore cannot block a healthy application update.
+
+The deployment-reporter GitHub App must be installed only on
+`rapucha/moon-service`, with repository metadata read and Deployments
+read/write and with its webhook disabled. Ignored inventory contains the App
+ID, installation ID, and absolute controller PEM path; the role installs the
+key root-only at `/etc/moon-service/github-app-private-key.pem`. The deployer
+mints short-lived installation tokens as needed; do not store a long-lived
+installation token or pass App credentials into the application container.
+
+The reporter is not an ingress service. It initiates HTTPS to GitHub and does
+not require the app to be reachable from GitHub, the public Internet, or a
+tailnet. Later Funnel configuration must not publish reporter files or
+credentials.
+
 ## Host verification
 
 After provisioning, open a new session as the dedicated operator and check the
@@ -234,6 +306,21 @@ ssh moonops@REPLACE_WITH_SSH_HOST
 sudo moon-service-control status
 sudo moon-service-control revision
 ```
+
+Confirm that both active timers have finite future monotonic triggers:
+
+```bash
+systemctl show moon-service-deploy.timer \
+  --property=ActiveState --property=NextElapseUSecMonotonic
+systemctl show moon-service-cleanup.timer \
+  --property=ActiveState --property=NextElapseUSecMonotonic
+systemctl list-timers moon-service-deploy.timer moon-service-cleanup.timer
+```
+
+`ActiveState=active` together with `NextElapseUSecMonotonic=infinity` is a
+broken schedule, not a healthy timer. After an issue #107 provisioning run, the
+deploy timer must be scheduled even when it was stopped and restarted in the
+same boot.
 
 With the default loopback listener, inspect it through SSH without changing
 the router:
@@ -287,7 +374,8 @@ For the first physical run, stop after any failed step and keep the Pi within
 its configured loopback or trusted-LAN boundary:
 
 1. Run the fact and SSH preflight commands before the playbook.
-2. Run provisioning once and wait for the first timer attempt.
+2. Run provisioning once and observe the immediate catch-up deployment when it
+   repairs scheduling; otherwise wait for the first timer attempt.
 3. Verify `status`, `/readyz`, the exact digest/revision, ARM64 platform,
    runtime UID/GID, and exact memory limit before making a live opportunity
    request.
@@ -295,8 +383,10 @@ its configured loopback or trusted-LAN boundary:
    changes; the host and application configuration should remain intact.
 5. Reboot the Pi, then verify the recorded digest starts and becomes ready
    without GHCR being part of the startup path.
-6. After a later healthy `main` publication, confirm the Pi advances within
-   five minutes and moves the old identity to `previous.env`.
+6. After a later healthy `main` publication, confirm the next timer cycle starts
+   the bounded deployment, moves the old identity to `previous.env`, and posts
+   success for the exact revision and digest before the GitHub workflow's
+   confirmation timeout.
 7. Use the constrained manual `rollback`, verify the previous revision, and
    confirm `status` reports that updates are held. Use `resume` only after the
    drill.
@@ -324,13 +414,84 @@ Each attempt:
 6. replaces the one Compose container and waits at most 90 seconds for both
    Docker health and `/readyz` to report the expected Git revision;
 7. commits current/previous state only after readiness succeeds;
-8. restores the unchanged current state when the candidate fails.
+8. posts success to the matching GitHub Deployment only after the recorded
+   state, running image, Docker health, and `/readyz` revision all match;
+9. restores the unchanged current state and reports failure when the candidate
+   fails.
 
 The systemd attempt has a ten-minute outer timeout, leaving bounded room for a
 slow ARM64 pull plus both the candidate and rollback readiness windows. If
 systemd must terminate an exceptionally stuck attempt, candidate state is never
 committed as current; the next timer run reconciles the recorded known-good
 digest and Compose configuration before contacting GHCR.
+
+### Timer scheduling and rearming
+
+The `OnActiveSec` initial timer deadlines are relative to timer activation, not
+machine boot. Stopping and starting a timer during an Ansible reconciliation
+therefore gives it a fresh finite deadline in the current boot. After the first
+run, `OnUnitInactiveSec` schedules the next deploy attempt approximately two
+minutes after the service becomes inactive and cleanup approximately one day
+after its service becomes inactive.
+
+Use the host-verification commands above after provisioning, timer-unit changes,
+or remediation. If an enabled timer is active but has no finite next trigger,
+inspect its unit and journal, then rerun the playbook to converge the managed
+unit. A bootstrap administrator may deliberately restart the two timers after
+inspection, but that is recovery rather than a substitute for the managed
+activation-relative schedule.
+
+When Ansible detects a changed deploy-timer definition, host remediation, or an
+elapsed deploy timer, it starts one immediate catch-up deployment after
+rearming and validating both timers. This is why applying issue #107 should
+pick up a `main` image that was published while the old timer was stuck.
+
+### Exact GitHub deployment confirmation
+
+Image publication, `main` tag promotion, and physical deployment are separate
+states. The GitHub workflow records the exact promotion result in environment
+`raspberry-pi`, task `deploy:raspberry-pi`, with payload schema version `1` and
+the expected image repository, revision, digest, deployment-reporter bot login,
+workflow run ID, workflow run attempt, and workflow run URL. It posts `queued`
+and waits up to 15 minutes for the Pi. The Pi may report success only when all
+of these match that Deployment payload:
+
+- `current.env` revision and immutable index digest;
+- the running container's image reference and revision/digest labels;
+- Docker health;
+- `GET /readyz` status and 40-character revision.
+
+Reporting merely that the process is up is insufficient. A status for another
+revision or digest cannot satisfy the waiting workflow. A newer successful
+publication may supersede an older pending Deployment, but an older workflow
+must never make the Pi downgrade a healthy newer version merely to become
+green.
+
+The reporter should publish `in_progress` when it begins the matching attempt,
+`success` only after the checks above, and `failure` when that candidate was
+tried but could not become healthy. The Actions waiter treats `inactive` as a
+superseded Deployment and fails because that exact request was not confirmed;
+only `success` makes confirmation green. Requests for the same revision and
+digest remain eligible for the same Pi success rather than superseding one
+another. Because Deployment statuses are append-only, a success from the
+configured App remains authoritative if a racing newer promotion appends
+`inactive` immediately afterward: the success proves the exact older revision
+really ran before supersession. A success from any other GitHub identity fails
+the waiter. If GitHub is temporarily unreachable, keep the locally verified
+healthy deployment and retry reporting on a later timer cycle; a callback
+transport failure is not a reason to roll back a good image. The bounded GitHub
+Actions waiter still fails when no exact success arrives, making the missing
+acknowledgement visible outside the Pi.
+
+Each reporter invocation has a 20-second outer timeout plus a five-second kill
+grace. GitHub slowness, duplicate matching requests, or a wedged TLS request can
+delay but cannot consume the deploy service's ten-minute budget or prevent the
+local GHCR update. A timed-out report remains nonfatal and the next timer cycle
+retries it; matching deployments are processed newest first.
+
+A 15-minute waiter timeout does not post a terminal `error` status. A Pi success
+that arrives late therefore remains authoritative, and a confirm-only workflow
+rerun can validate the stored creation attempt and accept it.
 
 A failed candidate is recorded in `rejected.env`. Later timer runs do not
 reintroduce two-minute outages by retrying the same bad digest. A newly
@@ -347,6 +508,8 @@ State is under `/var/lib/moon-service`:
 - `previous.env`: one rollback generation;
 - `rejected.env`: candidate that failed readiness;
 - `last-result.env`: latest update/control outcome;
+- `last-github-report.env`: latest callback result, status, exact identity, and
+  matching Deployment IDs, without tokens or private-key material;
 - `automatic-updates-held`: present after a manual rollback;
 - `memory-limit-remediation`: prevents automation from being re-enabled after
   an interrupted or failed host memory-limit repair;
@@ -367,9 +530,9 @@ sudo moon-service-control rollback
 sudo moon-service-control resume
 ```
 
-- `status` shows container/timer state, incomplete host remediation,
-  plus current, previous, rejected, and last-result identities. It does not
-  print application secrets.
+- `status` shows container/timer state, incomplete host remediation, plus
+  current, previous, rejected, last-result, and latest GitHub-report identities.
+  It does not print application or GitHub App secrets.
 - `revision` returns provider-independent `/readyz` JSON.
 - `logs` returns the latest 200 timestamped container lines.
 - `restart` recreates only the recorded current digest and rechecks readiness.

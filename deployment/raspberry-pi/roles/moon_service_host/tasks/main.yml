@@ -22,21 +22,58 @@
       - moon_service_image_repository == "ghcr.io/rapucha/moon-service"
       - moon_service_image_channel == "main"
       - moon_service_image_source == "https://github.com/rapucha/moon-service"
+      - moon_service_github_repository == "rapucha/moon-service"
+      - moon_service_github_deployment_task == "deploy:raspberry-pi"
+      - moon_service_github_deployment_environment == "raspberry-pi"
+      - moon_service_github_app_private_key_path == "/etc/moon-service/github-app-private-key.pem"
       - moon_service_compose_dir == "/opt/moon-service"
       - moon_service_config_dir == "/etc/moon-service"
       - moon_service_state_dir == "/var/lib/moon-service"
       - moon_service_host_port | int >= 1024
       - moon_service_host_port | int <= 65535
+      - moon_service_github_report_timeout_seconds | int >= 1
+      - moon_service_github_report_timeout_seconds | int <= 60
     fail_msg: >-
       Set distinct bootstrap-admin and operator users plus an absolute local
       SSH public-key path in the ignored inventory. Issue #95 uses the fixed
-      Moon Service repository, group, and host paths.
+      Moon Service repository, group, host paths, and a callback timeout no
+      longer than 60 seconds.
 
 - name: Validate the application listener boundary
   ansible.builtin.include_tasks: validate-bind-address.yml
   vars:
     _moon_service_primary_ipv4_address: >-
       {{ (ansible_facts.default_ipv4 | default({})).address | default('') }}
+
+- name: Record whether GitHub deployment reporting is configured
+  ansible.builtin.set_fact:
+    _moon_service_github_app_configuration_present: >-
+      {{ (moon_service_github_app_id | string | length > 0)
+         or (moon_service_github_app_installation_id | string | length > 0)
+         or (moon_service_github_app_private_key_file | length > 0) }}
+    _moon_service_github_reporting_enabled: >-
+      {{ (moon_service_github_app_id | string | length > 0)
+         and (moon_service_github_app_installation_id | string | length > 0)
+         and (moon_service_github_app_private_key_file | length > 0) }}
+
+- name: Validate GitHub deployment reporting configuration
+  ansible.builtin.assert:
+    that:
+      - >-
+        not _moon_service_github_app_configuration_present
+        or _moon_service_github_reporting_enabled
+      - >-
+        not _moon_service_github_reporting_enabled
+        or (moon_service_github_app_id | string) is match('^[0-9]+$')
+      - >-
+        not _moon_service_github_reporting_enabled
+        or (moon_service_github_app_installation_id | string) is match('^[0-9]+$')
+      - >-
+        not _moon_service_github_reporting_enabled
+        or moon_service_github_app_private_key_file is match('^/')
+    fail_msg: >-
+      Configure the GitHub App ID, installation ID, and an absolute local PEM
+      path together, or leave all three empty to disable deployment reporting.
 
 - name: Load the dedicated operator public key from the controller
   ansible.builtin.set_fact:
@@ -52,6 +89,26 @@
           '^(ssh-(ed25519|rsa)|ecdsa-sha2-nistp(256|384|521)|sk-(ssh-ed25519|ecdsa-sha2-nistp256)@openssh\.com) [A-Za-z0-9+/]+={0,3}( .*)?$'
         )
     fail_msg: The configured controller file must contain exactly one OpenSSH public key.
+  no_log: true
+
+- name: Load the GitHub App private key from the controller
+  ansible.builtin.set_fact:
+    _moon_service_github_app_private_key: >-
+      {{ lookup('ansible.builtin.file', moon_service_github_app_private_key_file) }}
+  when: _moon_service_github_reporting_enabled
+  no_log: true
+
+- name: Validate the GitHub App private key envelope
+  ansible.builtin.assert:
+    that:
+      - >-
+        _moon_service_github_app_private_key
+        is match('^-----BEGIN (RSA )?PRIVATE KEY-----')
+      - >-
+        _moon_service_github_app_private_key
+        is search('-----END (RSA )?PRIVATE KEY-----\s*$')
+    fail_msg: The configured GitHub App key must be a PEM private key.
+  when: _moon_service_github_reporting_enabled
   no_log: true
 
 - name: Remove Docker's legacy one-line repository definition
@@ -73,6 +130,7 @@
       - curl
       - gnupg
       - jq
+      - openssl
       - python3-apt
       - python3-debian
       - util-linux
@@ -235,6 +293,23 @@
   loop:
     - /etc/docker
     - /etc/systemd/journald.conf.d
+
+- name: Install the GitHub App private key for the root-only reporter
+  ansible.builtin.copy:
+    content: "{{ _moon_service_github_app_private_key }}\n"
+    dest: "{{ moon_service_github_app_private_key_path }}"
+    owner: root
+    group: root
+    mode: "0600"
+  when: _moon_service_github_reporting_enabled
+  no_log: true
+  diff: false
+
+- name: Remove the reporter private key when reporting is disabled
+  ansible.builtin.file:
+    path: "{{ moon_service_github_app_private_key_path }}"
+    state: absent
+  when: not _moon_service_github_reporting_enabled
 
 - name: Create the root Docker client configuration directory
   ansible.builtin.file:
@@ -402,6 +477,14 @@
     group: root
     mode: "0755"
 
+- name: Install GitHub deployment reporting command
+  ansible.builtin.copy:
+    src: moon-service-github-report
+    dest: /usr/local/sbin/moon-service-github-report
+    owner: root
+    group: root
+    mode: "0755"
+
 - name: Install constrained operator command
   ansible.builtin.copy:
     src: moon-service-control
@@ -419,7 +502,7 @@
     mode: "0440"
     validate: /usr/sbin/visudo -cf %s
 
-- name: Install deployment and cleanup units
+- name: Install deployment and cleanup service units
   ansible.builtin.template:
     src: "{{ item }}.j2"
     dest: "/etc/systemd/system/{{ item }}"
@@ -428,9 +511,27 @@
     mode: "0644"
   loop:
     - moon-service-deploy.service
-    - moon-service-deploy.timer
     - moon-service-cleanup.service
-    - moon-service-cleanup.timer
+  notify: Reload systemd
+
+- name: Install the deployment timer
+  ansible.builtin.template:
+    src: moon-service-deploy.timer.j2
+    dest: /etc/systemd/system/moon-service-deploy.timer
+    owner: root
+    group: root
+    mode: "0644"
+  register: _moon_service_deploy_timer_definition
+  notify: Reload systemd
+
+- name: Install the cleanup timer
+  ansible.builtin.template:
+    src: moon-service-cleanup.timer.j2
+    dest: /etc/systemd/system/moon-service-cleanup.timer
+    owner: root
+    group: root
+    mode: "0644"
+  register: _moon_service_cleanup_timer_definition
   notify: Reload systemd
 
 - name: Apply service configuration before enabling automation
@@ -722,6 +823,46 @@
     name: moon-service-deploy.service
     enabled: true
 
+- name: Inspect timer scheduling state before enabling automation
+  ansible.builtin.command:
+    argv:
+      - systemctl
+      - show
+      - "{{ item }}"
+      - --property=SubState
+      - --value
+  loop:
+    - moon-service-deploy.timer
+    - moon-service-cleanup.timer
+  register: _moon_service_timer_scheduling_state
+  changed_when: false
+  failed_when: false
+  check_mode: false
+
+- name: Rearm changed or exhausted automation timers
+  ansible.builtin.systemd_service:
+    name: "{{ item.name }}"
+    enabled: true
+    state: restarted
+  loop:
+    - name: moon-service-deploy.timer
+      definition_changed: "{{ _moon_service_deploy_timer_definition.changed }}"
+      prior_substate: >-
+        {{ (_moon_service_timer_scheduling_state.results
+            | selectattr('item', 'equalto', 'moon-service-deploy.timer')
+            | map(attribute='stdout')
+            | first) | default('unknown') }}
+    - name: moon-service-cleanup.timer
+      definition_changed: "{{ _moon_service_cleanup_timer_definition.changed }}"
+      prior_substate: >-
+        {{ (_moon_service_timer_scheduling_state.results
+            | selectattr('item', 'equalto', 'moon-service-cleanup.timer')
+            | map(attribute='stdout')
+            | first) | default('unknown') }}
+  when:
+    - not ansible_check_mode
+    - (item.definition_changed | bool) or item.prior_substate == "elapsed"
+
 - name: Enable automatic deployment and cleanup timers
   ansible.builtin.systemd_service:
     name: "{{ item }}"
@@ -730,3 +871,51 @@
   loop:
     - moon-service-deploy.timer
     - moon-service-cleanup.timer
+
+- name: Catch up immediately after repairing deployment scheduling
+  ansible.builtin.systemd_service:
+    name: moon-service-deploy.service
+    state: started
+  when:
+    - not ansible_check_mode
+    - >-
+      _moon_service_deploy_timer_definition.changed
+      or _moon_service_deployment_remediation_required
+      or ((_moon_service_timer_scheduling_state.results
+           | selectattr('item', 'equalto', 'moon-service-deploy.timer')
+           | map(attribute='stdout')
+           | first) | default('unknown')) == 'elapsed'
+
+- name: Inspect the enabled automation timer schedules
+  ansible.builtin.command:
+    argv:
+      - systemctl
+      - show
+      - "{{ item }}"
+      - --property=ActiveState
+      - --property=SubState
+      - --property=NextElapseUSecMonotonic
+  loop:
+    - moon-service-deploy.timer
+    - moon-service-cleanup.timer
+  register: _moon_service_enabled_timer_schedules
+  changed_when: false
+  check_mode: false
+  when: not ansible_check_mode
+
+- name: Require finite waiting automation timer schedules
+  ansible.builtin.assert:
+    that:
+      - "'ActiveState=active' in item.stdout_lines"
+      - "'SubState=waiting' in item.stdout_lines"
+      - >-
+        (item.stdout_lines
+         | select('match', '^NextElapseUSecMonotonic=.+$')
+         | reject('equalto', 'NextElapseUSecMonotonic=infinity')
+         | list
+         | length) == 1
+    fail_msg: >-
+      {{ item.item }} did not rearm with a finite monotonic deadline;
+      deployment automation remains unhealthy.
+  loop: "{{ _moon_service_enabled_timer_schedules.results }}"
+  when: not ansible_check_mode

@@ -9,9 +9,11 @@ Purpose
 Decision
 - Use a dedicated GitHub user account, called the agent account in this policy,
   for Moon Service agent work now.
-- Defer a GitHub App until this repo needs installation tokens, multi-repo
-  automation, or finer lifecycle controls than a dedicated user account can
-  provide.
+- Keep agent authorship separate from machine deployment identity. Issue
+  [#107](https://github.com/rapucha/moon-service/issues/107) introduces a
+  repository-only GitHub App for the Raspberry Pi deployment reporter; it does
+  not replace the agent account for branches, pull requests, issues, or review
+  comments.
 - Do not store agent account credentials, tokens, or setup secrets in this
   repository.
 
@@ -19,10 +21,33 @@ Rationale
 - An agent account solves the immediate review problem: agent-created branches,
   pull requests, issue updates, and review comments are authored by a separate
   GitHub identity.
-- The repo is currently small enough that a GitHub App would add setup and
-  maintenance overhead without clear near-term benefit.
+- A GitHub App is warranted for the deployment reporter because the Pi needs a
+  narrowly scoped machine identity and short-lived installation tokens to post
+  exact deployment results without reusing a person's credential.
 - A dedicated identity keeps public history honest: commits and comments should
   show whether a human or agent performed the action.
+
+Deployment Reporter App Boundary
+- Install the deployment-reporter GitHub App only on
+  `rapucha/moon-service`.
+- Disable webhooks; the Pi polls GitHub and needs no inbound callback endpoint.
+- Grant only repository metadata read and Deployments read/write. Do not grant
+  Contents, Packages, Actions, Issues, Pull requests, Administration, or secret
+  management permissions to this App.
+- Keep the App ID, installation ID, and private key outside Git. The private key
+  is root-only host configuration on the Pi and is never injected into the
+  application container.
+- Set repository Actions variable `MOON_PI_DEPLOYMENT_REPORTER_LOGIN` to the
+  installed App's `<app-slug>[bot]` login. Confirmation accepts success only
+  from that identity; the variable is public configuration, not a credential.
+- Mint a short-lived installation token only when the host needs to read or
+  update a deployment. Do not store an installation token as a long-lived host
+  secret.
+- Use the App only for deployment acknowledgement. GitHub Actions creates the
+  expected deployment with its workflow-scoped `GITHUB_TOKEN`; the Pi may post
+  status only for the exact repository deployment it has verified locally.
+- A Tailscale Funnel or other public ingress must never expose the App key,
+  installation token, or reporter implementation.
 
 Public Identity
 - Use a clearly non-human account name, for example `moon-service-agent` or
@@ -156,6 +181,7 @@ Smoke Test
 When To Revisit
 - More than one repository needs agent automation.
 - Token rotation or permission auditing becomes burdensome.
-- Agent work needs short-lived installation tokens.
-- CI, release, or deployment workflows need automation beyond branch and PR
-  operations.
+- Agent-authorship automation itself needs permissions beyond branch and pull
+  request operations.
+- The deployment reporter needs access to another repository or a permission
+  beyond the repository-only Deployments boundary above.

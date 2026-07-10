@@ -1,0 +1,298 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+
+umask 077
+PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+export PATH
+
+CONFIG_DIR="${MOON_CONFIG_DIR:-/etc/moon-service}"
+if [[ -r "$CONFIG_DIR/host.env" ]]; then
+    # This root-owned file contains App identifiers and a private-key path,
+    # never the private key or an installation token.
+    # shellcheck disable=SC1091
+    source "$CONFIG_DIR/host.env"
+fi
+
+REPORTING_ENABLED="${MOON_GITHUB_REPORTING_ENABLED:-false}"
+GITHUB_REPOSITORY="${MOON_GITHUB_REPOSITORY:-rapucha/moon-service}"
+IMAGE_REPOSITORY="${MOON_IMAGE_REPOSITORY:-ghcr.io/rapucha/moon-service}"
+DEPLOYMENT_TASK="${MOON_GITHUB_DEPLOYMENT_TASK:-deploy:raspberry-pi}"
+DEPLOYMENT_ENVIRONMENT="${MOON_GITHUB_DEPLOYMENT_ENVIRONMENT:-raspberry-pi}"
+GITHUB_APP_ID="${MOON_GITHUB_APP_ID:-}"
+GITHUB_APP_INSTALLATION_ID="${MOON_GITHUB_APP_INSTALLATION_ID:-}"
+GITHUB_APP_PRIVATE_KEY_FILE="${MOON_GITHUB_APP_PRIVATE_KEY_FILE:-}"
+GITHUB_API_URL="${MOON_GITHUB_API_URL:-https://api.github.com}"
+STATE_DIR="${MOON_STATE_DIR:-/var/lib/moon-service}"
+CURL_BIN="${MOON_CURL_BIN:-curl}"
+JQ_BIN="${MOON_JQ_BIN:-jq}"
+OPENSSL_BIN="${MOON_OPENSSL_BIN:-openssl}"
+DATE_BIN="${MOON_DATE_BIN:-date}"
+
+usage() {
+    printf 'Usage: %s {in_progress|success|failure} DIGEST REVISION DESCRIPTION\n' "$0" >&2
+    exit 64
+}
+
+[[ $# -eq 4 ]] || usage
+REQUESTED_STATE="$1"
+DIGEST="$2"
+REVISION="$3"
+DESCRIPTION="$4"
+
+case "$REQUESTED_STATE" in
+    in_progress|success|failure) ;;
+    *) usage ;;
+esac
+
+[[ "$DIGEST" =~ ^sha256:[0-9a-f]{64}$ ]] || exit 65
+[[ "$REVISION" =~ ^[0-9a-f]{40}$ ]] || exit 65
+[[ "$DESCRIPTION" != *$'\n'* && ${#DESCRIPTION} -le 140 ]] || exit 65
+
+if [[ "$REPORTING_ENABLED" == false ]]; then
+    exit 0
+fi
+
+[[ "$REPORTING_ENABLED" == true ]] || exit 65
+[[ "$GITHUB_REPOSITORY" =~ ^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$ ]] || exit 65
+[[ "$IMAGE_REPOSITORY" =~ ^ghcr\.io/[a-z0-9][a-z0-9._/-]*$ ]] || exit 65
+[[ "$DEPLOYMENT_TASK" =~ ^[A-Za-z0-9][A-Za-z0-9:._-]{0,63}$ ]] || exit 65
+[[ "$DEPLOYMENT_ENVIRONMENT" =~ ^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$ ]] || exit 65
+[[ "$GITHUB_APP_ID" =~ ^[0-9]+$ ]] || exit 65
+[[ "$GITHUB_APP_INSTALLATION_ID" =~ ^[0-9]+$ ]] || exit 65
+[[ -r "$GITHUB_APP_PRIVATE_KEY_FILE" ]] || exit 66
+[[ "$GITHUB_API_URL" =~ ^https://[A-Za-z0-9.-]+(:[0-9]+)?(/.*)?$ ]] || exit 65
+
+LAST_REPORT="$STATE_DIR/last-github-report.env"
+mkdir -p "$STATE_DIR"
+chmod 0700 "$STATE_DIR"
+AUTH_HEADER_FILE="$(mktemp "$STATE_DIR/.github-auth.XXXXXX")"
+chmod 0600 "$AUTH_HEADER_FILE"
+trap 'rm -f "$AUTH_HEADER_FILE"' EXIT
+trap 'exit 129' HUP
+trap 'exit 130' INT
+trap 'exit 143' TERM
+
+record_report() {
+    local result="$1"
+    local deployment_ids="${2:-none}"
+    local temporary
+    temporary="$(mktemp "$STATE_DIR/.github-report.XXXXXX")"
+    {
+        printf 'RESULT=%s\n' "$result"
+        printf 'STATE=%s\n' "$REQUESTED_STATE"
+        printf 'AT=%s\n' "$("$DATE_BIN" -u +%Y-%m-%dT%H:%M:%SZ)"
+        printf 'DIGEST=%s\n' "$DIGEST"
+        printf 'REVISION=%s\n' "$REVISION"
+        printf 'DEPLOYMENT_IDS=%s\n' "$deployment_ids"
+    } >"$temporary"
+    chmod 0600 "$temporary"
+    mv -f "$temporary" "$LAST_REPORT"
+}
+
+base64url() {
+    "$OPENSSL_BIN" base64 -A | tr '+/' '-_' | tr -d '='
+}
+
+write_authorization_header() {
+    local credential="$1"
+    printf 'Authorization: Bearer %s\n' "$credential" >"$AUTH_HEADER_FILE"
+}
+
+create_installation_token() {
+    local now issued_at expires_at header payload unsigned signature jwt response
+    now="$("$DATE_BIN" -u +%s)"
+    [[ "$now" =~ ^[0-9]+$ ]] || return 1
+    issued_at=$((now - 60))
+    expires_at=$((now + 540))
+    header="$(printf '%s' '{"alg":"RS256","typ":"JWT"}' | base64url)"
+    payload="$(
+        printf '{"iat":%s,"exp":%s,"iss":"%s"}' \
+            "$issued_at" "$expires_at" "$GITHUB_APP_ID" | base64url
+    )"
+    unsigned="$header.$payload"
+    signature="$(
+        printf '%s' "$unsigned" \
+            | "$OPENSSL_BIN" dgst -sha256 -sign "$GITHUB_APP_PRIVATE_KEY_FILE" -binary \
+            | base64url
+    )"
+    jwt="$unsigned.$signature"
+    write_authorization_header "$jwt"
+    response="$(
+        "$CURL_BIN" --fail --silent --show-error \
+            --connect-timeout 5 --max-time 20 \
+            --request POST \
+            --header 'Accept: application/vnd.github+json' \
+            --header "@$AUTH_HEADER_FILE" \
+            --header 'X-GitHub-Api-Version: 2026-03-10' \
+            --header 'Content-Type: application/json' \
+            --data-binary '{"permissions":{"deployments":"write"}}' \
+            "$GITHUB_API_URL/app/installations/$GITHUB_APP_INSTALLATION_ID/access_tokens"
+    )" || return 1
+    : >"$AUTH_HEADER_FILE"
+    "$JQ_BIN" -er '.token | select(type == "string" and length > 0)' <<<"$response"
+}
+
+github_api_get() {
+    local token="$1"
+    local path="$2"
+    local result=0
+    write_authorization_header "$token"
+    "$CURL_BIN" --fail --silent --show-error \
+        --connect-timeout 5 --max-time 20 \
+        --header 'Accept: application/vnd.github+json' \
+        --header "@$AUTH_HEADER_FILE" \
+        --header 'X-GitHub-Api-Version: 2026-03-10' \
+        "$GITHUB_API_URL$path" || result=$?
+    : >"$AUTH_HEADER_FILE"
+    return "$result"
+}
+
+github_api_post() {
+    local token="$1"
+    local path="$2"
+    local body="$3"
+    local result=0
+    write_authorization_header "$token"
+    "$CURL_BIN" --fail --silent --show-error \
+        --connect-timeout 5 --max-time 20 \
+        --request POST \
+        --header 'Accept: application/vnd.github+json' \
+        --header "@$AUTH_HEADER_FILE" \
+        --header 'X-GitHub-Api-Version: 2026-03-10' \
+        --header 'Content-Type: application/json' \
+        --data-binary "$body" \
+        "$GITHUB_API_URL$path" || result=$?
+    : >"$AUTH_HEADER_FILE"
+    return "$result"
+}
+
+token="$(create_installation_token)" || {
+    record_report api-failed
+    exit 1
+}
+
+deployments_json="$(
+    github_api_get "$token" \
+        "/repos/$GITHUB_REPOSITORY/deployments?sha=$REVISION&per_page=100"
+)" || {
+    record_report api-failed
+    exit 1
+}
+"$JQ_BIN" -e 'type == "array"' <<<"$deployments_json" >/dev/null || {
+    record_report api-failed
+    exit 1
+}
+
+mapfile -t deployment_ids < <(
+    "$JQ_BIN" -r \
+        --arg task "$DEPLOYMENT_TASK" \
+        --arg environment "$DEPLOYMENT_ENVIRONMENT" \
+        --arg repository "$IMAGE_REPOSITORY" \
+        --arg digest "$DIGEST" \
+        --arg revision "$REVISION" '
+        map(select(.task == $task))
+        | map(select(.environment == $environment))
+        | map(select(.sha == $revision))
+        | map(select(.payload.schema_version == 1))
+        | map(select(.payload.image_repository == $repository))
+        | map(select(.payload.image_digest == $digest))
+        | map(select(.payload.image_revision == $revision))
+        | sort_by(.id)
+        | reverse
+        | .[].id
+        | select(type == "number")
+    ' <<<"$deployments_json"
+)
+
+if (( ${#deployment_ids[@]} == 0 )); then
+    record_report no-match
+    exit 0
+fi
+
+reported_ids=()
+uninitialized_deployment=false
+unchanged_in_progress=false
+for deployment_id in "${deployment_ids[@]}"; do
+    statuses_json="$(
+        github_api_get "$token" \
+            "/repos/$GITHUB_REPOSITORY/deployments/$deployment_id/statuses?per_page=1"
+    )" || {
+        record_report api-failed
+        exit 1
+    }
+    "$JQ_BIN" -e '
+        type == "array"
+        and all(.[]; (.id | type) == "number" and (.state | type) == "string")
+    ' <<<"$statuses_json" >/dev/null || {
+        record_report api-failed
+        exit 1
+    }
+    latest_state="$(
+        "$JQ_BIN" -er 'if length == 0 then "none" else max_by(.id).state end' \
+            <<<"$statuses_json"
+    )" \
+        || {
+            record_report api-failed
+            exit 1
+        }
+
+    case "$latest_state" in
+        success|inactive)
+            continue
+            ;;
+        failure|error)
+            # A terminal failure is immutable from the deployer's perspective;
+            # a workflow retry creates a new Deployment request.
+            continue
+            ;;
+        queued|pending|in_progress) ;;
+        none)
+            # Creation and the workflow's initial queued status are separate
+            # GitHub API calls. Do not race ahead and let queued overwrite a
+            # Pi status as the newest status.
+            uninitialized_deployment=true
+            continue
+            ;;
+        *)
+            record_report api-failed
+            exit 1
+            ;;
+    esac
+
+    if [[ "$REQUESTED_STATE" == in_progress && "$latest_state" == in_progress ]]; then
+        unchanged_in_progress=true
+        continue
+    fi
+
+    status_body="$(
+        "$JQ_BIN" -cn \
+            --arg state "$REQUESTED_STATE" \
+            --arg description "$DESCRIPTION" \
+            --arg environment "$DEPLOYMENT_ENVIRONMENT" \
+            '{
+              state: $state,
+              environment: $environment,
+              description: $description,
+              auto_inactive: false
+            }'
+    )"
+    github_api_post "$token" \
+        "/repos/$GITHUB_REPOSITORY/deployments/$deployment_id/statuses" \
+        "$status_body" >/dev/null || {
+            record_report api-failed
+            exit 1
+        }
+    reported_ids+=("$deployment_id")
+done
+
+if (( ${#reported_ids[@]} == 0 )); then
+    if [[ "$uninitialized_deployment" == true ]]; then
+        record_report awaiting-queued "$(IFS=,; printf '%s' "${deployment_ids[*]}")"
+    elif [[ "$unchanged_in_progress" == true ]]; then
+        record_report already-in-progress "$(IFS=,; printf '%s' "${deployment_ids[*]}")"
+    else
+        record_report already-terminal "$(IFS=,; printf '%s' "${deployment_ids[*]}")"
+    fi
+else
+    record_report reported "$(IFS=,; printf '%s' "${reported_ids[*]}")"
+fi
