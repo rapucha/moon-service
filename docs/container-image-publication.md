@@ -5,8 +5,10 @@
 Moon Service publishes a tested multi-architecture backend image to the GitHub
 Container Registry (GHCR). Image publication packages a successful `main`
 revision. Digest-pinned deployment and rollback on the Raspberry Pi are
-implemented under [#95](https://github.com/rapucha/moon-service/issues/95) and
-documented in the
+implemented under [#95](https://github.com/rapucha/moon-service/issues/95).
+Reliable timer rearming and exact physical-deployment acknowledgement are
+follow-up [#107](https://github.com/rapucha/moon-service/issues/107). The host
+contract is documented in the
 [Raspberry Pi runbook](../deployment/raspberry-pi/README.md).
 
 The image repository is:
@@ -38,12 +40,15 @@ These jobs do not call live Open-Meteo endpoints. On `main`, image publication
 depends on all three jobs. Before pushing, the workflow builds and starts both
 the AMD64 and ARM64 images, waits for `/readyz`, and verifies the embedded
 source revision, OCI labels, and non-root runtime identity. ARM64 runs through
-QEMU on the GitHub-hosted AMD64 runner; physical-Pi validation remains part of
-#95.
+QEMU on the GitHub-hosted AMD64 runner. After publication and serialized `main`
+promotion, a separate main-only job waits for exact confirmation from the
+physical Pi.
 
 The workflow uses only GitHub-hosted runners. Test jobs receive read-only
 repository access. Only image publication and tag promotion receive
-`packages: write`, using the repository-scoped `GITHUB_TOKEN`. All external
+`packages: write`; promotion also receives `deployments: write` so it can record
+the exact result, while the separate confirmation waiter receives Deployments
+read access only. Each uses the repository-scoped `GITHUB_TOKEN`. All external
 Actions are pinned to full commit SHAs.
 
 ## Image Identity
@@ -82,7 +87,70 @@ Both platform configs include:
 The multi-platform index repeats source and revision as OCI annotations so tag
 promotion can compare revisions without starting the application.
 
+## Physical Deployment Confirmation
+
+A green image build or `main` promotion proves that a deployable artifact
+exists; it does not by itself prove that the Pi is running it. On a successful
+push to `main`, the workflow therefore:
+
+1. uses the promotion result's exact revision and immutable multi-platform
+   index digest, including the already-newer result selected when an older
+   workflow rerun must not move `main` backward;
+2. creates a GitHub Deployment with environment `raspberry-pi`, task
+   `deploy:raspberry-pi`, and the exact revision as its `ref`;
+3. records payload schema version `1`, image repository, digest, revision,
+   expected deployment-reporter bot login, workflow run ID, workflow run
+   attempt, and workflow run URL, then posts an initial `queued` status;
+4. waits up to 15 minutes for a status posted by the Pi's repository-only
+   deployment-reporter GitHub App;
+5. succeeds only when the matching Deployment reports that the same revision
+   and digest are healthy on the physical host.
+
+The Pi may report success only after all of these identities agree:
+
+- the expected GitHub Deployment revision and digest;
+- `current.env` on the host;
+- the running container's immutable image digest and revision labels;
+- Docker health and the revision returned by `/readyz`.
+
+The reporter uses outbound HTTPS and short-lived GitHub App installation
+tokens. Its root-only App private key stays on the host, outside both Git and
+the application container. The confirmation path does not require an inbound
+LAN connection, router port forwarding, Tailscale enrollment, or a public
+Funnel URL.
+
+The waiter accepts `queued`, `pending`, and `in_progress` as nonterminal and
+succeeds only on `success`. It fails on `failure`, `error`, or `inactive`;
+`inactive` means a newer, differing image identity superseded this Deployment
+before it received exact confirmation. Requests for the same revision and
+digest remain eligible for the same Pi success rather than superseding one
+another. A missing callback or a success status whose Deployment payload is
+invalid or mismatched also fails the bounded confirmation job. An older
+workflow must never downgrade a healthy newer deployment merely to satisfy its
+own waiter.
+
+Only `success` created by repository Actions variable
+`MOON_PI_DEPLOYMENT_REPORTER_LOGIN` is authoritative. The value is the
+repo-installed App's `<app-slug>[bot]` login and is copied into the Deployment
+payload for confirm-only reruns. A success from any other actor fails. Because
+statuses are append-only, an authoritative success that races just before a
+newer promotion appends `inactive` still proves the exact revision ran and
+takes precedence over that later supersession marker.
+
+The 15-minute timeout fails the confirmation job without posting a terminal
+`error` status. This avoids racing a Pi success that arrives at the deadline and
+allows a late exact success to remain visible; a confirm-only rerun can validate
+the stored creation attempt and accept that status without creating a new image
+deployment.
+
 ## One-Time Repository Setup
+
+Before enabling the main-only confirmation gate, install the deployment-reporter
+GitHub App on this repository and configure all three App values on the Pi as
+documented in the runbook. If reporting is deliberately left disabled, the Pi
+continues to deploy GHCR `main` locally but every new confirmation waiter times
+out; that is an expected failed external gate, not a successful deployment
+signal.
 
 After this workflow has completed successfully at least once:
 
@@ -99,8 +167,8 @@ After this workflow has completed successfully at least once:
    - Recommended for the public-source tester alpha: change the package from
      private to public, then verify an anonymous digest-pinned pull. GitHub does
      not allow a public package to be changed back to private.
-   - If the package remains private, #95 must provision a separate read-only
-     GHCR credential outside Git and document rotation/recovery.
+   - If the package remains private, the Pi needs a separate read-only GHCR
+     credential outside Git with documented rotation/recovery.
 
 Do not add a long-lived package token to GitHub Actions. Publication uses only
 the short-lived `GITHUB_TOKEN` supplied to the publishing jobs.
@@ -146,6 +214,11 @@ MOON_SERVICE_CONTAINER_PLATFORM=linux/amd64 \
 
 The Pi deployment must resolve `main` to a digest and record that digest before
 restarting the service. It must not treat the moving tag as deployment identity.
+After readiness succeeds, it must confirm the exact recorded identity to the
+matching GitHub Deployment; merely reporting that some application process is
+up is insufficient. GHCR `main` remains the desired-state source, and local
+deployment continues when the GitHub Deployments API is unavailable; the
+external confirmation then remains queued and eventually times out.
 
 ## Failure And Recovery
 
@@ -158,6 +231,14 @@ restarting the service. It must not treat the moving tag as deployment identity.
   digest references before deleting a package version.
 - A failed `main` promotion can be retried safely. The workflow reuses the
   validated full-SHA image and repeats the ancestry check.
+- A timed-out or failed physical-deployment confirmation does not erase the
+  tested image or silently move `main` backward. Inspect the Pi timer, deployer
+  result, GitHub Deployment statuses, and exact running revision/digest; rerun
+  confirmation only after repairing the host or callback path.
+- If a newer successful publication supersedes a pending confirmation, keep the
+  newer healthy revision. The older Deployment becomes `inactive` and its exact
+  confirmation job fails; never roll the host back solely to make an old
+  workflow green.
 - For explicit operator rollback or recovery, retag a previously verified
   digest; do not rebuild an old source revision under a new identity:
 
@@ -168,4 +249,5 @@ docker buildx imagetools create \
 ```
 
 Manual retagging is an exceptional operator action. Record the selected Git
-revision and digest so #95 can retain the correct rollback image.
+revision and digest so the Pi can retain the correct rollback image and report
+the selected identity accurately.

@@ -26,6 +26,10 @@ CURL_BIN="${MOON_CURL_BIN:-curl}"
 JQ_BIN="${MOON_JQ_BIN:-jq}"
 SLEEP_BIN="${MOON_SLEEP_BIN:-sleep}"
 DATE_BIN="${MOON_DATE_BIN:-date}"
+GITHUB_REPORTING_ENABLED="${MOON_GITHUB_REPORTING_ENABLED:-false}"
+GITHUB_REPORT_BIN="${MOON_GITHUB_REPORT_BIN:-/usr/local/sbin/moon-service-github-report}"
+GITHUB_REPORT_TIMEOUT_SECONDS="${MOON_GITHUB_REPORT_TIMEOUT_SECONDS:-20}"
+TIMEOUT_BIN="${MOON_TIMEOUT_BIN:-timeout}"
 
 CURRENT_STATE="$STATE_DIR/current.env"
 PREVIOUS_STATE="$STATE_DIR/previous.env"
@@ -64,6 +68,9 @@ esac
 [[ "$READY_TIMEOUT_SECONDS" =~ ^[0-9]+$ ]] || exit 65
 [[ "$READY_INTERVAL_SECONDS" =~ ^[0-9]+$ ]] || exit 65
 [[ "$OPERATOR_LOCK_TIMEOUT_SECONDS" =~ ^[0-9]+$ ]] || exit 65
+[[ "$GITHUB_REPORTING_ENABLED" == true || "$GITHUB_REPORTING_ENABLED" == false ]] || exit 65
+[[ "$GITHUB_REPORT_TIMEOUT_SECONDS" =~ ^[0-9]+$ ]] || exit 65
+(( GITHUB_REPORT_TIMEOUT_SECONDS >= 1 && GITHUB_REPORT_TIMEOUT_SECONDS <= 60 )) || exit 65
 
 mkdir -p "$STATE_DIR"
 chmod 0700 "$STATE_DIR"
@@ -188,6 +195,43 @@ ready_once() {
         '.status == "ok" and .revision == $revision' <<<"$response" >/dev/null
 }
 
+deployment_identity_once() {
+    local state_file="$1"
+    local expected_digest="$2"
+    local expected_revision="$3"
+    local configured_image labels_json
+    valid_state "$state_file" || return 1
+    [[ "$(state_value "$state_file" MOON_IMAGE_DIGEST)" == "$expected_digest" ]] || return 1
+    [[ "$(state_value "$state_file" MOON_IMAGE_REVISION)" == "$expected_revision" ]] || return 1
+    configured_image="$(
+        "$DOCKER_BIN" inspect --format '{{.Config.Image}}' "$CONTAINER_NAME" 2>/dev/null
+    )" || return 1
+    [[ "$configured_image" == "$IMAGE_REPOSITORY@$expected_digest" ]] || return 1
+    labels_json="$(
+        "$DOCKER_BIN" inspect --format '{{json .Config.Labels}}' "$CONTAINER_NAME" 2>/dev/null
+    )" || return 1
+    "$JQ_BIN" -e \
+        --arg digest "$expected_digest" \
+        --arg revision "$expected_revision" '
+        .["dev.moonservice.image-digest"] == $digest
+        and .["dev.moonservice.revision"] == $revision
+    ' <<<"$labels_json" >/dev/null || return 1
+    ready_once "$expected_revision"
+}
+
+report_deployment_status() {
+    local state="$1"
+    local digest="$2"
+    local revision="$3"
+    local description="$4"
+    [[ "$GITHUB_REPORTING_ENABLED" == true ]] || return 0
+    if ! "$TIMEOUT_BIN" --signal=TERM --kill-after=5s \
+        "${GITHUB_REPORT_TIMEOUT_SECONDS}s" \
+        "$GITHUB_REPORT_BIN" "$state" "$digest" "$revision" "$description"; then
+        log "GitHub deployment status $state could not be reported; a later poll will retry"
+    fi
+}
+
 wait_until_ready() {
     local expected_revision="$1"
     local deadline=$((SECONDS + READY_TIMEOUT_SECONDS))
@@ -211,9 +255,13 @@ restore_previous_after_current_failure() {
     log "current revision $failed_revision is not ready; trying previous revision $previous_revision"
     compose_up "$PREVIOUS_STATE" true || return 1
     wait_until_ready "$previous_revision" || return 1
+    deployment_identity_once "$PREVIOUS_STATE" \
+        "$(state_value "$PREVIOUS_STATE" MOON_IMAGE_DIGEST)" "$previous_revision" || return 1
     copy_state "$CURRENT_STATE" "$REJECTED_STATE"
     mv -f "$PREVIOUS_STATE" "$CURRENT_STATE"
     record_result boot-rollback current-unhealthy "$failed_digest" "$failed_revision"
+    report_deployment_status failure "$failed_digest" "$failed_revision" \
+        "Pi rejected the recorded revision and restored the previous image"
     RECOVERED_CURRENT=true
     log "restored previous revision $previous_revision"
 }
@@ -234,7 +282,9 @@ ensure_current_running() {
     # Compose configuration before doing network work. This also restores the
     # last known-good revision when an update was interrupted after container
     # replacement but before state commit.
-    if compose_up "$CURRENT_STATE" false && wait_until_ready "$revision"; then
+    if compose_up "$CURRENT_STATE" false \
+        && wait_until_ready "$revision" \
+        && deployment_identity_once "$CURRENT_STATE" "$digest" "$revision"; then
         return 0
     fi
     if restore_previous_after_current_failure; then
@@ -252,7 +302,10 @@ restore_current_after_candidate_failure() {
         local current_revision
         current_revision="$(state_value "$CURRENT_STATE" MOON_IMAGE_REVISION)"
         log "candidate $candidate_revision failed readiness; restoring $current_revision"
-        if compose_up "$CURRENT_STATE" true && wait_until_ready "$current_revision"; then
+        if compose_up "$CURRENT_STATE" true \
+            && wait_until_ready "$current_revision" \
+            && deployment_identity_once "$CURRENT_STATE" \
+                "$(state_value "$CURRENT_STATE" MOON_IMAGE_DIGEST)" "$current_revision"; then
             record_result rolled-back candidate-unhealthy "$candidate_digest" "$candidate_revision"
             return 0
         fi
@@ -303,7 +356,9 @@ restart_current() {
     fi
     digest="$(state_value "$CURRENT_STATE" MOON_IMAGE_DIGEST)"
     revision="$(state_value "$CURRENT_STATE" MOON_IMAGE_REVISION)"
-    if compose_up "$CURRENT_STATE" true && wait_until_ready "$revision"; then
+    if compose_up "$CURRENT_STATE" true \
+        && wait_until_ready "$revision" \
+        && deployment_identity_once "$CURRENT_STATE" "$digest" "$revision"; then
         record_result restarted operator-request "$digest" "$revision"
         return 0
     fi
@@ -325,7 +380,9 @@ manual_rollback() {
     previous_digest="$(state_value "$PREVIOUS_STATE" MOON_IMAGE_DIGEST)"
     previous_revision="$(state_value "$PREVIOUS_STATE" MOON_IMAGE_REVISION)"
 
-    if ! compose_up "$PREVIOUS_STATE" true || ! wait_until_ready "$previous_revision"; then
+    if ! compose_up "$PREVIOUS_STATE" true \
+        || ! wait_until_ready "$previous_revision" \
+        || ! deployment_identity_once "$PREVIOUS_STATE" "$previous_digest" "$previous_revision"; then
         log "manual rollback target failed; restoring current revision $current_revision"
         compose_up "$CURRENT_STATE" true >/dev/null 2>&1 || true
         wait_until_ready "$current_revision" >/dev/null 2>&1 || true
@@ -420,16 +477,27 @@ fi
 if valid_state "$REJECTED_STATE" \
     && [[ "$(state_value "$REJECTED_STATE" MOON_IMAGE_DIGEST)" == "$candidate_digest" ]]; then
     record_result skipped rejected-candidate "$candidate_digest" "$candidate_revision"
+    report_deployment_status failure "$candidate_digest" "$candidate_revision" \
+        "Pi previously rejected this revision and retained its known-good image"
     log "candidate $candidate_revision already failed readiness; waiting for a new digest or operator resume"
     exit 0
 fi
 
 if valid_state "$CURRENT_STATE" \
     && [[ "$(state_value "$CURRENT_STATE" MOON_IMAGE_DIGEST)" == "$candidate_digest" ]]; then
-    record_result unchanged already-current "$candidate_digest" "$candidate_revision"
-    exit 0
+    if deployment_identity_once "$CURRENT_STATE" "$candidate_digest" "$candidate_revision"; then
+        record_result unchanged already-current "$candidate_digest" "$candidate_revision"
+        report_deployment_status success "$candidate_digest" "$candidate_revision" \
+            "Pi is healthy on the exact requested image revision and digest"
+        exit 0
+    fi
+    record_result failed current-identity-mismatch "$candidate_digest" "$candidate_revision"
+    log "current deployment does not match its recorded immutable identity"
+    exit 1
 fi
 
+report_deployment_status in_progress "$candidate_digest" "$candidate_revision" \
+    "Pi is pulling and verifying the requested immutable image"
 log "pulling candidate $candidate_revision at $candidate_digest"
 if ! "$DOCKER_BIN" pull "$IMAGE_REPOSITORY@$candidate_digest"; then
     record_result deferred candidate-pull-failed "$candidate_digest" "$candidate_revision"
@@ -438,9 +506,13 @@ if ! "$DOCKER_BIN" pull "$IMAGE_REPOSITORY@$candidate_digest"; then
 fi
 
 write_state "$CANDIDATE_STATE" "$candidate_digest" "$candidate_revision"
-if ! compose_up "$CANDIDATE_STATE" true || ! wait_until_ready "$candidate_revision"; then
+if ! compose_up "$CANDIDATE_STATE" true \
+    || ! wait_until_ready "$candidate_revision" \
+    || ! deployment_identity_once "$CANDIDATE_STATE" "$candidate_digest" "$candidate_revision"; then
     copy_state "$CANDIDATE_STATE" "$REJECTED_STATE"
     restore_current_after_candidate_failure "$candidate_digest" "$candidate_revision" || true
+    report_deployment_status failure "$candidate_digest" "$candidate_revision" \
+        "Pi rejected the candidate and restored its known-good image"
     rm -f "$CANDIDATE_STATE"
     exit 1
 fi
@@ -452,4 +524,6 @@ mv -f "$CANDIDATE_STATE" "$CURRENT_STATE"
 rm -f "$REJECTED_STATE"
 record_result deployed candidate-ready "$candidate_digest" "$candidate_revision"
 log "deployed revision $candidate_revision at $candidate_digest"
+report_deployment_status success "$candidate_digest" "$candidate_revision" \
+    "Pi is healthy on the exact requested image revision and digest"
 cleanup_images || log "post-deployment image cleanup failed; daily cleanup will retry"

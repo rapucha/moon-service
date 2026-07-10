@@ -8,3 +8,8 @@ all:
       moon_service_operator_public_key_file: REPLACE_WITH_ABSOLUTE_LOCAL_PUBLIC_KEY_PATH
       # Optional trusted-LAN access; must equal this host's active primary IPv4.
       # moon_service_bind_address: REPLACE_WITH_PI_LAN_ADDRESS
+      # Optional exact deployment acknowledgement; configure all three after
+      # installing a repo-only GitHub App with Deployments read/write.
+      # moon_service_github_app_id: REPLACE_WITH_GITHUB_APP_ID
+      # moon_service_github_app_installation_id: REPLACE_WITH_INSTALLATION_ID
+      # moon_service_github_app_private_key_file: REPLACE_WITH_ABSOLUTE_LOCAL_PEM_PATH

@@ -49,9 +49,11 @@ case "$1" in
         printf 'last systemd result: %s\n' "$(
             systemctl show moon-service-deploy.service --property=Result --value 2>/dev/null || true
         )"
-        printf 'deploy timer: %s\n' "$(systemctl is-active moon-service-deploy.timer 2>/dev/null || true)"
-        printf 'next poll: %s\n' "$(
-            systemctl show moon-service-deploy.timer --property=NextElapseUSecRealtime --value 2>/dev/null || true
+        printf 'deploy timer: %s (%s)\n' \
+            "$(systemctl is-active moon-service-deploy.timer 2>/dev/null || true)" \
+            "$(systemctl show moon-service-deploy.timer --property=SubState --value 2>/dev/null || true)"
+        printf 'next poll (monotonic): %s\n' "$(
+            systemctl show moon-service-deploy.timer --property=NextElapseUSecMonotonic --value 2>/dev/null || true
         )"
         if [[ -e "$STATE_DIR/automatic-updates-held" ]]; then
             printf 'automatic updates: held (use resume after investigation)\n'
@@ -65,6 +67,7 @@ case "$1" in
         show_state previous "$STATE_DIR/previous.env"
         show_state rejected "$STATE_DIR/rejected.env"
         show_state last-result "$STATE_DIR/last-result.env"
+        show_state last-github-report "$STATE_DIR/last-github-report.env"
         show_state last-cleanup "$STATE_DIR/last-cleanup.env"
         ;;
     revision)

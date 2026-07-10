@@ -4,6 +4,7 @@ import os
 from pathlib import Path
 import subprocess
 import tempfile
+import time
 import unittest
 
 
@@ -63,6 +64,12 @@ fi
 if [[ "$1" == inspect ]]; then
     [[ -f "$FAKE_DOCKER_STATE/active-revision" ]] || exit 1
     revision="$(cat "$FAKE_DOCKER_STATE/active-revision")"
+    digest="$(cat "$FAKE_DOCKER_STATE/active-digest")"
+    reported_digest="${FAKE_CONTAINER_DIGEST:-$digest}"
+    reported_revision="${FAKE_CONTAINER_REVISION:-$revision}"
+    if [[ "$revision" == "${FAKE_IDENTITY_MISMATCH_REVISION:-none}" ]]; then
+        reported_digest="sha256:$(printf 'f%.0s' {1..64})"
+    fi
     if [[ "$3" == *State.Status* ]]; then
         printf 'running\n'
     elif [[ "$3" == *State.Health* ]]; then
@@ -71,6 +78,11 @@ if [[ "$1" == inspect ]]; then
         else
             printf 'healthy\n'
         fi
+    elif [[ "$3" == *Config.Image* ]]; then
+        printf 'ghcr.io/rapucha/moon-service@%s\n' "$reported_digest"
+    elif [[ "$3" == *Config.Labels* ]]; then
+        printf '{"dev.moonservice.image-digest":"%s","dev.moonservice.revision":"%s"}\n' \
+            "$reported_digest" "$reported_revision"
     else
         exit 2
     fi
@@ -108,6 +120,16 @@ FAKE_CURL = r"""#!/usr/bin/env bash
 set -euo pipefail
 revision="$(cat "$FAKE_DOCKER_STATE/active-revision")"
 printf '{"status":"ok","revision":"%s"}\n' "$revision"
+"""
+
+
+FAKE_GITHUB_REPORT = r"""#!/usr/bin/env bash
+set -euo pipefail
+printf '%s\n' "$*" >>"$FAKE_DOCKER_STATE/github-reports.log"
+if [[ -n "${FAKE_GITHUB_REPORT_SLEEP_SECONDS:-}" ]]; then
+    sleep "$FAKE_GITHUB_REPORT_SLEEP_SECONDS"
+fi
+[[ "${FAKE_GITHUB_REPORT_FAIL:-0}" != 1 ]]
 """
 
 
@@ -153,6 +175,9 @@ class DeploymentStateTest(unittest.TestCase):
         self.fake_curl = self.root / "curl"
         self.fake_curl.write_text(FAKE_CURL, encoding="utf-8")
         self.fake_curl.chmod(0o755)
+        self.fake_github_report = self.root / "github-report"
+        self.fake_github_report.write_text(FAKE_GITHUB_REPORT, encoding="utf-8")
+        self.fake_github_report.chmod(0o755)
         self.environment = os.environ.copy()
         self.environment.update(
             {
@@ -162,6 +187,7 @@ class DeploymentStateTest(unittest.TestCase):
                 "MOON_CONFIG_DIR": str(self.config),
                 "MOON_CURL_BIN": str(self.fake_curl),
                 "MOON_DOCKER_BIN": str(self.fake_docker),
+                "MOON_GITHUB_REPORT_BIN": str(self.fake_github_report),
                 "MOON_READY_INTERVAL_SECONDS": "0",
                 "MOON_READY_TIMEOUT_SECONDS": "0",
                 "MOON_STATE_DIR": str(self.state),
@@ -233,6 +259,95 @@ class DeploymentStateTest(unittest.TestCase):
         self.assertEqual(first_digest, read_env(self.state / "previous.env")["MOON_IMAGE_DIGEST"])
         self.assertEqual(first_revision, read_env(self.state / "previous.env")["MOON_IMAGE_REVISION"])
         self.assertEqual(second_revision, (self.root / "active-revision").read_text().strip())
+
+    def test_deployment_reports_in_progress_and_exact_success(self):
+        digest, revision = self.set_manifest("a", "1")
+
+        result = self.run_deploy(MOON_GITHUB_REPORTING_ENABLED="true")
+
+        self.assertEqual(0, result.returncode, result.stderr)
+        reports = (self.root / "github-reports.log").read_text().splitlines()
+        self.assertEqual(2, len(reports))
+        self.assertEqual(
+            f"in_progress {digest} {revision} "
+            "Pi is pulling and verifying the requested immutable image",
+            reports[0],
+        )
+        self.assertEqual(
+            f"success {digest} {revision} "
+            "Pi is healthy on the exact requested image revision and digest",
+            reports[1],
+        )
+
+    def test_already_current_poll_retries_success_report(self):
+        digest, revision = self.set_manifest("a", "1")
+        self.assertEqual(
+            0,
+            self.run_deploy(MOON_GITHUB_REPORTING_ENABLED="true").returncode,
+        )
+
+        result = self.run_deploy(MOON_GITHUB_REPORTING_ENABLED="true")
+
+        self.assertEqual(0, result.returncode, result.stderr)
+        reports = (self.root / "github-reports.log").read_text().splitlines()
+        self.assertEqual(3, len(reports))
+        self.assertEqual(
+            f"success {digest} {revision} "
+            "Pi is healthy on the exact requested image revision and digest",
+            reports[-1],
+        )
+
+    def test_reporting_outage_does_not_undo_a_healthy_deployment(self):
+        digest, revision = self.set_manifest("a", "1")
+
+        result = self.run_deploy(
+            MOON_GITHUB_REPORTING_ENABLED="true", FAKE_GITHUB_REPORT_FAIL=1
+        )
+
+        self.assertEqual(0, result.returncode, result.stderr)
+        self.assertEqual(digest, read_env(self.state / "current.env")["MOON_IMAGE_DIGEST"])
+        self.assertEqual(revision, (self.root / "active-revision").read_text().strip())
+        self.assertIn("a later poll will retry", result.stdout)
+
+    def test_slow_reporting_is_bounded_and_does_not_block_deployment(self):
+        digest, revision = self.set_manifest("a", "1")
+
+        started = time.monotonic()
+        result = self.run_deploy(
+            MOON_GITHUB_REPORTING_ENABLED="true",
+            MOON_GITHUB_REPORT_TIMEOUT_SECONDS=1,
+            FAKE_GITHUB_REPORT_SLEEP_SECONDS=10,
+        )
+        elapsed = time.monotonic() - started
+
+        self.assertEqual(0, result.returncode, result.stderr)
+        self.assertLess(elapsed, 5)
+        self.assertEqual(digest, read_env(self.state / "current.env")["MOON_IMAGE_DIGEST"])
+        self.assertEqual(revision, (self.root / "active-revision").read_text().strip())
+        self.assertEqual(2, result.stdout.count("a later poll will retry"))
+
+    def test_candidate_with_mismatched_container_identity_is_rejected(self):
+        _, first_revision = self.set_manifest("a", "1")
+        self.assertEqual(0, self.run_deploy().returncode)
+        candidate_digest, candidate_revision = self.set_manifest("b", "2")
+
+        result = self.run_deploy(
+            FAKE_IDENTITY_MISMATCH_REVISION=candidate_revision,
+            MOON_GITHUB_REPORTING_ENABLED="true",
+        )
+
+        self.assertEqual(1, result.returncode)
+        self.assertEqual(first_revision, (self.root / "active-revision").read_text().strip())
+        self.assertEqual(
+            candidate_digest,
+            read_env(self.state / "rejected.env")["MOON_IMAGE_DIGEST"],
+        )
+        self.assertTrue(
+            (self.root / "github-reports.log")
+            .read_text()
+            .splitlines()[-1]
+            .startswith(f"failure {candidate_digest} {candidate_revision} ")
+        )
 
     def test_unhealthy_candidate_rolls_back_once_and_is_quarantined(self):
         _, current_revision = self.set_manifest("a", "1")

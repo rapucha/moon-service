@@ -94,6 +94,7 @@ jobs:
       - name: Check deployment shell syntax
         run: |
           bash -n deployment/raspberry-pi/roles/moon_service_host/files/moon-service-deploy
+          bash -n deployment/raspberry-pi/roles/moon_service_host/files/moon-service-github-report
           bash -n deployment/raspberry-pi/roles/moon_service_host/files/moon-service-control
 
       - name: Install pinned Ansible Core
@@ -351,8 +352,15 @@ jobs:
       - publish-image
     runs-on: ubuntu-24.04
     timeout-minutes: 10
+    outputs:
+      deployment_id: ${{ steps.create-deployment.outputs.deployment_id }}
+      digest: ${{ steps.verify-main.outputs.digest }}
+      reporter_login: ${{ steps.create-deployment.outputs.reporter_login }}
+      revision: ${{ steps.verify-main.outputs.revision }}
+      run_attempt: ${{ steps.create-deployment.outputs.run_attempt }}
     permissions:
       contents: read
+      deployments: write
       packages: write
     concurrency:
       group: moon-service-ghcr-main-promotion
@@ -434,6 +442,7 @@ jobs:
             "$IMAGE_NAME@$CANDIDATE_DIGEST"
 
       - name: Verify main image
+        id: verify-main
         env:
           EXPECTED_DIGEST: ${{ steps.promotion.outputs.expected_digest }}
           EXPECTED_REVISION: ${{ steps.promotion.outputs.expected_revision }}
@@ -441,10 +450,357 @@ jobs:
           set -euo pipefail
           manifest_json="$(docker buildx imagetools inspect \
             "$IMAGE_NAME:main" --format '{{json .Manifest}}')"
-          digest="$(jq -er '.digest' <<<"$manifest_json")"
-          revision="$(jq -er '.annotations["org.opencontainers.image.revision"]' <<<"$manifest_json")"
+          digest="$(jq -er '.digest | select(test("^sha256:[0-9a-f]{64}$"))' <<<"$manifest_json")"
+          revision="$(jq -er '
+            .annotations["org.opencontainers.image.revision"]
+            | select(test("^[0-9a-f]{40}$"))
+          ' <<<"$manifest_json")"
           source="$(jq -er '.annotations["org.opencontainers.image.source"]' <<<"$manifest_json")"
           [[ "$digest" == "$EXPECTED_DIGEST" ]]
           [[ "$revision" == "$EXPECTED_REVISION" ]]
           [[ "$source" == "$IMAGE_SOURCE" ]]
+          {
+            echo "digest=$digest"
+            echo "revision=$revision"
+          } >>"$GITHUB_OUTPUT"
           echo "main points to $revision at $digest"
+
+      - name: Create and queue exact Raspberry Pi deployment request
+        id: create-deployment
+        env:
+          ACTUAL_DIGEST: ${{ steps.verify-main.outputs.digest }}
+          ACTUAL_REVISION: ${{ steps.verify-main.outputs.revision }}
+          EXPECTED_REPORTER_LOGIN: ${{ vars.MOON_PI_DEPLOYMENT_REPORTER_LOGIN }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          [[ "$ACTUAL_DIGEST" =~ ^sha256:[0-9a-f]{64}$ ]]
+          [[ "$ACTUAL_REVISION" =~ ^[0-9a-f]{40}$ ]]
+          [[ "$GITHUB_RUN_ID" =~ ^[0-9]+$ ]]
+          [[ "$GITHUB_RUN_ATTEMPT" =~ ^[1-9][0-9]*$ ]]
+          [[ "$EXPECTED_REPORTER_LOGIN" =~ ^[A-Za-z0-9][A-Za-z0-9-]{0,99}\[bot\]$ ]]
+
+          workflow_run_url="$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
+          request_json="$(jq -cn \
+            --arg ref "$ACTUAL_REVISION" \
+            --arg repository "$IMAGE_NAME" \
+            --arg digest "$ACTUAL_DIGEST" \
+            --arg revision "$ACTUAL_REVISION" \
+            --arg reporter_login "$EXPECTED_REPORTER_LOGIN" \
+            --arg run_url "$workflow_run_url" \
+            --argjson run_id "$GITHUB_RUN_ID" \
+            --argjson run_attempt "$GITHUB_RUN_ATTEMPT" \
+            '{
+              ref: $ref,
+              task: "deploy:raspberry-pi",
+              auto_merge: false,
+              required_contexts: [],
+              payload: {
+                schema_version: 1,
+                image_repository: $repository,
+                image_digest: $digest,
+                image_revision: $revision,
+                deployment_reporter_login: $reporter_login,
+                workflow_run_id: $run_id,
+                workflow_run_attempt: $run_attempt,
+                workflow_run_url: $run_url
+              },
+              environment: "raspberry-pi",
+              description: ("Deploy " + $revision[0:12] + " to Raspberry Pi"),
+              transient_environment: false,
+              production_environment: false
+            }')"
+
+          response_json="$(gh api \
+            --method POST \
+            --header 'Accept: application/vnd.github+json' \
+            --header 'X-GitHub-Api-Version: 2026-03-10' \
+            "repos/$GITHUB_REPOSITORY/deployments" \
+            --input - <<<"$request_json")"
+
+          deployment_id="$(jq -er '.id | numbers | floor | select(. > 0)' <<<"$response_json")"
+          jq -e \
+            --argjson deployment_id "$deployment_id" \
+            --arg digest "$ACTUAL_DIGEST" \
+            --arg revision "$ACTUAL_REVISION" \
+            --arg repository "$IMAGE_NAME" \
+            --arg reporter_login "$EXPECTED_REPORTER_LOGIN" \
+            --arg run_url "$workflow_run_url" \
+            --argjson run_id "$GITHUB_RUN_ID" \
+            --argjson run_attempt "$GITHUB_RUN_ATTEMPT" \
+            '
+              .id == $deployment_id
+              and .sha == $revision
+              and .ref == $revision
+              and .task == "deploy:raspberry-pi"
+              and .environment == "raspberry-pi"
+              and .transient_environment == false
+              and .production_environment == false
+              and .payload.schema_version == 1
+              and .payload.image_repository == $repository
+              and .payload.image_digest == $digest
+              and .payload.image_revision == $revision
+              and .payload.deployment_reporter_login == $reporter_login
+              and .payload.workflow_run_id == $run_id
+              and .payload.workflow_run_attempt == $run_attempt
+              and .payload.workflow_run_url == $run_url
+            ' <<<"$response_json" >/dev/null
+
+          status_json="$(jq -cn \
+            --arg environment raspberry-pi \
+            --arg log_url "$workflow_run_url" \
+            '{
+              state: "queued",
+              environment: $environment,
+              log_url: $log_url,
+              description: "Waiting for the Raspberry Pi deployment poller",
+              auto_inactive: false
+            }')"
+          status_response_json="$(gh api \
+            --method POST \
+            --header 'Accept: application/vnd.github+json' \
+            --header 'X-GitHub-Api-Version: 2026-03-10' \
+            "repos/$GITHUB_REPOSITORY/deployments/$deployment_id/statuses" \
+            --input - <<<"$status_json")"
+          jq -e \
+            --arg environment raspberry-pi \
+            --arg log_url "$workflow_run_url" \
+            '
+              .state == "queued"
+              and .environment == $environment
+              and .log_url == $log_url
+            ' <<<"$status_response_json" >/dev/null
+
+          deployments_json="$(gh api \
+            --method GET \
+            --header 'Accept: application/vnd.github+json' \
+            --header 'X-GitHub-Api-Version: 2026-03-10' \
+            "repos/$GITHUB_REPOSITORY/deployments" \
+            --field environment=raspberry-pi \
+            --field task='deploy:raspberry-pi' \
+            --field per_page=100)"
+          jq -e 'type == "array"' <<<"$deployments_json" >/dev/null
+          mapfile -t prior_deployment_ids < <(jq -r \
+            --argjson current_id "$deployment_id" \
+            --arg repository "$IMAGE_NAME" \
+            --arg digest "$ACTUAL_DIGEST" \
+            --arg revision "$ACTUAL_REVISION" \
+            '
+              .[]
+              | select(.id < $current_id)
+              | select(.task == "deploy:raspberry-pi")
+              | select(.environment == "raspberry-pi")
+              | select((.payload | type) == "object")
+              | select(.payload.schema_version == 1)
+              | select(
+                  .payload.image_repository != $repository
+                  or .payload.image_digest != $digest
+                  or .payload.image_revision != $revision)
+              | .id
+              | select(type == "number" and . > 0)
+            ' <<<"$deployments_json")
+
+          for prior_deployment_id in "${prior_deployment_ids[@]}"; do
+            prior_statuses_json="$(gh api \
+              --header 'Accept: application/vnd.github+json' \
+              --header 'X-GitHub-Api-Version: 2026-03-10' \
+              "repos/$GITHUB_REPOSITORY/deployments/$prior_deployment_id/statuses?per_page=100")"
+            jq -e 'type == "array"' <<<"$prior_statuses_json" >/dev/null
+            prior_state="$(jq -er '
+              if length == 0 then "none" else max_by(.id).state end
+            ' <<<"$prior_statuses_json")"
+
+            case "$prior_state" in
+              queued|pending|in_progress|none)
+                inactive_json="$(jq -cn \
+                  --arg description "Superseded by deployment $deployment_id" \
+                  --arg log_url "$workflow_run_url" \
+                  '{
+                    state: "inactive",
+                    environment: "raspberry-pi",
+                    description: $description,
+                    log_url: $log_url,
+                    auto_inactive: false
+                  }')"
+                inactive_response_json="$(gh api \
+                  --method POST \
+                  --header 'Accept: application/vnd.github+json' \
+                  --header 'X-GitHub-Api-Version: 2026-03-10' \
+                  "repos/$GITHUB_REPOSITORY/deployments/$prior_deployment_id/statuses" \
+                  --input - <<<"$inactive_json")"
+                jq -e '.state == "inactive"' <<<"$inactive_response_json" >/dev/null
+                echo "Marked deployment $prior_deployment_id inactive in favor of $deployment_id"
+                ;;
+              success|failure|error|inactive)
+                ;;
+              *)
+                echo "Deployment $prior_deployment_id returned unsupported state $prior_state" >&2
+                exit 1
+                ;;
+            esac
+          done
+
+          echo "deployment_id=$deployment_id" >>"$GITHUB_OUTPUT"
+          echo "reporter_login=$EXPECTED_REPORTER_LOGIN" >>"$GITHUB_OUTPUT"
+          echo "run_attempt=$GITHUB_RUN_ATTEMPT" >>"$GITHUB_OUTPUT"
+          echo "Created queued deployment $deployment_id for $ACTUAL_REVISION at $ACTUAL_DIGEST"
+
+  confirm-raspberry-pi:
+    name: Confirm Raspberry Pi deployment
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs:
+      - promote-main
+    runs-on: ubuntu-24.04
+    timeout-minutes: 17
+    permissions:
+      deployments: read
+    steps:
+      - name: Wait for exact Raspberry Pi deployment status
+        env:
+          DEPLOYMENT_ID: ${{ needs.promote-main.outputs.deployment_id }}
+          EXPECTED_DIGEST: ${{ needs.promote-main.outputs.digest }}
+          EXPECTED_REPORTER_LOGIN: ${{ needs.promote-main.outputs.reporter_login }}
+          EXPECTED_REVISION: ${{ needs.promote-main.outputs.revision }}
+          EXPECTED_RUN_ATTEMPT: ${{ needs.promote-main.outputs.run_attempt }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          [[ "$DEPLOYMENT_ID" =~ ^[0-9]+$ ]]
+          [[ "$EXPECTED_DIGEST" =~ ^sha256:[0-9a-f]{64}$ ]]
+          [[ "$EXPECTED_REVISION" =~ ^[0-9a-f]{40}$ ]]
+          [[ "$EXPECTED_REPORTER_LOGIN" =~ ^[A-Za-z0-9][A-Za-z0-9-]{0,99}\[bot\]$ ]]
+          [[ "$GITHUB_RUN_ID" =~ ^[0-9]+$ ]]
+          [[ "$EXPECTED_RUN_ATTEMPT" =~ ^[1-9][0-9]*$ ]]
+
+          workflow_run_url="$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
+          deployment_json="$(gh api \
+            --header 'Accept: application/vnd.github+json' \
+            --header 'X-GitHub-Api-Version: 2026-03-10' \
+            "repos/$GITHUB_REPOSITORY/deployments/$DEPLOYMENT_ID")"
+          jq -e \
+            --argjson deployment_id "$DEPLOYMENT_ID" \
+            --arg digest "$EXPECTED_DIGEST" \
+            --arg revision "$EXPECTED_REVISION" \
+            --arg repository "$IMAGE_NAME" \
+            --arg reporter_login "$EXPECTED_REPORTER_LOGIN" \
+            --arg run_url "$workflow_run_url" \
+            --argjson run_id "$GITHUB_RUN_ID" \
+            --argjson run_attempt "$EXPECTED_RUN_ATTEMPT" \
+            '
+              .id == $deployment_id
+              and .sha == $revision
+              and .ref == $revision
+              and .task == "deploy:raspberry-pi"
+              and .environment == "raspberry-pi"
+              and .transient_environment == false
+              and .production_environment == false
+              and .payload.schema_version == 1
+              and .payload.image_repository == $repository
+              and .payload.image_digest == $digest
+              and .payload.image_revision == $revision
+              and .payload.deployment_reporter_login == $reporter_login
+              and .payload.workflow_run_id == $run_id
+              and .payload.workflow_run_attempt == $run_attempt
+              and .payload.workflow_run_url == $run_url
+            ' <<<"$deployment_json" >/dev/null
+
+          deadline=$((SECONDS + 900))
+          last_status_id=""
+          consecutive_status_read_failures=0
+
+          retry_status_read() {
+            local reason="$1"
+            local delay remaining
+            consecutive_status_read_failures=$((consecutive_status_read_failures + 1))
+            if (( consecutive_status_read_failures > 3 )); then
+              echo "Unable to read deployment status after 3 retries: $reason" >&2
+              return 1
+            fi
+            delay=$((5 * (1 << (consecutive_status_read_failures - 1))))
+            remaining=$((deadline - SECONDS))
+            (( remaining > 0 )) || return 0
+            (( delay <= remaining )) || delay="$remaining"
+            echo "::warning::Unable to read deployment status ($reason); retrying in ${delay}s"
+            sleep "$delay"
+          }
+
+          while true; do
+            if ! statuses_json="$(gh api \
+                --header 'Accept: application/vnd.github+json' \
+                --header 'X-GitHub-Api-Version: 2026-03-10' \
+                "repos/$GITHUB_REPOSITORY/deployments/$DEPLOYMENT_ID/statuses?per_page=100")"; then
+              (( SECONDS < deadline )) || break
+              retry_status_read "GitHub API request failed" || exit 1
+              continue
+            fi
+            jq -e '
+              type == "array"
+              and all(.[];
+                (.id | type) == "number"
+                and (.state | type) == "string"
+                and (.creator.login | type) == "string"
+                and .environment == "raspberry-pi")
+            ' <<<"$statuses_json" >/dev/null
+
+            if [[ "$(jq -er 'length' <<<"$statuses_json")" == 0 ]]; then
+              (( SECONDS < deadline )) || break
+              retry_status_read "GitHub returned an empty status list" || exit 1
+              continue
+            fi
+            consecutive_status_read_failures=0
+
+            if successful_status="$(jq -cer --arg reporter "$EXPECTED_REPORTER_LOGIN" '
+                [.[] | select(
+                  .state == "success" and .creator.login == $reporter)]
+                | if length == 0 then empty else max_by(.id) end
+              ' <<<"$statuses_json")"; then
+              status_id="$(jq -er '.id | numbers | floor | select(. > 0)' \
+                <<<"$successful_status")"
+              creator="$(jq -er '.creator.login' <<<"$successful_status")"
+              echo "Deployment $DEPLOYMENT_ID reached success in status $status_id (reported by $creator)"
+              echo "Raspberry Pi confirmed $EXPECTED_REVISION at $EXPECTED_DIGEST"
+              exit 0
+            fi
+
+            latest_status="$(jq -cer 'max_by(.id)' <<<"$statuses_json")"
+            status_id="$(jq -er '.id | numbers | floor | select(. > 0)' <<<"$latest_status")"
+            state="$(jq -er '.state' <<<"$latest_status")"
+            creator="$(jq -er '.creator.login' <<<"$latest_status")"
+
+            if [[ "$status_id" != "$last_status_id" ]]; then
+              echo "Deployment $DEPLOYMENT_ID is $state (reported by $creator)"
+              last_status_id="$status_id"
+            fi
+
+            case "$state" in
+              success)
+                echo "Deployment $DEPLOYMENT_ID received success from unexpected actor $creator" >&2
+                exit 1
+                ;;
+              failure|error)
+                echo "Raspberry Pi deployment $DEPLOYMENT_ID reported $state" >&2
+                exit 1
+                ;;
+              inactive)
+                echo "Deployment $DEPLOYMENT_ID was superseded without exact confirmation" >&2
+                exit 1
+                ;;
+              queued|pending|in_progress)
+                ;;
+              *)
+                echo "Deployment $DEPLOYMENT_ID returned unsupported state $state" >&2
+                exit 1
+                ;;
+            esac
+
+            remaining=$((deadline - SECONDS))
+            (( remaining > 0 )) || break
+            if (( remaining < 15 )); then
+              sleep "$remaining"
+            else
+              sleep 15
+            fi
+          done
+
+          echo "Raspberry Pi did not confirm deployment $DEPLOYMENT_ID within 15 minutes" >&2
+          exit 1
