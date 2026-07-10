@@ -16,6 +16,7 @@ Start Here
   - `docs/api-shape.md`
   - `docs/self-hosting-alpha-plan.md`
   - `docs/container-image-publication.md`
+  - `deployment/raspberry-pi/README.md`
 - Domain decisions:
   - `docs/scoring-model.md`
   - `docs/ephemeris-research.md`

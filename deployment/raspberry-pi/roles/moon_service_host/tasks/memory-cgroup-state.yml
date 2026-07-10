@@ -1,0 +1,80 @@
+---
+- name: Read the persistent Raspberry Pi kernel command line
+  ansible.builtin.slurp:
+    src: "{{ _moon_service_memory_cgroup_boot_cmdline_path }}"
+  register: _moon_service_memory_cgroup_boot_cmdline
+
+- name: Validate the persistent Raspberry Pi kernel command line
+  ansible.builtin.assert:
+    that:
+      - (_moon_service_memory_cgroup_boot_cmdline.content | b64decode | trim | length) > 0
+      - >-
+        ((_moon_service_memory_cgroup_boot_cmdline.content | b64decode | trim)
+         | split('\n') | length) == 1
+      - >-
+        'cgroup_disable=memory' not in
+        (_moon_service_memory_cgroup_boot_cmdline.content | b64decode | trim).split()
+    fail_msg: >-
+      The supported Raspberry Pi boot file must contain one non-empty command
+      line and must not disable the memory cgroup after firmware arguments.
+
+- name: Record the persistent memory-cgroup argument state
+  ansible.builtin.set_fact:
+    _moon_service_memory_cgroup_boot_argument_present: >-
+      {{ 'cgroup_enable=memory' in
+         (_moon_service_memory_cgroup_boot_cmdline.content | b64decode | trim).split() }}
+
+- name: Persist the Raspberry Pi memory-cgroup kernel argument
+  ansible.builtin.lineinfile:
+    path: "{{ _moon_service_memory_cgroup_boot_cmdline_path }}"
+    regexp: '^(.+)$'
+    line: '\1 cgroup_enable=memory'
+    backrefs: true
+    state: present
+  when: not _moon_service_memory_cgroup_boot_argument_present
+
+- name: Read the active kernel command line
+  ansible.builtin.slurp:
+    src: "{{ _moon_service_memory_cgroup_runtime_cmdline_path }}"
+  register: _moon_service_memory_cgroup_runtime_cmdline
+  check_mode: false
+
+- name: Inspect the cgroup v2 controller file
+  ansible.builtin.stat:
+    path: "{{ _moon_service_memory_cgroup_controllers_path }}"
+  register: _moon_service_memory_cgroup_controllers_file
+  check_mode: false
+
+- name: Read the active cgroup v2 controllers
+  ansible.builtin.slurp:
+    src: "{{ _moon_service_memory_cgroup_controllers_path }}"
+  register: _moon_service_memory_cgroup_controllers
+  when: _moon_service_memory_cgroup_controllers_file.stat.exists
+  check_mode: false
+
+- name: Record the active memory-cgroup state
+  ansible.builtin.set_fact:
+    _moon_service_memory_cgroup_runtime_argument_present: >-
+      {{ 'cgroup_enable=memory' in
+         (_moon_service_memory_cgroup_runtime_cmdline.content | b64decode | trim).split() }}
+    _moon_service_memory_controller_active: >-
+      {{ _moon_service_memory_cgroup_controllers_file.stat.exists
+         and 'memory' in
+         (_moon_service_memory_cgroup_controllers.content
+          | default('') | b64decode | trim).split() }}
+
+- name: Record whether memory-cgroup activation requires a reboot
+  ansible.builtin.set_fact:
+    _moon_service_memory_cgroup_reboot_required: >-
+      {{ not _moon_service_memory_controller_active
+         and not _moon_service_memory_cgroup_runtime_argument_present }}
+
+- name: Require the active cgroup v2 memory controller
+  ansible.builtin.assert:
+    that:
+      - _moon_service_memory_controller_active
+    fail_msg: >-
+      The cgroup v2 memory controller is unavailable after applying the
+      supported Raspberry Pi boot argument. Refusing to start or recreate an
+      application container without its configured memory limit.
+  when: _moon_service_memory_cgroup_require_active | default(false) | bool

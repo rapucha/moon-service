@@ -1,0 +1,11 @@
+---
+- name: Refresh the recorded deployment state
+  ansible.builtin.stat:
+    path: "{{ moon_service_state_dir }}/current.env"
+  register: _moon_service_converged_deployment_state
+
+- name: Record whether the converged deployment must be recreated
+  ansible.builtin.set_fact:
+    _moon_service_container_recreate_required: >-
+      {{ _moon_service_converged_deployment_state.stat.exists
+         and _moon_service_deployment_remediation_required }}

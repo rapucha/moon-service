@@ -1,0 +1,12 @@
+[Unit]
+Description=Run bounded Moon Service image cleanup daily
+
+[Timer]
+OnBootSec=20min
+OnUnitInactiveSec=1d
+RandomizedDelaySec=30min
+Persistent=true
+Unit=moon-service-cleanup.service
+
+[Install]
+WantedBy=timers.target

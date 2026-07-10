@@ -1,0 +1,8 @@
+---
+all:
+  hosts:
+    syntax-only:
+      ansible_connection: local
+      ansible_user: ci-bootstrap
+      moon_service_operator_user: moonops
+      moon_service_operator_public_key_file: /dev/null

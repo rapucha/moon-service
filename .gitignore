@@ -5,3 +5,14 @@ node_modules/
 playwright-report/
 test-results/
 docs/generated/
+deployment/raspberry-pi/inventory*.yml
+!deployment/raspberry-pi/inventory.example.yml
+deployment/raspberry-pi/inventory*.yaml
+deployment/raspberry-pi/group_vars/
+deployment/raspberry-pi/host_vars/
+deployment/raspberry-pi/*.retry
+deployment/raspberry-pi/.vault-password*
+deployment/raspberry-pi/*.key
+deployment/raspberry-pi/*.pem
+deployment/raspberry-pi/*.pub
+deployment/raspberry-pi/id_*

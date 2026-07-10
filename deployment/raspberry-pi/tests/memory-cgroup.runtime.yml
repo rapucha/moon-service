@@ -1,0 +1,206 @@
+---
+- name: Test Raspberry Pi memory-cgroup state convergence
+  hosts: all
+  gather_facts: false
+  vars:
+    _test_memory_cgroup_root: /tmp/moon-service-memory-cgroup-test
+    _moon_service_memory_cgroup_boot_cmdline_path: >-
+      {{ _test_memory_cgroup_root }}/cmdline.txt
+    _moon_service_memory_cgroup_runtime_cmdline_path: >-
+      {{ _test_memory_cgroup_root }}/proc-cmdline
+    _moon_service_memory_cgroup_controllers_path: >-
+      {{ _test_memory_cgroup_root }}/cgroup.controllers
+  tasks:
+    - name: Exercise the memory-cgroup state contract
+      block:
+        - name: Reset the memory-cgroup test directory
+          ansible.builtin.file:
+            path: "{{ _test_memory_cgroup_root }}"
+            state: absent
+
+        - name: Create the memory-cgroup test directory
+          ansible.builtin.file:
+            path: "{{ _test_memory_cgroup_root }}"
+            state: directory
+            mode: "0700"
+
+        - name: Write a default persistent kernel command line
+          ansible.builtin.copy:
+            dest: "{{ _moon_service_memory_cgroup_boot_cmdline_path }}"
+            content: "console=tty1 root=/dev/test rootwait\n"
+            mode: "0600"
+
+        - name: Write a default active kernel command line
+          ansible.builtin.copy:
+            dest: "{{ _moon_service_memory_cgroup_runtime_cmdline_path }}"
+            content: "cgroup_disable=memory console=tty1 root=/dev/test rootwait\n"
+            mode: "0600"
+
+        - name: Write controllers without memory support
+          ansible.builtin.copy:
+            dest: "{{ _moon_service_memory_cgroup_controllers_path }}"
+            content: "cpuset cpu io pids\n"
+            mode: "0600"
+
+        - name: Apply the persistent memory-cgroup state
+          ansible.builtin.include_tasks: >-
+            ../roles/moon_service_host/tasks/memory-cgroup-state.yml
+          vars:
+            _moon_service_memory_cgroup_require_active: false
+
+        - name: Read the updated persistent kernel command line
+          ansible.builtin.slurp:
+            src: "{{ _moon_service_memory_cgroup_boot_cmdline_path }}"
+          register: _test_memory_cgroup_first_boot_cmdline
+
+        - name: Verify the first pass persists one argument and requests reboot
+          ansible.builtin.assert:
+            that:
+              - _moon_service_memory_cgroup_reboot_required
+              - >-
+                ((_test_memory_cgroup_first_boot_cmdline.content | b64decode | trim).split()
+                 | select('equalto', 'cgroup_enable=memory') | list | length) == 1
+
+        - name: Simulate the rebooted active kernel command line
+          ansible.builtin.copy:
+            dest: "{{ _moon_service_memory_cgroup_runtime_cmdline_path }}"
+            content: >-
+              cgroup_disable=memory console=tty1 root=/dev/test rootwait
+              cgroup_enable=memory
+            mode: "0600"
+
+        - name: Simulate the rebooted cgroup v2 controllers
+          ansible.builtin.copy:
+            dest: "{{ _moon_service_memory_cgroup_controllers_path }}"
+            content: "cpuset cpu io memory pids\n"
+            mode: "0600"
+
+        - name: Verify the active memory controller after simulated reboot
+          ansible.builtin.include_tasks: >-
+            ../roles/moon_service_host/tasks/memory-cgroup-state.yml
+          vars:
+            _moon_service_memory_cgroup_require_active: true
+
+        - name: Read the stable persistent kernel command line
+          ansible.builtin.slurp:
+            src: "{{ _moon_service_memory_cgroup_boot_cmdline_path }}"
+          register: _test_memory_cgroup_stable_boot_cmdline
+
+        - name: Reapply the active memory-cgroup state
+          ansible.builtin.include_tasks: >-
+            ../roles/moon_service_host/tasks/memory-cgroup-state.yml
+          vars:
+            _moon_service_memory_cgroup_require_active: true
+
+        - name: Read the reapplied persistent kernel command line
+          ansible.builtin.slurp:
+            src: "{{ _moon_service_memory_cgroup_boot_cmdline_path }}"
+          register: _test_memory_cgroup_reapplied_boot_cmdline
+
+        - name: Verify stable memory-cgroup state is byte-idempotent
+          ansible.builtin.assert:
+            that:
+              - not _moon_service_memory_cgroup_reboot_required
+              - >-
+                _test_memory_cgroup_reapplied_boot_cmdline.content
+                == _test_memory_cgroup_stable_boot_cmdline.content
+
+        - name: Remove the persistent argument while keeping active support
+          ansible.builtin.copy:
+            dest: "{{ _moon_service_memory_cgroup_boot_cmdline_path }}"
+            content: "console=tty1 root=/dev/test rootwait\n"
+            mode: "0600"
+
+        - name: Repair persistence without an unnecessary reboot
+          ansible.builtin.include_tasks: >-
+            ../roles/moon_service_host/tasks/memory-cgroup-state.yml
+          vars:
+            _moon_service_memory_cgroup_require_active: true
+
+        - name: Verify persistence repair does not request reboot
+          ansible.builtin.assert:
+            that:
+              - not _moon_service_memory_cgroup_reboot_required
+
+        - name: Simulate an interrupted run before reboot
+          ansible.builtin.copy:
+            dest: "{{ _moon_service_memory_cgroup_runtime_cmdline_path }}"
+            content: "cgroup_disable=memory console=tty1 root=/dev/test rootwait\n"
+            mode: "0600"
+
+        - name: Remove active memory support after the interrupted run
+          ansible.builtin.copy:
+            dest: "{{ _moon_service_memory_cgroup_controllers_path }}"
+            content: "cpuset cpu io pids\n"
+            mode: "0600"
+
+        - name: Detect the interrupted reboot requirement
+          ansible.builtin.include_tasks: >-
+            ../roles/moon_service_host/tasks/memory-cgroup-state.yml
+          vars:
+            _moon_service_memory_cgroup_require_active: false
+
+        - name: Verify an unchanged boot file still requests reboot
+          ansible.builtin.assert:
+            that:
+              - _moon_service_memory_cgroup_reboot_required
+
+        - name: Snapshot deployment state before an in-flight deployment finishes
+          ansible.builtin.stat:
+            path: "{{ _test_memory_cgroup_root }}/current.env"
+          register: _test_initial_deployment_state
+
+        - name: Simulate an in-flight deployment recording current state
+          ansible.builtin.copy:
+            dest: "{{ _test_memory_cgroup_root }}/current.env"
+            content: "MOON_IMAGE_DIGEST=sha256:test\n"
+            mode: "0600"
+
+        - name: Refresh deployment state after draining automatic work
+          ansible.builtin.include_tasks: >-
+            ../roles/moon_service_host/tasks/deployment-recreation-state.yml
+          vars:
+            moon_service_state_dir: "{{ _test_memory_cgroup_root }}"
+            _moon_service_deployment_remediation_required: true
+
+        - name: Verify the fresh state forces recreation
+          ansible.builtin.assert:
+            that:
+              - not _test_initial_deployment_state.stat.exists
+              - _moon_service_converged_deployment_state.stat.exists
+              - _moon_service_container_recreate_required
+
+        - name: Simulate an active argument without controller support
+          ansible.builtin.copy:
+            dest: "{{ _moon_service_memory_cgroup_runtime_cmdline_path }}"
+            content: >-
+              cgroup_disable=memory console=tty1 root=/dev/test rootwait
+              cgroup_enable=memory
+            mode: "0600"
+
+        - name: Initialize the fail-closed assertion result
+          ansible.builtin.set_fact:
+            _test_memory_cgroup_failure_observed: false
+
+        - name: Expect missing active controller support to fail closed
+          block:
+            - name: Require unavailable memory-controller support
+              ansible.builtin.include_tasks: >-
+                ../roles/moon_service_host/tasks/memory-cgroup-state.yml
+              vars:
+                _moon_service_memory_cgroup_require_active: true
+          rescue:
+            - name: Record the expected controller assertion failure
+              ansible.builtin.set_fact:
+                _test_memory_cgroup_failure_observed: true
+
+        - name: Verify missing controller support failed closed
+          ansible.builtin.assert:
+            that:
+              - _test_memory_cgroup_failure_observed
+              - not _moon_service_memory_cgroup_reboot_required
+      always:
+        - name: Remove the memory-cgroup test directory
+          ansible.builtin.file:
+            path: "{{ _test_memory_cgroup_root }}"
+            state: absent

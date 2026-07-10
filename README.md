@@ -2,10 +2,11 @@
 
 Moon Service is an early-stage discovery and alert tool for photographers. The goal is to identify upcoming Moon photography opportunities near a selected city or location, with emphasis on a low Moon, useful ambient light, and promising weather.
 
-The project is moving from documentation-led prototypes into a thin real
-backend spine. The first backend module is intentionally small and
-fixture-backed; Android, database, deployment, accounts, and live provider
-integrations still wait until their boundaries are proven.
+The project has moved from documentation-led prototypes into a thin real
+backend and deployment spine. The anonymous lookup uses live provider adapters,
+and tested multi-architecture images can run on the declaratively provisioned
+Raspberry Pi host. Android, a database, accounts, and saved alerts remain
+deferred until their boundaries are proven.
 
 ## MVP Direction
 
@@ -56,6 +57,8 @@ process, but they are cleared on restart and are not shared across instances.
 - `docs/weather-provider-research.md`: weather provider decision and validation notes.
 - `docs/geocoding-research.md`: geocoding provider decision and validation notes.
 - `docs/container-image-publication.md`: tested GHCR image publication, identity, and recovery contract.
+- `deployment/raspberry-pi/`: Ansible provisioning, digest-pinned Compose
+  deployment, automatic rollback, and the Raspberry Pi operator runbook.
 - `docs/mvp-roadmap.md`: milestone plan and next steps.
 - `scripts/geocoding_contract_spike.py`: retained Python spike for checking the v0 geocoding contract.
 - `scripts/scoring_contract_spike.py`: retained Python spike for checking the v0 scoring contract with fixture data.

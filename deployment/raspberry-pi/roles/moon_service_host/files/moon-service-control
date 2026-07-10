@@ -1,0 +1,90 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+
+umask 027
+PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+export PATH
+
+[[ $# -eq 1 ]] || {
+    printf 'Usage: %s {status|revision|logs|restart|rollback|resume}\n' "$0" >&2
+    exit 64
+}
+
+CONFIG_DIR=/etc/moon-service
+STATE_DIR=/var/lib/moon-service
+READY_URL=http://127.0.0.1:8080/readyz
+if [[ -r "$CONFIG_DIR/host.env" ]]; then
+    # Root-owned, non-secret deployment settings rendered by Ansible.
+    # shellcheck disable=SC1091
+    source "$CONFIG_DIR/host.env"
+    STATE_DIR="${MOON_STATE_DIR:-$STATE_DIR}"
+    READY_URL="${MOON_READY_URL:-$READY_URL}"
+fi
+
+show_state() {
+    local label="$1"
+    local file="$2"
+    printf '%s:\n' "$label"
+    if [[ -r "$file" ]]; then
+        sed 's/^/  /' "$file"
+    else
+        printf '  none\n'
+    fi
+}
+
+run_deployment_operation() {
+    local operation="$1"
+    exec env -i \
+        PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin \
+        MOON_CONFIG_DIR=/etc/moon-service \
+        /usr/local/sbin/moon-service-deploy "$operation"
+}
+
+case "$1" in
+    status)
+        printf 'container: '
+        docker inspect --format '{{.State.Status}} (health={{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}})' \
+            moon-service 2>/dev/null || printf 'absent\n'
+        printf 'deploy service: %s\n' "$(systemctl is-active moon-service-deploy.service 2>/dev/null || true)"
+        printf 'last systemd result: %s\n' "$(
+            systemctl show moon-service-deploy.service --property=Result --value 2>/dev/null || true
+        )"
+        printf 'deploy timer: %s\n' "$(systemctl is-active moon-service-deploy.timer 2>/dev/null || true)"
+        printf 'next poll: %s\n' "$(
+            systemctl show moon-service-deploy.timer --property=NextElapseUSecRealtime --value 2>/dev/null || true
+        )"
+        if [[ -e "$STATE_DIR/automatic-updates-held" ]]; then
+            printf 'automatic updates: held (use resume after investigation)\n'
+        elif [[ -e "$STATE_DIR/memory-limit-remediation" \
+            || -e "$STATE_DIR/host-configuration-remediation" ]]; then
+            printf 'automatic updates: disabled (rerun provisioning to complete host remediation)\n'
+        else
+            printf 'automatic updates: enabled\n'
+        fi
+        show_state current "$STATE_DIR/current.env"
+        show_state previous "$STATE_DIR/previous.env"
+        show_state rejected "$STATE_DIR/rejected.env"
+        show_state last-result "$STATE_DIR/last-result.env"
+        show_state last-cleanup "$STATE_DIR/last-cleanup.env"
+        ;;
+    revision)
+        curl --fail --silent --show-error --noproxy '*' --max-time 5 "$READY_URL"
+        printf '\n'
+        ;;
+    logs)
+        docker logs --tail 200 --timestamps moon-service
+        ;;
+    restart)
+        run_deployment_operation restart
+        ;;
+    rollback)
+        run_deployment_operation rollback
+        ;;
+    resume)
+        run_deployment_operation resume
+        ;;
+    *)
+        printf 'Usage: %s {status|revision|logs|restart|rollback|resume}\n' "$0" >&2
+        exit 64
+        ;;
+esac

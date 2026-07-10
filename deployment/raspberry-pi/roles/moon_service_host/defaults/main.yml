@@ -1,0 +1,26 @@
+---
+moon_service_image_repository: ghcr.io/rapucha/moon-service
+moon_service_image_channel: main
+moon_service_image_source: https://github.com/rapucha/moon-service
+
+# Keep the safe default on loopback. A host may explicitly select its primary
+# IPv4 address for trusted-LAN access; public ingress remains issue #97.
+moon_service_bind_address: 127.0.0.1
+moon_service_host_port: 8080
+moon_service_container_memory: 1536m
+moon_service_container_cpus: "2.0"
+moon_service_container_pids: 256
+moon_service_readiness_timeout_seconds: 90
+moon_service_poll_interval: 2min
+
+moon_service_ops_group: moon-service-ops
+moon_service_operator_user: moonops
+moon_service_compose_dir: /opt/moon-service
+moon_service_config_dir: /etc/moon-service
+moon_service_state_dir: /var/lib/moon-service
+
+moon_service_docker_log_max_size: 10m
+moon_service_docker_log_max_files: "3"
+moon_service_journal_system_max_use: 256M
+moon_service_journal_runtime_max_use: 64M
+moon_service_journal_max_retention: 7day

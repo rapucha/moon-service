@@ -1,0 +1,27 @@
+[Unit]
+Description=Remove superseded Moon Service images
+Requires=docker.service
+After=docker.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/moon-service-deploy cleanup
+TimeoutStartSec=10min
+UMask=0027
+EnvironmentFile={{ moon_service_config_dir }}/host.env
+NoNewPrivileges=true
+PrivateDevices=true
+PrivateTmp=true
+ProtectClock=true
+ProtectControlGroups=true
+ProtectHome=read-only
+ProtectHostname=true
+ProtectKernelLogs=true
+ProtectKernelModules=true
+ProtectKernelTunables=true
+ProtectSystem=strict
+ReadWritePaths={{ moon_service_state_dir }} /root/.docker
+RestrictAddressFamilies=AF_UNIX
+RestrictNamespaces=true
+RestrictRealtime=true
+LockPersonality=true

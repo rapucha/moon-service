@@ -81,12 +81,97 @@ jobs:
       - name: Run frontend checks
         run: npm run frontend:ci
 
+  deployment-tests:
+    name: Deployment tests
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Check out source
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          persist-credentials: false
+
+      - name: Check deployment shell syntax
+        run: |
+          bash -n deployment/raspberry-pi/roles/moon_service_host/files/moon-service-deploy
+          bash -n deployment/raspberry-pi/roles/moon_service_host/files/moon-service-control
+
+      - name: Install pinned Ansible Core
+        run: |
+          python3 -m venv /tmp/moon-service-ansible
+          /tmp/moon-service-ansible/bin/pip install \
+            --disable-pip-version-check --no-input \
+            --requirement deployment/raspberry-pi/ci-requirements.txt
+
+      - name: Check Ansible role syntax
+        working-directory: deployment/raspberry-pi
+        run: |
+          /tmp/moon-service-ansible/bin/ansible-playbook \
+            --inventory tests/inventory.syntax.yml \
+            --syntax-check site.yml
+
+      - name: Test memory-cgroup provisioning state
+        working-directory: deployment/raspberry-pi
+        run: |
+          /tmp/moon-service-ansible/bin/ansible-playbook \
+            --inventory localhost, \
+            --connection local \
+            tests/memory-cgroup.runtime.yml
+
+      - name: Test application listener boundary
+        working-directory: deployment/raspberry-pi
+        run: |
+          /tmp/moon-service-ansible/bin/ansible-playbook \
+            --inventory localhost, \
+            --connection local \
+            tests/bind-address.runtime.yml
+
+      - name: Validate rendered Compose definition
+        run: |
+          sed \
+            -e 's#{{ moon_service_config_dir }}/application.env#/dev/null#g' \
+            -e 's#{{ moon_service_bind_address }}#127.0.0.1#g' \
+            -e 's#{{ moon_service_host_port }}#8080#g' \
+            -e 's#{{ moon_service_container_pids }}#256#g' \
+            -e 's#{{ moon_service_container_memory }}#1536m#g' \
+            -e 's#{{ moon_service_container_cpus }}#2.0#g' \
+            -e 's#{{ moon_service_docker_log_max_size }}#10m#g' \
+            -e 's#{{ moon_service_docker_log_max_files }}#3#g' \
+            deployment/raspberry-pi/roles/moon_service_host/templates/compose.yml.j2 \
+            | env \
+                MOON_IMAGE_REPOSITORY=ghcr.io/rapucha/moon-service \
+                MOON_IMAGE_DIGEST=sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa \
+                MOON_IMAGE_REVISION=1111111111111111111111111111111111111111 \
+                docker compose --file - config --quiet
+
+      - name: Validate rendered LAN Compose definition
+        run: |
+          sed \
+            -e 's#{{ moon_service_config_dir }}/application.env#/dev/null#g' \
+            -e 's#{{ moon_service_bind_address }}#192.0.2.10#g' \
+            -e 's#{{ moon_service_host_port }}#8080#g' \
+            -e 's#{{ moon_service_container_pids }}#256#g' \
+            -e 's#{{ moon_service_container_memory }}#1536m#g' \
+            -e 's#{{ moon_service_container_cpus }}#2.0#g' \
+            -e 's#{{ moon_service_docker_log_max_size }}#10m#g' \
+            -e 's#{{ moon_service_docker_log_max_files }}#3#g' \
+            deployment/raspberry-pi/roles/moon_service_host/templates/compose.yml.j2 \
+            | env \
+                MOON_IMAGE_REPOSITORY=ghcr.io/rapucha/moon-service \
+                MOON_IMAGE_DIGEST=sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa \
+                MOON_IMAGE_REVISION=1111111111111111111111111111111111111111 \
+                docker compose --file - config --quiet
+
+      - name: Test deployment state transitions
+        run: python3 -m unittest discover -s deployment/raspberry-pi/tests -v
+
   publish-image:
     name: Publish immutable image
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     needs:
       - backend-tests
       - frontend-tests
+      - deployment-tests
     runs-on: ubuntu-24.04
     timeout-minutes: 45
     permissions:

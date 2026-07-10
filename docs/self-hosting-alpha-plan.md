@@ -2,35 +2,51 @@
 
 ## Purpose
 
-This plan captures the rough hosting boundary for a small Moon Service alpha on
-home hardware, likely k3s on Raspberry Pis. It is a planning document, not a
-request to add production Kubernetes manifests yet.
+This plan captures the hosting boundary for a small Moon Service alpha on home
+hardware. The current implementation is deliberately smaller than the earlier
+k3s design: one Docker Compose application on a dedicated Raspberry Pi 4,
+provisioned by Ansible and updated from tested GHCR images. The operational
+runbook is [`deployment/raspberry-pi/README.md`](../deployment/raspberry-pi/README.md).
+
+The k3s/NFS sections remain as future design notes. They are not the current
+tester-alpha runtime and are explicitly out of scope for infrastructure
+milestone [#93](https://github.com/rapucha/moon-service/issues/93).
 
 The current constraint is that SSDs are not available. The assumed node storage
-is 32 GB WD Purple SD cards, with roughly 64-80 GB of storage available through
-NFS from another server. That makes the cluster acceptable for a small alpha,
-but the Pi nodes should be treated as replaceable infrastructure with explicit
-off-card backups. A database is expected later, but should not be introduced
+is a 32 GB WD Purple SD card, with roughly 64-80 GB of storage available through
+NFS from another server if durable storage is needed later. The Pi should be
+treated as replaceable infrastructure with explicit off-card secret recovery.
+A database is expected later, but should not be introduced
 only to make the first public lookup, RSS, or calendar behavior deployable.
 
-Tracked issue: [#19](https://github.com/rapucha/moon-service/issues/19).
+The original hosting boundary was tracked in
+[#19](https://github.com/rapucha/moon-service/issues/19). The current delivery
+is tracked by [#93](https://github.com/rapucha/moon-service/issues/93) and its
+host child [#95](https://github.com/rapucha/moon-service/issues/95).
 
 ## Decision Snapshot
 
 - Use home hosting only for alpha or beta, not as the long-term production
   assumption.
-- Prefer Cloudflare Tunnel over raw port forwarding.
-- Use the k3s-packaged Traefik ingress controller as the first in-cluster
-  reverse proxy unless a concrete limitation appears.
+- Use Raspberry Pi OS Lite 64-bit based on Debian Trixie and Docker Compose for
+  the current alpha; do not introduce k3s yet.
+- Pull the tested GHCR multi-architecture image by immutable index digest. Keep
+  one current and one previous known-good image and automatically roll back a
+  candidate that fails revision-aware readiness.
+- Bind the private deployment to loopback by default. A host-local inventory
+  opt-in may bind the Pi's primary IPv4 address for direct access from the
+  trusted home LAN. Use SSH or the existing MikroTik WireGuard path for
+  administration; do not forward a router port.
+- Install Tailscale without enrollment during host provisioning. Issue
+  [#97](https://github.com/rapucha/moon-service/issues/97) owns the later
+  Tailscale Funnel public HTTPS boundary.
 - Keep one backend instance at first because provider counters and caches are
   currently process-local. Public request rate limiting is planned for the edge
   or ingress first, with app-level rate limiting added when the product response
   contract needs backend-owned `429` JSON.
 - Add edge and ingress rate limits before any public alpha.
-- Avoid embedded etcd HA on SD cards. If multiple Raspberry Pis are used, start
-  with one k3s server and optional worker agents.
-- Use 32 GB SD cards for Pi OS, k3s, container runtime state, images, and short
-  local logs. Keep durable application data off the cards.
+- Use the 32 GB SD card for Pi OS, Docker runtime state, two application image
+  generations, and bounded local logs. Keep durable application data off it.
 - Plan a small NFS-backed storage pool around 64-80 GB for alpha data that must
   survive Pod rescheduling or SD-card replacement.
 - Avoid running Postgres on SD cards until there is a clear product need and a
@@ -39,21 +55,26 @@ Tracked issue: [#19](https://github.com/rapucha/moon-service/issues/19).
   Add a database when private feeds, saved locations, alert subscriptions,
   durable counters, or durable cache state require it.
 
-## Target Alpha Topology
+## Current Private Alpha Topology
 
 ```text
-Browser
-  -> Cloudflare DNS/TLS/Tunnel and optional access rules
-  -> cloudflared in the home network or cluster
-  -> Traefik Ingress in k3s
-  -> moon-service backend Service
-  -> one Spring Boot backend Pod
+operator browser
+  -> trusted-LAN primary IPv4:8080 when explicitly enabled
+     or SSH tunnel over LAN or MikroTik WireGuard with the loopback default
+  -> one exact host listener on the Raspberry Pi
+  -> one Docker Compose Spring Boot container
   -> Open-Meteo geocoding/weather over outbound HTTPS
+
+GitHub-hosted Actions
+  -> tested AMD64/ARM64 image in GHCR
+  -> Pi systemd timer resolves main to an immutable index digest
+  -> readiness/revision check
+  -> commit current/previous state or restore current
 ```
 
-The preferred public exposure is an outbound tunnel. The home router should not
-forward the Kubernetes API, node ports, admin routes, databases, or other home
-services to the internet.
+The home router does not forward application, SSH, Docker, admin, database, or
+other Pi ports. Public tester access is a later outbound Tailscale Funnel under
+#97; the Funnel URL is public ingress, not an authentication boundary.
 
 The admin path remains private:
 
@@ -62,9 +83,10 @@ GET /admin/status
 ```
 
 The backend already requires `X-Moon-Admin-Token` when admin routes are enabled.
-The deployment should also protect `/admin/**` at the edge, for example with
-Cloudflare Access or an equivalent allow rule. The backend token is the minimum
-application-level guard, not the only operator boundary.
+The Compose seed configuration leaves `/admin/**` disabled. If an operator
+adds a host-local token, the route remains private during #95. Issue #97 must
+also keep `/admin/**` off the public surface; the backend token is a minimum
+application boundary, not permission to publish the route.
 
 ## Phase 0: Prove The Container Boundary
 
@@ -102,7 +124,7 @@ Exit criteria:
   during graceful shutdown.
 - `/admin/status` works only with the configured admin token.
 
-## Phase 1: SD-Card-Aware k3s Baseline
+## Deferred Phase 1: SD-Card-Aware k3s Baseline
 
 Goal: run k3s without pretending the SD card is durable server storage.
 
@@ -154,7 +176,7 @@ Backup matrix before public alpha:
 | Disposable logs | No | Keep short retention unless debugging a specific issue. |
 | Future Postgres data | Yes | Only after a restore drill exists. |
 
-## Phase 2: Public Edge And Reverse Proxy
+## Deferred Phase 2: Public Edge And Reverse Proxy
 
 Goal: expose only the public app surface and keep hostile traffic away from the
 home network where possible.
@@ -339,6 +361,12 @@ Do not add these until a follow-up issue makes them necessary:
 
 ## Related Issues
 
+- [#93](https://github.com/rapucha/moon-service/issues/93): current Docker
+  Compose tester-alpha infrastructure milestone.
+- [#95](https://github.com/rapucha/moon-service/issues/95): Raspberry Pi
+  provisioning and health-checked host-pull deployment.
+- [#97](https://github.com/rapucha/moon-service/issues/97): public HTTPS
+  exposure and hardening through Tailscale Funnel.
 - [#8](https://github.com/rapucha/moon-service/issues/8): add basic
   provider-call scalability protections.
 - [#9](https://github.com/rapucha/moon-service/issues/9): add basic backend

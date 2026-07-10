@@ -4,8 +4,10 @@
 
 Moon Service publishes a tested multi-architecture backend image to the GitHub
 Container Registry (GHCR). Image publication packages a successful `main`
-revision; deployment and rollback on the Raspberry Pi remain owned by
-[#95](https://github.com/rapucha/moon-service/issues/95).
+revision. Digest-pinned deployment and rollback on the Raspberry Pi are
+implemented under [#95](https://github.com/rapucha/moon-service/issues/95) and
+documented in the
+[Raspberry Pi runbook](../deployment/raspberry-pi/README.md).
 
 The image repository is:
 
@@ -22,6 +24,9 @@ Pull requests and `main` pushes run these deterministic checks in parallel:
 
 - `Backend tests`: Java 25 and `mvn test -pl backend -am`.
 - `Frontend tests`: Node.js, static checks, and fixture-backed Playwright tests.
+- `Deployment tests`: pinned Ansible role syntax, shell/Compose validation,
+  plus fake-registry/Docker/readiness transitions for digest advancement,
+  serialization, retention, and rollback.
 
 Hosted CI runs every Playwright test with `--ignore-snapshots`. The current
 pixel baselines depend on the workstation browser, fonts, and renderer, so
@@ -30,10 +35,11 @@ enforcing them on GitHub's Ubuntu image would produce environment-only failures.
 `npm run frontend:ci` keeps all non-pixel assertions in the publication gate.
 
 These jobs do not call live Open-Meteo endpoints. On `main`, image publication
-depends on both jobs. Before pushing, the workflow builds and starts both the
-AMD64 and ARM64 images, waits for `/readyz`, and verifies the embedded source
-revision, OCI labels, and non-root runtime identity. ARM64 runs through QEMU on
-the GitHub-hosted AMD64 runner; the physical Pi validation remains part of #95.
+depends on all three jobs. Before pushing, the workflow builds and starts both
+the AMD64 and ARM64 images, waits for `/readyz`, and verifies the embedded
+source revision, OCI labels, and non-root runtime identity. ARM64 runs through
+QEMU on the GitHub-hosted AMD64 runner; physical-Pi validation remains part of
+#95.
 
 The workflow uses only GitHub-hosted runners. Test jobs receive read-only
 repository access. Only image publication and tag promotion receive
@@ -80,10 +86,11 @@ promotion can compare revisions without starting the application.
 
 After this workflow has completed successfully at least once:
 
-1. In the repository rules for `main`, require the stable `Backend tests` and
-   `Frontend tests` status checks before merge. Image publication still refuses
-   to run after a failed test even before this rule is enabled, but the rule also
-   prevents knowingly broken pull requests from merging.
+1. In the repository rules for `main`, require the stable `Backend tests`,
+   `Frontend tests`, and `Deployment tests` status checks before merge. Image
+   publication still refuses to run after a failed test even before this rule is
+   enabled, but the rule also prevents knowingly broken pull requests from
+   merging.
 2. Open the `moon-service` package settings and confirm that the package is
    connected to `rapucha/moon-service` with Actions access inherited from the
    repository. The OCI source label should establish this connection on the

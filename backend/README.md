@@ -437,6 +437,8 @@ or durable cache state require it.
 
 The current planning boundary is documented in
 `docs/self-hosting-alpha-plan.md`.
+The digest-pinned Docker Compose host and Raspberry Pi operator procedures are
+documented in `deployment/raspberry-pi/README.md`.
 
 ## Direct Fixture Endpoint
 
