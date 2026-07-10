@@ -55,6 +55,8 @@ case "$1" in
         )"
         if [[ -e "$STATE_DIR/automatic-updates-held" ]]; then
             printf 'automatic updates: held (use resume after investigation)\n'
+        elif [[ -e "$STATE_DIR/memory-limit-remediation" ]]; then
+            printf 'automatic updates: disabled (rerun provisioning to complete memory-limit remediation)\n'
         else
             printf 'automatic updates: enabled\n'
         fi

@@ -16,6 +16,9 @@ configure Funnel. Public exposure remains issue
 The Ansible role:
 
 - accepts only Debian 13 Trixie on ARM64;
+- persists Raspberry Pi's supported `cgroup_enable=memory` kernel argument and
+  performs a controlled reboot when the active kernel still lacks that
+  controller;
 - installs Docker Engine, Buildx, and the Compose plugin from Docker's official
   Debian ARM64 repository;
 - installs Tailscale from its official Trixie repository, starts `tailscaled`,
@@ -129,6 +132,23 @@ updates managed files, preserves deployment state, and does not overwrite
 configuration changes; `live-restore` keeps an already-running container alive
 during that restart.
 
+Raspberry Pi kernels disable the memory cgroup by default. The role appends
+only `cgroup_enable=memory` to the existing single line in
+`/boot/firmware/cmdline.txt`; do not add the unrecognized `cgroup_memory=1`
+argument. When the argument is not active, provisioning pauses both Moon
+Service timers, disables boot deployment, waits for any in-flight deployment
+lock, and reboots once. Ansible reconnects automatically, requires the cgroup
+v2 `memory` controller, and re-enables automation only after Docker reports
+memory-limit support. Expect a short SSH and application interruption on that
+corrective run.
+
+If a recorded deployment already exists with a discarded or incorrect limit,
+the role force-recreates that exact digest and waits for its existing readiness
+contract. A failed reboot, controller check, recreation, or exact-limit check
+leaves automatic deployment disabled and retains a remediation marker so a
+later playbook rerun must repeat readiness and exact-limit checks before
+automation can resume.
+
 The deploy timer starts after provisioning. A missing registry credential or
 temporary network failure is safe: the updater records a deferred attempt and
 keeps the recorded local image running.
@@ -215,13 +235,17 @@ administrator because the daily operator intentionally has no arbitrary Docker
 access:
 
 ```bash
+grep -w memory /sys/fs/cgroup/cgroup.controllers
+sudo docker info --format 'memory-limit={{.MemoryLimit}}'
 sudo docker inspect moon-service \
-  --format 'platform={{.Platform}} image={{.Config.Image}} user={{.Config.User}} health={{.State.Health.Status}}'
+  --format 'platform={{.Platform}} image={{.Config.Image}} user={{.Config.User}} health={{.State.Health.Status}} memory={{.HostConfig.Memory}}'
 ```
 
 Expected runtime user: `10001:10001`. The image reference must contain the
 recorded multi-architecture index digest; Docker selects its ARM64 child on the
-Pi.
+Pi. Docker must report `memory-limit=true`, and the configured `1536m` limit
+must render as exactly `1610612736` bytes. Use the cgroup v2 controller file,
+not the legacy `/proc/cgroups`, for this acceptance check.
 
 ### Controlled live-validation sequence
 
@@ -229,8 +253,9 @@ For the first physical run, stop after any failed step and keep the Pi private:
 
 1. Run the fact and SSH preflight commands before the playbook.
 2. Run provisioning once and wait for the first timer attempt.
-3. Verify `status`, `/readyz`, the exact digest/revision, ARM64 platform, and
-   runtime UID/GID before making a live opportunity request.
+3. Verify `status`, `/readyz`, the exact digest/revision, ARM64 platform,
+   runtime UID/GID, and exact memory limit before making a live opportunity
+   request.
 4. Run the same playbook again. Review the recap and investigate unexpected
    changes; the host and application configuration should remain intact.
 5. Reboot the Pi, then verify the recorded digest starts and becomes ready
@@ -288,6 +313,8 @@ State is under `/var/lib/moon-service`:
 - `rejected.env`: candidate that failed readiness;
 - `last-result.env`: latest update/control outcome;
 - `automatic-updates-held`: present after a manual rollback;
+- `memory-limit-remediation`: prevents automation from being re-enabled after
+  an interrupted or failed host memory-limit repair;
 - `last-cleanup.env`: latest daily image-cleanup result.
 
 ## Constrained operations
@@ -303,8 +330,9 @@ sudo moon-service-control rollback
 sudo moon-service-control resume
 ```
 
-- `status` shows container/timer state plus current, previous, rejected, and
-  last-result identities. It does not print application secrets.
+- `status` shows container/timer state, incomplete memory-limit remediation,
+  plus current, previous, rejected, and last-result identities. It does not
+  print application secrets.
 - `revision` returns provider-independent `/readyz` JSON.
 - `logs` returns the latest 200 timestamped container lines.
 - `restart` recreates only the recorded current digest and rechecks readiness.
@@ -421,6 +449,8 @@ When Ansible is available, also run:
 
 ```bash
 (cd deployment/raspberry-pi && ansible-playbook site.yml --syntax-check)
+(cd deployment/raspberry-pi && ansible-playbook \
+  --inventory localhost, --connection local tests/memory-cgroup.runtime.yml)
 ```
 
 Do not run the playbook against the physical Pi merely as a repository test.
@@ -432,4 +462,7 @@ services/timers, and may pull/start the application.
 - [Install Docker Engine on Debian](https://docs.docker.com/engine/install/debian/)
 - [Tailscale packages for Debian Trixie](https://pkgs.tailscale.com/stable/#debian-trixie)
 - [Docker local logging driver](https://docs.docker.com/engine/logging/drivers/local/)
+- [Raspberry Pi kernel command line](https://www.raspberrypi.com/documentation/computers/config_txt.html#kernel-command-line-cmdlinetxt)
+- [Raspberry Pi memory-cgroup override](https://github.com/raspberrypi/linux/issues/6980#issuecomment-3149752155)
+- [Docker resource constraints](https://docs.docker.com/engine/containers/resource_constraints/)
 - [Authenticate to GitHub Container Registry](https://docs.github.com/en/packages/working-with-a-github-packages-registry/working-with-the-container-registry)

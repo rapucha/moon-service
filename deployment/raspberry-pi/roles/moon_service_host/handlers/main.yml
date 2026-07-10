@@ -1,4 +1,13 @@
 ---
+- name: Reboot to activate the memory cgroup controller
+  ansible.builtin.reboot:
+    reboot_command: >-
+      /usr/bin/flock --wait 600 {{ moon_service_state_dir }}/deploy.lock
+      /usr/bin/systemctl reboot
+    reboot_timeout: 600
+    test_command: test -r /sys/fs/cgroup/cgroup.controllers
+  listen: Activate Moon Service memory cgroup
+
 - name: Restart Docker
   ansible.builtin.service:
     name: docker

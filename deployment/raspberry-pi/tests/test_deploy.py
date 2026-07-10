@@ -199,6 +199,28 @@ class DeploymentStateTest(unittest.TestCase):
         self.assertEqual("deployed", read_env(self.state / "last-result.env")["RESULT"])
         self.assertIn(f"pull ghcr.io/rapucha/moon-service@{digest}", (self.root / "commands.log").read_text())
 
+    def test_restart_force_recreates_recorded_current(self):
+        digest, revision = self.set_manifest("a", "1")
+        self.assertEqual(0, self.run_deploy().returncode)
+        commands_before = (self.root / "commands.log").read_text().splitlines()
+
+        result = self.run_deploy("restart")
+
+        self.assertEqual(0, result.returncode, result.stderr)
+        current = read_env(self.state / "current.env")
+        self.assertEqual(digest, current["MOON_IMAGE_DIGEST"])
+        self.assertEqual(revision, current["MOON_IMAGE_REVISION"])
+        self.assertEqual(revision, (self.root / "active-revision").read_text().strip())
+        self.assertEqual("restarted", read_env(self.state / "last-result.env")["RESULT"])
+        restart_commands = (self.root / "commands.log").read_text().splitlines()[
+            len(commands_before) :
+        ]
+        compose_commands = [
+            command for command in restart_commands if command.startswith("compose ")
+        ]
+        self.assertEqual(1, len(compose_commands))
+        self.assertIn("--force-recreate", compose_commands[0])
+
     def test_healthy_update_retains_previous_known_good_digest(self):
         first_digest, first_revision = self.set_manifest("a", "1")
         self.assertEqual(0, self.run_deploy().returncode)

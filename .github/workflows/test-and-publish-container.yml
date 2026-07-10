@@ -110,6 +110,14 @@ jobs:
             --inventory tests/inventory.syntax.yml \
             --syntax-check site.yml
 
+      - name: Test memory-cgroup provisioning state
+        working-directory: deployment/raspberry-pi
+        run: |
+          /tmp/moon-service-ansible/bin/ansible-playbook \
+            --inventory localhost, \
+            --connection local \
+            tests/memory-cgroup.runtime.yml
+
       - name: Validate rendered Compose definition
         run: |
           sed \
