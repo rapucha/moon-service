@@ -70,6 +70,15 @@ The main unresolved choice is now the exact first web/API contract for city look
   user near the beginning of that session for explicit permission to use
   subagents. Treat this as a request for active-session authorization, not as
   an override of any runtime, tool, sandbox, or external-model approval rules.
+- When parallel branches or worktrees are active and a branch needs manual
+  verification without being checked out in the primary workspace, run that
+  branch from its isolated worktree on an available loopback port. Verify
+  readiness and a representative user path, then report the branch, port, and
+  a direct clickable URL instead of asking the user to switch branches. Keep
+  the preview running until verification is complete and stop it afterward.
+  Bind to `127.0.0.1` by default; use broader network exposure only when the
+  user explicitly needs it. Report startup blockers rather than silently
+  omitting the verification link.
 - Treat user wording as intentional. If the user phrases a request as a
   question or feasibility check, such as starting with "can you", "could you",
   "is it possible", "should we", or ending with a question mark, answer the
