@@ -57,6 +57,9 @@
         <artifactId>maven-surefire-plugin</artifactId>
         <configuration>
           <argLine>-javaagent:${org.mockito:mockito-core:jar}</argLine>
+          <systemPropertyVariables>
+            <astronomy.version>${astronomy.version}</astronomy.version>
+          </systemPropertyVariables>
         </configuration>
       </plugin>
       <plugin>

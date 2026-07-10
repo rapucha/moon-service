@@ -21,7 +21,8 @@ Current Shape
 - Current non-goals:
   - Mandatory accounts.
   - Production database.
-  - Android app.
+  - Installed client scaffolding. React Native with Expo is a leading candidate,
+    but the client-platform decision remains open in GitHub issue `#109`.
   - Deployment scaffolding.
   - Email alerts.
   - Automated social posting.

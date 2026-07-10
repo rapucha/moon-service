@@ -3,6 +3,7 @@
 FROM --platform=$BUILDPLATFORM maven:3.9.16-eclipse-temurin-25-noble AS build
 WORKDIR /workspace
 
+COPY .mvn .mvn
 COPY pom.xml .
 COPY backend/pom.xml backend/pom.xml
 COPY prototypes/jvm-scoring/pom.xml prototypes/jvm-scoring/pom.xml
