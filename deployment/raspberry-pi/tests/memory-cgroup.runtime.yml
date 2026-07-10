@@ -158,10 +158,10 @@
 
         - name: Refresh deployment state after draining automatic work
           ansible.builtin.include_tasks: >-
-            ../roles/moon_service_host/tasks/memory-limit-recreation-state.yml
+            ../roles/moon_service_host/tasks/deployment-recreation-state.yml
           vars:
             moon_service_state_dir: "{{ _test_memory_cgroup_root }}"
-            _moon_service_memory_remediation_required: true
+            _moon_service_deployment_remediation_required: true
 
         - name: Verify the fresh state forces recreation
           ansible.builtin.assert:

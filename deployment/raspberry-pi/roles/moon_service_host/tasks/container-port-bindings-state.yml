@@ -1,0 +1,17 @@
+---
+- name: Record the expected and observed container port bindings
+  ansible.builtin.set_fact:
+    _moon_service_expected_container_port_bindings:
+      "8080/tcp":
+        - HostIp: "{{ moon_service_bind_address }}"
+          HostPort: "{{ moon_service_host_port | string }}"
+    _moon_service_observed_container_port_bindings: >-
+      {{ (_moon_service_container_port_bindings_result.stdout
+          | default('{}', true)) | from_json }}
+
+- name: Record whether the container port bindings match exactly
+  ansible.builtin.set_fact:
+    _moon_service_container_port_bindings_match: >-
+      {{ (_moon_service_container_port_bindings_result.rc | default(1)) == 0
+         and _moon_service_observed_container_port_bindings
+             == _moon_service_expected_container_port_bindings }}

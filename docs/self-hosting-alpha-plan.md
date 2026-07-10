@@ -33,8 +33,10 @@ host child [#95](https://github.com/rapucha/moon-service/issues/95).
 - Pull the tested GHCR multi-architecture image by immutable index digest. Keep
   one current and one previous known-good image and automatically roll back a
   candidate that fails revision-aware readiness.
-- Bind the private deployment to loopback. Use SSH over the LAN or the existing
-  MikroTik WireGuard path for administration; do not forward a router port.
+- Bind the private deployment to loopback by default. A host-local inventory
+  opt-in may bind the Pi's primary IPv4 address for direct access from the
+  trusted home LAN. Use SSH or the existing MikroTik WireGuard path for
+  administration; do not forward a router port.
 - Install Tailscale without enrollment during host provisioning. Issue
   [#97](https://github.com/rapucha/moon-service/issues/97) owns the later
   Tailscale Funnel public HTTPS boundary.
@@ -57,8 +59,9 @@ host child [#95](https://github.com/rapucha/moon-service/issues/95).
 
 ```text
 operator browser
-  -> SSH tunnel over LAN or MikroTik WireGuard
-  -> 127.0.0.1:8080 on the Raspberry Pi
+  -> trusted-LAN primary IPv4:8080 when explicitly enabled
+     or SSH tunnel over LAN or MikroTik WireGuard with the loopback default
+  -> one exact host listener on the Raspberry Pi
   -> one Docker Compose Spring Boot container
   -> Open-Meteo geocoding/weather over outbound HTTPS
 

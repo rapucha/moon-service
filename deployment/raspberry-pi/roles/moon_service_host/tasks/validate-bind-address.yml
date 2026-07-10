@@ -1,0 +1,11 @@
+---
+- name: Require a loopback or primary IPv4 application listener
+  ansible.builtin.assert:
+    that:
+      - >-
+        moon_service_bind_address == '127.0.0.1'
+        or moon_service_bind_address == _moon_service_primary_ipv4_address
+    fail_msg: >-
+      moon_service_bind_address must be 127.0.0.1 or the managed host's
+      active primary IPv4 address. Wildcard and secondary-interface listeners
+      are not accepted.

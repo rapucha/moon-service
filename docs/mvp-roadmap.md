@@ -122,8 +122,10 @@ Tasks:
 - Pull successfully published ARM64 images by immutable digest, verify
   revision-aware readiness, and automatically retain/restore a known-good
   rollback generation.
-- Keep the private service loopback-only and use Tailscale Funnel for the first
-  tester-facing HTTPS boundary under #97; do not forward a raw router port.
+- Keep loopback as the safe host default, allow an explicit primary-IPv4
+  listener on the operator's trusted home LAN, and use Tailscale Funnel for the
+  first tester-facing HTTPS boundary under #97; do not forward a raw router
+  port.
 - Keep the 32 GB SD-card host rebuildable with bounded logs/images and no
   durable application data. Document off-host secret and host recovery.
 

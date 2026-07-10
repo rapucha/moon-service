@@ -25,13 +25,18 @@
       - moon_service_compose_dir == "/opt/moon-service"
       - moon_service_config_dir == "/etc/moon-service"
       - moon_service_state_dir == "/var/lib/moon-service"
-      - moon_service_bind_address == "127.0.0.1"
       - moon_service_host_port | int >= 1024
       - moon_service_host_port | int <= 65535
     fail_msg: >-
       Set distinct bootstrap-admin and operator users plus an absolute local
       SSH public-key path in the ignored inventory. Issue #95 uses the fixed
-      Moon Service repository, group, host paths, and loopback-only listener.
+      Moon Service repository, group, and host paths.
+
+- name: Validate the application listener boundary
+  ansible.builtin.include_tasks: validate-bind-address.yml
+  vars:
+    _moon_service_primary_ipv4_address: >-
+      {{ (ansible_facts.default_ipv4 | default({})).address | default('') }}
 
 - name: Load the dedicated operator public key from the controller
   ansible.builtin.set_fact:
@@ -258,6 +263,104 @@
     mode: "0644"
   notify: Restart systemd-journald
 
+- name: Probe the managed Compose definition
+  ansible.builtin.template:
+    src: compose.yml.j2
+    dest: "{{ moon_service_compose_dir }}/compose.yml"
+    owner: root
+    group: root
+    mode: "0644"
+  check_mode: true
+  diff: false
+  register: _moon_service_compose_definition_probe
+
+- name: Inspect deployment state before changing Compose
+  ansible.builtin.stat:
+    path: "{{ moon_service_state_dir }}/current.env"
+  register: _moon_service_preconfiguration_current_deployment_state
+
+- name: Inspect pending host-configuration remediation state
+  ansible.builtin.stat:
+    path: "{{ moon_service_state_dir }}/host-configuration-remediation"
+  register: _moon_service_host_configuration_remediation_state
+
+- name: Inspect the current container port bindings
+  ansible.builtin.command:
+    argv:
+      - docker
+      - inspect
+      - --format
+      - "{{ '{{json .HostConfig.PortBindings}}' }}"
+      - moon-service
+  register: _moon_service_current_container_port_bindings_result
+  changed_when: false
+  failed_when: false
+  when: _moon_service_preconfiguration_current_deployment_state.stat.exists
+  check_mode: false
+
+- name: Select the current container port-binding result
+  ansible.builtin.set_fact:
+    _moon_service_container_port_bindings_result: >-
+      {{ _moon_service_current_container_port_bindings_result }}
+
+- name: Evaluate the current container port bindings
+  ansible.builtin.include_tasks: container-port-bindings-state.yml
+
+- name: Record whether host configuration requires remediation
+  ansible.builtin.set_fact:
+    _moon_service_host_configuration_remediation_required: >-
+      {{ _moon_service_host_configuration_remediation_state.stat.exists
+         or (_moon_service_preconfiguration_current_deployment_state.stat.exists
+             and (_moon_service_compose_definition_probe.changed
+                  or (_moon_service_current_container_port_bindings_result.rc
+                      | default(1)) != 0
+                  or not _moon_service_container_port_bindings_match)) }}
+
+- name: Persist fail-closed host-configuration remediation state
+  ansible.builtin.copy:
+    dest: "{{ moon_service_state_dir }}/host-configuration-remediation"
+    content: |
+      Host-configuration remediation must complete before deployment automation is enabled.
+    owner: root
+    group: root
+    mode: "0600"
+  when:
+    - _moon_service_host_configuration_remediation_required
+    - not ansible_check_mode
+
+- name: Pause automatic deployment before changing host configuration
+  ansible.builtin.systemd_service:
+    name: "{{ item }}"
+    enabled: false
+    state: stopped
+  loop:
+    - moon-service-deploy.timer
+    - moon-service-cleanup.timer
+  when:
+    - _moon_service_host_configuration_remediation_required
+    - not ansible_check_mode
+
+- name: Disable boot deployment before changing host configuration
+  ansible.builtin.systemd_service:
+    name: moon-service-deploy.service
+    enabled: false
+  when:
+    - _moon_service_host_configuration_remediation_required
+    - not ansible_check_mode
+
+- name: Wait for in-flight deployment work before changing host configuration
+  ansible.builtin.command:
+    argv:
+      - /usr/bin/flock
+      - --wait
+      - "600"
+      - "{{ moon_service_state_dir }}/deploy.lock"
+      - /usr/bin/true
+  changed_when: false
+  when:
+    - _moon_service_host_configuration_remediation_required
+    - not ansible_check_mode
+
 - name: Install Compose definition
   ansible.builtin.template:
     src: compose.yml.j2
@@ -401,7 +504,7 @@
               or ((_moon_service_current_container_memory.stdout | default('0') | int)
                   != (moon_service_container_memory | human_to_bytes | int))) }}
 
-- name: Record whether deployment automation must be paused
+- name: Record whether memory-limit remediation is required
   ansible.builtin.set_fact:
     _moon_service_memory_remediation_required: >-
       {{ _moon_service_memory_cgroup_reboot_required
@@ -411,6 +514,12 @@
          or _moon_service_memory_remediation_state.stat.exists }}
     _moon_service_memory_cgroup_reboot_planned: >-
       {{ _moon_service_memory_cgroup_reboot_required }}
+
+- name: Record whether deployment automation must be paused
+  ansible.builtin.set_fact:
+    _moon_service_deployment_remediation_required: >-
+      {{ _moon_service_memory_remediation_required
+         or _moon_service_host_configuration_remediation_required }}
 
 - name: Persist fail-closed memory-limit remediation state
   ansible.builtin.copy:
@@ -424,7 +533,7 @@
     - _moon_service_memory_remediation_required
     - not ansible_check_mode
 
-- name: Pause automatic deployment during memory-limit remediation
+- name: Pause automatic deployment during host remediation
   ansible.builtin.systemd_service:
     name: "{{ item }}"
     enabled: false
@@ -433,15 +542,15 @@
     - moon-service-deploy.timer
     - moon-service-cleanup.timer
   when:
-    - _moon_service_memory_remediation_required
+    - _moon_service_deployment_remediation_required
     - not ansible_check_mode
 
-- name: Disable boot deployment during memory-limit remediation
+- name: Disable boot deployment during host remediation
   ansible.builtin.systemd_service:
     name: moon-service-deploy.service
     enabled: false
   when:
-    - _moon_service_memory_remediation_required
+    - _moon_service_deployment_remediation_required
     - not ansible_check_mode
 
 - name: Request the controlled memory-cgroup reboot
@@ -466,7 +575,7 @@
       - /usr/bin/true
   changed_when: false
   when:
-    - _moon_service_memory_remediation_required
+    - _moon_service_deployment_remediation_required
     - not ansible_check_mode
 
 - name: Verify the active memory-cgroup host state
@@ -478,7 +587,7 @@
     _moon_service_memory_cgroup_require_active: >-
       {{ not (ansible_check_mode and _moon_service_memory_cgroup_reboot_planned) }}
 
-- name: Reconfirm required daemons after memory-limit remediation
+- name: Reconfirm required daemons after host remediation
   ansible.builtin.systemd_service:
     name: "{{ item }}"
     enabled: true
@@ -509,9 +618,9 @@
   when: not (ansible_check_mode and _moon_service_memory_cgroup_reboot_planned)
 
 - name: Refresh deployment state after pausing automatic work
-  ansible.builtin.include_tasks: memory-limit-recreation-state.yml
+  ansible.builtin.include_tasks: deployment-recreation-state.yml
 
-- name: Recreate an existing deployment with enforced memory limits
+- name: Recreate an existing deployment with managed host configuration
   ansible.builtin.command:
     argv:
       - /usr/local/sbin/moon-service-deploy
@@ -537,6 +646,35 @@
     - _moon_service_converged_deployment_state.stat.exists
     - not ansible_check_mode
 
+- name: Inspect the converged container port bindings
+  ansible.builtin.command:
+    argv:
+      - docker
+      - inspect
+      - --format
+      - "{{ '{{json .HostConfig.PortBindings}}' }}"
+      - moon-service
+  register: _moon_service_converged_container_port_bindings_result
+  changed_when: false
+  failed_when: false
+  when:
+    - _moon_service_converged_deployment_state.stat.exists
+    - not ansible_check_mode
+
+- name: Select the converged container port-binding result
+  ansible.builtin.set_fact:
+    _moon_service_container_port_bindings_result: >-
+      {{ _moon_service_converged_container_port_bindings_result }}
+  when:
+    - _moon_service_converged_deployment_state.stat.exists
+    - not ansible_check_mode
+
+- name: Evaluate the converged container port bindings
+  ansible.builtin.include_tasks: container-port-bindings-state.yml
+  when:
+    - _moon_service_converged_deployment_state.stat.exists
+    - not ansible_check_mode
+
 - name: Require the exact configured container memory limit
   ansible.builtin.assert:
     that:
@@ -551,12 +689,32 @@
     - _moon_service_converged_deployment_state.stat.exists
     - not ansible_check_mode
 
+- name: Require the exact configured container port binding
+  ansible.builtin.assert:
+    that:
+      - _moon_service_converged_container_port_bindings_result.rc == 0
+      - _moon_service_container_port_bindings_match
+    fail_msg: >-
+      The recorded Moon Service deployment does not enforce the exact
+      configured host listener. Deployment automation remains disabled.
+  when:
+    - _moon_service_converged_deployment_state.stat.exists
+    - not ansible_check_mode
+
 - name: Clear completed memory-limit remediation state
   ansible.builtin.file:
     path: "{{ moon_service_state_dir }}/memory-limit-remediation"
     state: absent
   when:
     - _moon_service_memory_remediation_required
+    - not ansible_check_mode
+
+- name: Clear completed host-configuration remediation state
+  ansible.builtin.file:
+    path: "{{ moon_service_state_dir }}/host-configuration-remediation"
+    state: absent
+  when:
+    - _moon_service_host_configuration_remediation_required
     - not ansible_check_mode
 
 - name: Enable deployment on boot

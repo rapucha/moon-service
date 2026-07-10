@@ -118,11 +118,37 @@ jobs:
             --connection local \
             tests/memory-cgroup.runtime.yml
 
+      - name: Test application listener boundary
+        working-directory: deployment/raspberry-pi
+        run: |
+          /tmp/moon-service-ansible/bin/ansible-playbook \
+            --inventory localhost, \
+            --connection local \
+            tests/bind-address.runtime.yml
+
       - name: Validate rendered Compose definition
         run: |
           sed \
             -e 's#{{ moon_service_config_dir }}/application.env#/dev/null#g' \
             -e 's#{{ moon_service_bind_address }}#127.0.0.1#g' \
+            -e 's#{{ moon_service_host_port }}#8080#g' \
+            -e 's#{{ moon_service_container_pids }}#256#g' \
+            -e 's#{{ moon_service_container_memory }}#1536m#g' \
+            -e 's#{{ moon_service_container_cpus }}#2.0#g' \
+            -e 's#{{ moon_service_docker_log_max_size }}#10m#g' \
+            -e 's#{{ moon_service_docker_log_max_files }}#3#g' \
+            deployment/raspberry-pi/roles/moon_service_host/templates/compose.yml.j2 \
+            | env \
+                MOON_IMAGE_REPOSITORY=ghcr.io/rapucha/moon-service \
+                MOON_IMAGE_DIGEST=sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa \
+                MOON_IMAGE_REVISION=1111111111111111111111111111111111111111 \
+                docker compose --file - config --quiet
+
+      - name: Validate rendered LAN Compose definition
+        run: |
+          sed \
+            -e 's#{{ moon_service_config_dir }}/application.env#/dev/null#g' \
+            -e 's#{{ moon_service_bind_address }}#192.0.2.10#g' \
             -e 's#{{ moon_service_host_port }}#8080#g' \
             -e 's#{{ moon_service_container_pids }}#256#g' \
             -e 's#{{ moon_service_container_memory }}#1536m#g' \

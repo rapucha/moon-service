@@ -182,7 +182,7 @@ ready_once() {
             "$CONTAINER_NAME" 2>/dev/null || true
     )"
     [[ "$container_status" == running && "$health_status" == healthy ]] || return 1
-    response="$("$CURL_BIN" --fail --silent --show-error --max-time 3 "$READY_URL" 2>/dev/null)" \
+    response="$("$CURL_BIN" --fail --silent --show-error --noproxy '*' --max-time 3 "$READY_URL" 2>/dev/null)" \
         || return 1
     "$JQ_BIN" -e --arg revision "$expected_revision" \
         '.status == "ok" and .revision == $revision' <<<"$response" >/dev/null

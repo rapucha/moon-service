@@ -55,8 +55,9 @@ case "$1" in
         )"
         if [[ -e "$STATE_DIR/automatic-updates-held" ]]; then
             printf 'automatic updates: held (use resume after investigation)\n'
-        elif [[ -e "$STATE_DIR/memory-limit-remediation" ]]; then
-            printf 'automatic updates: disabled (rerun provisioning to complete memory-limit remediation)\n'
+        elif [[ -e "$STATE_DIR/memory-limit-remediation" \
+            || -e "$STATE_DIR/host-configuration-remediation" ]]; then
+            printf 'automatic updates: disabled (rerun provisioning to complete host remediation)\n'
         else
             printf 'automatic updates: enabled\n'
         fi
@@ -67,7 +68,7 @@ case "$1" in
         show_state last-cleanup "$STATE_DIR/last-cleanup.env"
         ;;
     revision)
-        curl --fail --silent --show-error --max-time 5 "$READY_URL"
+        curl --fail --silent --show-error --noproxy '*' --max-time 5 "$READY_URL"
         printf '\n'
         ;;
     logs)

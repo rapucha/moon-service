@@ -7,8 +7,9 @@ Trixie). The Pi pulls the already-tested ARM64 image from GHCR. It never builds
 Java or container images.
 
 This is the private deployment layer. It binds the application to
-`127.0.0.1:8080`, opens no router port, does not enroll Tailscale, and does not
-configure Funnel. Public exposure remains issue
+`127.0.0.1:8080` by default and supports an explicit primary-IPv4 listener for
+a trusted home LAN. It opens no router port, does not enroll Tailscale, and
+does not configure Funnel. Public exposure remains issue
 [#97](https://github.com/rapucha/moon-service/issues/97).
 
 ## What provisioning installs
@@ -24,6 +25,8 @@ The Ansible role:
 - installs Tailscale from its official Trixie repository, starts `tailscaled`,
   and deliberately leaves the host unenrolled;
 - creates root-owned configuration, Compose, and deployment-state directories;
+- keeps the listener on loopback unless ignored host inventory explicitly
+  selects that host's active primary IPv4 address;
 - runs the application as the image's non-root UID/GID `10001` with no Linux
   capabilities, a read-only root filesystem, bounded memory/CPU/PIDs, and a
   small temporary filesystem;
@@ -89,6 +92,19 @@ Replace all placeholders in `inventory.yml`:
 - `moon_service_operator_public_key_file` is the absolute controller path to
   exactly one OpenSSH public key for that account.
 
+The safe listener default is `127.0.0.1`. For direct access from a trusted LAN,
+add the Pi's active primary IPv4 address to ignored `inventory.yml`:
+
+```yaml
+moon_service_bind_address: REPLACE_WITH_PI_LAN_ADDRESS
+```
+
+The role rejects wildcard and secondary-interface listeners. Keep the address
+stable with a DHCP reservation or static network configuration; it should
+normally match the address used by `ansible_host`. This opt-in changes only
+the Docker host binding. It does not configure a firewall, router forwarding,
+Tailscale, Funnel, TLS, or public access.
+
 Do not reuse an existing administrator as the operator: the role deliberately
 locks the operator password, sets its primary group, and removes all
 supplementary groups. If the bootstrap private key needs an explicit path, add
@@ -131,6 +147,13 @@ updates managed files, preserves deployment state, and does not overwrite
 `/etc/moon-service/application.env`. Docker may restart when its daemon
 configuration changes; `live-restore` keeps an already-running container alive
 during that restart.
+
+Before changing an existing Compose definition or listener, provisioning
+records a host-remediation marker, stops automatic timers, disables boot
+deployment, and drains the shared deployment lock. It then recreates the exact
+recorded digest and verifies readiness plus the exact requested host binding.
+A failure keeps the marker and automation pause in place so a later playbook
+run must retry the same reconciliation before timers can resume.
 
 Raspberry Pi kernels disable the memory cgroup by default. The role appends
 only `cgroup_enable=memory` to the existing single line in
@@ -201,7 +224,7 @@ are explicit bootstrap-administrator actions for #97. Existing MikroTik
 WireGuard remains the remote-administration path and does not need any software
 on this Pi.
 
-## Private verification
+## Host verification
 
 After provisioning, open a new session as the dedicated operator and check the
 deployment:
@@ -212,8 +235,8 @@ sudo moon-service-control status
 sudo moon-service-control revision
 ```
 
-Because the application is loopback-only, inspect it through SSH without
-changing the router:
+With the default loopback listener, inspect it through SSH without changing
+the router:
 
 ```bash
 ssh -L 8080:127.0.0.1:8080 moonops@REPLACE_WITH_SSH_HOST
@@ -225,6 +248,17 @@ Then, from the controller:
 curl --fail http://127.0.0.1:8080/readyz
 curl --fail 'http://127.0.0.1:8080/api/opportunities?q=Prague'
 ```
+
+With the trusted-LAN inventory override, access the Pi directly instead:
+
+```bash
+curl --fail http://REPLACE_WITH_PI_LAN_ADDRESS:8080/readyz
+curl --fail 'http://REPLACE_WITH_PI_LAN_ADDRESS:8080/api/opportunities?q=Prague'
+```
+
+Docker must publish exactly the configured primary IPv4 address, never
+`0.0.0.0`; the home router must continue to have no forwarding rule for this
+port.
 
 The first response must report `status: ok` and the same 40-character Git
 revision shown in `current.env`. The opportunity request is the deliberate live
@@ -249,7 +283,8 @@ not the legacy `/proc/cgroups`, for this acceptance check.
 
 ### Controlled live-validation sequence
 
-For the first physical run, stop after any failed step and keep the Pi private:
+For the first physical run, stop after any failed step and keep the Pi within
+its configured loopback or trusted-LAN boundary:
 
 1. Run the fact and SSH preflight commands before the playbook.
 2. Run provisioning once and wait for the first timer attempt.
@@ -315,6 +350,8 @@ State is under `/var/lib/moon-service`:
 - `automatic-updates-held`: present after a manual rollback;
 - `memory-limit-remediation`: prevents automation from being re-enabled after
   an interrupted or failed host memory-limit repair;
+- `host-configuration-remediation`: prevents automation from being re-enabled
+  after an interrupted or failed Compose/listener reconciliation;
 - `last-cleanup.env`: latest daily image-cleanup result.
 
 ## Constrained operations
@@ -330,7 +367,7 @@ sudo moon-service-control rollback
 sudo moon-service-control resume
 ```
 
-- `status` shows container/timer state, incomplete memory-limit remediation,
+- `status` shows container/timer state, incomplete host remediation,
   plus current, previous, rejected, and last-result identities. It does not
   print application secrets.
 - `revision` returns provider-independent `/readyz` JSON.
@@ -378,7 +415,7 @@ journalctl --disk-usage
 The role uses package state `present`; a provisioning rerun does not silently
 upgrade Docker, Tailscale, or the operating system. In a planned maintenance
 window, the bootstrap administrator should review and apply Trixie updates,
-then re-run provisioning and the private verification:
+then re-run provisioning and the host verification:
 
 ```bash
 sudo apt update
