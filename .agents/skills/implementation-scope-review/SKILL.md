@@ -1,0 +1,124 @@
+---
+name: implementation-scope-review
+description: Run an independent read-only pre-implementation scope review and return a single-PR or split-required verdict. Use when an issue, plan, or requested change may span multiple independently reviewable concerns, subsystems, providers, deployment layers, UI and backend work, CI, privacy policy, or a large expected diff; when project instructions define PR-size gates; or when Codex needs to map acceptance criteria into a safe ordered PR series before editing files.
+---
+
+# Implementation Scope Review
+
+## Purpose
+
+Review planned work before implementation so oversized or incoherent changes
+are split before code accumulates. Operate read-only. The primary agent owns
+the plan, issue updates, implementation, and final judgment.
+
+This skill reviews scope, not completed code. After implementation, use
+`$second-agent-review` when available for an independent staged-diff review.
+
+This skill assumes the source issue is suitable implementation authority. When
+an agent drafted a nontrivial issue, use `$issue-design-review` first to test
+its premise, hidden decisions, alternatives, and issue boundaries. Issue-design
+review does not replace this PR-packaging review.
+
+## Preconditions
+
+- The invoking primary agent must delegate the review to a fresh read-only
+  subagent that did not draft the proposed plan. Self-review does not satisfy
+  this skill.
+- Confirm delegation is allowed and any project-required user authorization
+  for subagents exists. If a fresh agent cannot be used, stop and report the
+  blocker instead of returning a scope verdict.
+- Do not edit files, create issues, change branches, or mutate external state.
+- Review the target project instructions before applying generic heuristics.
+- Ask for missing information only when it would materially change the verdict;
+  otherwise state a bounded assumption.
+
+## Inputs
+
+Give the reviewer raw task context without the primary agent's preferred
+answer:
+
+- User request and source issue, including acceptance criteria.
+- Project authority such as `AGENTS.md`, contribution rules, and PR template.
+- Only the product, architecture, API, privacy, or deployment documents needed
+  to understand the work.
+- Any proposed file list, subsystem estimate, rollout constraint, or known
+  dependency.
+- Existing parent or child issues that may already own part of the scope.
+- The issue-design verdict or summary when project policy required one.
+
+## Review Method
+
+1. Restate the single intended user-visible or operational outcome.
+2. Enumerate independently reviewable concerns. Treat code, tests, and
+   documentation supporting one behavior as one concern; do not merge distinct
+   backend, frontend, deployment, CI, provider, privacy, or rollout decisions
+   merely because one issue mentions them.
+3. Estimate affected non-generated files and added-plus-deleted lines. Disclose
+   generated, vendored, and lock files separately.
+4. Apply the repository's explicit scope gates. If none exist, use coherence,
+   reviewability, independent safety, and rollback boundaries as heuristics and
+   make the lack of numeric gates visible.
+5. Map every acceptance criterion to one proposed PR. Identify dependencies and
+   merge order.
+6. Check that each slice is independently safe and mergeable. Keep unfinished
+   capability disabled by default when partial rollout could expose it.
+7. Return exactly one verdict: `single_pr` or `split_required`.
+
+Default to `split_required` when any repository gate is crossed. Recommend a
+single-PR exception only when splitting would create a concrete correctness,
+safety, or migration hazard; require the rationale and owner approval to be
+recorded through the project's normal workflow.
+
+## Output Contract
+
+Lead with this structure:
+
+```text
+Verdict: single_pr | split_required
+
+Gate assessment:
+- Concerns/subsystems: <count and names>
+- Non-generated files: <estimate>
+- Non-generated lines: <estimate or bounded range>
+- Triggered gates: <list or none>
+
+Acceptance ownership:
+- <criterion> -> <PR>
+
+Proposed PR sequence:
+1. <coherent outcome; dependencies; disabled-by-default boundary>
+
+Risks and unknowns:
+- <material ambiguity, unsafe split, missing authority, or validation need>
+
+Primary-agent next action:
+- <proceed with one PR, or create/link child issues before editing>
+```
+
+For `single_pr`, explain why the change is one coherent review unit. For
+`split_required`, propose the smallest practical ordered series rather than a
+broad rewrite of the parent issue.
+
+## Reviewer Prompt
+
+Use a prompt like:
+
+```text
+Use a read-only planning-review stance. Review the issue and relevant project
+authority before implementation. Do not edit files or external state. Apply
+the repository scope gates, map every acceptance criterion to a proposed PR,
+and return single_pr or split_required. Make every proposed slice independently
+safe and mergeable, identify dependencies and merge order, and state material
+unknowns. Do not assume the primary agent's preferred plan is correct.
+```
+
+## Primary-Agent Follow-Up
+
+- Record the verdict on the source issue or active plan when project workflow
+  requires it.
+- If `split_required`, create and link child issues before implementation and
+  keep the parent open.
+- If `single_pr`, record the coherent outcome and gate estimate before editing.
+- Re-run scope review if the actual diff crosses a gate or gains a new
+  independently reviewable concern.
+- Do not treat planning approval as code-review approval.

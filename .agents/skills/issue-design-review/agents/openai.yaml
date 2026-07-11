@@ -1,0 +1,4 @@
+interface:
+  display_name: "Issue Design Review"
+  short_description: "Independent review of agent-created issues"
+  default_prompt: "Use $issue-design-review to review this draft issue before it becomes implementation authority."

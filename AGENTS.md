@@ -105,6 +105,42 @@ The main unresolved choice is now the exact first web/API contract for city look
 - In this environment, `git push` requires network access and sandboxed DNS has repeatedly failed. When the user asks to push any branch or remote, run the push with escalated permissions immediately instead of first attempting a sandboxed push.
 - Do not repeat a failing command, API request, or tool call unchanged unless the failure is plausibly transient, such as a timeout, network interruption, rate-limit retry hint, lock contention, or service restart. For deterministic errors, change the request based on a concrete hypothesis, reduce it to a minimal reproduction, inspect docs/help/output, or stop and explain the blocker. For plausibly transient errors, retry with exponential backoff and a small retry budget; once the next backoff delay would reach roughly 30 to 60 seconds, stop retrying and report the failure.
 
+## Agent Review Workflows
+
+The canonical definitions of project-specific review skills live under
+`.agents/skills/`. Change them through the repository's normal issue and pull
+request workflow. Treat copies outside the repository as temporary installed
+artifacts, not as an independently editable source of truth.
+
+A skill migration is not complete while a same-named legacy copy remains
+discoverable outside the repository. After the repository-local version reaches
+the default branch, remove or disable the legacy copy and verify in a fresh
+Codex session that only the canonical path is offered. Until then, do not edit
+the legacy copy independently or claim migration cleanup is complete.
+
+Before an agent creates a nontrivial actionable issue or treats its own draft
+as implementation authority, use `$issue-design-review` with a fresh read-only
+agent after the user has authorized subagents for the active session. This
+includes implementation, technical-debt, follow-up, decision, dependency,
+privacy, and operational issues. The review must return `ready`, `revise`, or
+`split_required`; record the verdict or a concise review summary in the issue
+when it is created. Do not publish or act on a `revise` draft, and split a
+`split_required` draft according to the repository workflow. Tiny bookkeeping
+issues that directly transcribe an explicit user instruction may skip this
+review only when the issue records why it was unnecessary.
+
+An issue is not `ready` while it silently introduces or leaves unresolved a
+material runtime component, edge proxy, provider, external account, stored-data
+or privacy obligation, network exposure, deployment burden, recurring cost, or
+operational dependency. Document the need and alternatives and obtain the
+required owner decision before implementation planning.
+
+If implementation would add or materially change one of these dependencies and
+the source issue does not already document and approve it, stop before editing.
+Update the issue through the authorized workflow, rerun `$issue-design-review`,
+and rerun `$implementation-scope-review` when the accepted scope or PR packaging
+may change.
+
 ## Change Scope and Pull Request Sizing
 
 Before issue-backed implementation, record the intended coherent outcome,
@@ -125,12 +161,13 @@ Tests and supporting documentation count toward the file and line limits.
 Generated, vendored, and lock files do not count toward the numeric gate, but
 the plan and PR must disclose them.
 
-Before editing an oversized plan, use a fresh read-only planning agent after
-the user has authorized subagents for the active session. The reviewer must
-return `single_pr` or `split_required`, map acceptance criteria to proposed
-PRs, identify dependencies, and recommend merge order. If a planning agent is
-unavailable or not authorized, pause oversized work and report the blocker;
-do not silently waive the review.
+Before editing a plan that may cross a scope gate, use
+`$implementation-scope-review` with a fresh read-only agent after the user has
+authorized subagents for the active session. The reviewer must return
+`single_pr` or `split_required`, map acceptance criteria to proposed PRs,
+identify dependencies, and recommend merge order. If a planning agent is
+unavailable or not authorized, pause oversized work and report the blocker; do
+not silently waive the review.
 
 Default to `split_required` whenever a gate is crossed. Keeping oversized work
 in one PR requires an inseparability or safety rationale recorded on the issue
@@ -139,15 +176,17 @@ create and link child issues before implementation, keep the parent issue open,
 give each PR one coherent outcome, and make every slice independently safe and
 mergeable. Leave unfinished capabilities disabled by default.
 
-Re-evaluate the gate during implementation. If the actual diff crosses it or
-a new independently reviewable concern appears, stop and split instead of
-silently expanding the current PR.
+Re-evaluate the gate during implementation. If the actual diff crosses it or a
+new independently reviewable concern appears, stop and rerun
+`$implementation-scope-review`. Split the work unless keeping one PR satisfies
+the recorded inseparability or safety rationale and explicit owner-approval
+requirements above; never silently expand the current PR.
 
-Before opening a nontrivial implementation PR, stage the complete intended
-diff and ask a fresh read-only agent to review it against repository
-instructions and relevant contracts. Triage every finding, fix accepted
-findings narrowly, record reasons for rejected or deferred findings, rerun
-relevant checks, and summarize the review outcome in the PR.
+Before opening or finalizing a nontrivial implementation PR, stage the complete
+intended diff and use `$second-agent-review` with a fresh read-only agent. Triage
+every finding, fix accepted findings narrowly, record reasons for rejected or
+deferred findings, rerun relevant checks, and summarize the review outcome in
+the PR.
 
 Treat implementation work as nontrivial when it changes runtime behavior,
 public contracts, scoring or data transformation, provider/privacy/security
