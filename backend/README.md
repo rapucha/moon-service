@@ -420,8 +420,13 @@ The current backend is suitable for a single-process private alpha. Keep one
 backend replica until provider counters and caches move to a durable/shared
 store. Multiple replicas would make `/admin/status` quota usage incomplete and
 would reduce cache effectiveness. Public request rate limiting is not currently
-backend-owned; use edge or ingress limits before public exposure, then add
-application-level `429` JSON when the product API contract requires it.
+backend-owned. Before temporary Funnel exposure,
+[#119](https://github.com/rapucha/moon-service/issues/119) and
+[#120](https://github.com/rapucha/moon-service/issues/120) will add a
+disabled-by-default hosted surface and process-local shared limits through
+Spring-managed application components. Those controls bound accepted work and
+provider use after requests reach the Pi; they are not an inbound WAN cap.
+Cloudflare remains the later production edge.
 
 Spring Boot shutdown is explicitly graceful with a 30-second per-phase
 timeout. Container orchestration must send `SIGTERM` and allow more than 30
