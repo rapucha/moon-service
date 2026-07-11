@@ -43,7 +43,7 @@ answer:
   to understand the work.
 - Any proposed file list, subsystem estimate, rollout constraint, or known
   dependency.
-- The change class selected from the accepted issue, plus any generated,
+- The change category selected from the accepted issue, plus any generated,
   vendored, or lock-file paths and reproduction information.
 - Existing parent or child issues that may already own part of the scope.
 - The issue-design verdict or summary when project policy required one.
@@ -52,7 +52,7 @@ answer:
 
 1. Restate the single intended user-visible or operational outcome and the
    accepted issue authority.
-2. Determine the repository-defined change class from the accepted issue, not
+2. Determine the repository-defined change category from the accepted issue, not
    from the allowance the proposed diff needs. Use the stricter applicable gate
    for ambiguous or mixed work.
 3. Enumerate independently reviewable concerns. Treat code, tests, and
@@ -89,7 +89,7 @@ Lead with this structure:
 Verdict: single_pr | split_required
 
 Gate assessment:
-- Change class: <repository-defined class and why>
+- Change category: <repository-defined category and why>
 - Applicable gates: <concerns/files/lines and output budgets>
 - Concerns/subsystems: <count and names>
 - Ordinary files: <estimate>
@@ -127,7 +127,7 @@ Use a prompt like:
 ```text
 Use a read-only planning-review stance. Review the issue and relevant project
 authority before implementation. Do not edit files or external state. Apply
-the repository change classification, ordinary and output gates, and semantic
+the repository change categorization, ordinary and output gates, and semantic
 stop/replan controls. Map every acceptance criterion to a proposed PR and
 return single_pr or split_required. Make every proposed slice independently
 safe and mergeable, identify dependencies and merge order, and state material

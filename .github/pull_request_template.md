@@ -10,7 +10,7 @@
 ## Scope Review
 
 - Coherent outcome:
-- Change class and rationale:
+- Change category and rationale:
 - Applicable gate (concerns / ordinary files / ordinary lines):
 - Independently reviewable concerns or subsystems:
 - Ordinary files changed:
@@ -27,7 +27,7 @@
 - New abstractions or extension points: None / current accepted use or established boundary
 - Follow-up issue mutation authority: None / explicit user instruction / explicit source-issue authority / owner-accepted enumerated split plan (link exact issues)
 
-- [ ] The change class was selected from accepted authority before editing and was not changed to fit the diff.
+- [ ] The change category was selected from accepted authority before editing and was not changed to fit the diff.
 - [ ] This PR is within every applicable ordinary and generated/vendored/lock gate.
 - [ ] If this PR exceeds a gate, its recorded inseparability/safety rationale and explicit owner approval are linked above. (N/A if within all gates.)
 - [ ] Numeric headroom was not used to add an unaccepted concern, dependency, cleanup, refactor, abstraction, test, or documentation.

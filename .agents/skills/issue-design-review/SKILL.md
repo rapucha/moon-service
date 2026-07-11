@@ -41,7 +41,7 @@ answer:
   to test the premise.
 - Existing issues or pull requests that may duplicate, supersede, or own part
   of the work.
-- The proposed repository change class; estimated ordinary, generated, vendored,
+- The proposed repository change category; estimated ordinary, generated, vendored,
   and lock-file output; and authority for any follow-up issue or dependency.
 - Known dependencies, rollout constraints, assumptions, and owner decisions.
 
@@ -61,9 +61,9 @@ answer:
 5. Separate owner decisions from implementation details. Do not mark a draft
    ready while a material product, architecture, privacy, cost, or operational
    choice is implicit or unauthorized.
-6. Classify the proposed work from its outcome and apply every repository gate:
+6. Categorize the proposed work from its outcome and apply every repository gate:
    concerns, ordinary files/lines, and separate generated, vendored, and
-   lock-file budgets. Do not choose a more generous class to fit an estimate.
+   lock-file budgets. Do not choose a more generous category to fit an estimate.
 7. Identify incidental findings, opportunistic cleanup, unrelated tests/docs,
    and dependencies not authorized by the user's request or existing source
    issue. Remove them or return `revise`; numeric headroom is not authority.
@@ -107,7 +107,7 @@ Decisions and hidden dependencies:
 - <decision/dependency; owner approval state>
 
 Scope assessment:
-- Change class: <repository-defined class and why>
+- Change category: <repository-defined category and why>
 - Concerns/subsystems: <count and names>
 - Expected files/lines: <estimate or bounded range>
 - Generated/vendored/lock output: <budget assessment or none>
@@ -140,7 +140,7 @@ Use a read-only issue-design-review stance. Review the draft issue and relevant
 project authority before it is created or treated as implementation authority.
 Do not edit files or external state. Challenge the premise, alternatives,
 hidden dependencies, owner decisions, scope authority, YAGNI, and acceptance
-criteria. Apply the repository change class and all ordinary/output gates and
+criteria. Apply the repository change category and all ordinary/output gates and
 return exactly ready, revise, or split_required. Do not assume the drafting
 agent's proposed solution is correct.
 ```

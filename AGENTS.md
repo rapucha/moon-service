@@ -141,25 +141,25 @@ Update the issue through the authorized workflow, rerun `$issue-design-review`,
 and rerun `$implementation-scope-review` when the accepted scope or PR packaging
 may change.
 
-## Change Scope and Pull Request Sizing
+## Change Categories and Gates
 
-Before issue-backed implementation, classify the accepted work and record its
+Before issue-backed implementation, categorize the accepted work and record its
 coherent outcome, independently reviewable concerns or subsystems, likely files,
 estimated added-plus-deleted lines, and acceptance-criterion ownership. Select
-the class from the accepted issue before editing; do not relabel work later to
-obtain a larger allowance. Ambiguous or mixed work uses the stricter applicable
-gate or splits.
+the change category from the accepted issue before editing; do not relabel work
+later to obtain a larger allowance. Ambiguous or mixed work uses the stricter
+applicable gate or splits.
 
 The default gates are:
 
-| Change class | Maximum concerns or subsystems | Maximum ordinary files | Maximum ordinary lines |
+| Change category | Maximum concerns or subsystems | Maximum ordinary files | Maximum ordinary lines |
 | --- | ---: | ---: | ---: |
 | Bug fix | 1 | 6 | 300 |
 | New feature or default | 2 supporting one accepted outcome | 10 | 600 |
 | Documentation-only | 1 | 6 | 400 |
 
 Documentation-only work changes no runtime, policy or workflow, configuration,
-CI, or tooling behavior. Those changes use the new-feature/default class. An
+CI, or tooling behavior. Those changes use the new-feature/default category. An
 authorized refactor uses the feature file and line limits but may contain only
 one concern. Operations and dependency work use the feature limits plus the
 explicit dependency or operational authority required below; file spread does
@@ -246,7 +246,7 @@ Re-evaluate the gate during implementation. If the actual diff crosses it or a
 new independently reviewable concern, output category, or dependency appears,
 stop and rerun `$implementation-scope-review`. Split the work unless keeping one
 PR satisfies the recorded exception requirements above; never silently expand
-or reclassify the current PR.
+or recategorize the current PR.
 
 Before opening or finalizing a nontrivial implementation PR, stage the complete
 intended diff and use `$second-agent-review` with a fresh read-only agent. Triage

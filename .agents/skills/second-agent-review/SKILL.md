@@ -62,7 +62,7 @@ Prefer these inputs:
 - Project authority files, for example `AGENTS.md`, `README.md`, contribution docs, or policy docs.
 - Relevant design/API/product docs, not every document in the repository.
 - The staged diff, branch diff, or exact file list under review.
-- The accepted change class, scope review, explicit source-issue authority, and
+- The accepted change category, scope review, explicit source-issue authority, and
   any approved exception or owner-accepted enumerated split plan.
 - Generated, vendored, and lock-file counts, churn, sizes, reproduction commands,
   and validation evidence when present.
@@ -83,7 +83,7 @@ project instructions and relevant docs. Do not modify files.
 
 Check scope before implementation quality:
 
-1. Compare the staged diff with the accepted outcome, change class, acceptance
+1. Compare the staged diff with the accepted outcome, change category, acceptance
    criteria, and approved exceptions. Flag unaccepted concerns even when the
    diff remains below numeric gates.
 2. Verify ordinary and generated/vendored/lock measurements and reproduction
