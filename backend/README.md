@@ -107,6 +107,7 @@ reason to tune them.
 | `moon.location.resolver` | unset | Must be `open-meteo` for runtime geocoding. |
 | `moon.weather.provider` | unset | Must be `open-meteo` for runtime weather. |
 | `moon.build.revision` | `local` | Safe revision identifier returned by operational health and protected admin status. Container builds set this from `MOON_BUILD_REVISION`. |
+| `moon.hosted-alpha.enabled` | `false` | Enables the fail-closed Spring application surface for temporary Funnel hosting. The policy applies to LAN and tunneled requests alike. |
 | `moon.open-meteo.timeout` | `3s` | Open-Meteo connect and read timeout. |
 | `moon.open-meteo.max-transport-retries` | `1` | Maximum retries after the first Open-Meteo attempt. |
 | `moon.open-meteo.max-retry-after` | `1s` | Largest provider `Retry-After` delay accepted for retry. |
@@ -304,6 +305,36 @@ The request log records method, path, status, duration, and request ID. It uses
 the route path only, not the raw query string, so location queries such as
 `q=...` are not written to application logs by this filter.
 
+### Hosted-alpha application surface
+
+`moon.hosted-alpha.enabled` is disabled by default. Set
+`MOON_HOSTED_ALPHA_ENABLED=true` only for a deliberately prepared hosted-alpha
+deployment. Because Docker NAT does not reliably distinguish the direct LAN
+listener from Funnel's loopback target, enabling the mode applies the same
+policy to every request reaching that application instance.
+
+The enabled policy allows only `GET` and `HEAD` for `/`, `/search`, `/about`,
+their backing HTML files, the exact static files tracked by the current build,
+`/api/opportunities`, and `/readyz`. Adding a static file does not publish it
+automatically; update the explicit allowlist and its test inventory. The policy
+returns `404` for `/admin/**` even when an admin token is configured, the
+fixture-only `/api/opportunities/search`, `/healthz`, and every unapproved path.
+An unapproved method on an approved path returns `405`; a content-length or
+transfer-encoded body on an approved `GET` or `HEAD` returns `400`.
+
+Before controller handling, the policy removes
+`Forwarded`, `X-Forwarded-For`, `X-Real-IP`, `X-Client-IP`, `True-Client-IP`,
+`CF-Connecting-IP`, Tailscale user identity headers, and
+`Tailscale-App-Capabilities`. Moon Service does not use those headers as visitor
+identity or authorization; the outer request logger records no forwarded
+identity values. Responses reached through the Spring filter chain receive CSP,
+HSTS, frame-denial, no-sniff, no-referrer, permissions, and same-origin
+opener/resource headers on both success and error paths. The CSP keeps scripts
+and provider requests same-origin while permitting the current UI's generated
+data images, score-bar widths, and SVG silhouette-layer styles. Connector-level
+requests rejected before Spring filters, including Tomcat's disabled `TRACE`
+handling and malformed requests, are outside this application boundary.
+
 ### Operational health
 
 The deployment-facing health endpoints are unauthenticated and intentionally
@@ -419,14 +450,13 @@ header token is the minimum app-level boundary.
 The current backend is suitable for a single-process private alpha. Keep one
 backend replica until provider counters and caches move to a durable/shared
 store. Multiple replicas would make `/admin/status` quota usage incomplete and
-would reduce cache effectiveness. Public request rate limiting is not currently
-backend-owned. Before temporary Funnel exposure,
-[#119](https://github.com/rapucha/moon-service/issues/119) and
-[#120](https://github.com/rapucha/moon-service/issues/120) will add a
-disabled-by-default hosted surface and process-local shared limits through
-Spring-managed application components. Those controls bound accepted work and
-provider use after requests reach the Pi; they are not an inbound WAN cap.
-Cloudflare remains the later production edge.
+would reduce cache effectiveness. The disabled-by-default hosted surface is
+implemented under [#119](https://github.com/rapucha/moon-service/issues/119).
+Before temporary Funnel exposure,
+[#120](https://github.com/rapucha/moon-service/issues/120) will add process-local
+shared limits through Spring-managed application components. Those controls
+bound accepted work and provider use after requests reach the Pi; they are not
+an inbound WAN cap. Cloudflare remains the later production edge.
 
 Spring Boot shutdown is explicitly graceful with a 30-second per-phase
 timeout. Container orchestration must send `SIGTERM` and allow more than 30

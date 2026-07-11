@@ -21,7 +21,7 @@ import java.util.HexFormat;
 import java.util.function.Supplier;
 
 @Component
-@Order(Ordered.HIGHEST_PRECEDENCE + 10)
+@Order(Ordered.HIGHEST_PRECEDENCE + 20)
 public final class AdminAccessFilter extends OncePerRequestFilter {
     public static final String ADMIN_TOKEN_HEADER = "X-Moon-Admin-Token";
     private static final Logger LOGGER = LoggerFactory.getLogger(AdminAccessFilter.class);
