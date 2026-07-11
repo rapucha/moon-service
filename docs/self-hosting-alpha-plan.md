@@ -49,10 +49,16 @@ timer rearming and exact GitHub deployment confirmation are follow-up
   an exact loopback listener or loopback proxy for Funnel rather than replacing
   the LAN listener with a wildcard bind.
 - Keep one backend instance at first because provider counters and caches are
-  currently process-local. Public request rate limiting is planned for the edge
-  or ingress first, with app-level rate limiting added when the product response
-  contract needs backend-owned `429` JSON.
-- Add edge and ingress rate limits before any public alpha.
+  currently process-local. For the temporary tester alpha, use one shared,
+  process-local request boundary inside the Spring application. Do not add
+  visitor identity or per-client fairness. Cloudflare remains the later
+  production edge.
+- Before Funnel activation, add the fail-closed hosted surface and the
+  Spring-managed limits selected under
+  [#118](https://github.com/rapucha/moon-service/issues/118) and
+  [#120](https://github.com/rapucha/moon-service/issues/120). These controls
+  bound accepted application work, responses, and provider calls after a
+  request reaches the Pi; they are not a WAN bandwidth cap.
 - Use the 32 GB SD card for Pi OS, Docker runtime state, two application image
   generations, and bounded local logs. Keep durable application data off it.
 - Plan a small NFS-backed storage pool around 64-80 GB for alpha data that must
@@ -219,8 +225,9 @@ Backup matrix before public alpha:
 
 ## Deferred Phase 2: Tailscale Funnel Public Edge
 
-Goal: expose only the public app surface and keep hostile traffic away from the
-home network where possible.
+Goal: expose only a bounded public app surface through an outbound-established
+tunnel, without a raw router port forward and without claiming that local
+application rejection can stop traffic already carried over the home ISP link.
 
 Recommended shape:
 
@@ -238,52 +245,119 @@ Recommended shape:
   protected by the backend token if enabled for private operation.
 - No raw router port forward is required for HTTP(S) when Funnel is used.
 
-Ingress controls to plan:
+### Tester-Alpha Shared-Uplink Decision
+
+Issue [#118](https://github.com/rapucha/moon-service/issues/118) selects a
+best-effort boundary for the temporary alpha:
+
+- Do not add router or host traffic shaping for the couple of expected testers.
+- Do not claim a project-selected Mbps ceiling. Tailscale documents a
+  non-configurable Funnel bandwidth limit but does not publish a numeric value
+  that Moon Service can treat as a guarantee.
+- Enforce request admission and search/provider work with Spring-managed
+  application components. Values are supplied through Spring configuration;
+  this is not a Tomcat valve, connector rate limiter, or proxy policy.
+- Share the limits across the deployed instance. Visitor identity, source IP,
+  forwarded-client identity, and fairness between testers are unnecessary for
+  this alpha.
+- Keep Cloudflare as the production edge rather than growing the home-hosted
+  alpha into a production ingress design.
+
+The control and observation points are deliberately separate:
+
+| Boundary | Exact point | What it establishes | What it does not establish |
+| --- | --- | --- | --- |
+| Tailscale Funnel limit | Tailscale-operated Funnel service, outside the home deployment and project configuration | An additional upstream limit exists | A known numeric ceiling or a Moon Service guarantee for household traffic |
+| Spring request/work limits | Inside the Spring Boot process on the Pi, after the request has reached the embedded server | Bounds admitted application requests, concurrent opportunity work, bounded responses, and provider calls | An inbound Mbps cap or prevention of bytes already crossing the ISP access link |
+| Household-impact observation | A trusted LAN client sharing the same router and ISP connection while test load originates outside the LAN | Shows whether the allowed alpha load materially harms ordinary household latency or usability | An enforcement mechanism or protection from traffic outside the controlled test |
+
+The planned application values are request and work limits, not external
+Funnel restrictions:
+
+- One shared whole-site token bucket refills at 60 requests per minute (one
+  token per second) and stores at most 40 tokens. Capacity 40 is the maximum
+  initial or accumulated burst; it is not 40 requests in addition to an
+  unrelated 60-request allowance.
+- At most two opportunity searches execute concurrently.
+- A separate provider-backed lookup bucket initially holds ten tokens and
+  refills once per minute. It protects Open-Meteo usage and is not a home-uplink
+  bandwidth measurement.
+
+Issue [#119](https://github.com/rapucha/moon-service/issues/119) owns the
+disabled-by-default route, method, body, header, admin, and fixture boundary.
+Issue [#120](https://github.com/rapucha/moon-service/issues/120) owns the actual
+Spring implementation, deterministic limiter and concurrency tests, provider
+arithmetic, `429` behavior, and Docker-readiness carve-out. Until those issues
+are merged and deployed, these values describe policy rather than current
+runtime behavior.
+
+Other hosted-surface controls remain narrow:
 
 - Request size limits suitable for query-only endpoints.
 - Conservative timeouts so slow clients do not tie up the backend.
-- Per-IP or per-forwarded-client rate limits on `/api/opportunities`.
-- Stricter limits for one-character lookups and future feed/calendar refresh
-  routes if they become abuse targets.
 - Basic security headers for browser responses.
-- Forwarded-client-IP handling that matches the chosen edge path. Rate limits
-  are only useful if Funnel or the loopback proxy preserves the intended client
-  identity, or the public edge applies the limit first.
+- Future feed and calendar routes must join an explicit shared bound before
+  public exposure; their caching and polling policy remains future work.
 
-Initial alpha rate-limit targets, to tune after real traffic:
+### Safe Activation Check
 
-- `/api/opportunities`: about 30 requests per minute per client, with a small
-  burst allowance for manual repeated searches.
-- One-character or otherwise high-ambiguity lookups: about 10 requests per
-  minute per client.
-- Future feed and calendar routes: favor HTTP caching and low per-client refresh
-  rates, because calendars and feed readers can poll repeatedly without a human
-  actively using the site.
-- Upstream provider exhaustion still maps to `temporarily_unavailable`; client
-  overuse maps to `rate_limited` with HTTP `429` once backend-owned app-level
-  limiting exists. Edge or ingress rate limiting is an earlier safety control
-  and may not produce the final product JSON shape.
+Public activation remains blocked until #119, #120,
+[#121](https://github.com/rapucha/moon-service/issues/121), and
+[#122](https://github.com/rapucha/moon-service/issues/122) are merged and the
+required revision is deployed. Issue
+[#123](https://github.com/rapucha/moon-service/issues/123) then requires a new,
+explicit owner-approved activation window.
+
+During that window:
+
+1. From one trusted household LAN client, record an unloaded latency and packet
+   loss baseline to one stable external target and confirm ordinary Internet
+   use before Funnel is enabled.
+2. From outside the household LAN, send one finite, static-only over-limit
+   probe: after the whole-site bucket is full, request the same bounded static
+   asset concurrently exactly `capacity + 1` times. Verify at least one bounded
+   HTTP `429` response, wait for the configured refill interval, and verify one
+   static request succeeds. Make only the single real provider lookup
+   authorized by #123; do not live-saturate provider or
+   opportunity-concurrency limits.
+3. At the same time, repeat the LAN measurement and check ordinary household
+   browsing or other active use. Use #120's deterministic tests, rather than
+   additional live provider calls, as the proof of provider-bucket and
+   opportunity-concurrency behavior in the deployed revision.
+4. On material household degradation, unexpected provider work, failure to
+   reject the static over-limit probe, or unrelated public exposure, stop the
+   test immediately and run the exact Funnel-off procedure prepared by #122.
+5. At the end of every window, including a successful one, run that same
+   Funnel-off procedure. Verify that public access stops while LAN access and
+   deployment health remain intact.
+
+Every check leaves Funnel off. A failed check blocks reactivation.
+Reconsidering a MikroTik/router cap or host shaping requires a new reviewed
+issue and explicit mutation authority; #118 does not authorize either change.
 
 WAF stance:
 
 - Do not start by tuning a local WAF on the Pis.
-- Prefer simple edge bot controls, ingress rate limits, request bounds, and app
-  validation first.
+- Prefer the narrow hosted surface, shared Spring limits, request bounds, and
+  application validation for this alpha.
 - Revisit WAF only if traffic shows repeated exploit attempts or the public
   input surface becomes more complex than city lookup, feeds, and calendar
   exports.
 
 Exit criteria:
 
-- The public domain reaches the backend through the tunnel.
-- The Kubernetes API, node ports, admin path, and any future database are not
-  publicly reachable.
-- A burst of repeated public API calls receives `429` before provider quotas are
-  at risk.
+- During the explicit #123 window, the public URL reaches only the accepted
+  hosted surface through the tunnel.
+- Admin, fixture, SSH, Docker, and unrelated host surfaces are not publicly
+  reachable.
+- Excess requests receive bounded rejection before provider quotas are at risk,
+  the household-impact check passes, and the exact Funnel-off path restores the
+  private-only state.
 
 ## Phase 3: App-Level Abuse And Provider Protection
 
-Goal: keep Open-Meteo usage, CPU, memory, and home bandwidth bounded.
+Goal: keep accepted Open-Meteo usage, application work, and generated traffic
+bounded. This phase does not claim to cap inbound WAN traffic.
 
 The backend already has useful alpha primitives:
 
@@ -295,8 +369,8 @@ The backend already has useful alpha primitives:
 
 Remaining application work:
 
-- Add explicit application-level rate limiting when ingress-only limits are not
-  enough for correct product responses.
+- Add the shared Spring-managed whole-site, opportunity-concurrency, and
+  provider-backed lookup limits selected above.
 - Return documented `status: "rate_limited"` with HTTP `429`.
 - Keep Open-Meteo quota limits configurable and visible in `/admin/status`.
 - Add operator-visible current public rate-limit settings.
@@ -308,6 +382,10 @@ Exit criteria:
 
 - Repeated searches for the same city hit caches instead of increasing provider
   counters.
+- Deterministic tests prove burst, refill, concurrency, retry, and restart
+  behavior without relying on visitor identity.
+- Limiter exhaustion does not make Docker health restart an otherwise healthy
+  application.
 - Provider timeout, retry, and rate-limit counts are visible during a manual
   spike.
 - Dependency failure returns `temporarily_unavailable`, not an empty opportunity
@@ -413,6 +491,18 @@ Do not add these until a follow-up issue makes them necessary:
   rearming and exact physical-deployment confirmation through GitHub.
 - [#97](https://github.com/rapucha/moon-service/issues/97): public HTTPS
   exposure and hardening through Tailscale Funnel.
+- [#118](https://github.com/rapucha/moon-service/issues/118): accepted
+  tester-alpha shared-uplink protection boundary.
+- [#119](https://github.com/rapucha/moon-service/issues/119): fail-closed
+  hosted-alpha application surface.
+- [#120](https://github.com/rapucha/moon-service/issues/120): shared
+  application and provider-use bounds.
+- [#121](https://github.com/rapucha/moon-service/issues/121): provider
+  attribution and noncommercial-alpha disclosure.
+- [#122](https://github.com/rapucha/moon-service/issues/122): inactive direct
+  Tailscale Funnel routing preparation.
+- [#123](https://github.com/rapucha/moon-service/issues/123): separately
+  approved Funnel activation and physical verification.
 - [#8](https://github.com/rapucha/moon-service/issues/8): add basic
   provider-call scalability protections.
 - [#9](https://github.com/rapucha/moon-service/issues/9): add basic backend
