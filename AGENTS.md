@@ -105,6 +105,57 @@ The main unresolved choice is now the exact first web/API contract for city look
 - In this environment, `git push` requires network access and sandboxed DNS has repeatedly failed. When the user asks to push any branch or remote, run the push with escalated permissions immediately instead of first attempting a sandboxed push.
 - Do not repeat a failing command, API request, or tool call unchanged unless the failure is plausibly transient, such as a timeout, network interruption, rate-limit retry hint, lock contention, or service restart. For deterministic errors, change the request based on a concrete hypothesis, reduce it to a minimal reproduction, inspect docs/help/output, or stop and explain the blocker. For plausibly transient errors, retry with exponential backoff and a small retry budget; once the next backoff delay would reach roughly 30 to 60 seconds, stop retrying and report the failure.
 
+## Change Scope and Pull Request Sizing
+
+Before issue-backed implementation, record the intended coherent outcome,
+independently reviewable concerns, likely files, estimated non-generated changed
+lines, and which proposed PR owns each acceptance criterion. Examples of
+independent concerns include backend behavior, frontend UX,
+deployment/operations, CI/automation, and provider/privacy policy. Code, tests,
+and documentation that support one behavior do not become separate concerns
+merely because they live in different file types.
+
+A proposed PR crosses the scope gate when any of these is true:
+
+- More than two independently reviewable concerns or subsystems.
+- More than 12 non-generated changed files.
+- More than 800 non-generated added-plus-deleted lines.
+
+Tests and supporting documentation count toward the file and line limits.
+Generated, vendored, and lock files do not count toward the numeric gate, but
+the plan and PR must disclose them.
+
+Before editing an oversized plan, use a fresh read-only planning agent after
+the user has authorized subagents for the active session. The reviewer must
+return `single_pr` or `split_required`, map acceptance criteria to proposed
+PRs, identify dependencies, and recommend merge order. If a planning agent is
+unavailable or not authorized, pause oversized work and report the blocker;
+do not silently waive the review.
+
+Default to `split_required` whenever a gate is crossed. Keeping oversized work
+in one PR requires an inseparability or safety rationale recorded on the issue
+and explicit approval from the user or repository owner. For split work,
+create and link child issues before implementation, keep the parent issue open,
+give each PR one coherent outcome, and make every slice independently safe and
+mergeable. Leave unfinished capabilities disabled by default.
+
+Re-evaluate the gate during implementation. If the actual diff crosses it or
+a new independently reviewable concern appears, stop and split instead of
+silently expanding the current PR.
+
+Before opening a nontrivial implementation PR, stage the complete intended
+diff and ask a fresh read-only agent to review it against repository
+instructions and relevant contracts. Triage every finding, fix accepted
+findings narrowly, record reasons for rejected or deferred findings, rerun
+relevant checks, and summarize the review outcome in the PR.
+
+Treat implementation work as nontrivial when it changes runtime behavior,
+public contracts, scoring or data transformation, provider/privacy/security
+boundaries, deployment or CI behavior, migrations, or multiple files with
+coupled behavior. Tiny mechanical edits and wording-only documentation changes
+may skip the staged-diff review, but the PR must record why review was not
+required.
+
 ## Suggested Tooling Direction
 
 As implementation continues, the expected stack remains:
