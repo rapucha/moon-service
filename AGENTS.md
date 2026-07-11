@@ -143,25 +143,87 @@ may change.
 
 ## Change Scope and Pull Request Sizing
 
-Before issue-backed implementation, record the intended coherent outcome,
-independently reviewable concerns, likely files, estimated non-generated changed
-lines, and which proposed PR owns each acceptance criterion. Examples of
-independent concerns include backend behavior, frontend UX,
+Before issue-backed implementation, classify the accepted work and record its
+coherent outcome, independently reviewable concerns or subsystems, likely files,
+estimated added-plus-deleted lines, and acceptance-criterion ownership. Select
+the class from the accepted issue before editing; do not relabel work later to
+obtain a larger allowance. Ambiguous or mixed work uses the stricter applicable
+gate or splits.
+
+The default gates are:
+
+| Change class | Maximum concerns or subsystems | Maximum ordinary files | Maximum ordinary lines |
+| --- | ---: | ---: | ---: |
+| Bug fix | 1 | 6 | 300 |
+| New feature or default | 2 supporting one accepted outcome | 10 | 600 |
+| Documentation-only | 1 | 6 | 400 |
+
+Documentation-only work changes no runtime, policy or workflow, configuration,
+CI, or tooling behavior. Those changes use the new-feature/default class. An
+authorized refactor uses the feature file and line limits but may contain only
+one concern. Operations and dependency work use the feature limits plus the
+explicit dependency or operational authority required below; file spread does
+not earn a larger allowance.
+
+Examples of distinct concerns include backend behavior, frontend UX,
 deployment/operations, CI/automation, and provider/privacy policy. Code, tests,
-and documentation that support one behavior do not become separate concerns
-merely because they live in different file types.
+and documentation that directly support one accepted behavior remain the same
+concern, but they count toward ordinary file and line totals. Numeric headroom
+never authorizes an unaccepted concern.
 
-A proposed PR crosses the scope gate when any of these is true:
+"Ordinary" means every changed file that does not qualify as generated,
+vendored, or a lock file. Those three categories have independent budgets:
 
-- More than two independently reviewable concerns or subsystems.
-- More than 12 non-generated changed files.
-- More than 800 non-generated added-plus-deleted lines.
+- Generated output: 8 changed files, 20,000 textual added-plus-deleted lines,
+  and 512 KiB aggregate resulting size.
+- Vendored output: zero by default. When the accepted issue explicitly
+  authorizes vendoring, 2 changed files and 1 MiB aggregate resulting size.
+- Lock files: 1 changed file, 2,000 textual added-plus-deleted lines, and
+  256 KiB resulting size.
 
-Tests and supporting documentation count toward the file and line limits.
-"Generated" means reproducibly emitted by a deterministic build or
-code-generation tool. Files authored by an agent or LLM are non-generated.
-Generated, vendored, and lock files do not count toward the numeric gate, but
-the plan and PR must disclose them.
+"Generated" means a tracked deterministic command emits the complete file
+byte-for-byte from tracked inputs. A mixed authored/generated file is ordinary,
+and every agent- or LLM-authored file is ordinary. The manifest that triggers a
+lock-file change is also ordinary.
+
+Plans and PRs that change generated output must record its paths, generator and
+version, inputs, exact command, counts, textual churn, resulting bytes, clean
+regeneration result, and semantic validation. Visual snapshots require a pinned
+reproducible environment. Authorized vendoring must record provenance,
+immutable version or hash, license, and why repository storage is required.
+Lock-file evidence must record the package-manager version and reproduction
+command.
+
+## Scope Growth and Mutation Authority
+
+Do not use available numeric budget to enlarge accepted work. Stop before
+editing and obtain new scope authority when accepted behavior cannot be
+delivered safely without an unrequested refactor, incidental fix, new concern,
+or new dependency. In particular:
+
+- Omit an unrequested refactor when the accepted behavior can be delivered
+  safely without it. If it is genuinely required, explain why and re-estimate.
+- Report an incidental finding without fixing or filing it when it does not
+  block correctness, safety, or validation. A blocking finding requires
+  stop-and-replan authority.
+- Add an abstraction, production API, configuration option, provider slot,
+  toggle, or extension point only for a current accepted production use or an
+  established local boundary. Tests alone and speculative future use are not
+  sufficient.
+- Exclude opportunistic formatting, renames, dead-code removal, dependency
+  upgrades, cleanup, and unrelated hardening tests or documentation.
+- Stop before adding or changing a manifest, lock file, workflow, provider,
+  account, network service, runtime component, build tool, or test dependency
+  unless the accepted issue explicitly approves that dependency and its
+  consequences.
+
+A `split_required` verdict does not itself authorize GitHub mutations. After the
+owner explicitly accepts an enumerated split plan, an agent may create only the
+child issues that directly map the parent acceptance criteria named in that
+plan. Incidental findings, cleanup, speculative work, and new dependencies still
+require separate explicit user/owner instruction or explicit source-issue
+authority. Without that authority, report the observation without mutating
+GitHub.
 
 Before editing a plan that may cross a scope gate, use
 `$implementation-scope-review` with a fresh read-only agent after the user has
@@ -172,17 +234,19 @@ unavailable or not authorized, pause oversized work and report the blocker; do
 not silently waive the review.
 
 Default to `split_required` whenever a gate is crossed. Keeping oversized work
-in one PR requires an inseparability or safety rationale recorded on the issue
-and explicit approval from the user or repository owner. For split work,
-create and link child issues before implementation, keep the parent issue open,
-give each PR one coherent outcome, and make every slice independently safe and
+in one PR requires the exact exceeded gate and measured values, an
+inseparability or safety rationale recorded on the issue, and explicit approval
+from the user or repository owner. General approval of an issue or PR is not a
+blanket exception. For an owner-accepted split plan, create and link only its
+authorized child issues before implementation, keep the parent issue open, give
+each PR one coherent outcome, and make every slice independently safe and
 mergeable. Leave unfinished capabilities disabled by default.
 
 Re-evaluate the gate during implementation. If the actual diff crosses it or a
-new independently reviewable concern appears, stop and rerun
-`$implementation-scope-review`. Split the work unless keeping one PR satisfies
-the recorded inseparability or safety rationale and explicit owner-approval
-requirements above; never silently expand the current PR.
+new independently reviewable concern, output category, or dependency appears,
+stop and rerun `$implementation-scope-review`. Split the work unless keeping one
+PR satisfies the recorded exception requirements above; never silently expand
+or reclassify the current PR.
 
 Before opening or finalizing a nontrivial implementation PR, stage the complete
 intended diff and use `$second-agent-review` with a fresh read-only agent. Triage

@@ -41,6 +41,8 @@ answer:
   to test the premise.
 - Existing issues or pull requests that may duplicate, supersede, or own part
   of the work.
+- The proposed repository change class; estimated ordinary, generated, vendored,
+  and lock-file output; and authority for any follow-up issue or dependency.
 - Known dependencies, rollout constraints, assumptions, and owner decisions.
 
 ## Review Method
@@ -50,28 +52,35 @@ answer:
 2. Check whether an existing issue, pull request, or documented decision already
    owns the work.
 3. Challenge the proposed solution and identify materially simpler alternatives
-   or cases where no action is warranted.
+   or cases where no action is warranted. Reject speculative abstractions,
+   extension points, cleanup, or refactors that the stated outcome does not
+   require.
 4. Surface hidden decisions and dependencies, including new runtime components,
    providers, accounts, stored data, privacy obligations, network exposure,
    deployment or rollback work, CI, and ongoing operations.
 5. Separate owner decisions from implementation details. Do not mark a draft
    ready while a material product, architecture, privacy, cost, or operational
    choice is implicit or unauthorized.
-6. Apply the repository's concern, file, and line gates. Split distinct
-   outcomes, decision work, or independently deliverable concerns rather than
-   hiding them under one issue.
-7. Test acceptance criteria for observable outcomes, completeness, feasibility,
+6. Classify the proposed work from its outcome and apply every repository gate:
+   concerns, ordinary files/lines, and separate generated, vendored, and
+   lock-file budgets. Do not choose a more generous class to fit an estimate.
+7. Identify incidental findings, opportunistic cleanup, unrelated tests/docs,
+   and dependencies not authorized by the user's request or existing source
+   issue. Remove them or return `revise`; numeric headroom is not authority.
+8. Split distinct outcomes, decision work, or independently deliverable
+   concerns rather than hiding them under one issue.
+9. Test acceptance criteria for observable outcomes, completeness, feasibility,
    and solution bias. Identify prerequisites, dependency order, rollback
    boundaries, and disabled-by-default needs.
-8. Return exactly one verdict: `ready`, `revise`, or `split_required`.
+10. Return exactly one verdict: `ready`, `revise`, or `split_required`.
 
 ## Verdict Rules
 
 - `ready`: the problem is supported, the scope is coherent, material decisions
   are explicit and authorized, and acceptance criteria are testable.
 - `revise`: one coherent issue remains appropriate, but its premise, choices,
-  dependencies, boundaries, or acceptance criteria need correction before it is
-  created or acted upon.
+  dependencies, boundaries, scope authority, or acceptance criteria need
+  correction before it is created or acted upon.
 - `split_required`: the draft combines independently reviewable outcomes,
   crosses a project scope gate, or mixes a prerequisite decision with
   implementation that should not begin before that decision.
@@ -98,8 +107,11 @@ Decisions and hidden dependencies:
 - <decision/dependency; owner approval state>
 
 Scope assessment:
+- Change class: <repository-defined class and why>
 - Concerns/subsystems: <count and names>
 - Expected files/lines: <estimate or bounded range>
+- Generated/vendored/lock output: <budget assessment or none>
+- Scope-authority findings: <unrequested work, dependency, follow-up authority, or none>
 - Triggered gates: <list or none>
 
 Acceptance-quality findings:
@@ -127,9 +139,10 @@ Use a prompt like:
 Use a read-only issue-design-review stance. Review the draft issue and relevant
 project authority before it is created or treated as implementation authority.
 Do not edit files or external state. Challenge the premise, alternatives,
-hidden dependencies, owner decisions, scope, and acceptance criteria. Apply
-the repository scope gates and return exactly ready, revise, or split_required.
-Do not assume the drafting agent's proposed solution is correct.
+hidden dependencies, owner decisions, scope authority, YAGNI, and acceptance
+criteria. Apply the repository change class and all ordinary/output gates and
+return exactly ready, revise, or split_required. Do not assume the drafting
+agent's proposed solution is correct.
 ```
 
 ## Primary-Agent Follow-Up
@@ -138,10 +151,14 @@ Do not assume the drafting agent's proposed solution is correct.
   a concise review summary in the issue.
 - For `revise`, correct the draft and re-run review when the changes are
   material; do not publish the rejected version as implementation authority.
-- For `split_required`, present or create the ordered issue set according to
-  project workflow and owner authority; keep prerequisite decisions ahead of
-  implementation.
+- For `split_required`, present the ordered issue set for owner acceptance.
+  Create only children explicitly authorized by that accepted plan, keep the
+  parent open, and keep prerequisite decisions ahead of implementation.
 - Preserve the reviewer output as evidence, but do not treat it as owner
   approval for a material decision.
+- Reviewer suggestions do not authorize incidental follow-up issues. Without
+  explicit user/owner instruction, explicit source-issue authority, or an
+  owner-accepted enumerated split plan, report the observation without mutating
+  external state.
 - If reviewing an existing issue, update or comment on it only when the user
   authorized that external mutation.
