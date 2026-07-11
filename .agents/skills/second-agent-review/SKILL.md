@@ -43,6 +43,8 @@ independent pass can add value:
 - External provider, network, cache, quota, observability, auth, or privacy boundaries.
 - UI behavior that needs responsive, accessibility, state, or layout judgment.
 - Refactors, renames, ownership-boundary moves, and module restructuring.
+- Policy, workflow, scope-control, or dependency changes where the completed
+  diff must remain aligned with accepted authority.
 - PR-ready work where missed tests or docs could delay review.
 - Any change the primary agent found subtle, surprising, or hard to validate.
 
@@ -60,6 +62,10 @@ Prefer these inputs:
 - Project authority files, for example `AGENTS.md`, `README.md`, contribution docs, or policy docs.
 - Relevant design/API/product docs, not every document in the repository.
 - The staged diff, branch diff, or exact file list under review.
+- The accepted change category, scope review, explicit source-issue authority, and
+  any approved exception or owner-accepted enumerated split plan.
+- Generated, vendored, and lock-file counts, churn, sizes, reproduction commands,
+  and validation evidence when present.
 - The validation commands already run and their outcomes.
 - Any intentionally untracked/generated files that should be ignored.
 
@@ -75,10 +81,24 @@ Ask the second agent to review, not edit. Use a prompt like this:
 Use a read-only code-review stance. Review the provided diff against the
 project instructions and relevant docs. Do not modify files.
 
-Prioritize concrete findings: bugs, behavior regressions, public contract
-drift, missing or weak tests, privacy/security/provider risks, UI/layout
-risks, docs mismatches, and validation gaps. Ignore style preferences unless
-they cause maintainability or user-facing risk.
+Check scope before implementation quality:
+
+1. Compare the staged diff with the accepted outcome, change category, acceptance
+   criteria, and approved exceptions. Flag unaccepted concerns even when the
+   diff remains below numeric gates.
+2. Verify ordinary and generated/vendored/lock measurements and reproduction
+   evidence against project policy. Treat mixed or agent/LLM-authored files as
+   ordinary.
+3. Look for unrequested refactors, incidental fixes, opportunistic cleanup,
+   speculative extensibility, unrelated tests/docs, and abstractions without a
+   current accepted production use or established boundary.
+4. Flag manifest, lock, workflow, provider, account, network, runtime, build, or
+   test dependencies that lack explicit source authority.
+5. Then prioritize concrete bugs, behavior regressions, public contract drift,
+   missing or weak tests, privacy/security/provider risks, UI/layout risks,
+   documentation mismatches, and validation gaps.
+
+Ignore style preferences unless they cause maintainability or user-facing risk.
 
 For each finding, include severity, file and line reference when possible,
 why it matters, and the smallest practical fix. If there are no findings,
@@ -97,6 +117,10 @@ After receiving the review:
 - Fix accepted findings narrowly.
 - Explain rejected findings with a concrete reason, not a preference.
 - Convert deferred findings into project follow-ups only when the project's workflow calls for that.
+- Do not create a follow-up from a reviewer suggestion unless explicit
+  user/owner instruction, explicit source-issue authority, or an owner-accepted
+  enumerated split plan permits it; otherwise report the observation without
+  external mutation.
 - Rerun the relevant validation after any fixes.
 - Mention the second-agent review outcome in the final response or PR summary when useful.
 
