@@ -352,6 +352,19 @@ main {
   font-weight: 740;
 }
 
+.data-attribution {
+  max-width: 860px;
+  margin: 12px 0 0;
+  color: var(--muted);
+  font-size: 0.8rem;
+  line-height: 1.45;
+}
+
+.data-attribution strong,
+.data-attribution a {
+  font-weight: 720;
+}
+
 .tooltip {
   position: relative;
   cursor: help;
@@ -1541,6 +1554,14 @@ summary {
   max-width: 760px;
   margin: 0;
   color: var(--muted);
+}
+
+.about-section .data-attribution {
+  margin-top: 0;
+}
+
+.about-section .data-attribution + p {
+  margin-top: 12px;
 }
 
 .about-list {

@@ -1,0 +1,28 @@
+[Unit]
+Description=Trip the Moon Service public-ingress circuit breaker
+Documentation=https://github.com/rapucha/moon-service/blob/main/deployment/raspberry-pi/README.md
+After=nginx.service tailscaled.service
+OnFailure=moon-service-public-emergency-off.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/moon-service-public check
+TimeoutStartSec=2min
+UMask=0077
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectClock=true
+ProtectControlGroups=true
+ProtectHome=true
+ProtectHostname=true
+ProtectKernelLogs=true
+ProtectKernelModules=true
+ProtectKernelTunables=true
+ProtectSystem=strict
+ReadWritePaths={{ moon_service_state_dir }}
+ReadWritePaths=-/run/moon-service
+ReadWritePaths=-/run/xtables.lock
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6 AF_NETLINK
+RestrictNamespaces=true
+RestrictRealtime=true
+LockPersonality=true

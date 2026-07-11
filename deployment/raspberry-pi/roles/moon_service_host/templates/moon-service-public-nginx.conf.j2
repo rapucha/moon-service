@@ -1,0 +1,224 @@
+# Moon Service tester-alpha ingress. Tailscale Funnel is the only intended
+# caller and must connect over loopback using the PROXY protocol.
+
+limit_req_zone $server_name zone=moon_service_public_requests:1m rate={{ moon_service_public_request_rate_per_minute }}r/m;
+limit_req_zone $server_name zone=moon_service_public_api_requests:1m rate={{ moon_service_public_api_rate_per_minute }}r/m;
+limit_req_zone $binary_remote_addr zone=moon_service_public_api_clients:10m rate={{ moon_service_public_client_api_rate_per_minute }}r/m;
+
+limit_conn_zone $server_name zone=moon_service_public_connections:1m;
+limit_conn_zone $binary_remote_addr zone=moon_service_public_client_connections:10m;
+
+map "$limit_req_status:$limit_conn_status" $moon_service_public_limiter_event {
+    default 0;
+    ~REJECTED 1;
+}
+
+map $status $moon_service_public_retry_after {
+    default "";
+    429 60;
+}
+
+log_format moon_service_public_limiter 'rate-limited';
+
+upstream moon_service_public_app {
+    server {{ moon_service_bind_address }}:{{ moon_service_host_port }};
+    keepalive 8;
+}
+
+server {
+    listen 127.0.0.1:{{ moon_service_public_ingress_port }} proxy_protocol default_server;
+    server_name _;
+    server_tokens off;
+    error_log syslog:server=unix:/dev/log,facility=local6,tag=moon-service-public-error crit;
+
+    # Do not trust forwarding headers supplied by an Internet client. The
+    # listener accepts only loopback connections from tailscaled, and the
+    # PROXY header carries the original Funnel client address.
+    set_real_ip_from 127.0.0.1;
+    real_ip_header proxy_protocol;
+    real_ip_recursive off;
+
+    # Declaring this server-level log replaces any inherited ordinary access
+    # log. Only rejected limiter events are emitted, with fixed non-PII fields.
+    access_log syslog:server=unix:/dev/log,facility=local6,tag=moon-service-public-limit,severity=notice
+        moon_service_public_limiter if=$moon_service_public_limiter_event;
+
+    client_max_body_size 1k;
+    client_body_timeout 5s;
+    client_header_timeout 5s;
+    client_header_buffer_size 1k;
+    large_client_header_buffers 2 4k;
+    keepalive_timeout 10s;
+    keepalive_requests 50;
+    send_timeout 15s;
+    reset_timedout_connection on;
+
+    limit_req zone=moon_service_public_requests burst={{ moon_service_public_request_burst }} nodelay;
+    limit_req_status 429;
+    limit_req_log_level info;
+    limit_conn zone=moon_service_public_connections {{ moon_service_public_connection_limit }};
+    limit_conn zone=moon_service_public_client_connections {{ moon_service_public_client_connection_limit }};
+    limit_conn_status 429;
+    limit_conn_log_level info;
+
+    proxy_http_version 1.1;
+    proxy_connect_timeout 3s;
+    proxy_send_timeout 5s;
+    proxy_read_timeout 45s;
+    proxy_request_buffering on;
+    proxy_buffering on;
+    proxy_set_header Connection "";
+    proxy_set_header Host "{{ moon_service_bind_address }}:{{ moon_service_host_port }}";
+    proxy_set_header X-Forwarded-For "";
+    proxy_set_header X-Forwarded-Proto https;
+    proxy_set_header X-Real-IP "";
+    proxy_set_header Forwarded "";
+    proxy_set_header X-Request-Id $request_id;
+
+    add_header Content-Security-Policy "default-src 'self'; base-uri 'none'; connect-src 'self'; font-src 'self'; form-action 'self'; frame-ancestors 'none'; img-src 'self' data:; object-src 'none'; script-src 'self'; style-src 'self'" always;
+    add_header Cross-Origin-Opener-Policy "same-origin" always;
+    add_header Cross-Origin-Resource-Policy "same-origin" always;
+    add_header Permissions-Policy "camera=(), geolocation=(), microphone=()" always;
+    add_header Referrer-Policy "no-referrer" always;
+    add_header Strict-Transport-Security "max-age=31536000" always;
+    add_header X-Content-Type-Options "nosniff" always;
+    add_header X-Frame-Options "DENY" always;
+    add_header Retry-After $moon_service_public_retry_after always;
+
+    # nginx treats HEAD as allowed whenever GET is listed in limit_except.
+    location = / {
+        limit_except GET { deny all; }
+        proxy_pass http://moon_service_public_app;
+    }
+
+    location = /search {
+        limit_except GET { deny all; }
+        proxy_pass http://moon_service_public_app;
+    }
+
+    location = /about {
+        limit_except GET { deny all; }
+        proxy_pass http://moon_service_public_app;
+    }
+
+    location = /readyz {
+        limit_except GET { deny all; }
+        proxy_pass http://moon_service_public_app;
+    }
+
+    location = /api/opportunities {
+        limit_except GET { deny all; }
+        # Location-level request limits replace inherited limits, so repeat the
+        # whole-public ceiling alongside the API aggregate and per-client caps.
+        limit_req zone=moon_service_public_requests burst={{ moon_service_public_request_burst }} nodelay;
+        limit_req zone=moon_service_public_api_requests burst={{ moon_service_public_api_burst }} nodelay;
+        limit_req zone=moon_service_public_api_clients burst={{ moon_service_public_client_api_burst }} nodelay;
+        error_page 429 = @moon_service_public_api_rate_limited;
+        proxy_pass http://moon_service_public_app;
+    }
+
+    location = /api.js {
+        limit_except GET { deny all; }
+        proxy_pass http://moon_service_public_app;
+    }
+
+    location = /app.js {
+        limit_except GET { deny all; }
+        proxy_pass http://moon_service_public_app;
+    }
+
+    location = /dom.js {
+        limit_except GET { deny all; }
+        proxy_pass http://moon_service_public_app;
+    }
+
+    location = /favicon.svg {
+        limit_except GET { deny all; }
+        proxy_pass http://moon_service_public_app;
+    }
+
+    location = /format.js {
+        limit_except GET { deny all; }
+        proxy_pass http://moon_service_public_app;
+    }
+
+    location = /moonPathLightBands.js {
+        limit_except GET { deny all; }
+        proxy_pass http://moon_service_public_app;
+    }
+
+    location = /moonPathSilhouetteSymbols.js {
+        limit_except GET { deny all; }
+        proxy_pass http://moon_service_public_app;
+    }
+
+    location = /moonPathSilhouettes.js {
+        limit_except GET { deny all; }
+        proxy_pass http://moon_service_public_app;
+    }
+
+    location = /moonPathView.js {
+        limit_except GET { deny all; }
+        proxy_pass http://moon_service_public_app;
+    }
+
+    location = /moonPhaseView.js {
+        limit_except GET { deny all; }
+        proxy_pass http://moon_service_public_app;
+    }
+
+    location = /moonTexture.js {
+        limit_except GET { deny all; }
+        proxy_pass http://moon_service_public_app;
+    }
+
+    location = /opportunityCard.js {
+        limit_except GET { deny all; }
+        proxy_pass http://moon_service_public_app;
+    }
+
+    location = /recentSearches.js {
+        limit_except GET { deny all; }
+        proxy_pass http://moon_service_public_app;
+    }
+
+    location = /responseView.js {
+        limit_except GET { deny all; }
+        proxy_pass http://moon_service_public_app;
+    }
+
+    location = /scoreView.js {
+        limit_except GET { deny all; }
+        proxy_pass http://moon_service_public_app;
+    }
+
+    location = /styles.css {
+        limit_except GET { deny all; }
+        proxy_pass http://moon_service_public_app;
+    }
+
+    location = /sun-marker-aperture-flare.svg {
+        limit_except GET { deny all; }
+        proxy_pass http://moon_service_public_app;
+    }
+
+    location = /terms.js {
+        limit_except GET { deny all; }
+        proxy_pass http://moon_service_public_app;
+    }
+
+    # Keep private/fixture and operational-only routes outside the public edge,
+    # even if a host-local application configuration enables them later.
+    location ~ ^/(?:admin(?:/|$)|api/opportunities/search(?:/|$)|healthz/?$) {
+        return 404;
+    }
+
+    location @moon_service_public_api_rate_limited {
+        default_type application/json;
+        return 429 '{"status":"rate_limited","message":"Too many requests. Please try again shortly.","retryAfterSeconds":60}';
+    }
+
+    location / {
+        return 404;
+    }
+}

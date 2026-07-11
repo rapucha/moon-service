@@ -45,6 +45,8 @@
         <ul class="about-list">
           <li>No account, email, cookies, or saved server-side user profile is required.</li>
           <li>City or town searches are enough; exact home addresses are not needed.</li>
+          <li>The backend sends the location text you submit to Open-Meteo for lookup. For weather forecasts, it sends the resolved location's coordinates rounded to four decimal places.</li>
+          <li>Open-Meteo says free-API logs may contain sensitive geographic request information and are deleted after 90 days. See its <a href="https://open-meteo.com/en/terms">Terms &amp; Privacy</a>.</li>
           <li>Forecasts and scores are decision support, not a guarantee of clear skies or a usable horizon.</li>
           <li>Local hills, buildings, trees, and other horizon obstructions are not modelled yet.</li>
         </ul>
@@ -52,6 +54,16 @@
 
       <section class="about-section">
         <h2>Data and Imagery</h2>
+        <p class="data-attribution">
+          <strong>Data sources:</strong>
+          Weather data comes from <a href="https://open-meteo.com/">Open-Meteo</a>
+          (<a href="https://creativecommons.org/licenses/by/4.0/" rel="license">CC BY 4.0</a>).
+          Location data comes from Open-Meteo Geocoding, is based on
+          <a href="https://www.geonames.org/">GeoNames</a>, and is treated as
+          <a href="https://creativecommons.org/licenses/by-nc/4.0/" rel="license">CC BY-NC 4.0</a>
+          for this noncommercial alpha.
+          Moon Service adapts and aggregates these data and applies its own scoring.
+        </p>
         <p>The Moon surface texture is derived from the <a href="https://svs.gsfc.nasa.gov/4720/">NASA SVS CGI Moon Kit</a>. Credit: NASA's Scientific Visualization Studio.</p>
       </section>
     </section>

@@ -7,7 +7,9 @@ provider privacy, credential, caching, and quota conclusions remain unchanged.
 
 ## Decision
 
-Use Open-Meteo as the first weather provider candidate for the MVP. It has passed the first field-coverage validation spike for the thin scoring prototype.
+Use Open-Meteo as the current weather provider for the web MVP and
+noncommercial tester alpha. It passed the field-coverage validation spike for
+the thin scoring prototype and now serves the live backend path.
 
 Docs: <https://open-meteo.com/en/docs>
 
@@ -24,6 +26,39 @@ Remaining caveats:
 
 - The free API is non-commercial, rate-limited, has no uptime guarantee, and requires attribution through the underlying CC BY 4.0 weather data license.
 - Open-Meteo may log IP addresses and request URLs, which can include coordinates, for troubleshooting. Their terms state these logs are deleted after 90 days.
+
+## Tester-Alpha Provider Boundary
+
+Decision recorded 2026-07-11:
+
+- The tester alpha is explicitly noncommercial. It has no advertising,
+  subscriptions, paid access, or use in commercial promotion, so the free
+  Open-Meteo endpoints are acceptable within their published limits and without
+  an uptime guarantee.
+- The browser visibly credits [Open-Meteo](https://open-meteo.com/), identifies
+  [GeoNames](https://www.geonames.org/) as the location-data basis, links
+  [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/) for weather and
+  [CC BY-NC 4.0](https://creativecommons.org/licenses/by-nc/4.0/) for location
+  data pending upstream clarification, and states that Moon Service adapts and
+  aggregates provider data and applies its own scoring. This supplies credit,
+  both license notices, and notice of modification.
+- Attribution remains required if Moon Service later uses a paid Open-Meteo
+  plan. Before advertising, subscriptions, paid access, or other commercial
+  activity, switch to an appropriate customer endpoint/API key or select another
+  provider and review its terms. Do not treat the noncommercial alpha decision
+  as a production license.
+- The #97 public edge starts with 300 requests/minute for the whole public
+  surface and 1 opportunity request/minute both in aggregate and per forwarded
+  client, plus small bursts and connection limits. A lookup can call geocoding
+  and weather and retry each once; one sustained lookup/minute remains below the
+  provider's published 10,000-call daily allowance when conservatively treated
+  as shared. A persistent circuit breaker disables Funnel after 100 limiter
+  rejections in 60 seconds. These are Moon Service safety ceilings, not claims
+  about provider entitlement, and should be tuned downward if counters warrant
+  it.
+- The external uptime probe calls only Moon Service `/readyz`, which is
+  provider-independent. It must never use a live opportunity lookup as a
+  heartbeat.
 
 ## Recommended MVP Boundary
 
@@ -104,13 +139,16 @@ API key:
 
 Pricing/free tier:
 
-- Free/open-access API: non-commercial only, 10,000 calls/day, 5,000 calls/hour, 600 calls/minute.
+- Free/open-access API: non-commercial only, 600 calls/minute, 5,000 calls/hour,
+  10,000 calls/day, and 300,000 calls/month under the current published pricing.
 - Paid plans add commercial use and dedicated customer endpoint.
 
 Caching terms:
 
 - No specific product-level cache API contract found in the docs reviewed.
-- Weather data is under CC BY 4.0, so attribution is required.
+- Weather data is under CC BY 4.0, so attribution requires appropriate credit, a
+  license link, and an indication that Moon Service adapts and aggregates the
+  source data.
 - For Moon Service, cache API responses for quota and repeatability, but keep source attribution and avoid redistributing raw provider data as a standalone weather product.
 
 Privacy:
@@ -511,7 +549,8 @@ Privacy defaults:
 
 - An installed client keeps exact saved locations local.
 - Backend receives exact coordinates only for the active refresh request.
-- Backend rounds coordinates before provider lookup where acceptable.
+- Backend rounds forecast coordinates to four decimal places before the current
+  Open-Meteo request.
 - Backend logs should avoid full request URLs containing exact coordinates.
 - Weather cache keys should use rounded coordinate buckets.
 - Do not store user identity plus exact coordinates until push/sync requires it and the product privacy model is updated.
@@ -524,15 +563,16 @@ Weather provider research pushes the MVP toward the hybrid architecture:
 - A small backend gives immediate value: provider abstraction, cache, coordinate rounding, API-key protection, attribution handling, and scoring updates without app releases.
 - The first backend can remain stateless with respect to users, while still caching weather by rounded coordinate/time bucket.
 
-## Open Questions
+## Remaining Open Questions
 
-- Is the project strictly non-commercial during alpha? If yes, Open-Meteo free API is acceptable. If no, budget for paid Open-Meteo or another commercial provider.
-- What public API rate limit should Moon Service apply before launch?
+- What observed tester traffic or provider-counter level should trigger tuning
+  the initial public-edge limits?
 - How much coordinate rounding is acceptable before weather quality suffers in hills, mountains, or coastal areas?
 - Should forecast confidence be derived from provider/model age and forecast horizon, or should ensemble data be added later?
 - Should raw provider payloads be stored at all, or only normalized derived fields?
 
-The alpha hosting/commercial-use boundary is tracked by
-[#19](https://github.com/rapucha/moon-service/issues/19). Empirical scoring
-calibration is tracked by
-[#33](https://github.com/rapucha/moon-service/issues/33).
+The implemented alpha hosting/commercial-use boundary and its remaining physical
+acceptance are tracked by [#97](https://github.com/rapucha/moon-service/issues/97)
+under parent [#93](https://github.com/rapucha/moon-service/issues/93). Empirical
+scoring calibration in [#33](https://github.com/rapucha/moon-service/issues/33)
+follows that infrastructure milestone.

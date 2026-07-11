@@ -63,6 +63,18 @@ class OpportunitySearchControllerTest {
                 .exchange()
                 .expectStatus().isOk()
                 .expectHeader().contentTypeCompatibleWith(MediaType.APPLICATION_JSON)
+                .expectHeader().valueEquals(
+                        "Moon-Data-Attribution",
+                        "Weather data: Open-Meteo, CC BY 4.0; location data: Open-Meteo Geocoding, "
+                                + "based on GeoNames, CC BY-NC 4.0; adapted and aggregated by Moon Service.")
+                .expectHeader().valueEquals(
+                        "Link",
+                        "<https://open-meteo.com/>; rel=\"describedby\"; title=\"Open-Meteo\"",
+                        "<https://www.geonames.org/>; rel=\"describedby\"; title=\"GeoNames\"",
+                        "<https://creativecommons.org/licenses/by/4.0/>; "
+                                + "rel=\"license\"; title=\"CC BY 4.0 weather data\"",
+                        "<https://creativecommons.org/licenses/by-nc/4.0/>; "
+                                + "rel=\"license\"; title=\"CC BY-NC 4.0 location data\"")
                 .expectBody()
                 .jsonPath("$.status").isEqualTo("ok")
                 .jsonPath("$.location.id").isEqualTo("prague-cz")
@@ -92,6 +104,13 @@ class OpportunitySearchControllerTest {
                     assertTrue(body.contains("Moon windows near a city"));
                     assertTrue(body.contains("href=\"/about\""));
                     assertTrue(body.contains("Privacy and caveats"));
+                    assertTrue(body.contains("The backend sends the location text you submit to Open-Meteo"));
+                    assertTrue(body.contains("href=\"https://open-meteo.com/en/terms\""));
+                    assertTrue(body.contains("href=\"https://open-meteo.com/\""));
+                    assertTrue(body.contains("href=\"https://www.geonames.org/\""));
+                    assertTrue(body.contains("href=\"https://creativecommons.org/licenses/by/4.0/\""));
+                    assertTrue(body.contains("href=\"https://creativecommons.org/licenses/by-nc/4.0/\""));
+                    assertTrue(body.contains("Moon Service adapts and aggregates these data and applies its own scoring."));
                     assertTrue(body.contains("type=\"module\" src=\"/app.js\""));
                 });
     }
@@ -108,6 +127,13 @@ class OpportunitySearchControllerTest {
                     assertTrue(body.contains("About Moon Service"));
                     assertTrue(body.contains("Why It Exists"));
                     assertTrue(body.contains("Search opportunities"));
+                    assertTrue(body.contains("The backend sends the location text you submit to Open-Meteo"));
+                    assertTrue(body.contains("href=\"https://open-meteo.com/en/terms\""));
+                    assertTrue(body.contains("href=\"https://open-meteo.com/\""));
+                    assertTrue(body.contains("href=\"https://www.geonames.org/\""));
+                    assertTrue(body.contains("href=\"https://creativecommons.org/licenses/by/4.0/\""));
+                    assertTrue(body.contains("href=\"https://creativecommons.org/licenses/by-nc/4.0/\""));
+                    assertTrue(body.contains("Moon Service adapts and aggregates these data and applies its own scoring."));
                     assertTrue(body.contains("NASA's Scientific Visualization Studio"));
                 });
     }
@@ -262,6 +288,18 @@ class OpportunitySearchControllerTest {
                 .exchange()
                 .expectStatus().isOk()
                 .expectHeader().contentTypeCompatibleWith(MediaType.APPLICATION_JSON)
+                .expectHeader().valueEquals(
+                        "Moon-Data-Attribution",
+                        "Weather data: Open-Meteo, CC BY 4.0; location data: Open-Meteo Geocoding, "
+                                + "based on GeoNames, CC BY-NC 4.0; adapted and aggregated by Moon Service.")
+                .expectHeader().valueEquals(
+                        "Link",
+                        "<https://open-meteo.com/>; rel=\"describedby\"; title=\"Open-Meteo\"",
+                        "<https://www.geonames.org/>; rel=\"describedby\"; title=\"GeoNames\"",
+                        "<https://creativecommons.org/licenses/by/4.0/>; "
+                                + "rel=\"license\"; title=\"CC BY 4.0 weather data\"",
+                        "<https://creativecommons.org/licenses/by-nc/4.0/>; "
+                                + "rel=\"license\"; title=\"CC BY-NC 4.0 location data\"")
                 .expectBody()
                 .jsonPath("$.status").isEqualTo("ambiguous_location")
                 .jsonPath("$.candidates[0].kind").isEqualTo("real_location")

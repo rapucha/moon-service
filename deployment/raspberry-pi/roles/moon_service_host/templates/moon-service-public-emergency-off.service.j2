@@ -1,0 +1,15 @@
+[Unit]
+Description=Emergency fail-closed Moon Service public transport shutdown
+Documentation=https://github.com/rapucha/moon-service/blob/main/deployment/raspberry-pi/README.md
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/moon-service-public-emergency-off
+TimeoutStartSec=6min
+UMask=0077
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectHome=true
+RestrictAddressFamilies=AF_UNIX
+RestrictRealtime=true
+LockPersonality=true

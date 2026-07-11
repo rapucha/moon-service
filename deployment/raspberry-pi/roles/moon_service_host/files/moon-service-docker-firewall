@@ -1,0 +1,88 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+
+umask 077
+PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+export PATH
+
+TEST_MODE=false
+if [[ "$EUID" -ne 0 ]]; then
+    [[ "${MOON_PUBLIC_FIREWALL_ALLOW_NON_ROOT:-false}" == true ]] || {
+        printf 'moon-service-docker-firewall must run as root\n' >&2
+        exit 77
+    }
+    TEST_MODE=true
+fi
+[[ $# -eq 0 ]] || {
+    printf 'Usage: %s\n' "$0" >&2
+    exit 64
+}
+
+CONFIG_DIR=/etc/moon-service
+SMTP_PORT=25
+RUNTIME_DIR=/run/moon-service
+if [[ "$TEST_MODE" == true ]]; then
+    CONFIG_DIR="${MOON_CONFIG_DIR:-$CONFIG_DIR}"
+    SMTP_PORT="${MOON_PUBLIC_SMTP_PORT:-$SMTP_PORT}"
+    RUNTIME_DIR="${MOON_PUBLIC_RUNTIME_DIR:-$RUNTIME_DIR}"
+fi
+if [[ -r "$CONFIG_DIR/public-ingress.env" ]]; then
+    # Root-owned settings rendered by Ansible.
+    # shellcheck disable=SC1091
+    source "$CONFIG_DIR/public-ingress.env"
+    SMTP_PORT="${MOON_PUBLIC_SMTP_PORT:-$SMTP_PORT}"
+fi
+[[ "$SMTP_PORT" =~ ^[0-9]+$ ]] || exit 65
+(( SMTP_PORT >= 1 && SMTP_PORT <= 65535 )) || exit 65
+mkdir -p "$RUNTIME_DIR"
+chmod 0700 "$RUNTIME_DIR"
+
+IPTABLES_BIN=iptables
+IP6TABLES_BIN=ip6tables
+if [[ "$TEST_MODE" == true ]]; then
+    IPTABLES_BIN="${MOON_IPTABLES_BIN:-$IPTABLES_BIN}"
+    IP6TABLES_BIN="${MOON_IP6TABLES_BIN:-$IP6TABLES_BIN}"
+fi
+COMMENT=moon-service-block-container-smtp
+PORTS=25,465,587
+case ",$PORTS," in
+    *",$SMTP_PORT,"*) ;;
+    *) PORTS="$PORTS,$SMTP_PORT" ;;
+esac
+
+ensure_rule() {
+    local binary="$1"
+    local bridge="$2"
+    local required="$3"
+    if ! command -v "$binary" >/dev/null 2>&1; then
+        [[ "$required" == false ]] && return 0
+        printf '%s is required\n' "$binary" >&2
+        return 1
+    fi
+    if ! "$binary" --wait 10 -n -L DOCKER-USER >/dev/null 2>&1; then
+        [[ "$required" == false ]] && return 0
+        printf 'Docker DOCKER-USER chain is unavailable\n' >&2
+        return 1
+    fi
+    local -a rule=(
+        -i "$bridge"
+        -p tcp
+        -m multiport
+        --dports "$PORTS"
+        -m comment
+        --comment "$COMMENT"
+        -j REJECT
+        --reject-with tcp-reset
+    )
+    if ! "$binary" --wait 10 -C DOCKER-USER "${rule[@]}" >/dev/null 2>&1; then
+        "$binary" --wait 10 -I DOCKER-USER 1 "${rule[@]}"
+    fi
+    "$binary" --wait 10 -C DOCKER-USER "${rule[@]}" >/dev/null
+}
+
+# Docker Compose uses br-* interfaces; docker0 matches docker*. The host's own
+# SMTP connection never traverses DOCKER-USER and remains available.
+ensure_rule "$IPTABLES_BIN" 'br+' true
+ensure_rule "$IPTABLES_BIN" 'docker+' true
+ensure_rule "$IP6TABLES_BIN" 'br+' false
+ensure_rule "$IP6TABLES_BIN" 'docker+' false

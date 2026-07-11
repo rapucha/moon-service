@@ -136,11 +136,18 @@ limits are configured. Extra operations can be added to the status surface
 before their provider integration is wired, as long as both provider and
 operation names are configured.
 
-Example local Open-Meteo free-tier limits:
+Open-Meteo publishes free-service limits without documenting separate full
+allowances for Moon Service's geocoding and weather traffic. Moon Service
+therefore conservatively treats the allowance as shared. The current counters
+are per-operation, process-local observability only and do not enforce or
+coordinate that upstream budget. Leave their limits unknown unless the operator
+deliberately allocates the assumed shared allowance. For example, this
+conservative equal split keeps the configured hourly and daily totals within
+the published ceilings:
 
 ```bash
 mvn -pl backend -am spring-boot:run \
-  -Dspring-boot.run.arguments="--moon.location.resolver=open-meteo --moon.weather.provider=open-meteo --moon.admin.token=$ADMIN_TOKEN --moon.provider-quotas.operations.open-meteo-geocoding.hourly-limit=5000 --moon.provider-quotas.operations.open-meteo-geocoding.daily-limit=10000 --moon.provider-quotas.operations.open-meteo-weather.hourly-limit=5000 --moon.provider-quotas.operations.open-meteo-weather.daily-limit=10000"
+  -Dspring-boot.run.arguments="--moon.location.resolver=open-meteo --moon.weather.provider=open-meteo --moon.admin.token=$ADMIN_TOKEN --moon.provider-quotas.operations.open-meteo-geocoding.hourly-limit=2500 --moon.provider-quotas.operations.open-meteo-geocoding.daily-limit=5000 --moon.provider-quotas.operations.open-meteo-weather.hourly-limit=2500 --moon.provider-quotas.operations.open-meteo-weather.daily-limit=5000"
 ```
 
 Example placeholder for a later LLM-backed fictional-location fallback:
@@ -416,12 +423,70 @@ header token is the minimum app-level boundary.
 
 ## Alpha Hosting Notes
 
-The current backend is suitable for a single-process private alpha. Keep one
-backend replica until provider counters and caches move to a durable/shared
-store. Multiple replicas would make `/admin/status` quota usage incomplete and
-would reduce cache effectiveness. Public request rate limiting is not currently
-backend-owned; use edge or ingress limits before public exposure, then add
-application-level `429` JSON when the product API contract requires it.
+The tester alpha keeps one backend replica until provider counters and caches
+move to a durable/shared store. Multiple replicas would make `/admin/status`
+quota usage incomplete and would reduce cache effectiveness.
+
+### Public edge contract
+
+Tailscale Funnel terminates public HTTPS and sends PROXY protocol v2 over an
+exact loopback connection to the managed nginx ingress. Funnel never targets
+the application's trusted-LAN listener directly. The public ingress accepts
+`GET` and `HEAD` only for:
+
+- `/`, `/search`, and `/about`;
+- `/api/opportunities`;
+- `/readyz`; and
+- the exact JavaScript, CSS, favicon, and SVG assets referenced by the browser
+  pages. There is no wildcard static-resource pass-through.
+
+All other public paths return `404`, and other methods are denied. In
+particular, `POST /api/opportunities/search`, `/admin/**`, and `/healthz` remain
+LAN-only application routes. `/admin/**` also retains its backend token boundary
+when enabled. `/readyz` is the only public operational route: the scheduled
+external uptime workflow calls it, validates `status` plus the 40-hex build
+revision, and never consumes geocoding or weather quota through an opportunity
+lookup.
+
+The loopback nginx listener accepts client identity only from Funnel's PROXY v2
+header and uses that address for per-client limits. It clears `Forwarded`,
+`X-Forwarded-For`, and `X-Real-IP` before proxying to Spring. Configurable
+defaults allow 300 requests per minute across the public edge, 1 opportunity
+API request per minute in total, 1 opportunity API request per minute per
+client, 32 concurrent public connections in total, and 8 per client, each with
+a small configured burst where applicable. One lookup can call both geocoding
+and weather, and each operation permits one retry; the sustained API ceiling
+therefore remains below the free provider's daily allowance even in that worst
+case, conservatively treating the allowance as shared by both operations.
+Static browsing does not consume the lookup budget. nginx also caps
+request bodies at 1 KiB, limits client header/body reads to 5 seconds, and
+bounds upstream connect, send, and response timeouts.
+
+Provider-derived successful and ambiguous `GET /api/opportunities` responses
+carry a `Moon-Data-Attribution` field plus HTTP `Link` fields for Open-Meteo,
+GeoNames, CC BY 4.0 weather data, and CC BY-NC 4.0 location data. Direct JSON
+clients therefore receive provider credit, both license notices, and notice
+that Moon Service adapts and aggregates the data even when they never load the
+browser pages. nginx preserves those headers on the public route.
+
+Every public response receives a restrictive content security policy, HSTS,
+`X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY`, no-referrer policy,
+same-origin opener/resource policies, and disabled camera, geolocation, and
+microphone permissions. The browser search and about pages visibly attribute
+Open-Meteo weather/location data and GeoNames-derived locations, distinguishing
+weather under CC BY 4.0 from location data treated under CC BY-NC 4.0 while the
+provider's published license discrepancy remains unresolved.
+Ordinary access logging is disabled. Fixed limiter events and critical nginx
+errors go to the size- and retention-bounded system journal; no separate
+unbounded nginx error file is used for this server.
+
+Public API limiter rejection happens at nginx before Spring or an upstream
+provider is called. It returns HTTP `429`, `Retry-After`, and the documented
+`status: "rate_limited"` JSON shape. This is an edge implementation of the
+public contract, not backend-owned rate limiting: direct LAN calls do not use
+it, and a future deployment that bypasses this ingress must add an equivalent
+control. An upstream provider `429` remains a dependency failure represented as
+`temporarily_unavailable`, not client overuse.
 
 Spring Boot shutdown is explicitly graceful with a 30-second per-phase
 timeout. Container orchestration must send `SIGTERM` and allow more than 30
@@ -461,9 +526,11 @@ Request body:
 
 Only the Prague fixture is supported for now.
 
-This endpoint remains useful for deterministic prototype/scoring checks. Decide
-later whether it stays public, becomes internal, or is removed after the
-query-shaped flow covers the needed behavior.
+This endpoint remains useful for deterministic prototype/scoring checks on the
+trusted LAN. The tester-alpha nginx ingress returns `404` for it, so it is not
+part of the public browser/API contract. Decide later whether to remove it or
+replace it with an explicitly internal test surface after the query-shaped flow
+covers the needed behavior.
 
 ## Verify
 

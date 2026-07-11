@@ -13,6 +13,52 @@ test.beforeEach(async ({ page }) => {
   });
 });
 
+test("shows provider attribution and backend handling without horizontal overflow", async ({ page }) => {
+  await page.goto("/search");
+
+  const searchAttribution = page.locator(".workspace .data-attribution");
+  await expect(searchAttribution).toBeVisible();
+  await expect(searchAttribution).toContainText(
+    "Moon Service adapts and aggregates these data and applies its own scoring."
+  );
+  await expect(searchAttribution.getByRole("link", { name: "Open-Meteo" }))
+    .toHaveAttribute("href", "https://open-meteo.com/");
+  await expect(searchAttribution.getByRole("link", { name: "GeoNames" }))
+    .toHaveAttribute("href", "https://www.geonames.org/");
+  await expect(searchAttribution.getByRole("link", { name: "CC BY 4.0", exact: true }))
+    .toHaveAttribute("href", "https://creativecommons.org/licenses/by/4.0/");
+  await expect(searchAttribution.getByRole("link", { name: "CC BY-NC 4.0", exact: true }))
+    .toHaveAttribute("href", "https://creativecommons.org/licenses/by-nc/4.0/");
+  await expect(page.getByText(/The backend sends the location text you submit to Open-Meteo/)).toBeVisible();
+  await expect(page.getByRole("link", { name: "Terms & Privacy" })).toHaveAttribute(
+    "href",
+    "https://open-meteo.com/en/terms"
+  );
+  expect(await horizontalOverflow(page)).toBeLessThanOrEqual(1);
+
+  await page.goto("/about");
+
+  const aboutAttribution = page.locator(".about-section .data-attribution");
+  await expect(aboutAttribution).toBeVisible();
+  await expect(aboutAttribution).toContainText(
+    "Moon Service adapts and aggregates these data and applies its own scoring."
+  );
+  await expect(aboutAttribution.getByRole("link", { name: "Open-Meteo" }))
+    .toHaveAttribute("href", "https://open-meteo.com/");
+  await expect(aboutAttribution.getByRole("link", { name: "GeoNames" }))
+    .toHaveAttribute("href", "https://www.geonames.org/");
+  await expect(aboutAttribution.getByRole("link", { name: "CC BY 4.0", exact: true }))
+    .toHaveAttribute("href", "https://creativecommons.org/licenses/by/4.0/");
+  await expect(aboutAttribution.getByRole("link", { name: "CC BY-NC 4.0", exact: true }))
+    .toHaveAttribute("href", "https://creativecommons.org/licenses/by-nc/4.0/");
+  await expect(page.getByText(/free-API logs may contain sensitive geographic request information/)).toBeVisible();
+  await expect(page.getByRole("link", { name: "Terms & Privacy" })).toHaveAttribute(
+    "href",
+    "https://open-meteo.com/en/terms"
+  );
+  expect(await horizontalOverflow(page)).toBeLessThanOrEqual(1);
+});
+
 test("renders grouped Moon pass cards", async ({ page }) => {
   await page.goto("/search?locationId=moon-service-3067696");
 
@@ -447,6 +493,10 @@ test("renders grouped Moon pass cards", async ({ page }) => {
     expect(chart.rotations.every(transform => /rotate\([-0-9.]+\)/.test(transform))).toBe(true);
   }
 });
+
+async function horizontalOverflow(page) {
+  return page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+}
 
 test("renders a point-only Sun pass when one above-horizon sample is available", async ({ page }) => {
   const response = structuredClone(fixture);

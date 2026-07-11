@@ -1,0 +1,57 @@
+#!/usr/bin/env bash
+set -uo pipefail
+
+# Last-resort shutdown for watchdog startup/configuration failures. This command
+# deliberately reads no Moon Service configuration or persistent state.
+umask 077
+PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+export PATH
+
+[[ $# -eq 0 ]] || exit 64
+TEST_MODE=false
+if [[ "$EUID" -ne 0 ]]; then
+    [[ "${MOON_PUBLIC_EMERGENCY_ALLOW_NON_ROOT:-false}" == true ]] || exit 77
+    TEST_MODE=true
+fi
+
+SYSTEMCTL_BIN=systemctl
+TAILSCALE_BIN=tailscale
+TIMEOUT_BIN=timeout
+FLOCK_BIN=flock
+RUNTIME_AUTH_FILE=/run/moon-service/public-authorized
+if [[ "$TEST_MODE" == true ]]; then
+    SYSTEMCTL_BIN="${MOON_SYSTEMCTL_BIN:-$SYSTEMCTL_BIN}"
+    TAILSCALE_BIN="${MOON_TAILSCALE_BIN:-$TAILSCALE_BIN}"
+    TIMEOUT_BIN="${MOON_TIMEOUT_BIN:-$TIMEOUT_BIN}"
+    FLOCK_BIN="${MOON_FLOCK_BIN:-$FLOCK_BIN}"
+    RUNTIME_AUTH_FILE="${MOON_RUNTIME_AUTH_FILE:-$RUNTIME_AUTH_FILE}"
+fi
+
+failure=0
+RUNTIME_DIR="${RUNTIME_AUTH_FILE%/*}"
+LOCK_FILE="$RUNTIME_DIR/public-ingress.lock"
+mkdir -p "$RUNTIME_DIR" || failure=1
+chmod 0700 "$RUNTIME_DIR" || failure=1
+exec 9>"$LOCK_FILE" || failure=1
+if ! "$FLOCK_BIN" -w 200 9; then
+    printf 'moon-service-public-emergency-off: control lock wait failed; forcing shutdown\n' >&2
+    failure=1
+fi
+rm -f "$RUNTIME_AUTH_FILE" || failure=1
+"$SYSTEMCTL_BIN" stop nginx.service >/dev/null 2>&1 || failure=1
+"$SYSTEMCTL_BIN" disable --now moon-service-funnel.service >/dev/null 2>&1 || failure=1
+"$TIMEOUT_BIN" --signal=TERM --kill-after=2s 8s \
+    "$TAILSCALE_BIN" funnel reset >/dev/null 2>&1 || failure=1
+"$SYSTEMCTL_BIN" disable --now tailscaled.service >/dev/null 2>&1 || failure=1
+
+if "$SYSTEMCTL_BIN" is-active --quiet nginx.service >/dev/null 2>&1 \
+    || "$SYSTEMCTL_BIN" is-active --quiet tailscaled.service >/dev/null 2>&1; then
+    printf 'moon-service-public-emergency-off: public transport shutdown is unverified\n' >&2
+    exit 1
+fi
+
+if (( failure != 0 )); then
+    printf 'moon-service-public-emergency-off: public transport is off; one or more cleanup steps failed\n' >&2
+    exit 1
+fi
+printf 'moon-service-public-emergency-off: public transport disabled\n'

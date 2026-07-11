@@ -31,10 +31,13 @@ calendar exports.
 The web page can call a single opportunity search endpoint:
 
 ```http
-GET /api/opportunities?q=Praha&lang=cs
+GET /api/opportunities?q=Praha
 ```
 
-`lang` is optional. If absent, use `Accept-Language` as a display/ranking hint only.
+The implemented endpoint accepts `q` or a selected `locationId`. Per-request
+`lang`, `country`, and `Accept-Language` handling remain future contract work;
+the current Open-Meteo adapter uses the operator-configured
+`moon.open-meteo.geocoding.language` value.
 
 ## Request Parameters
 
@@ -48,18 +51,20 @@ GET /api/opportunities?q=Praha&lang=cs
 
 `lang`:
 
-- Optional BCP 47 language tag.
+- Future optional BCP 47 language tag; it is not accepted by the current
+  controller.
 - Used only for display/ranking preferences.
 - Must not prevent local-language queries from resolving.
 
 `country`:
 
-- Optional ISO country code.
+- Future optional ISO country code; it is not accepted by the current
+  controller.
 - Used as a disambiguation hint, not as a hard filter unless the UI explicitly says so.
 
 `locationId`:
 
-- Optional later parameter for a selected canonical real location or curated fictional location.
+- Implemented optional parameter for a selected canonical real location or curated fictional location.
 - Useful after `ambiguous_location` so the user can choose a candidate without repeating fuzzy geocoding.
 
 ## Response Statuses
@@ -119,13 +124,18 @@ The backend must protect both Moon Service and upstream providers.
 
 Application-level limits:
 
-- Rate limit `/api/opportunities` by IP or coarse anonymous client fingerprint
-  before public alpha. For home-hosted alpha, start with an edge or ingress
-  limit around 30 requests per minute per client, with stricter handling for
-  one-character or otherwise high-ambiguity lookups.
-- Edge or ingress limits are acceptable as an early safety control, but the
-  documented `rate_limited` JSON response requires application-level handling.
-- Keep limits generous enough for manual use and testing.
+- Rate limit `/api/opportunities` by verified forwarded client identity before
+  public alpha. The current home-hosted ingress allows 1 request/minute both in
+  aggregate and per client, with small bursts. A lookup can call geocoding and
+  weather and retry each once, so sustained public traffic remains below the
+  free provider's daily allowance even in that worst case, conservatively
+  treating the allowance as shared by both operations.
+- Edge or ingress limits are acceptable for the Funnel-only alpha and must
+  return the documented `rate_limited` JSON response. Add equivalent
+  application-level handling before any public path can bypass this ingress or
+  the rate-limit contract becomes backend-owned.
+- Keep bursts large enough for a few testers' normal manual use without raising
+  the sustained provider-call ceiling.
 - Return `status: "rate_limited"` with HTTP `429` when a client is limited.
 - Include a retry hint when possible.
 
@@ -137,6 +147,18 @@ Upstream provider limits:
 - Cache geocoding, weather, and scoring outputs enough to avoid repeated provider calls for the same city/time window.
 - If an upstream provider quota is exhausted, return `temporarily_unavailable`, not `opportunities: []`.
 - Record outbound provider calls in local counters so `/admin/status` can show hourly, daily, and monthly usage.
+
+Provider attribution on the public JSON route:
+
+- Provider-derived successful and ambiguous-location responses include a human-readable
+  `Moon-Data-Attribution` header naming Open-Meteo and GeoNames, stating that
+  Moon Service adapts and aggregates the data, and distinguishing weather data
+  under CC BY 4.0 from location data treated under CC BY-NC 4.0.
+- Repeated HTTP `Link` headers point to Open-Meteo and GeoNames with
+  `rel="describedby"`, and to both applicable license notices with
+  `rel="license"`.
+- These headers apply to successful and ambiguous-location responses so direct
+  API clients receive the same provider/license context as browser users.
 
 Example rate-limited response:
 
@@ -846,7 +868,9 @@ Response rules:
 
 - Accept raw Unicode input.
 - Do not assume query language from browser locale.
-- Use `lang` or `Accept-Language` as display/ranking hints only.
+- When per-request localization is implemented, use `lang` or
+  `Accept-Language` as display/ranking hints only. The current controller does
+  not consume either value.
 - Store times as UTC instants.
 - Return the resolved location timezone.
 - Display event times in the location timezone.

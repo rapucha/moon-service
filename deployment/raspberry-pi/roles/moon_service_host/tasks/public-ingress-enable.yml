@@ -1,0 +1,110 @@
+---
+- name: Reassert the fail-closed latch after daemon reconciliation
+  ansible.builtin.include_tasks: public-ingress-latch-off.yml
+  when: not ansible_check_mode
+
+- name: Validate the installed nginx configuration
+  ansible.builtin.command:
+    argv:
+      - nginx
+      - -t
+  changed_when: false
+
+- name: Dump the complete installed nginx configuration
+  ansible.builtin.command:
+    argv:
+      - nginx
+      - -T
+  register: _moon_service_nginx_configuration
+  changed_when: false
+
+- name: Require nginx to own only the managed loopback listener
+  ansible.builtin.assert:
+    that:
+      - >-
+        (_moon_service_nginx_configuration.stdout
+        | regex_findall('(?m)^[ \t]*listen[ \t]+([^;]+);'))
+        == ['127.0.0.1:' + (moon_service_public_ingress_port | string)
+        + ' proxy_protocol default_server']
+    fail_msg: >-
+      Every active nginx listen directive must be the single managed
+      127.0.0.1 public-proxy listener.
+
+- name: Validate the installed public-ingress systemd units
+  ansible.builtin.command:
+    argv:
+      - systemd-analyze
+      - verify
+      - /etc/systemd/system/moon-service-docker-firewall.service
+      - /etc/systemd/system/moon-service-funnel.service
+      - /etc/systemd/system/moon-service-public-emergency-off.service
+      - /etc/systemd/system/moon-service-public-notify.service
+      - /etc/systemd/system/moon-service-public-notify.timer
+      - /etc/systemd/system/moon-service-public-watchdog.service
+      - /etc/systemd/system/moon-service-public-watchdog.timer
+  changed_when: false
+
+- name: Enable and start the loopback-only public proxy
+  ansible.builtin.systemd_service:
+    name: nginx.service
+    enabled: true
+    state: started
+
+- name: Reload changed public proxy configuration
+  ansible.builtin.systemd_service:
+    name: nginx.service
+    state: reloaded
+  when: >-
+    _moon_service_nginx_default_site.changed
+    or _moon_service_nginx_public_definition.changed
+
+- name: Enable and reconcile the container SMTP boundary
+  ansible.builtin.systemd_service:
+    name: moon-service-docker-firewall.service
+    enabled: true
+    state: restarted
+
+- name: Enable the public control timers
+  ansible.builtin.systemd_service:
+    name: "{{ item }}"
+    enabled: true
+    state: started
+  loop:
+    - moon-service-public-notify.timer
+    - moon-service-public-watchdog.timer
+
+- name: Inspect the public proxy loopback listener
+  ansible.builtin.command:
+    argv:
+      - ss
+      - -H
+      - -ltn
+      - sport
+      - =
+      - ":{{ moon_service_public_ingress_port }}"
+  register: _moon_service_public_proxy_listener
+  changed_when: false
+
+- name: Inspect accidental wildcard HTTP listeners
+  ansible.builtin.command:
+    argv:
+      - ss
+      - -H
+      - -ltn
+      - sport
+      - =
+      - ":80"
+  register: _moon_service_public_port_eighty_listener
+  changed_when: false
+
+- name: Require only the exact loopback public proxy listener
+  ansible.builtin.assert:
+    that:
+      - _moon_service_public_proxy_listener.stdout_lines | length == 1
+      - >-
+        _moon_service_public_proxy_listener.stdout
+        is search('127\.0\.0\.1:' + (moon_service_public_ingress_port | string))
+      - _moon_service_public_port_eighty_listener.stdout | trim | length == 0
+    fail_msg: >-
+      nginx must listen only on the configured 127.0.0.1 public-proxy port;
+      package-default or wildcard port-80 listeners are forbidden.

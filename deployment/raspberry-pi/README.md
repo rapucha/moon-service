@@ -1,18 +1,17 @@
 # Raspberry Pi Deployment
 
-This directory implements issue
-[#95](https://github.com/rapucha/moon-service/issues/95): a reproducible,
-single-instance Docker Compose host on Raspberry Pi OS Lite 64-bit (Debian 13
-Trixie). The Pi pulls the already-tested ARM64 image from GHCR. It never builds
-Java or container images. Follow-up
-[#107](https://github.com/rapucha/moon-service/issues/107) makes timer rearming
-reliable and adds exact physical-deployment acknowledgement to GitHub.
+This directory implements the Raspberry Pi host from
+[#95](https://github.com/rapucha/moon-service/issues/95), exact deployment
+acknowledgement from [#107](https://github.com/rapucha/moon-service/issues/107),
+and the tester-alpha public boundary from
+[#97](https://github.com/rapucha/moon-service/issues/97). The Pi pulls an
+already-tested ARM64 image from GHCR; it never builds Java or container images.
 
-This is the private deployment layer. It binds the application to
-`127.0.0.1:8080` by default and supports an explicit primary-IPv4 listener for
-a trusted home LAN. It opens no router port, does not enroll Tailscale, and
-does not configure Funnel. Public exposure remains issue
-[#97](https://github.com/rapucha/moon-service/issues/97).
+The application keeps one exact loopback or trusted-LAN listener. A separate
+nginx proxy listens only on `127.0.0.1:18080`, accepts Tailscale's PROXY
+protocol, and enforces the public route, rate, connection, request, timeout,
+header, and logging boundaries. Tailscale Funnel is an explicit, reversible
+operator action after provisioning. No router port is opened.
 
 ## What provisioning installs
 
@@ -25,7 +24,14 @@ The Ansible role:
 - installs Docker Engine, Buildx, and the Compose plugin from Docker's official
   Debian ARM64 repository;
 - installs Tailscale from its official Trixie repository, starts `tailscaled`,
-  and deliberately leaves the host unenrolled;
+  and deliberately leaves the host unenrolled and Funnel disabled;
+- installs nginx without its wildcard port-80 site, then requires the exact
+  loopback public-proxy listener before completing provisioning;
+- applies per-client and aggregate ingress limits plus a latched automatic
+  circuit breaker for distributed or sustained abuse;
+- queues minimal operator incident mail through an explicitly accepted
+  plaintext, IP-authorized ISP SMTP relay and blocks Docker containers from
+  using SMTP ports;
 - creates root-owned configuration, Compose, and deployment-state directories;
 - keeps the listener on loopback unless ignored host inventory explicitly
   selects that host's active primary IPv4 address;
@@ -81,6 +87,16 @@ Prepare these before the controlled physical-host run:
    outside the repository. Set repository Actions variable
    `MOON_PI_DEPLOYMENT_REPORTER_LOGIN` to the App bot login in the form
    `<app-slug>[bot]`; success from any other actor is rejected.
+10. A Tailscale tailnet where the bootstrap administrator can enroll this host,
+    enable HTTPS/Funnel for the node, and remove a stale replacement node during
+    SD-card recovery. Do not put a reusable Tailscale auth key in inventory.
+11. For local circuit-breaker notification, the ISP SMTP hostname, port,
+    envelope sender, and one operator recipient. This deployment deliberately
+    supports the current IP-authorized relay with neither AUTH nor STARTTLS;
+    notification contents therefore contain no request or client data.
+12. After the public URL exists, set repository variable
+    `MOON_PUBLIC_BASE_URL` to its HTTPS origin so the independent scheduled
+    `/readyz` check can detect a home-path outage.
 
 Do not put the host address, SSH key path, GHCR token, Tailscale key, admin
 token, GitHub App private key or path, or another private-network identifier in
@@ -134,6 +150,26 @@ stable with a DHCP reservation or static network configuration; it should
 normally match the address used by `ansible_host`. This opt-in changes only
 the Docker host binding. It does not configure a firewall, router forwarding,
 Tailscale, Funnel, TLS, or public access.
+
+Configure the operator incident relay only as one complete block in ignored
+`inventory.yml`:
+
+```yaml
+moon_service_public_smtp_enabled: true
+moon_service_public_smtp_allow_plaintext: true
+moon_service_public_smtp_host: smtp.provider.example
+moon_service_public_smtp_port: 25
+moon_service_public_smtp_sender: moon-service@example.test
+moon_service_public_smtp_recipient: operator@example.test
+```
+
+The explicit plaintext flag records the accepted ISP boundary; the notifier
+never attempts AUTH or STARTTLS. Ansible rejects partial configuration and
+renders the envelope into root-only `public-ingress.env`. It is operational
+mail to one maintainer, not the deferred product email-alert feature. The app
+container does not receive these values. SMTP sender/recipient and the fixed
+operational metadata can be observed or modified in transit. Treat mail as a
+prompt to inspect local status, never as authoritative state.
 
 Do not reuse an existing administrator as the operator: the role deliberately
 locks the operator password, sets its primary group, and removes all
@@ -260,19 +296,57 @@ not overwrite this file on later runs.
 
 ### Tailscale boundary
 
-Provisioning installs the package and enables `tailscaled` only. Do not add a
-Tailscale auth key to inventory. Tailnet enrollment and Funnel configuration
-are explicit bootstrap-administrator actions for #97. Existing MikroTik
-WireGuard remains the remote-administration path and does not need any software
-on this Pi.
+Provisioning installs the package and starts `tailscaled`, but deliberately
+leaves the host unenrolled and Funnel off. Do not add a reusable Tailscale auth
+key to inventory. Existing MikroTik WireGuard remains the independent remote-
+administration path.
 
-The current private deployment intentionally publishes one exact host address.
-Tailscale's HTTP proxy requires a loopback backend, so #97 must either publish
-the same container on both the exact primary LAN IPv4 address and
-`127.0.0.1`, or add a loopback-only local proxy in front of the LAN-bound app.
-The binding validator must then require that exact two-address set; it must not
-accept `0.0.0.0`. The GitHub deployment callback remains outbound and local-
-health-based, so this later ingress change does not alter its trust boundary.
+The implemented traffic shape is:
+
+```text
+trusted LAN -> exact primary-LAN-IPv4:8080 -> Spring Boot container
+Internet -> Funnel HTTPS/PROXY v2 -> 127.0.0.1:18080 nginx -> same LAN listener
+```
+
+nginx trusts PROXY client identity only from a loopback connection made by
+`tailscaled`. It uses that source address in an in-memory per-client limit, but
+clears `Forwarded`, `X-Forwarded-For`, and `X-Real-IP` before proxying. Ordinary
+access logging is disabled. A rate rejection emits only the fixed
+`rate-limited` journal event used by the watchdog—never a query, URI, client
+address, header, or user agent.
+
+The exact tester-alpha public surface is `/`, `/search`, `/about`, `/readyz`,
+`GET /api/opportunities`, and the assets those pages currently load. nginx
+returns an edge response for every other route. In particular, it never proxies
+`/admin/**`, fixture-only `POST /api/opportunities/search`, `/healthz`, raw HTML
+files, actuator-style paths, or newly added routes until the allowlist changes
+deliberately. The Spring admin token remains useful on the trusted LAN but
+cannot make an admin route public.
+
+Current edge defaults are 300 accepted requests/minute aggregate, 1 API
+request/minute aggregate with burst 10, 1 API request/minute per PROXY client
+with burst 3, 32 total connections, and 8 connections per client. At the
+sustained aggregate ceiling, a lookup can make both geocoding and weather calls
+and retry each once while remaining below the provider's published 10,000-call
+daily allowance, conservatively treating it as shared and leaving headroom for
+trusted-LAN/manual work; caches normally reduce calls further.
+Request/body/header sizes and client/upstream timeouts are bounded. A strict
+CSP, frame denial, no-sniff, referrer, permissions, cross-origin, and HSTS
+headers are added even on error responses. One hundred limiter rejections in a
+rolling 60-second window trigger the latched circuit breaker; tune these values
+through inventory only after observing real tester traffic and provider
+counters.
+
+This protects the app, provider quota, and accepted response bandwidth; it is
+not volumetric DDoS protection for the home connection. Funnel avoids a router
+port forward and hides the home's public address, but request bytes still reach
+`tailscaled` before nginx can reject them locally. The automated response is
+therefore deliberately availability-sacrificing: once rejection volume crosses
+the threshold, the tester alpha is taken offline and stays off for inspection.
+
+The GitHub deployment callback remains outbound and local-health-based. Funnel
+state therefore cannot make a healthy image deployment appear successful or
+force a rollback.
 
 ### GitHub deployment reporter boundary
 
@@ -293,8 +367,116 @@ installation token or pass App credentials into the application container.
 
 The reporter is not an ingress service. It initiates HTTPS to GitHub and does
 not require the app to be reachable from GitHub, the public Internet, or a
-tailnet. Later Funnel configuration must not publish reporter files or
-credentials.
+tailnet. Funnel does not publish reporter files or credentials.
+
+### First enrollment and public activation
+
+Provisioning is safe to run before Tailscale login: nginx and both watchdog
+timers start locally, while `moon-service-funnel.service` remains disabled and
+has no public listener. As the bootstrap administrator, enroll the dedicated
+host interactively and follow the browser URL printed by Tailscale:
+
+```bash
+sudo tailscale up --hostname=moon-service
+sudo tailscale status
+```
+
+Do not continue until `tailscale status --json` reports the node online with a
+DNS name, the LAN revision is healthy, nginx configuration passes, and the
+operator SMTP block is installed through Ansible. `public-notify-test` is an
+optional standalone diagnostic; `public-on` always repeats a live relay test
+before it can activate the exact foreground Funnel service:
+
+```bash
+sudo moon-service-control public-notify-test
+sudo moon-service-control public-on
+sudo moon-service-control public-status
+sudo tailscale funnel status
+```
+
+`public-on` refuses to proceed without configured incident mail accepted by the
+relay during that activation and reserved queue capacity for a later critical
+incident. It checks the LAN app, the PROXY-protocol nginx path, Tailscale
+enrollment, and the exact Funnel target before recording success. It then
+queues a restoration/activation notice. The public command
+uses TLS-terminated TCP plus PROXY protocol v2 on Funnel port 443; the
+foreground systemd session is the lifetime of exposure.
+
+Record the resulting `https://...ts.net` origin in repository variable
+`MOON_PUBLIC_BASE_URL`, without a path or trailing credentials. The scheduled
+`Check public uptime` workflow calls only `/readyz`, makes three bounded
+attempts, and validates `status: ok` plus a 40-hex revision. It never consumes
+weather or geocoding quota. GitHub's workflow failure is the independent
+off-home outage signal; the ISP relay cannot report a home WAN failure. The
+scheduled job remains skipped while the repository variable is absent, so it
+does not report an outage before deliberate first activation.
+
+### Public kill switch and operator mail
+
+The manual kill switch is:
+
+```bash
+sudo moon-service-control public-off
+```
+
+It removes volatile runtime authorization first and stops the loopback nginx
+proxy, which immediately closes already-accepted HTTP keepalive flows. It then
+disables and stops the foreground Funnel unit. Only after those shutdown
+attempts does it update SD-backed marker/transition state, so slow or read-only
+persistent storage cannot delay the kill switch. Closing the original
+foreground CLI session
+is what removes its session-scoped route; a separate
+`tailscale funnel ... off` command cannot address that opaque foreground
+session. The control verifies that no Funnel route remains. On this dedicated
+node it falls back to `tailscale funnel reset`; if exposure still cannot be
+disproved, it disables and stops `tailscaled` so a reboot cannot restore unknown
+configuration. Docker, the trusted-LAN application listener, the deployment
+timer, and outbound GitHub reporting remain available. `public-on` validates
+and starts nginx again. A reboot may also start its loopback-only listener, but
+an ordinary Ansible rerun does not re-enable a tripped Funnel. Recovery is the
+explicit `public-on` command after investigation.
+
+If malformed configuration prevents the normal manual `public-off` path from
+starting, the constrained wrapper automatically invokes the same
+configuration-independent emergency shutdown used by watchdog `OnFailure`.
+
+The watchdog checks the fixed nginx limiter events every 15 seconds. At 100
+rejections within 60 seconds it invokes the same kill path once and queues a
+`circuit_open` notification after shutdown verification. A watchdog state or
+Funnel-state disagreement, stale SMTP preflight, stopped notification timer, or
+failed container-SMTP firewall reconciliation also fails closed. There is no
+traffic-based automatic restart.
+
+The watchdog lock and volatile authorization live under `/run/moon-service`,
+not on the SD-backed state path. If persistent state becomes read-only, shutdown
+still removes runtime authorization and stops nginx/Funnel before reporting the
+state-write failure. If malformed configuration, a missing executable, or a
+systemd sandbox/start error prevents the watchdog command from running, its
+configuration-independent `OnFailure` unit stops nginx, resets Funnel, and
+disables `tailscaled` as the final availability-sacrificing fallback.
+Checks defer successfully while an operator control transaction owns that lock;
+an emergency shutdown waits for the transaction before acting, so it cannot race
+an in-progress activation and then be silently undone.
+
+The current ISP relay authenticates only by the home's public source IP and
+offers neither AUTH nor STARTTLS. The accepted plaintext message contains only
+event/reason categories, UTC time, rejection count, deployed revision, and
+fixed recovery commands. It contains no query, request body, client address, or
+user agent. Failed delivery stays in a root-only queue and retries every five
+minutes; it never delays or reverses shutdown. A DOCKER-USER rule rejects
+container traffic to ports 25, 465, 587, and any separately configured relay
+port while leaving host-originated notification traffic available. The
+watchdog reasserts that rule on every pass. Docker IPv6 networking is explicitly
+disabled; equivalent IPv6 bridge rules are still applied when that chain is
+available. The Funnel service is bound to the firewall service, so a Docker or
+firewall stop removes volatile authorization and stops public exposure.
+
+Relay acceptance does not prove inbox delivery. Circuit-open messages have
+reserved queue capacity and priority over routine transition mail, malformed
+queue entries are quarantined, and every retry keeps a stable `Message-ID`.
+Delivery is at-least-once: a process loss after SMTP acceptance but before queue
+removal can produce a duplicate. Confirm receipt during physical acceptance and
+verify every incident against `public-status`.
 
 ## Host verification
 
@@ -316,6 +498,20 @@ systemctl show moon-service-cleanup.timer \
   --property=ActiveState --property=NextElapseUSecMonotonic
 systemctl list-timers moon-service-deploy.timer moon-service-cleanup.timer
 ```
+
+The public watchdog and notification timers must also be active even while
+Funnel is disabled:
+
+```bash
+systemctl show moon-service-public-watchdog.timer moon-service-public-notify.timer \
+  --property=ActiveState --property=NextElapseUSecMonotonic
+sudo moon-service-control public-status
+ss -ltn 'sport = :18080'
+```
+
+The only `:18080` listener must be `127.0.0.1`; port 80 must have no listener.
+Before activation, public status must show a disabled marker, inactive Funnel
+route, and active nginx/watchdog state.
 
 `ActiveState=active` together with `NextElapseUSecMonotonic=infinity` is a
 broken schedule, not a healthy timer. After an issue #107 provisioning run, the
@@ -350,6 +546,26 @@ port.
 The first response must report `status: ok` and the same 40-character Git
 revision shown in `current.env`. The opportunity request is the deliberate live
 provider validation; readiness itself never contacts Open-Meteo.
+
+After public activation, verify the intended path from a machine outside the
+home LAN, replacing the origin exactly once:
+
+```bash
+PUBLIC_ORIGIN=https://REPLACE_WITH_FUNNEL_HOST.ts.net
+curl --fail --silent --show-error "$PUBLIC_ORIGIN/"
+curl --fail --silent --show-error "$PUBLIC_ORIGIN/readyz"
+curl --fail --silent --show-error "$PUBLIC_ORIGIN/api/opportunities?q=Prague"
+curl --head "$PUBLIC_ORIGIN/"
+curl --include "$PUBLIC_ORIGIN/admin/status"
+curl --include --request POST "$PUBLIC_ORIGIN/api/opportunities/search"
+```
+
+Home, assets, readiness, and the Prague lookup must succeed. The two private
+routes must be rejected at nginx without reaching Spring, even if a valid admin
+token is supplied. Inspect the home response for CSP, HSTS, frame denial,
+no-sniff, referrer, permissions, and cross-origin headers. Confirm SSH, Docker,
+port 8080, port 18080, and unrelated host services are not reachable through
+the Funnel hostname.
 
 For the one-time native ARM64/runtime-identity check, use the bootstrap
 administrator because the daily operator intentionally has no arbitrary Docker
@@ -393,6 +609,22 @@ its configured loopback or trusted-LAN boundary:
 8. During a short controlled registry/network outage, trigger the deploy
    service and verify the local current revision remains ready. Restore network
    access immediately afterward.
+9. Configure incident SMTP, run `public-notify-test`, enroll Tailscale, announce
+   the public state change, and run `public-on`. Verify the exact allowed and
+   denied routes above, including visible Open-Meteo/GeoNames attribution. Both
+   the standalone test and `public-on` preflight must be accepted by the relay;
+   confirm at least one message actually reaches the operator inbox.
+10. Send a controlled repeated burst through the public API. Confirm nginx
+    returns `429` before provider use grows materially, the watchdog disables
+    Funnel after the configured rejection threshold, one SMTP notice arrives,
+    and LAN readiness remains healthy. Reboot once while latched off and verify
+    it stays off; restore explicitly with `public-on`.
+11. Set `MOON_PUBLIC_BASE_URL`, run the uptime workflow manually, then disable
+    Funnel long enough to prove a scheduled check fails externally. Restore the
+    alpha and confirm the next check succeeds.
+12. Publish a later healthy `main` revision and reconfirm that public ingress
+    serves that revision while the exact GitHub Deployment callback still
+    completes independently.
 
 The deterministic tests exercise an unhealthy candidate and automatic rollback
 without deliberately publishing a broken `main` image. Do not create a broken
@@ -515,6 +747,16 @@ State is under `/var/lib/moon-service`:
   an interrupted or failed host memory-limit repair;
 - `host-configuration-remediation`: prevents automation from being re-enabled
   after an interrupted or failed Compose/listener reconciliation;
+- `public-ingress-enabled`: present only while explicit public activation is
+  fully committed for the current boot; the volatile
+  `/run/moon-service/public-authorized` file is also required to start Funnel,
+  and the breaker removes both before network shutdown;
+- `public-ingress-last.env`: latest enabled/disabled transition, fixed reason,
+  UTC time, and limiter rejection count;
+- `public-notification-tested`: hash and UTC time proving the current SMTP
+  envelope's latest direct test was accepted by the configured relay;
+- `public-notifications/`: root-only bounded incident messages waiting for the
+  IP-authorized SMTP relay;
 - `last-cleanup.env`: latest daily image-cleanup result.
 
 ## Constrained operations
@@ -528,6 +770,10 @@ sudo moon-service-control logs
 sudo moon-service-control restart
 sudo moon-service-control rollback
 sudo moon-service-control resume
+sudo moon-service-control public-status
+sudo moon-service-control public-on
+sudo moon-service-control public-off
+sudo moon-service-control public-notify-test
 ```
 
 - `status` shows container/timer state, incomplete host remediation, plus
@@ -541,11 +787,22 @@ sudo moon-service-control resume
   poll from immediately undoing an intentional rollback.
 - `resume` clears the manual hold and any rejected candidate, then immediately
   runs normal discovery. Investigate before using it.
+- `public-status` reports the latch, Funnel/nginx/watchdog and notification-timer
+  state, active limit values, pending-notification count, and last transition
+  without revealing the SMTP envelope or visitor data.
+- `public-off` is idempotent and persistently removes public exposure while
+  leaving LAN service and deployment automation running.
+- `public-on` performs all readiness/Tailscale/notification preflights and is
+  the only normal way to restore a tripped Funnel.
+- `public-notify-test` sends one harmless message directly as a standalone relay
+  diagnostic. It does not queue the test and does not replace the live test that
+  `public-on` performs for every activation.
 
 Timer update/cleanup runs skip successfully when another operation holds the
-deployment lock. Interactive restart/rollback/resume waits up to 30 seconds and
-returns a nonzero error if the lock remains busy; it never reports a skipped
-operator action as successful.
+deployment lock. Interactive restart/rollback/resume uses the deployment lock;
+public operations use a separate root-owned ingress lock. They wait for their
+respective lock and return nonzero rather than report a skipped operator action
+as successful.
 
 The dedicated operator has no Docker or sudo group and cannot pass arbitrary
 arguments through these wrappers. The bootstrap administrator can still use
@@ -602,6 +859,38 @@ Docker is enabled at boot and Compose uses `restart: unless-stopped`.
 cannot become ready, it tries `previous.env`, records the failed current digest
 as rejected, and continues on the previous revision.
 
+Funnel deliberately does not restart automatically after a reboot. Its unit
+requires `/run/moon-service/public-authorized`, which only `public-on` creates
+after live preflight and which reboot always clears. The persistent marker alone
+cannot authorize exposure; the watchdog reconciles any stale marker back to the
+disabled state. nginx, the watchdog, and notification retry timer still start;
+they expose only a loopback listener. After checking status and WAN/provider
+conditions, restore the tester edge explicitly with `public-on`.
+
+### Public ingress or notification failure
+
+Run `public-status` first. If state is inconsistent or hostile traffic is still
+arriving, run `public-off`; it is safe when already disabled. Inspect
+`journalctl -u moon-service-funnel.service`,
+`journalctl -u moon-service-public-watchdog.service`, and
+`journalctl -u moon-service-public-notify.service`. Correct inventory and rerun
+Ansible for nginx, limit, or SMTP-envelope drift. `public-notify-test` can
+diagnose the relay separately; `public-on` performs its own mandatory live test.
+
+Treat every Ansible provisioning run as a public maintenance window. If the
+control is already installed, the role latches ingress off before any host
+mutation; it repeats the latch after changed public files and again after daemon
+reconciliation. This prevents a failed or interrupted run from leaving Funnel
+live under a partially changed rate, breaker, route, port, unit, or SMTP
+contract. Verify the converged settings and restore explicitly with
+`public-on`, which sends a fresh relay test.
+
+If the ISP changes relay behavior or the source-IP authorization fails, queued
+mail remains local and public activation refuses when SMTP is disabled. A WAN
+outage may prevent both Funnel and SMTP; the external GitHub uptime failure is
+the independent signal. Do not weaken the no-AUTH/no-STARTTLS configuration by
+silently sending visitor details over plaintext.
+
 ### Bad image
 
 Automatic readiness failure restores current and records the candidate in
@@ -629,9 +918,14 @@ not silently turn a moving tag into current state.
 There is no durable application data in this deployment. Flash a fresh
 supported image, restore SSH/sudo access, rerun Ansible from the controller,
 restore the admin token and optional private GHCR credential from their
-off-host stores, and allow the Pi to pull the current published digest. Record
-the previously deployed digest off-host if reproducing that exact version may
-matter. Process-local caches and provider counters restart empty by design.
+off-host stores, and allow the Pi to pull the current published digest. Restore
+the SMTP inventory block, but leave Funnel off. Remove or rename the stale
+Tailscale device deliberately, enroll the replacement, verify the resulting
+DNS name, and update `MOON_PUBLIC_BASE_URL` plus tester instructions if that
+name changed. Run all preflights and the notification test before `public-on`.
+Record the previously deployed digest off-host if reproducing that exact
+version may matter. Process-local caches and provider counters restart empty by
+design.
 
 ## Local verification of repository changes
 
@@ -642,6 +936,8 @@ they do not contact GHCR or a Pi:
 python3 -m unittest discover -s deployment/raspberry-pi/tests -v
 bash -n deployment/raspberry-pi/roles/moon_service_host/files/moon-service-deploy
 bash -n deployment/raspberry-pi/roles/moon_service_host/files/moon-service-control
+bash -n deployment/raspberry-pi/roles/moon_service_host/files/moon-service-public
+bash -n deployment/raspberry-pi/roles/moon_service_host/files/moon-service-docker-firewall
 git diff --check
 ```
 
@@ -651,6 +947,10 @@ When Ansible is available, also run:
 (cd deployment/raspberry-pi && ansible-playbook site.yml --syntax-check)
 (cd deployment/raspberry-pi && ansible-playbook \
   --inventory localhost, --connection local tests/memory-cgroup.runtime.yml)
+(cd deployment/raspberry-pi && ansible-playbook \
+  --inventory localhost, --connection local tests/bind-address.runtime.yml)
+(cd deployment/raspberry-pi && ansible-playbook \
+  --inventory localhost, --connection local tests/public-ingress.runtime.yml)
 ```
 
 Do not run the playbook against the physical Pi merely as a repository test.
@@ -661,6 +961,11 @@ services/timers, and may pull/start the application.
 
 - [Install Docker Engine on Debian](https://docs.docker.com/engine/install/debian/)
 - [Tailscale packages for Debian Trixie](https://pkgs.tailscale.com/stable/#debian-trixie)
+- [Tailscale Funnel](https://tailscale.com/docs/features/tailscale-funnel)
+- [`tailscale funnel` CLI](https://tailscale.com/docs/reference/tailscale-cli/funnel)
+- [nginx request limiting](https://nginx.org/en/docs/http/ngx_http_limit_req_module.html)
+- [nginx PROXY/real client address](https://nginx.org/en/docs/http/ngx_http_realip_module.html)
+- [nginx conditional syslog access logging](https://nginx.org/en/docs/http/ngx_http_log_module.html)
 - [Docker local logging driver](https://docs.docker.com/engine/logging/drivers/local/)
 - [Raspberry Pi kernel command line](https://www.raspberrypi.com/documentation/computers/config_txt.html#kernel-command-line-cmdlinetxt)
 - [Raspberry Pi memory-cgroup override](https://github.com/raspberrypi/linux/issues/6980#issuecomment-3149752155)

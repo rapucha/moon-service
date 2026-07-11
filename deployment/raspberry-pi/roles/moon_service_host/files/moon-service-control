@@ -6,13 +6,22 @@ PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 export PATH
 
 [[ $# -eq 1 ]] || {
-    printf 'Usage: %s {status|revision|logs|restart|rollback|resume}\n' "$0" >&2
+    printf 'Usage: %s {status|revision|logs|restart|rollback|resume|public-status|public-on|public-off|public-notify-test}\n' "$0" >&2
     exit 64
 }
 
 CONFIG_DIR=/etc/moon-service
 STATE_DIR=/var/lib/moon-service
 READY_URL=http://127.0.0.1:8080/readyz
+PUBLIC_BIN=/usr/local/sbin/moon-service-public
+EMERGENCY_BIN=/usr/local/sbin/moon-service-public-emergency-off
+TIMEOUT_BIN=timeout
+if [[ "$EUID" -ne 0 && "${MOON_CONTROL_ALLOW_NON_ROOT:-false}" == true ]]; then
+    # Test-only overrides are deliberately ignored for root callers.
+    PUBLIC_BIN="${MOON_PUBLIC_BIN:-$PUBLIC_BIN}"
+    EMERGENCY_BIN="${MOON_EMERGENCY_BIN:-$EMERGENCY_BIN}"
+    TIMEOUT_BIN="${MOON_TIMEOUT_BIN:-$TIMEOUT_BIN}"
+fi
 if [[ -r "$CONFIG_DIR/host.env" ]]; then
     # Root-owned, non-secret deployment settings rendered by Ansible.
     # shellcheck disable=SC1091
@@ -69,6 +78,8 @@ case "$1" in
         show_state last-result "$STATE_DIR/last-result.env"
         show_state last-github-report "$STATE_DIR/last-github-report.env"
         show_state last-cleanup "$STATE_DIR/last-cleanup.env"
+        printf 'public ingress:\n'
+        "$PUBLIC_BIN" status | sed 's/^/  /'
         ;;
     revision)
         curl --fail --silent --show-error --noproxy '*' --max-time 5 "$READY_URL"
@@ -86,8 +97,34 @@ case "$1" in
     resume)
         run_deployment_operation resume
         ;;
+    public-status)
+        exec "$PUBLIC_BIN" status
+        ;;
+    public-on)
+        if "$TIMEOUT_BIN" --signal=TERM --kill-after=10s 180s \
+            "$PUBLIC_BIN" on; then
+            exit 0
+        else
+            operation_status=$?
+        fi
+        "$EMERGENCY_BIN" || true
+        exit "$operation_status"
+        ;;
+    public-off)
+        if "$TIMEOUT_BIN" --signal=TERM --kill-after=10s 60s \
+            "$PUBLIC_BIN" off; then
+            exit 0
+        else
+            operation_status=$?
+        fi
+        "$EMERGENCY_BIN" || true
+        exit "$operation_status"
+        ;;
+    public-notify-test)
+        exec "$PUBLIC_BIN" notify-test
+        ;;
     *)
-        printf 'Usage: %s {status|revision|logs|restart|rollback|resume}\n' "$0" >&2
+        printf 'Usage: %s {status|revision|logs|restart|rollback|resume|public-status|public-on|public-off|public-notify-test}\n' "$0" >&2
         exit 64
         ;;
 esac

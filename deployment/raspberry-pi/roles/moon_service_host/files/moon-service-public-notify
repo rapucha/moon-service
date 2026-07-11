@@ -1,0 +1,475 @@
+#!/usr/bin/env python3
+"""Queue and deliver bounded Moon Service operator notifications over SMTP."""
+
+from __future__ import annotations
+
+from dataclasses import dataclass
+from datetime import datetime, timezone
+from email.message import EmailMessage
+from email.utils import format_datetime, parseaddr
+import fcntl
+import json
+import os
+from pathlib import Path
+import re
+import smtplib
+import sys
+import tempfile
+import uuid
+
+
+VALID_EVENTS = {
+    "circuit_open": "Public alpha disabled automatically",
+    "public_disabled": "Public alpha disabled",
+    "public_enabled": "Public alpha enabled",
+    "test": "Operator notification test",
+}
+VALID_REASONS = {
+    "activation_failed",
+    "activation_unverified",
+    "operator",
+    "rate_limit",
+    "shutdown_unverified",
+    "watchdog_failure",
+}
+REVISION_PATTERN = re.compile(r"^[0-9a-f]{40}$")
+NOTIFICATION_ID_PATTERN = re.compile(r"^[0-9a-f]{32}$")
+HOST_PATTERN = re.compile(r"^[A-Za-z0-9.-]{1,253}$")
+MAILBOX_PATTERN = re.compile(r"^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+$")
+MAX_DELIVERIES = 5
+MAX_QUEUED = 100
+MAX_NONCRITICAL_QUEUED = 90
+MAX_QUARANTINED = 20
+CRITICAL_EVENTS = {"circuit_open"}
+
+
+@dataclass(frozen=True)
+class Configuration:
+    enabled: bool
+    allow_plaintext: bool
+    host: str
+    port: int
+    sender: str
+    recipient: str
+    timeout_seconds: int
+    state_dir: Path
+
+    @property
+    def queue_dir(self) -> Path:
+        return self.state_dir / "public-notifications"
+
+    @property
+    def delivery_lock_path(self) -> Path:
+        return self.state_dir / "public-notifications.lock"
+
+    @property
+    def invalid_dir(self) -> Path:
+        return self.queue_dir / "invalid"
+
+
+def fail(message: str, code: int = 65) -> "NoReturn":
+    print(f"moon-service-public-notify: {message}", file=sys.stderr)
+    raise SystemExit(code)
+
+
+def read_env(path: Path) -> dict[str, str]:
+    values: dict[str, str] = {}
+    if not path.is_file():
+        return values
+    for raw_line in path.read_text(encoding="utf-8").splitlines():
+        line = raw_line.strip()
+        if not line or line.startswith("#"):
+            continue
+        if "=" not in line:
+            fail(f"invalid configuration line in {path}")
+        key, value = line.split("=", 1)
+        values[key] = value
+    return values
+
+
+def valid_mailbox(value: str) -> bool:
+    if not value or "\n" in value or "\r" in value:
+        return False
+    display_name, address = parseaddr(value)
+    return (
+        not display_name
+        and address == value
+        and len(address) <= 254
+        and MAILBOX_PATTERN.fullmatch(address) is not None
+    )
+
+
+def configuration() -> Configuration:
+    allow_test_overrides = os.geteuid() != 0
+    config_dir = Path(
+        os.environ.get("MOON_CONFIG_DIR", "/etc/moon-service")
+        if allow_test_overrides
+        else "/etc/moon-service"
+    )
+    values = read_env(config_dir / "public-ingress.env")
+    state_dir = Path(
+        os.environ.get(
+            "MOON_STATE_DIR",
+            values.get("MOON_STATE_DIR", "/var/lib/moon-service"),
+        )
+        if allow_test_overrides
+        else values.get("MOON_STATE_DIR", "/var/lib/moon-service")
+    )
+    enabled = values.get("MOON_PUBLIC_SMTP_ENABLED", "false") == "true"
+    allow_plaintext = values.get("MOON_PUBLIC_SMTP_ALLOW_PLAINTEXT", "false") == "true"
+    host = values.get("MOON_PUBLIC_SMTP_HOST", "")
+    sender = values.get("MOON_PUBLIC_SMTP_SENDER", "")
+    recipient = values.get("MOON_PUBLIC_SMTP_RECIPIENT", "")
+    try:
+        port = int(values.get("MOON_PUBLIC_SMTP_PORT", "25"))
+        timeout_seconds = int(values.get("MOON_PUBLIC_SMTP_TIMEOUT_SECONDS", "10"))
+    except ValueError:
+        fail("SMTP port and timeout must be integers")
+
+    if enabled:
+        if not allow_plaintext:
+            fail("plaintext SMTP requires an explicit allow flag")
+        if not HOST_PATTERN.fullmatch(host) or host.startswith(".") or host.endswith("."):
+            fail("invalid SMTP host")
+        if not 1 <= port <= 65535:
+            fail("invalid SMTP port")
+        if not valid_mailbox(sender) or not valid_mailbox(recipient):
+            fail("invalid SMTP sender or recipient")
+        if not 1 <= timeout_seconds <= 30:
+            fail("invalid SMTP timeout")
+
+    return Configuration(
+        enabled=enabled,
+        allow_plaintext=allow_plaintext,
+        host=host,
+        port=port,
+        sender=sender,
+        recipient=recipient,
+        timeout_seconds=timeout_seconds,
+        state_dir=state_dir,
+    )
+
+
+def current_revision(state_dir: Path) -> str:
+    current = read_env(state_dir / "current.env")
+    revision = current.get("MOON_IMAGE_REVISION", "unknown")
+    return revision if REVISION_PATTERN.fullmatch(revision) else "unknown"
+
+
+def ensure_queue(configuration: Configuration) -> None:
+    configuration.state_dir.mkdir(mode=0o700, parents=True, exist_ok=True)
+    os.chmod(configuration.state_dir, 0o700)
+    configuration.queue_dir.mkdir(mode=0o700, exist_ok=True)
+    os.chmod(configuration.queue_dir, 0o700)
+    configuration.invalid_dir.mkdir(mode=0o700, exist_ok=True)
+    os.chmod(configuration.invalid_dir, 0o700)
+
+
+def enqueue(configuration: Configuration, event: str, reason: str, rejected: int) -> Path:
+    if not configuration.enabled:
+        fail("SMTP notification is not configured", 78)
+    if event not in VALID_EVENTS:
+        fail("invalid event")
+    if reason not in VALID_REASONS:
+        fail("invalid reason")
+    if rejected < 0 or rejected > 1_000_000_000:
+        fail("invalid rejected-request count")
+
+    ensure_queue(configuration)
+    queued = pending(configuration)
+    limit = MAX_QUEUED if event in CRITICAL_EVENTS else MAX_NONCRITICAL_QUEUED
+    if queued >= limit:
+        fail("notification queue is full", 75)
+    payload = event_payload(configuration, event, reason, rejected)
+    now = datetime.now(timezone.utc).replace(microsecond=0)
+    target = configuration.queue_dir / f"{now.strftime('%Y%m%dT%H%M%SZ')}-{uuid.uuid4().hex}.json"
+    file_descriptor, temporary_name = tempfile.mkstemp(
+        prefix=".notification-", dir=configuration.queue_dir
+    )
+    temporary = Path(temporary_name)
+    try:
+        with os.fdopen(file_descriptor, "w", encoding="utf-8") as stream:
+            json.dump(payload, stream, separators=(",", ":"), sort_keys=True)
+            stream.write("\n")
+        os.chmod(temporary, 0o600)
+        os.replace(temporary, target)
+    finally:
+        temporary.unlink(missing_ok=True)
+    return target
+
+
+def event_payload(
+    configuration: Configuration, event: str, reason: str, rejected: int
+) -> dict[str, object]:
+    now = datetime.now(timezone.utc).replace(microsecond=0)
+    return {
+        "schemaVersion": 1,
+        "event": event,
+        "reason": reason,
+        "rejectedRequests": rejected,
+        "revision": current_revision(configuration.state_dir),
+        "notificationId": uuid.uuid4().hex,
+        "occurredAt": now.isoformat().replace("+00:00", "Z"),
+    }
+
+
+def load_event(path: Path) -> dict[str, object]:
+    try:
+        serialized = path.read_text(encoding="utf-8")
+    except OSError:
+        raise
+    try:
+        payload = json.loads(serialized)
+    except json.JSONDecodeError as error:
+        raise ValueError("invalid queued notification") from error
+    if not isinstance(payload, dict) or payload.get("schemaVersion") != 1:
+        raise ValueError("invalid queued notification schema")
+    event = payload.get("event")
+    reason = payload.get("reason")
+    rejected = payload.get("rejectedRequests")
+    revision = payload.get("revision")
+    notification_id = payload.get("notificationId")
+    occurred_at = payload.get("occurredAt")
+    if event not in VALID_EVENTS or reason not in VALID_REASONS:
+        raise ValueError("invalid queued notification fields")
+    if not isinstance(rejected, int) or rejected < 0:
+        raise ValueError("invalid queued rejection count")
+    if revision != "unknown" and (
+        not isinstance(revision, str) or not REVISION_PATTERN.fullmatch(revision)
+    ):
+        raise ValueError("invalid queued revision")
+    if not isinstance(notification_id, str) or not NOTIFICATION_ID_PATTERN.fullmatch(
+        notification_id
+    ):
+        raise ValueError("invalid queued notification id")
+    if not isinstance(occurred_at, str) or len(occurred_at) > 32:
+        raise ValueError("invalid queued timestamp")
+    try:
+        parsed_timestamp = datetime.fromisoformat(occurred_at.replace("Z", "+00:00"))
+    except ValueError as error:
+        raise ValueError("invalid queued timestamp") from error
+    if parsed_timestamp.tzinfo is None:
+        raise ValueError("invalid queued timestamp timezone")
+    return payload
+
+
+def quarantine_invalid(configuration: Configuration, path: Path) -> None:
+    ensure_queue(configuration)
+    quarantined = sorted(configuration.invalid_dir.glob("*.invalid"))
+    while len(quarantined) >= MAX_QUARANTINED:
+        quarantined.pop(0).unlink()
+    os.replace(path, configuration.invalid_dir / f"{path.name}.invalid")
+    print(
+        "moon-service-public-notify: quarantined an invalid queued notification",
+        file=sys.stderr,
+    )
+
+
+def message_for(configuration: Configuration, payload: dict[str, object]) -> EmailMessage:
+    event = str(payload["event"])
+    occurred_at = datetime.fromisoformat(str(payload["occurredAt"]).replace("Z", "+00:00"))
+    message = EmailMessage()
+    message["From"] = configuration.sender
+    message["To"] = configuration.recipient
+    message["Date"] = format_datetime(occurred_at)
+    message["Message-ID"] = f"<{payload['notificationId']}@moon-service.invalid>"
+    message["Subject"] = f"[Moon Service] {VALID_EVENTS[event]}"
+    if event in {"circuit_open", "public_disabled"}:
+        action = "Restore after investigation: sudo moon-service-control public-on"
+    elif event == "public_enabled":
+        action = "If this was unexpected: sudo moon-service-control public-off"
+    else:
+        action = "No action is required for this relay test."
+    message.set_content(
+        "\n".join(
+            [
+                f"Event: {event}",
+                f"Reason: {payload['reason']}",
+                f"UTC time: {payload['occurredAt']}",
+                f"Rate-limit rejections: {payload['rejectedRequests']}",
+                f"Application revision: {payload['revision']}",
+                "",
+                "No request query, body, client address, or user-agent data is included.",
+                "Inspect: sudo moon-service-control public-status",
+                action,
+            ]
+        )
+        + "\n"
+    )
+    return message
+
+
+def deliver(configuration: Configuration, path: Path) -> None:
+    payload = load_event(path)
+    deliver_payload(configuration, payload)
+
+
+def deliver_payload(
+    configuration: Configuration, payload: dict[str, object]
+) -> None:
+    message = message_for(configuration, payload)
+    # This ISP relay deliberately authorizes the home connection's source IP.
+    # Do not add AUTH or STARTTLS silently; the accepted plaintext boundary is
+    # explicit in configuration and notification bodies contain no visitor data.
+    client = smtplib.SMTP(
+        configuration.host,
+        configuration.port,
+        timeout=configuration.timeout_seconds,
+    )
+    try:
+        client.ehlo_or_helo_if_needed()
+        client.send_message(message)
+    finally:
+        # Once DATA is accepted, a QUIT timeout must not turn a successful send
+        # into a retry. A crash before queue removal can still duplicate mail;
+        # the stable Message-ID lets receiving systems deduplicate it.
+        try:
+            client.quit()
+        except (OSError, smtplib.SMTPException):
+            client.close()
+
+
+def acquire_delivery_lock(configuration: Configuration) -> int | None:
+    ensure_queue(configuration)
+    descriptor = os.open(
+        configuration.delivery_lock_path,
+        os.O_CREAT | os.O_RDWR,
+        0o600,
+    )
+    os.fchmod(descriptor, 0o600)
+    try:
+        fcntl.flock(descriptor, fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except BlockingIOError:
+        os.close(descriptor)
+        return None
+    return descriptor
+
+
+def release_delivery_lock(descriptor: int) -> None:
+    try:
+        fcntl.flock(descriptor, fcntl.LOCK_UN)
+    finally:
+        os.close(descriptor)
+
+
+def flush(
+    configuration: Configuration, max_deliveries: int = MAX_DELIVERIES
+) -> int:
+    if not configuration.enabled:
+        return 0
+    descriptor = acquire_delivery_lock(configuration)
+    if descriptor is None:
+        # Another sender owns delivery. Newly queued events remain durable and
+        # that sender or the retry timer will pick them up. Delivery is
+        # intentionally at-least-once, with stable Message-IDs for deduplication.
+        return 0
+    try:
+        accepted = 0
+        queued_events: list[tuple[int, Path, dict[str, object]]] = []
+        for path in sorted(configuration.queue_dir.glob("*.json")):
+            try:
+                payload = load_event(path)
+            except ValueError:
+                try:
+                    quarantine_invalid(configuration, path)
+                except OSError as error:
+                    print(
+                        "moon-service-public-notify: queue quarantine deferred: "
+                        f"{type(error).__name__}",
+                        file=sys.stderr,
+                    )
+                    return 75
+                continue
+            except OSError as error:
+                print(
+                    f"moon-service-public-notify: queue read deferred: {type(error).__name__}",
+                    file=sys.stderr,
+                )
+                return 75
+            priority = 0 if payload["event"] in CRITICAL_EVENTS else 1
+            queued_events.append((priority, path, payload))
+
+        for _priority, path, payload in sorted(
+            queued_events, key=lambda item: (item[0], item[1].name)
+        )[:max_deliveries]:
+            try:
+                deliver_payload(configuration, payload)
+            except (OSError, smtplib.SMTPException, ValueError) as error:
+                print(
+                    f"moon-service-public-notify: delivery deferred: {type(error).__name__}",
+                    file=sys.stderr,
+                )
+                return 75
+            try:
+                path.unlink()
+            except OSError as error:
+                print(
+                    f"moon-service-public-notify: queue update deferred: {type(error).__name__}",
+                    file=sys.stderr,
+                )
+                return 75
+            accepted += 1
+        if accepted:
+            print(f"configured relay accepted {accepted} operator notification(s)")
+        return 0
+    finally:
+        release_delivery_lock(descriptor)
+
+
+def test_delivery(configuration: Configuration) -> int:
+    if not configuration.enabled:
+        fail("SMTP notification is not configured", 78)
+    descriptor = acquire_delivery_lock(configuration)
+    if descriptor is None:
+        fail("another notification delivery is in progress; retry the test", 75)
+    try:
+        try:
+            deliver_payload(
+                configuration,
+                event_payload(configuration, "test", "operator", 0),
+            )
+        except (OSError, smtplib.SMTPException, ValueError) as error:
+            print(
+                f"moon-service-public-notify: test delivery failed: {type(error).__name__}",
+                file=sys.stderr,
+            )
+            return 75
+        print("operator notification test accepted by configured relay")
+        return 0
+    finally:
+        release_delivery_lock(descriptor)
+
+
+def pending(configuration: Configuration) -> int:
+    if not configuration.queue_dir.is_dir():
+        return 0
+    return sum(1 for _ in configuration.queue_dir.glob("*.json"))
+
+
+def main(arguments: list[str]) -> int:
+    if os.geteuid() != 0 and os.environ.get("MOON_PUBLIC_NOTIFY_ALLOW_NON_ROOT") != "true":
+        fail("must run as root", 77)
+    config = configuration()
+    if arguments == ["flush"]:
+        return flush(config)
+    if arguments == ["pending"]:
+        print(pending(config))
+        return 0
+    if arguments == ["test"]:
+        return test_delivery(config)
+    if len(arguments) == 4 and arguments[0] == "enqueue":
+        try:
+            rejected = int(arguments[3])
+        except ValueError:
+            fail("rejected-request count must be an integer")
+        enqueue(config, arguments[1], arguments[2], rejected)
+        return flush(config, max_deliveries=1)
+    fail(
+        "usage: moon-service-public-notify "
+        "{flush|pending|test|enqueue EVENT REASON COUNT}",
+        64,
+    )
+
+
+if __name__ == "__main__":
+    raise SystemExit(main(sys.argv[1:]))

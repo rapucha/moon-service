@@ -2,7 +2,10 @@
 
 ## Decision
 
-Use Open-Meteo Geocoding API as the first geocoding provider candidate for the web MVP, but not as the only option until the native-script query gaps are resolved.
+Use Open-Meteo Geocoding API as the current provider for the web MVP and
+noncommercial tester alpha. Keep the provider seam because known native-script
+gaps and a future commercial boundary may require a curated fallback or
+replacement.
 
 Docs: <https://open-meteo.com/en/docs/geocoding-api>
 
@@ -22,6 +25,29 @@ Remaining caveats:
 - For the first MVP, use explicit search/submit rather than per-keystroke autocomplete.
 - Initial validation found that Open-Meteo Geocoding handles many raw Unicode city names, including diacritics, Cyrillic, Chinese, Hindi, Thai, Arabic, and Hebrew examples. It did not resolve tested Japanese-script or Korean-script queries such as `東京`, `京都`, `大阪`, `とうきょう`, or `서울`. If broad native-script city search remains part of the v0 promise, add a curated alias/transliteration layer before considering a secondary provider.
 
+Tester-alpha provider and attribution boundary:
+
+- The current tester alpha has no advertising, subscriptions, paid access, or
+  commercial promotion. The free noncommercial Open-Meteo resource is accepted
+  only within that boundary and its published request limits.
+- The `/search` and `/about` pages visibly credit
+  [Open-Meteo](https://open-meteo.com/), identify
+  [GeoNames](https://www.geonames.org/) as the location-data basis, distinguish
+  weather data under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/)
+  from location data treated under
+  [CC BY-NC 4.0](https://creativecommons.org/licenses/by-nc/4.0/), and state
+  that Moon Service adapts and aggregates the data and applies its own scoring.
+- As reviewed on 2026-07-11, Open-Meteo's hosted
+  [Terms & Privacy](https://open-meteo.com/en/terms) say API data is CC BY 4.0,
+  while the official geocoding service
+  [repository README](https://github.com/open-meteo/geocoding-api#data-license)
+  says its API data is CC BY-NC 4.0. The noncommercial tester alpha satisfies
+  either published boundary. Do not assume commercial geocoding reuse is
+  cleared until Open-Meteo resolves or clarifies that discrepancy.
+- Attribution remains required on a paid plan. Before any commercial use, move
+  to an appropriate customer endpoint/API key or another reviewed provider; do
+  not carry the free-alpha provider assumption into production.
+
 ## Internationalization
 
 Location search must support raw Unicode input. Users may have an English browser locale but type a local-language or non-Latin place name, such as `Praha`, `Muenchen`, `München`, `Kraków`, `Αθήνα`, `東京`, or `京都`.
@@ -29,14 +55,17 @@ Location search must support raw Unicode input. Users may have an English browse
 Rules:
 
 - Do not ASCII-normalize or translate the submitted query before geocoding.
-- Treat browser locale and `Accept-Language` as display/ranking hints only.
+- Treat browser locale and `Accept-Language` as future display/ranking hints
+  only. The current controller uses an operator-configured provider language
+  and does not consume either request value.
 - Let the geocoding provider search the raw query.
 - Preserve non-ASCII display names returned by the provider.
 - Store UTC internally, but display event times in the resolved location timezone.
 - Keep UI copy English-only for the first MVP unless translation work is explicitly added.
 - Allow one visible-character place-name queries because real examples exist, such as `Å` and `Y`; handle them with exact-match and stricter abuse controls rather than a blanket minimum-length rejection.
 
-Recommended fallback lookup sequence:
+Future recommended fallback lookup sequence (not the current controller
+contract):
 
 ```text
 1. raw query + requested/browser display language
@@ -243,7 +272,8 @@ LLM fallback rules:
 
 ### Open-Meteo Geocoding
 
-Status: useful first provider candidate, but not sufficient alone for the current internationalized search promise.
+Status: current noncommercial alpha provider, but not sufficient alone for the
+full internationalized search promise.
 
 Source: <https://open-meteo.com/en/docs/geocoding-api>
 
@@ -263,11 +293,20 @@ Caching:
 
 - No detailed geocoding-specific cache rule found in the docs reviewed.
 - Cache selected normalized location records to reduce repeated provider calls and preserve result stability.
-- Keep attribution to GeoNames/Open-Meteo.
+- Keep visible attribution to Open-Meteo and GeoNames, link the CC BY-NC 4.0
+  notice for location data, and say when Moon Service has adapted, filtered, or
+  aggregated the provider data.
 
 Privacy:
 
-- Backend should avoid logging raw query strings if they may contain exact addresses or personal locations.
+- The backend sends the submitted location text to Open-Meteo. This can include
+  more specific text than a city name even though the UI asks for a city or
+  town. Application and public-ingress logs should avoid recording that raw
+  query string.
+- Open-Meteo's hosted terms say free-API troubleshooting logs may contain
+  sensitive information such as geographic coordinates and are deleted after
+  90 days. The user-facing search and about pages disclose this provider
+  processing and link those terms.
 - For MVP, guide the user toward city/town names rather than exact home addresses.
 
 Limitations:
@@ -617,7 +656,8 @@ GeocodingResult
 Rules:
 
 - Use WGS84 decimal degrees.
-- Preserve provider attribution/source.
+- Preserve Open-Meteo/GeoNames attribution and the CC BY-NC 4.0 location-data
+  license notice unless Open-Meteo resolves the published discrepancy.
 - Do not expose provider-specific IDs as stable public product IDs unless the provider allows it.
 - Treat `display_name`, coordinates, elevation, and timezone as the fields the scoring system actually needs.
 - Treat elevation as observer elevation above sea level, not as terrain horizon obstruction.
@@ -656,6 +696,15 @@ Admin visibility:
 - Warn at roughly 50 percent, 80 percent, and 95 percent usage.
 - Keep geocoding explicit-submit only in v0; do not add autocomplete until quota behavior is understood.
 
+The #97 public edge currently limits `/api/opportunities` to 1 request/minute
+per PROXY-protocol client and in aggregate, inside a 300-request/minute
+whole-site ceiling. A lookup can call geocoding and weather and retry each once;
+the aggregate remains below the provider's published daily allowance in that
+worst case when the allowance is conservatively treated as shared. An automated
+circuit breaker latches Funnel off after 100 limiter rejections in 60 seconds.
+These controls reduce abuse exposure but do not replace the outbound provider
+counters or caches.
+
 Backend metrics and operator visibility are tracked by
 [#9](https://github.com/rapucha/moon-service/issues/9).
 
@@ -682,6 +731,9 @@ Enter a city or town. Exact home addresses are not needed.
 Privacy defaults:
 
 - Use backend-mediated geocoding.
+- Tell users that the backend sends the location text they submit to Open-Meteo for location
+  lookup and sends the resolved location's four-decimal coordinates for the
+  separate weather request.
 - Avoid raw query logging by default.
 - Do not store IP address plus query text in application logs.
 - Store selected city/location records separately from any future user identity.
@@ -706,4 +758,7 @@ Geocoding research reinforces the web-first backend MVP:
 The first web lookup flow, including ambiguity handling in the form, is tracked
 by [#15](https://github.com/rapucha/moon-service/issues/15). Cache TTLs and
 provider-call protection are tracked by
-[#8](https://github.com/rapucha/moon-service/issues/8).
+[#8](https://github.com/rapucha/moon-service/issues/8). Public alpha exposure,
+limits, and final provider-compliance checks are tracked by
+[#97](https://github.com/rapucha/moon-service/issues/97) under
+[#93](https://github.com/rapucha/moon-service/issues/93).

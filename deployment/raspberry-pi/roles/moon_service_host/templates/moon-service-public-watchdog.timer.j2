@@ -1,0 +1,11 @@
+[Unit]
+Description=Check Moon Service public-ingress abuse limits
+
+[Timer]
+OnActiveSec=15s
+OnUnitInactiveSec=15s
+AccuracySec=2s
+Unit=moon-service-public-watchdog.service
+
+[Install]
+WantedBy=timers.target

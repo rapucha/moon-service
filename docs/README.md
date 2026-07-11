@@ -34,8 +34,8 @@ Start Here
 Current Canonical API Location
 - `docs/api-shape.md` is currently the human-owned API design document.
 - It includes intended public response examples and status semantics.
-- Current implemented fixture-backed endpoint usage is documented in
-  `backend/README.md`.
+- Current live-provider browser/query behavior and the separately retained
+  direct fixture endpoint are documented in `backend/README.md`.
 
 Documentation Ownership
 - Human-owned docs hold product and API truth.

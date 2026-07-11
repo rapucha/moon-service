@@ -13,3 +13,12 @@ all:
       # moon_service_github_app_id: REPLACE_WITH_GITHUB_APP_ID
       # moon_service_github_app_installation_id: REPLACE_WITH_INSTALLATION_ID
       # moon_service_github_app_private_key_file: REPLACE_WITH_ABSOLUTE_LOCAL_PEM_PATH
+      # Optional operator incident mail for issue #97. Configure every value
+      # together only when the ISP authorizes SMTP by the home public IP. This
+      # explicit opt-in accepts that the relay has neither AUTH nor STARTTLS.
+      # moon_service_public_smtp_enabled: true
+      # moon_service_public_smtp_allow_plaintext: true
+      # moon_service_public_smtp_host: REPLACE_WITH_ISP_SMTP_HOST
+      # moon_service_public_smtp_port: 25
+      # moon_service_public_smtp_sender: REPLACE_WITH_ENVELOPE_SENDER
+      # moon_service_public_smtp_recipient: REPLACE_WITH_OPERATOR_RECIPIENT

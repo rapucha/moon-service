@@ -1,0 +1,92 @@
+---
+- name: Test the managed public-ingress configuration boundary
+  hosts: all
+  gather_facts: false
+  vars:
+    moon_service_host_port: 8080
+    moon_service_public_ingress_port: 18080
+    moon_service_public_https_port: 443
+    moon_service_public_request_rate_per_minute: 300
+    moon_service_public_request_burst: 40
+    moon_service_public_api_rate_per_minute: 1
+    moon_service_public_api_burst: 10
+    moon_service_public_client_api_rate_per_minute: 1
+    moon_service_public_client_api_burst: 3
+    moon_service_public_connection_limit: 32
+    moon_service_public_client_connection_limit: 8
+    moon_service_public_breaker_window_seconds: 60
+    moon_service_public_breaker_rejections: 100
+    moon_service_public_smtp_enabled: false
+    moon_service_public_smtp_allow_plaintext: false
+    moon_service_public_smtp_host: ""
+    moon_service_public_smtp_port: 25
+    moon_service_public_smtp_sender: ""
+    moon_service_public_smtp_recipient: ""
+    moon_service_public_smtp_timeout_seconds: 10
+  tasks:
+    - name: Accept the disabled SMTP default
+      ansible.builtin.include_tasks: >-
+        ../roles/moon_service_host/tasks/validate-public-ingress.yml
+
+    - name: Accept the explicit IP-authorized plaintext SMTP boundary
+      ansible.builtin.include_tasks: >-
+        ../roles/moon_service_host/tasks/validate-public-ingress.yml
+      vars:
+        moon_service_public_smtp_enabled: true
+        moon_service_public_smtp_allow_plaintext: true
+        moon_service_public_smtp_host: smtp.provider.example
+        moon_service_public_smtp_sender: moon-service@example.test
+        moon_service_public_smtp_recipient: operator@example.test
+
+    - name: Initialize expected public-ingress rejection results
+      ansible.builtin.set_fact:
+        _test_port_collision_rejected: false
+        _test_insecure_smtp_rejected: false
+        _test_partial_smtp_rejected: false
+
+    - name: Reject a public-proxy and application port collision
+      block:
+        - name: Validate a colliding loopback proxy port
+          ansible.builtin.include_tasks: >-
+            ../roles/moon_service_host/tasks/validate-public-ingress.yml
+          vars:
+            moon_service_public_ingress_port: 8080
+      rescue:
+        - name: Record the expected public-proxy port rejection
+          ansible.builtin.set_fact:
+            _test_port_collision_rejected: true
+
+    - name: Reject SMTP without an explicit plaintext opt-in
+      block:
+        - name: Validate an unacknowledged plaintext SMTP relay
+          ansible.builtin.include_tasks: >-
+            ../roles/moon_service_host/tasks/validate-public-ingress.yml
+          vars:
+            moon_service_public_smtp_enabled: true
+            moon_service_public_smtp_allow_plaintext: false
+            moon_service_public_smtp_host: smtp.provider.example
+            moon_service_public_smtp_sender: moon-service@example.test
+            moon_service_public_smtp_recipient: operator@example.test
+      rescue:
+        - name: Record the expected insecure SMTP rejection
+          ansible.builtin.set_fact:
+            _test_insecure_smtp_rejected: true
+
+    - name: Reject partially configured disabled SMTP
+      block:
+        - name: Validate a dormant partial SMTP envelope
+          ansible.builtin.include_tasks: >-
+            ../roles/moon_service_host/tasks/validate-public-ingress.yml
+          vars:
+            moon_service_public_smtp_host: smtp.provider.example
+      rescue:
+        - name: Record the expected partial SMTP rejection
+          ansible.builtin.set_fact:
+            _test_partial_smtp_rejected: true
+
+    - name: Verify unsafe public-ingress configurations failed closed
+      ansible.builtin.assert:
+        that:
+          - _test_port_collision_rejected
+          - _test_insecure_smtp_rejected
+          - _test_partial_smtp_rejected

@@ -4,3 +4,7 @@
 %{{ moon_service_ops_group }} ALL=(root) NOPASSWD: /usr/local/sbin/moon-service-control restart
 %{{ moon_service_ops_group }} ALL=(root) NOPASSWD: /usr/local/sbin/moon-service-control rollback
 %{{ moon_service_ops_group }} ALL=(root) NOPASSWD: /usr/local/sbin/moon-service-control resume
+%{{ moon_service_ops_group }} ALL=(root) NOPASSWD: /usr/local/sbin/moon-service-control public-status
+%{{ moon_service_ops_group }} ALL=(root) NOPASSWD: /usr/local/sbin/moon-service-control public-on
+%{{ moon_service_ops_group }} ALL=(root) NOPASSWD: /usr/local/sbin/moon-service-control public-off
+%{{ moon_service_ops_group }} ALL=(root) NOPASSWD: /usr/local/sbin/moon-service-control public-notify-test

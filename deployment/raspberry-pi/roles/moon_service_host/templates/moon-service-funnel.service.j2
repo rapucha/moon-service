@@ -1,0 +1,34 @@
+[Unit]
+Description=Expose the hardened Moon Service tester alpha through Tailscale Funnel
+Documentation=https://github.com/rapucha/moon-service/blob/main/deployment/raspberry-pi/README.md
+BindsTo=nginx.service tailscaled.service moon-service-docker-firewall.service
+After=nginx.service tailscaled.service moon-service-docker-firewall.service network-online.target
+Wants=network-online.target
+ConditionPathExists=/run/moon-service/public-authorized
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/tailscale funnel --yes --proxy-protocol=2 --tls-terminated-tcp={{ moon_service_public_https_port }} tcp://127.0.0.1:{{ moon_service_public_ingress_port }}
+Restart=on-failure
+RestartSec=10s
+TimeoutStartSec=30s
+TimeoutStopSec=20s
+UMask=0077
+NoNewPrivileges=true
+PrivateDevices=true
+PrivateTmp=true
+ProtectClock=true
+ProtectControlGroups=true
+ProtectHome=true
+ProtectHostname=true
+ProtectKernelLogs=true
+ProtectKernelModules=true
+ProtectKernelTunables=true
+ProtectSystem=strict
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+RestrictNamespaces=true
+RestrictRealtime=true
+LockPersonality=true
+
+[Install]
+WantedBy=multi-user.target

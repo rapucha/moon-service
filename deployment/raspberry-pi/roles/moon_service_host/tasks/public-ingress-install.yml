@@ -1,0 +1,99 @@
+---
+- name: Install the loopback public proxy and container firewall tools without starting package services
+  ansible.builtin.apt:
+    name:
+      - iptables
+      - nginx
+    state: present
+    policy_rc_d: 101
+
+- name: Install the shared xtables lock boot contract
+  ansible.builtin.copy:
+    content: "f /run/xtables.lock 0600 root root -\n"
+    dest: /etc/tmpfiles.d/moon-service-xtables.conf
+    owner: root
+    group: root
+    mode: "0644"
+  register: _moon_service_xtables_tmpfiles
+
+- name: Materialize the shared xtables lock
+  ansible.builtin.command:
+    argv:
+      - systemd-tmpfiles
+      - --create
+      - /etc/tmpfiles.d/moon-service-xtables.conf
+  changed_when: false
+
+- name: Remove nginx's package-default wildcard site
+  ansible.builtin.file:
+    path: /etc/nginx/sites-enabled/default
+    state: absent
+  register: _moon_service_nginx_default_site
+
+- name: Install the loopback-only public proxy definition
+  ansible.builtin.template:
+    src: moon-service-public-nginx.conf.j2
+    dest: /etc/nginx/conf.d/moon-service-public.conf
+    owner: root
+    group: root
+    mode: "0644"
+  register: _moon_service_nginx_public_definition
+
+- name: Install root-only public-ingress and operator-notification settings
+  ansible.builtin.template:
+    src: public-ingress.env.j2
+    dest: "{{ moon_service_config_dir }}/public-ingress.env"
+    owner: root
+    group: root
+    mode: "0600"
+  register: _moon_service_public_ingress_settings
+  no_log: true
+  diff: false
+
+- name: Install public-ingress control commands
+  ansible.builtin.copy:
+    src: "{{ item }}"
+    dest: "/usr/local/sbin/{{ item }}"
+    owner: root
+    group: root
+    mode: "0755"
+  loop:
+    - moon-service-docker-firewall
+    - moon-service-public
+    - moon-service-public-emergency-off
+    - moon-service-public-notify
+  register: _moon_service_public_control_files
+
+- name: Install public-ingress service units
+  ansible.builtin.template:
+    src: "{{ item }}.j2"
+    dest: "/etc/systemd/system/{{ item }}"
+    owner: root
+    group: root
+    mode: "0644"
+  loop:
+    - moon-service-docker-firewall.service
+    - moon-service-funnel.service
+    - moon-service-public-emergency-off.service
+    - moon-service-public-notify.service
+    - moon-service-public-notify.timer
+    - moon-service-public-watchdog.service
+    - moon-service-public-watchdog.timer
+  register: _moon_service_public_unit_definitions
+  notify: Reload systemd
+
+- name: Immediately latch public ingress off after managed contract drift
+  ansible.builtin.include_tasks: public-ingress-latch-off.yml
+  when: >-
+    _moon_service_nginx_default_site.changed
+    or _moon_service_nginx_public_definition.changed
+    or _moon_service_public_ingress_settings.changed
+    or _moon_service_xtables_tmpfiles.changed
+    or ((_moon_service_public_control_files.results
+         | selectattr('changed')
+         | list
+         | length) > 0)
+    or ((_moon_service_public_unit_definitions.results
+         | selectattr('changed')
+         | list
+         | length) > 0)

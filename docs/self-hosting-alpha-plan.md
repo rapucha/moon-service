@@ -21,10 +21,12 @@ only to make the first public lookup, RSS, or calendar behavior deployable.
 
 The original hosting boundary was tracked in
 [#19](https://github.com/rapucha/moon-service/issues/19). The current delivery
-is tracked by [#93](https://github.com/rapucha/moon-service/issues/93) and its
-host child [#95](https://github.com/rapucha/moon-service/issues/95). Reliable
-timer rearming and exact GitHub deployment confirmation are follow-up
-[#107](https://github.com/rapucha/moon-service/issues/107).
+is tracked by [#93](https://github.com/rapucha/moon-service/issues/93). Its host
+provisioning and physical-deployment foundations are complete under
+[#95](https://github.com/rapucha/moon-service/issues/95) and
+[#107](https://github.com/rapucha/moon-service/issues/107); the public edge and
+final tester-alpha acceptance are tracked by
+[#97](https://github.com/rapucha/moon-service/issues/97).
 
 ## Decision Snapshot
 
@@ -43,16 +45,26 @@ timer rearming and exact GitHub deployment confirmation are follow-up
   separate states. The Pi must report the exact healthy revision and immutable
   digest back to its GitHub Deployment before the main workflow calls the
   deployment successful.
-- Install Tailscale without enrollment during host provisioning. Issue
-  [#97](https://github.com/rapucha/moon-service/issues/97) owns the later
-  Tailscale Funnel public HTTPS boundary. Preserve direct LAN access by adding
-  an exact loopback listener or loopback proxy for Funnel rather than replacing
-  the LAN listener with a wildcard bind.
+- Install Tailscale without credentials in tracked provisioning. The #97
+  implementation installs a fail-closed public edge without enrolling the node
+  or enabling Funnel: Tailscale Funnel sends PROXY protocol v2 to nginx on the
+  exact `127.0.0.1:18080` listener, and nginx proxies only allowlisted routes to
+  the unchanged exact application listener. Public activation remains an
+  explicit operator action after enrollment and physical checks.
 - Keep one backend instance at first because provider counters and caches are
-  currently process-local. Public request rate limiting is planned for the edge
-  or ingress first, with app-level rate limiting added when the product response
-  contract needs backend-owned `429` JSON.
-- Add edge and ingress rate limits before any public alpha.
+  currently process-local. nginx owns the first public request, connection,
+  body, header, and timeout limits; add backend-owned limiting later only if a
+  non-Funnel ingress or product contract requires it.
+- Treat public alpha availability as expendable. A root-owned watchdog latches
+  Funnel off after excessive limiter rejections or inconsistent Funnel state;
+  only an explicit operator command may restore it.
+- Use the home ISP's source-IP-authorized plaintext SMTP relay only for bounded
+  operator messages from the host. It has no AUTH or STARTTLS and is not product
+  email infrastructure. Keep the application container unable to reach SMTP.
+- Check the public `/readyz` path independently from the Pi through GitHub
+  Actions without consuming Open-Meteo quota. Host SMTP cannot be the only
+  outage notification path because it is unavailable when the home WAN is
+  down.
 - Use the 32 GB SD card for Pi OS, Docker runtime state, two application image
   generations, and bounded local logs. Keep durable application data off it.
 - Plan a small NFS-backed storage pool around 64-80 GB for alpha data that must
@@ -63,15 +75,20 @@ timer rearming and exact GitHub deployment confirmation are follow-up
   Add a database when private feeds, saved locations, alert subscriptions,
   durable counters, or durable cache state require it.
 
-## Current Private Alpha Topology
+## Implemented Tester-Alpha Topology
 
 ```text
-operator browser
-  -> trusted-LAN primary IPv4:8080 when explicitly enabled
-     or SSH tunnel over LAN or MikroTik WireGuard with the loopback default
-  -> one exact host listener on the Raspberry Pi
+trusted-LAN browser
+  -> exact primary-LAN-IPv4:8080
   -> one Docker Compose Spring Boot container
   -> Open-Meteo geocoding/weather over outbound HTTPS
+
+Internet tester
+  -> Tailscale Funnel HTTPS on the stable *.ts.net name
+  -> TLS-terminated TCP with PROXY protocol v2
+  -> nginx on exact 127.0.0.1:18080
+  -> exact GET/HEAD route allowlist plus limits and security headers
+  -> the same exact application listener
 
 GitHub-hosted Actions
   -> tested AMD64/ARM64 image in GHCR
@@ -88,11 +105,17 @@ Raspberry Pi systemd timer
 
 GitHub-hosted Actions
   -> waits for the matching Pi status with a bounded timeout
+
+GitHub-hosted scheduled uptime check
+  -> public Funnel /readyz only
+  -> three bounded attempts, status=ok, and a 40-hex revision
 ```
 
 The home router does not forward application, SSH, Docker, admin, database, or
-other Pi ports. Public tester access is a later outbound Tailscale Funnel under
-#97; the Funnel URL is public ingress, not an authentication boundary.
+other Pi ports. The Funnel URL is public ingress, not an invitation-only
+authentication boundary. The repository implementation remains latched off
+until the operator enrolls Tailscale, configures and tests operator SMTP, runs
+the local readiness checks, and deliberately enables Funnel.
 
 The callback path is independent of application ingress: the Pi initiates
 outbound HTTPS to GitHub after checking Docker health, the recorded digest, and
@@ -102,20 +125,21 @@ remains the host's desired-state source, so a GitHub App or Deployments API
 outage cannot block an otherwise healthy local update; it instead makes the
 external workflow time out without confirmation.
 
-Issue #97 will add a separate public-ingress shape without opening a router
-port:
+The public path is deliberately separate from the trusted-LAN listener:
 
 ```text
-trusted LAN client -> exact primary-LAN-IPv4:8080 ----+
-                                                       +-> one Compose container
-Tailscale Funnel -> exact 127.0.0.1:8080 or local proxy+
+trusted LAN client -> exact primary-LAN-IPv4:8080 --------+
+                                                          +-> one app container
+Tailscale Funnel -> PROXY v2 -> 127.0.0.1:18080 nginx ----+
 ```
 
-The current deployment intentionally has one exact host listener. Funnel's
-loopback target requires #97 to teach Compose and binding verification about
-the two explicit endpoints, or to introduce a small loopback-only proxy. It
-must not broaden either path to `0.0.0.0`, and deployment confirmation must
-continue to use a local endpoint rather than depend on the public Funnel URL.
+nginx accepts PROXY protocol only on loopback and trusts the supplied client
+address only when the immediate peer is `127.0.0.1`. It discards Internet-
+supplied forwarding headers before proxying, uses the PROXY address only for
+edge per-client limits, and does not send it to Spring Boot. Neither nginx nor
+the application binds a public or wildcard host address. Deployment
+confirmation continues to use the local application endpoint rather than the
+public Funnel URL.
 
 The admin path remains private:
 
@@ -123,11 +147,11 @@ The admin path remains private:
 GET /admin/status
 ```
 
-The backend already requires `X-Moon-Admin-Token` when admin routes are enabled.
-The Compose seed configuration leaves `/admin/**` disabled. If an operator
-adds a host-local token, the route remains private during #95. Issue #97 must
-also keep `/admin/**` off the public surface; the backend token is a minimum
-application boundary, not permission to publish the route.
+The backend requires `X-Moon-Admin-Token` when admin routes are enabled, and the
+Compose seed configuration leaves `/admin/**` disabled. Independently, nginx
+returns `404` for `/admin/**`, `/healthz`, the direct fixture endpoint
+`/api/opportunities/search`, raw HTML resource paths, and every unknown route.
+The public readiness exception is the provider-free `/readyz` endpoint.
 
 ## Phase 0: Prove The Container Boundary
 
@@ -217,52 +241,109 @@ Backup matrix before public alpha:
 | Disposable logs | No | Keep short retention unless debugging a specific issue. |
 | Future Postgres data | Yes | Only after a restore drill exists. |
 
-## Deferred Phase 2: Tailscale Funnel Public Edge
+## Implemented Public Edge: Tailscale Funnel And Loopback nginx
 
 Goal: expose only the public app surface and keep hostile traffic away from the
 home network where possible.
 
-Recommended shape:
+Implemented shape:
 
-- Tailscale Funnel terminates public HTTPS and reaches the Pi over Tailscale's
-  outbound-established connectivity; the home router has no HTTP port forward.
-- Funnel proxies to an exact loopback listener or a loopback-only local reverse
-  proxy. The existing exact primary-IPv4 listener remains available only to the
-  trusted LAN.
-- Public routes are limited to the web app, `/search`, `/api/opportunities`,
-  future public feed routes, and future public calendar export routes.
-- The current prototype fixture endpoint, `POST /api/opportunities/search`,
-  must be explicitly blocked, protected, or retired before public alpha unless
-  a follow-up decision keeps it public.
-- `/admin/**` is disabled or blocked before the Funnel boundary as well as
-  protected by the backend token if enabled for private operation.
-- No raw router port forward is required for HTTP(S) when Funnel is used.
+- Funnel terminates public HTTPS on an allowed Funnel port and forwards
+  TLS-terminated TCP with PROXY protocol v2 to `127.0.0.1:18080`.
+- nginx has one loopback-only PROXY-protocol listener. It proxies to the exact
+  configured application listener, so the trusted LAN path remains unchanged
+  and no raw router port forward is required.
+- The public surface allows only `GET`/`HEAD` for `/`, `/search`, `/about`,
+  `/readyz`, `/api/opportunities`, and the exact static assets required by the
+  browser. Feed and calendar routes are not implicitly public; they require a
+  deliberate allowlist update when implemented.
+- `/admin/**`, `/healthz`, `POST /api/opportunities/search`, raw HTML resource
+  paths, unknown routes, and non-`GET`/`HEAD` methods remain outside the public
+  contract.
+- The edge applies baseline Content Security Policy, framing, referrer,
+  permissions, MIME-sniffing, cross-origin, and HSTS headers.
 
-Ingress controls to plan:
+Default ingress controls:
 
-- Request size limits suitable for query-only endpoints.
-- Conservative timeouts so slow clients do not tie up the backend.
-- Per-IP or per-forwarded-client rate limits on `/api/opportunities`.
-- Stricter limits for one-character lookups and future feed/calendar refresh
-  routes if they become abuse targets.
-- Basic security headers for browser responses.
-- Forwarded-client-IP handling that matches the chosen edge path. Rate limits
-  are only useful if Funnel or the loopback proxy preserves the intended client
-  identity, or the public edge applies the limit first.
+- All public traffic: 300 requests/minute with burst 40, 32 concurrent
+  connections globally, and 8 concurrent connections per PROXY-protocol client.
+- `/api/opportunities`: 1 request/minute globally with burst 10 and 1
+  request/minute per client with burst 3. At the sustained global ceiling, each
+  lookup can call geocoding and weather and retry both once while remaining
+  below the provider's published 10,000-call daily allowance, conservatively
+  treating it as shared and leaving headroom for trusted-LAN/manual work.
+- Request bodies are capped at 1 KiB. Header buffers, client/header/body/send
+  timeouts, keepalive use, proxy connection/send/read timeouts, and container
+  CPU, memory, and PID use are all bounded.
+- API request or connection rejection returns HTTP `429`, `Retry-After: 60`, and
+  the documented `status: "rate_limited"` JSON shape. Upstream exhaustion still
+  maps to `temporarily_unavailable`.
+- Ordinary public access is not logged by nginx. Limiter rejections emit only a
+  fixed `rate-limited` event without path, query, client address, headers, or
+  user agent.
+- These limits protect the application, provider quota, and accepted response
+  bandwidth; they are not volumetric DDoS protection for the home connection.
+  Funnel avoids a router port forward and hides the home's public address, but
+  request bytes still reach `tailscaled` before local nginx can reject them.
+  The latched breaker therefore takes the alpha offline quickly when rejection
+  volume crosses the threshold, which is acceptable for this small test.
 
-Initial alpha rate-limit targets, to tune after real traffic:
+Circuit breaker and notification boundary:
 
-- `/api/opportunities`: about 30 requests per minute per client, with a small
-  burst allowance for manual repeated searches.
-- One-character or otherwise high-ambiguity lookups: about 10 requests per
-  minute per client.
-- Future feed and calendar routes: favor HTTP caching and low per-client refresh
-  rates, because calendars and feed readers can poll repeatedly without a human
-  actively using the site.
-- Upstream provider exhaustion still maps to `temporarily_unavailable`; client
-  overuse maps to `rate_limited` with HTTP `429` once backend-owned app-level
-  limiting exists. Edge or ingress rate limiting is an earlier safety control
-  and may not produce the final product JSON shape.
+- A root-owned watchdog runs every 15 seconds. At 100 limiter rejections in the
+  preceding 60 seconds it removes volatile runtime authorization, stops the
+  public transport, and only then updates the persistent enable marker/state so
+  SD-card failure cannot delay shutdown. It also fails closed when
+  enabled state disagrees with the actual Funnel route or it cannot verify the
+  route or rejection counters.
+- Its lock and volatile authorization use a dedicated `/run` directory, so a
+  read-only persistent state path cannot prevent transport shutdown. A minimal
+  configuration-independent systemd `OnFailure` action stops nginx/Funnel and
+  disables `tailscaled` if the normal watchdog cannot start or parse config.
+- Exact Funnel removal is verified. Failure escalates to `tailscale funnel
+  reset`, then disabling and stopping `tailscaled` so the public path stays
+  closed across reboot. The loopback nginx proxy is stopped first to close
+  already-accepted keepalive flows; the trusted-LAN listener and application
+  remain independent.
+- The breaker stays latched off across service restarts and reboot. There is no
+  automatic recovery loop; the operator investigates and uses the constrained
+  `public-on` command explicitly.
+- Successful exposure also requires volatile authorization in
+  `/run/moon-service/public-authorized`, created
+  only after activation preflight. Reboot clears it, so Funnel never comes back
+  merely because a stale persistent marker or enabled unit survived; the
+  operator checks conditions and runs `public-on` again.
+- Public activation refuses to proceed unless operator SMTP is completely
+  configured, a test message is accepted by the configured relay during that
+  activation, and a local nginx/application/Tailscale preflight passes. Relay
+  acceptance is not proof of inbox delivery; confirm receipt in physical
+  acceptance. Activation also requires enough queue headroom to preserve the
+  reserved circuit-open capacity.
+- The current ISP relay authorizes the home connection's source IP and provides
+  neither AUTH nor STARTTLS. Enabling it requires explicit plaintext opt-in.
+  Messages contain only a fixed event/reason, UTC time, rejection count, and
+  deployed revision—never request data or client identity. Failed delivery is
+  queued root-only and retried; notification failure never prevents shutdown.
+- A host firewall rejects SMTP ports from Docker bridges while leaving the
+  root-owned host notifier's outbound connection available. The watchdog
+  reasserts this rule, Docker IPv6 is explicitly disabled, and the standard
+  global xtables lock remains shared with Docker and other firewall tooling.
+- Circuit-open mail has reserved queue capacity and priority. Invalid queue
+  entries are quarantined. Delivery is at-least-once with a stable `Message-ID`,
+  so a process loss after relay acceptance can produce a harmless duplicate.
+
+External availability:
+
+- A scheduled GitHub Actions workflow checks the public `/readyz` every 15
+  minutes. It makes up to three bounded HTTPS attempts and requires HTTP `200`,
+  `status: "ok"`, and a 40-hex revision.
+- The probe never calls geocoding or weather. Repository variable
+  `MOON_PUBLIC_BASE_URL` holds only the public HTTPS origin, without credentials,
+  a path, query, or fragment. The scheduled job is skipped until that variable
+  is configured after deliberate first activation.
+- GitHub workflow failure is the off-home outage signal. Host SMTP is for local
+  transitions and cannot report a home-WAN outage, so the operator must keep
+  GitHub Actions failure notifications enabled.
 
 WAF stance:
 
@@ -273,13 +354,14 @@ WAF stance:
   input surface becomes more complex than city lookup, feeds, and calendar
   exports.
 
-Exit criteria:
+Remaining physical acceptance:
 
-- The public domain reaches the backend through the tunnel.
-- The Kubernetes API, node ports, admin path, and any future database are not
-  publicly reachable.
-- A burst of repeated public API calls receives `429` before provider quotas are
-  at risk.
+- Enroll the dedicated Pi in Tailscale without committing an auth key.
+- Configure and test the operator relay, then deliberately enable Funnel.
+- Verify the real public home, About, assets, representative Prague lookup,
+  attribution, `/readyz`, security headers, and exact revision.
+- Verify blocked routes, `429` behavior, automated breaker shutdown and email,
+  external outage detection, preserved LAN access, and manual restoration.
 
 ## Phase 3: App-Level Abuse And Provider Protection
 
@@ -295,11 +377,13 @@ The backend already has useful alpha primitives:
 
 Remaining application work:
 
-- Add explicit application-level rate limiting when ingress-only limits are not
-  enough for correct product responses.
-- Return documented `status: "rate_limited"` with HTTP `429`.
+- Add application-level rate limiting only if ingress-only limits become
+  insufficient for a future non-Funnel path or backend-owned contract.
+- Keep the ingress-owned `status: "rate_limited"` response aligned with the
+  public API contract.
 - Keep Open-Meteo quota limits configurable and visible in `/admin/status`.
-- Add operator-visible current public rate-limit settings.
+- Keep current public rate-limit and breaker settings visible through the
+  constrained host status command.
 - Preserve the v0 rule that the browser does not call geocoding on every
   keystroke.
 - Keep cache TTLs and maximum sizes visible in backend configuration.
@@ -401,7 +485,9 @@ Do not add these until a follow-up issue makes them necessary:
 - Local WAF rules.
 - Multi-node HA control plane.
 - GitOps automation.
-- Alert delivery infrastructure.
+- Product email alerts or general-purpose alert delivery. The root-only,
+  plaintext operator notifier for public-ingress transitions is already part of
+  the #97 safety boundary and is not a user-notification system.
 
 ## Related Issues
 

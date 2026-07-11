@@ -1,0 +1,26 @@
+[Unit]
+Description=Deliver queued Moon Service operator notifications
+Documentation=https://github.com/rapucha/moon-service/blob/main/deployment/raspberry-pi/README.md
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/moon-service-public-notify flush
+TimeoutStartSec=3min
+UMask=0077
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectClock=true
+ProtectControlGroups=true
+ProtectHome=true
+ProtectHostname=true
+ProtectKernelLogs=true
+ProtectKernelModules=true
+ProtectKernelTunables=true
+ProtectSystem=strict
+ReadWritePaths={{ moon_service_state_dir }}
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+RestrictNamespaces=true
+RestrictRealtime=true
+LockPersonality=true

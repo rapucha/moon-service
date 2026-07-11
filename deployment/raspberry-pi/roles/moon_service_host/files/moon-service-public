@@ -1,0 +1,755 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+
+umask 077
+PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+export PATH
+
+usage() {
+    printf 'Usage: %s {status|on|off|check|notify-test}\n' "$0" >&2
+    exit 64
+}
+
+[[ $# -eq 1 ]] || usage
+TEST_MODE=false
+if [[ "$EUID" -ne 0 ]]; then
+    [[ "${MOON_PUBLIC_ALLOW_NON_ROOT:-false}" == true ]] || {
+        printf 'moon-service-public must run as root\n' >&2
+        exit 77
+    }
+    TEST_MODE=true
+fi
+
+MODE="$1"
+case "$MODE" in
+    status|on|off|check|notify-test) ;;
+    *) usage ;;
+esac
+
+CONFIG_DIR=/etc/moon-service
+STATE_DIR=/var/lib/moon-service
+READY_URL=http://127.0.0.1:8080/readyz
+PUBLIC_PORT=18080
+PUBLIC_HTTPS_PORT=443
+BREAKER_WINDOW_SECONDS=60
+BREAKER_REJECTIONS=100
+REQUEST_RATE_PER_MINUTE=300
+API_RATE_PER_MINUTE=1
+CLIENT_API_RATE_PER_MINUTE=1
+CONNECTION_LIMIT=32
+CLIENT_CONNECTION_LIMIT=8
+SMTP_ENABLED=false
+SMTP_TIMEOUT_SECONDS=10
+NOTIFICATION_ACTIVATION_QUEUE_LIMIT=90
+RUNTIME_AUTH_FILE=/run/moon-service/public-authorized
+if [[ "$TEST_MODE" == true ]]; then
+    CONFIG_DIR="${MOON_CONFIG_DIR:-$CONFIG_DIR}"
+    STATE_DIR="${MOON_STATE_DIR:-$STATE_DIR}"
+    READY_URL="${MOON_READY_URL:-$READY_URL}"
+    PUBLIC_PORT="${MOON_PUBLIC_PROXY_PORT:-$PUBLIC_PORT}"
+    PUBLIC_HTTPS_PORT="${MOON_PUBLIC_HTTPS_PORT:-$PUBLIC_HTTPS_PORT}"
+    BREAKER_WINDOW_SECONDS="${MOON_PUBLIC_BREAKER_WINDOW_SECONDS:-$BREAKER_WINDOW_SECONDS}"
+    BREAKER_REJECTIONS="${MOON_PUBLIC_BREAKER_REJECTIONS:-$BREAKER_REJECTIONS}"
+    REQUEST_RATE_PER_MINUTE="${MOON_PUBLIC_REQUEST_RATE_PER_MINUTE:-$REQUEST_RATE_PER_MINUTE}"
+    API_RATE_PER_MINUTE="${MOON_PUBLIC_API_RATE_PER_MINUTE:-$API_RATE_PER_MINUTE}"
+    CLIENT_API_RATE_PER_MINUTE="${MOON_PUBLIC_CLIENT_API_RATE_PER_MINUTE:-$CLIENT_API_RATE_PER_MINUTE}"
+    CONNECTION_LIMIT="${MOON_PUBLIC_CONNECTION_LIMIT:-$CONNECTION_LIMIT}"
+    CLIENT_CONNECTION_LIMIT="${MOON_PUBLIC_CLIENT_CONNECTION_LIMIT:-$CLIENT_CONNECTION_LIMIT}"
+    SMTP_ENABLED="${MOON_PUBLIC_SMTP_ENABLED:-$SMTP_ENABLED}"
+    SMTP_TIMEOUT_SECONDS="${MOON_PUBLIC_SMTP_TIMEOUT_SECONDS:-$SMTP_TIMEOUT_SECONDS}"
+    RUNTIME_AUTH_FILE="${MOON_RUNTIME_AUTH_FILE:-$RUNTIME_AUTH_FILE}"
+fi
+
+if [[ -r "$CONFIG_DIR/host.env" ]]; then
+    # Root-owned, non-secret deployment settings rendered by Ansible.
+    # shellcheck disable=SC1091
+    source "$CONFIG_DIR/host.env"
+    STATE_DIR="${MOON_STATE_DIR:-$STATE_DIR}"
+    READY_URL="${MOON_READY_URL:-$READY_URL}"
+fi
+if [[ -r "$CONFIG_DIR/public-ingress.env" ]]; then
+    # Root-owned public-ingress settings rendered by Ansible.
+    # shellcheck disable=SC1091
+    source "$CONFIG_DIR/public-ingress.env"
+    PUBLIC_PORT="${MOON_PUBLIC_PROXY_PORT:-$PUBLIC_PORT}"
+    PUBLIC_HTTPS_PORT="${MOON_PUBLIC_HTTPS_PORT:-$PUBLIC_HTTPS_PORT}"
+    BREAKER_WINDOW_SECONDS="${MOON_PUBLIC_BREAKER_WINDOW_SECONDS:-$BREAKER_WINDOW_SECONDS}"
+    BREAKER_REJECTIONS="${MOON_PUBLIC_BREAKER_REJECTIONS:-$BREAKER_REJECTIONS}"
+    REQUEST_RATE_PER_MINUTE="${MOON_PUBLIC_REQUEST_RATE_PER_MINUTE:-$REQUEST_RATE_PER_MINUTE}"
+    API_RATE_PER_MINUTE="${MOON_PUBLIC_API_RATE_PER_MINUTE:-$API_RATE_PER_MINUTE}"
+    CLIENT_API_RATE_PER_MINUTE="${MOON_PUBLIC_CLIENT_API_RATE_PER_MINUTE:-$CLIENT_API_RATE_PER_MINUTE}"
+    CONNECTION_LIMIT="${MOON_PUBLIC_CONNECTION_LIMIT:-$CONNECTION_LIMIT}"
+    CLIENT_CONNECTION_LIMIT="${MOON_PUBLIC_CLIENT_CONNECTION_LIMIT:-$CLIENT_CONNECTION_LIMIT}"
+    SMTP_ENABLED="${MOON_PUBLIC_SMTP_ENABLED:-$SMTP_ENABLED}"
+    SMTP_TIMEOUT_SECONDS="${MOON_PUBLIC_SMTP_TIMEOUT_SECONDS:-$SMTP_TIMEOUT_SECONDS}"
+fi
+
+SYSTEMCTL_BIN=systemctl
+TAILSCALE_BIN=tailscale
+CURL_BIN=curl
+JQ_BIN=jq
+NGINX_BIN=nginx
+JOURNALCTL_BIN=journalctl
+NOTIFY_BIN=/usr/local/sbin/moon-service-public-notify
+FIREWALL_BIN=/usr/local/sbin/moon-service-docker-firewall
+FIREWALL_SERVICE=moon-service-docker-firewall.service
+TIMEOUT_BIN=timeout
+DATE_BIN=date
+SLEEP_BIN=sleep
+SHA256SUM_BIN=sha256sum
+if [[ "$TEST_MODE" == true ]]; then
+    SYSTEMCTL_BIN="${MOON_SYSTEMCTL_BIN:-$SYSTEMCTL_BIN}"
+    TAILSCALE_BIN="${MOON_TAILSCALE_BIN:-$TAILSCALE_BIN}"
+    CURL_BIN="${MOON_CURL_BIN:-$CURL_BIN}"
+    JQ_BIN="${MOON_JQ_BIN:-$JQ_BIN}"
+    NGINX_BIN="${MOON_NGINX_BIN:-$NGINX_BIN}"
+    JOURNALCTL_BIN="${MOON_JOURNALCTL_BIN:-$JOURNALCTL_BIN}"
+    NOTIFY_BIN="${MOON_PUBLIC_NOTIFY_BIN:-$NOTIFY_BIN}"
+    FIREWALL_BIN="${MOON_PUBLIC_FIREWALL_BIN:-$FIREWALL_BIN}"
+    TIMEOUT_BIN="${MOON_TIMEOUT_BIN:-$TIMEOUT_BIN}"
+    DATE_BIN="${MOON_DATE_BIN:-$DATE_BIN}"
+    SLEEP_BIN="${MOON_SLEEP_BIN:-$SLEEP_BIN}"
+    SHA256SUM_BIN="${MOON_SHA256SUM_BIN:-$SHA256SUM_BIN}"
+fi
+
+[[ "$PUBLIC_PORT" =~ ^[0-9]+$ ]] || exit 65
+[[ "$PUBLIC_HTTPS_PORT" =~ ^(443|8443|10000)$ ]] || exit 65
+[[ "$BREAKER_WINDOW_SECONDS" =~ ^[0-9]+$ ]] || exit 65
+[[ "$BREAKER_REJECTIONS" =~ ^[0-9]+$ ]] || exit 65
+[[ "$REQUEST_RATE_PER_MINUTE" =~ ^[0-9]+$ ]] || exit 65
+[[ "$API_RATE_PER_MINUTE" =~ ^[0-9]+$ ]] || exit 65
+[[ "$CLIENT_API_RATE_PER_MINUTE" =~ ^[0-9]+$ ]] || exit 65
+[[ "$CONNECTION_LIMIT" =~ ^[0-9]+$ ]] || exit 65
+[[ "$CLIENT_CONNECTION_LIMIT" =~ ^[0-9]+$ ]] || exit 65
+[[ "$SMTP_TIMEOUT_SECONDS" =~ ^[0-9]+$ ]] || exit 65
+(( PUBLIC_PORT >= 1024 && PUBLIC_PORT <= 65535 )) || exit 65
+(( BREAKER_WINDOW_SECONDS >= 10 && BREAKER_WINDOW_SECONDS <= 600 )) || exit 65
+(( BREAKER_REJECTIONS >= 1 && BREAKER_REJECTIONS <= 100000 )) || exit 65
+(( SMTP_TIMEOUT_SECONDS >= 1 && SMTP_TIMEOUT_SECONDS <= 30 )) || exit 65
+[[ "$SMTP_ENABLED" == true || "$SMTP_ENABLED" == false ]] || exit 65
+
+ENABLED_MARKER="$STATE_DIR/public-ingress-enabled"
+NOTIFICATION_TEST_MARKER="$STATE_DIR/public-notification-tested"
+STATE_FILE="$STATE_DIR/public-ingress-last.env"
+RUNTIME_DIR="${RUNTIME_AUTH_FILE%/*}"
+LOCK_FILE="$RUNTIME_DIR/public-ingress.lock"
+FUNNEL_SERVICE=moon-service-funnel.service
+WATCHDOG_TIMER=moon-service-public-watchdog.timer
+NOTIFY_TIMER=moon-service-public-notify.timer
+LIMIT_LOG_TAG=moon-service-public-limit
+
+log() {
+    printf '%s moon-service-public: %s\n' "$("$DATE_BIN" -u +%Y-%m-%dT%H:%M:%SZ)" "$*"
+}
+
+prepare_persistent_state() {
+    if ! mkdir -p "$STATE_DIR" || ! chmod 0700 "$STATE_DIR"; then
+        log "persistent public state is not writable"
+        return 1
+    fi
+}
+
+smtp_configuration_fingerprint() {
+    printf '%s\0%s\0%s\0%s\0%s\0%s\0%s\0' \
+        "$SMTP_ENABLED" \
+        "${MOON_PUBLIC_SMTP_ALLOW_PLAINTEXT:-false}" \
+        "${MOON_PUBLIC_SMTP_HOST:-}" \
+        "${MOON_PUBLIC_SMTP_PORT:-}" \
+        "${MOON_PUBLIC_SMTP_SENDER:-}" \
+        "${MOON_PUBLIC_SMTP_RECIPIENT:-}" \
+        "$SMTP_TIMEOUT_SECONDS" \
+        | "$SHA256SUM_BIN" \
+        | awk '{ print $1 }'
+}
+
+notification_test_is_current() {
+    local expected recorded
+    [[ -r "$NOTIFICATION_TEST_MARKER" ]] || return 1
+    expected="$(smtp_configuration_fingerprint)"
+    recorded="$(awk -F= '$1 == "CONFIG_SHA256" { print $2; exit }' "$NOTIFICATION_TEST_MARKER")"
+    [[ "$expected" =~ ^[0-9a-f]{64}$ && "$recorded" == "$expected" ]]
+}
+
+record_notification_test() {
+    local temporary
+    temporary="$(mktemp "$STATE_DIR/.notification-tested.XXXXXX")" || return 1
+    if ! {
+        printf 'CONFIG_SHA256=%s\n' "$(smtp_configuration_fingerprint)"
+        printf 'AT=%s\n' "$("$DATE_BIN" -u +%Y-%m-%dT%H:%M:%SZ)"
+    } >"$temporary" \
+        || ! chmod 0600 "$temporary" \
+        || ! mv -f "$temporary" "$NOTIFICATION_TEST_MARKER"; then
+        rm -f "$temporary"
+        return 1
+    fi
+}
+
+perform_notification_test() {
+    [[ "$SMTP_ENABLED" == true ]] || {
+        log "operator SMTP notification is not configured"
+        return 78
+    }
+    if ! MOON_CONFIG_DIR="$CONFIG_DIR" MOON_STATE_DIR="$STATE_DIR" \
+        "$TIMEOUT_BIN" --signal=TERM --kill-after=2s \
+        "$((SMTP_TIMEOUT_SECONDS + 5))s" \
+        "$NOTIFY_BIN" test; then
+        log "operator notification test failed; public ingress remains off"
+        return 75
+    fi
+    if ! record_notification_test; then
+        log "relay test succeeded, but its audit marker could not be persisted"
+        return 1
+    fi
+    log "operator notification test was accepted by the configured relay"
+}
+
+notification_queue_is_ready() {
+    local pending
+    pending="$(
+        MOON_CONFIG_DIR="$CONFIG_DIR" MOON_STATE_DIR="$STATE_DIR" \
+            "$NOTIFY_BIN" pending 2>/dev/null
+    )" || return 1
+    [[ "$pending" =~ ^[0-9]+$ ]] || return 1
+    (( pending < NOTIFICATION_ACTIVATION_QUEUE_LIMIT ))
+}
+
+record_runtime_authorization() {
+    local temporary
+    mkdir -p "$RUNTIME_DIR" || return 1
+    chmod 0700 "$RUNTIME_DIR" || return 1
+    temporary="$(mktemp "${RUNTIME_AUTH_FILE}.XXXXXX")" || return 1
+    if ! printf 'authorized_at=%s\n' "$("$DATE_BIN" -u +%Y-%m-%dT%H:%M:%SZ)" >"$temporary" \
+        || ! chmod 0600 "$temporary" \
+        || ! mv -f "$temporary" "$RUNTIME_AUTH_FILE"; then
+        rm -f "$temporary"
+        return 1
+    fi
+}
+
+record_enabled_marker() {
+    local temporary
+    temporary="$(mktemp "$STATE_DIR/.public-enabled.XXXXXX")" || return 1
+    if ! printf 'enabled_at=%s\n' "$("$DATE_BIN" -u +%Y-%m-%dT%H:%M:%SZ)" >"$temporary" \
+        || ! chmod 0600 "$temporary" \
+        || ! mv -f "$temporary" "$ENABLED_MARKER"; then
+        rm -f "$temporary"
+        return 1
+    fi
+}
+
+write_state() {
+    local state="$1"
+    local reason="$2"
+    local rejected="${3:-0}"
+    local temporary
+    temporary="$(mktemp "$STATE_DIR/.public-state.XXXXXX")" || return 1
+    if ! {
+        printf 'STATE=%s\n' "$state"
+        printf 'REASON=%s\n' "$reason"
+        printf 'AT=%s\n' "$("$DATE_BIN" -u +%Y-%m-%dT%H:%M:%SZ)"
+        printf 'REJECTED_REQUESTS=%s\n' "$rejected"
+    } >"$temporary" \
+        || ! chmod 0600 "$temporary" \
+        || ! mv -f "$temporary" "$STATE_FILE"; then
+        rm -f "$temporary"
+        return 1
+    fi
+}
+
+service_state() {
+    "$SYSTEMCTL_BIN" is-active "$1" 2>/dev/null || true
+}
+
+service_enabled_state() {
+    "$SYSTEMCTL_BIN" is-enabled "$1" 2>/dev/null || true
+}
+
+funnel_status() {
+    "$TIMEOUT_BIN" --signal=TERM --kill-after=2s 8s \
+        "$TAILSCALE_BIN" funnel status --json
+}
+
+funnel_is_off() {
+    local status
+    if [[ "$(service_state tailscaled.service)" != active ]]; then
+        case "$(service_enabled_state tailscaled.service)" in
+            disabled|masked|not-found) return 0 ;;
+            *) return 1 ;;
+        esac
+    fi
+    status="$(funnel_status 2>/dev/null)" || return 1
+    # Tailscale 1.98.8 reports the dedicated node's exact no-config state as
+    # `{}`. Treat any other schema as unknown, not as proof that exposure is off.
+    "$JQ_BIN" -e '. == {}' <<<"$status" >/dev/null
+}
+
+funnel_is_on() {
+    local status
+    status="$(funnel_status 2>/dev/null)" || return 1
+    "$JQ_BIN" -e \
+        --arg target "127.0.0.1:$PUBLIC_PORT" \
+        --arg port "$PUBLIC_HTTPS_PORT" '
+        def enabled_funnels: [
+            recurse(.Foreground[]? // empty)
+            | (.AllowFunnel? // {})
+            | to_entries[]?
+            | select(.value == true)
+        ];
+        type == "object"
+        and (.Foreground | type == "object")
+        and (enabled_funnels | length == 1)
+        and ([
+            .Foreground[]?
+            | (.TCP[$port]? // null) as $handler
+            | select(
+                ($handler | type == "object")
+                and $handler.TCPForward == $target
+                and $handler.ProxyProtocol == 2
+                and ($handler.TerminateTLS | type == "string" and length > 0)
+                and (.AllowFunnel[($handler.TerminateTLS + ":" + $port)] == true)
+            )
+        ] | length == 1)
+    ' <<<"$status" >/dev/null
+}
+
+funnel_has_any_exposure() {
+    local status
+    [[ "$(service_state tailscaled.service)" == active ]] || return 1
+    status="$(funnel_status 2>/dev/null)" || return 1
+    "$JQ_BIN" -e '
+        type == "object"
+        and ([
+            recurse(.Foreground[]? // empty)
+            | (.AllowFunnel? // {})
+            | to_entries[]?
+            | select(.value == true)
+        ] | length > 0)
+    ' <<<"$status" >/dev/null
+}
+
+ready_url_is_healthy() {
+    local response
+    response="$(
+        "$CURL_BIN" --fail --silent --show-error --noproxy '*' \
+            --connect-timeout 2 --max-time 5 "$READY_URL" 2>/dev/null
+    )" || return 1
+    "$JQ_BIN" -e '
+        .status == "ok"
+        and (.revision | type == "string" and test("^[0-9a-f]{40}$"))
+    ' <<<"$response" >/dev/null
+}
+
+proxy_is_healthy() {
+    local response
+    response="$(
+        "$CURL_BIN" --haproxy-protocol --fail --silent --show-error --noproxy '*' \
+            --connect-timeout 2 --max-time 5 \
+            "http://127.0.0.1:$PUBLIC_PORT/readyz" 2>/dev/null
+    )" || return 1
+    "$JQ_BIN" -e '
+        .status == "ok"
+        and (.revision | type == "string" and test("^[0-9a-f]{40}$"))
+    ' <<<"$response" >/dev/null
+}
+
+edge_proxy_is_responsive() {
+    local response_code
+    response_code="$(
+        "$CURL_BIN" --haproxy-protocol --silent --show-error --noproxy '*' \
+            --connect-timeout 2 --max-time 5 --output /dev/null \
+            --write-out '%{http_code}' \
+            "http://127.0.0.1:$PUBLIC_PORT/__moon_edge_probe" 2>/dev/null
+    )" || return 1
+    [[ "$response_code" == 404 ]]
+}
+
+tailscale_is_online() {
+    local status
+    status="$(
+        "$TIMEOUT_BIN" --signal=TERM --kill-after=2s 8s \
+            "$TAILSCALE_BIN" status --json 2>/dev/null
+    )" || return 1
+    "$JQ_BIN" -e '
+        .BackendState == "Running"
+        and .Self.Online == true
+        and (.Self.DNSName | type == "string" and length > 0)
+    ' <<<"$status" >/dev/null
+}
+
+enqueue_notification() {
+    local event="$1"
+    local reason="$2"
+    local rejected="${3:-0}"
+    [[ "$SMTP_ENABLED" == true ]] || return 0
+    if ! MOON_CONFIG_DIR="$CONFIG_DIR" MOON_STATE_DIR="$STATE_DIR" \
+        "$TIMEOUT_BIN" --signal=TERM --kill-after=2s \
+        "$((SMTP_TIMEOUT_SECONDS + 5))s" \
+        "$NOTIFY_BIN" enqueue "$event" "$reason" "$rejected"; then
+        log "notification enqueue or delivery failed; inspect the retry queue"
+    fi
+}
+
+acquire_lock() {
+    if ! mkdir -p "$RUNTIME_DIR" || ! chmod 0700 "$RUNTIME_DIR"; then
+        log "could not prepare the volatile public-ingress lock directory"
+        exit 75
+    fi
+    exec 9>"$LOCK_FILE"
+    if [[ "$MODE" == check ]]; then
+        if ! flock -n 9; then
+            log "an authorized public control transaction is in progress; watchdog check deferred"
+            exit 0
+        fi
+    elif ! flock -w 15 9; then
+        log "could not acquire the public-ingress lock"
+        exit 75
+    fi
+}
+
+disable_funnel() {
+    local reason="$1"
+    local rejected="${2:-0}"
+    local transitioned="${3:-false}"
+    local state_failure=false
+    local shutdown_failure=false
+
+    if [[ -e "$RUNTIME_AUTH_FILE" ]] \
+        || [[ -e "$ENABLED_MARKER" ]] \
+        || [[ "$(service_state "$FUNNEL_SERVICE")" == active ]] \
+        || [[ "$(service_enabled_state "$FUNNEL_SERVICE")" == enabled ]] \
+        || funnel_has_any_exposure; then
+        transitioned=true
+    fi
+
+    # Volatile authorization is the reboot-safe latch. Remove it before any
+    # network or persistent-state operation; /run is cleared by reboot even if
+    # the root filesystem has become read-only.
+    if ! rm -f "$RUNTIME_AUTH_FILE"; then
+        log "volatile public authorization could not be removed"
+        state_failure=true
+    fi
+    # Stop the loopback HTTP endpoint first. Removing a foreground ServeConfig
+    # prevents new ingress, but already-accepted TCP flows are independent and
+    # could otherwise reuse an HTTP keepalive connection briefly.
+    "$SYSTEMCTL_BIN" stop nginx.service >/dev/null 2>&1 || true
+    "$SYSTEMCTL_BIN" disable --now "$FUNNEL_SERVICE" >/dev/null 2>&1 || true
+
+    if ! funnel_is_off; then
+        log "exact Funnel removal could not be verified; resetting this dedicated node's Funnel configuration"
+        "$TIMEOUT_BIN" --signal=TERM --kill-after=2s 8s \
+            "$TAILSCALE_BIN" funnel reset >/dev/null 2>&1 || true
+    fi
+    if ! funnel_is_off; then
+        log "Funnel reset could not be verified; disabling tailscaled fail closed"
+        "$SYSTEMCTL_BIN" disable --now tailscaled.service >/dev/null 2>&1 || true
+    fi
+    if [[ "$(service_state nginx.service)" == active ]]; then
+        log "nginx could not be stopped; disabling tailscaled to close accepted ingress flows"
+        "$SYSTEMCTL_BIN" disable --now tailscaled.service >/dev/null 2>&1 || true
+    fi
+    if [[ "$(service_state nginx.service)" == active ]] \
+        && [[ "$(service_state tailscaled.service)" == active ]]; then
+        log "accepted public connections could not be proven closed"
+        shutdown_failure=true
+    fi
+    if ! funnel_is_off; then
+        log "public ingress could not be proven off"
+        shutdown_failure=true
+    fi
+
+    # Persistent bookkeeping happens only after the transport path is closed or
+    # all fail-closed shutdown attempts have run. A slow or read-only SD card
+    # must never delay the actual kill switch.
+    if ! rm -f "$ENABLED_MARKER"; then
+        log "durable public marker could not be removed"
+        state_failure=true
+    fi
+    if ! write_state disabled "$reason" "$rejected"; then
+        log "disabled transition state could not be recorded"
+        state_failure=true
+    fi
+
+    if ! ready_url_is_healthy; then
+        log "public ingress is off, but LAN readiness is unhealthy"
+    fi
+    if [[ "$shutdown_failure" == true ]]; then
+        enqueue_notification circuit_open shutdown_unverified "$rejected"
+    elif [[ "$transitioned" == true ]]; then
+        if [[ "$reason" == rate_limit || "$reason" == watchdog_failure ]]; then
+            enqueue_notification circuit_open "$reason" "$rejected"
+        else
+            enqueue_notification public_disabled "$reason" "$rejected"
+        fi
+    fi
+    if [[ "$shutdown_failure" == true ]]; then
+        log "public ingress shutdown could not be proven; emergency fallback is required"
+        return 1
+    fi
+    log "public ingress is disabled and latched off"
+    if [[ "$state_failure" == true ]]; then
+        log "network shutdown succeeded, but public state persistence needs repair"
+        return 1
+    fi
+}
+
+ACTIVATION_PENDING=false
+
+rollback_pending_activation() {
+    local status=$?
+    trap - EXIT HUP INT TERM
+    if [[ "$ACTIVATION_PENDING" == true ]]; then
+        ACTIVATION_PENDING=false
+        set +e
+        log "rolling back an incomplete public activation"
+        disable_funnel activation_failed 0 true
+    fi
+    (( status != 0 )) || status=1
+    exit "$status"
+}
+
+enable_funnel() {
+    prepare_persistent_state || return 1
+    [[ "$SMTP_ENABLED" == true ]] || {
+        log "refusing public ingress without configured operator SMTP notification"
+        return 78
+    }
+    [[ "$(service_state "$FIREWALL_SERVICE")" == active ]] || {
+        log "refusing public ingress while the container SMTP firewall service is inactive"
+        return 69
+    }
+    # Test the real IP-authorized relay on every activation. A persistent marker
+    # alone cannot prove that the current WAN source IP is still authorized.
+    perform_notification_test || return $?
+    notification_queue_is_ready || {
+        log "operator notification queue is unavailable or lacks reserved incident capacity"
+        return 75
+    }
+    if ! "$FIREWALL_BIN"; then
+        log "container SMTP firewall verification failed"
+        return 69
+    fi
+    "$NGINX_BIN" -t >/dev/null
+
+    if ! rm -f "$RUNTIME_AUTH_FILE" "$ENABLED_MARKER"; then
+        log "stale public authorization state could not be cleared"
+        return 1
+    fi
+
+    # From this point forward every service/state mutation is transactional.
+    # In particular, verify the node has no existing Funnel route before
+    # starting nginx, so a stale route cannot regain a live upstream briefly.
+    ACTIVATION_PENDING=true
+    trap rollback_pending_activation EXIT HUP INT TERM
+    "$SYSTEMCTL_BIN" enable --now tailscaled.service
+    tailscale_is_online || {
+        log "Tailscale is not enrolled and online"
+        return 69
+    }
+    if ! funnel_is_off; then
+        log "refusing activation while an existing Funnel route is present or unverifiable"
+        return 1
+    fi
+    "$SYSTEMCTL_BIN" start nginx.service
+    ready_url_is_healthy || {
+        log "LAN application readiness failed"
+        return 69
+    }
+    proxy_is_healthy || {
+        log "loopback public proxy readiness failed"
+        return 69
+    }
+    record_runtime_authorization
+
+    if ! "$SYSTEMCTL_BIN" enable --now "$FUNNEL_SERVICE"; then
+        return 1
+    fi
+
+    local attempt
+    for attempt in 1 2 3 4 5 6 7 8 9 10; do
+        if funnel_is_on; then
+            break
+        fi
+        "$SLEEP_BIN" 1
+    done
+
+    if ! funnel_is_on; then
+        log "Funnel did not expose the exact loopback target"
+        return 1
+    fi
+    if ! write_state enabled operator 0; then
+        log "enabled transition state could not be recorded"
+        return 1
+    fi
+    if ! "$SYSTEMCTL_BIN" enable --now "$WATCHDOG_TIMER" "$NOTIFY_TIMER" >/dev/null; then
+        log "public control timers could not be enabled"
+        return 1
+    fi
+    if ! funnel_is_on; then
+        log "Funnel changed before activation could be committed"
+        return 1
+    fi
+    if [[ "$(service_state "$FIREWALL_SERVICE")" != active ]] || ! "$FIREWALL_BIN"; then
+        log "container SMTP firewall changed before activation could be committed"
+        return 1
+    fi
+    record_enabled_marker
+    trap - EXIT HUP INT TERM
+    ACTIVATION_PENDING=false
+    enqueue_notification public_enabled operator 0
+    log "public ingress is enabled"
+}
+
+breaker_check() {
+    if [[ ! -e "$ENABLED_MARKER" ]]; then
+        local funnel_service_state funnel_service_enabled_state
+        funnel_service_state="$(service_state "$FUNNEL_SERVICE")"
+        funnel_service_enabled_state="$(service_enabled_state "$FUNNEL_SERVICE")"
+        if [[ -e "$RUNTIME_AUTH_FILE" ]] \
+            || [[ "$funnel_service_state" != inactive ]] \
+            || [[ "$funnel_service_enabled_state" != disabled ]]; then
+            log "public authorization or a non-inactive Funnel service exists without the durable enabled marker"
+            disable_funnel watchdog_failure 0 true
+            return $?
+        fi
+        if funnel_is_off; then
+            return 0
+        fi
+        if funnel_status >/dev/null 2>&1; then
+            log "Funnel status is nonempty or unrecognized without the durable enabled marker"
+            disable_funnel watchdog_failure 0 true
+            return $?
+        fi
+        log "Funnel status cannot be verified without the durable enabled marker"
+        disable_funnel watchdog_failure 0 true
+        return $?
+    fi
+    if [[ ! -e "$RUNTIME_AUTH_FILE" ]] \
+        || [[ "$(service_state "$FUNNEL_SERVICE")" != active ]] \
+        || ! funnel_is_on \
+        || ! edge_proxy_is_responsive \
+        || [[ "$SMTP_ENABLED" != true ]] \
+        || ! notification_test_is_current \
+        || [[ "$(service_state "$NOTIFY_TIMER")" != active ]] \
+        || [[ "$(service_state "$WATCHDOG_TIMER")" != active ]] \
+        || [[ "$(service_state "$FIREWALL_SERVICE")" != active ]]; then
+        log "enabled marker disagrees with the active Funnel route"
+        disable_funnel watchdog_failure 0
+        return $?
+    fi
+    if ! "$FIREWALL_BIN"; then
+        log "container SMTP firewall verification failed"
+        disable_funnel watchdog_failure 0
+        return $?
+    fi
+
+    local enabled_at enabled_epoch now_epoch since_epoch window_epoch rejected
+    enabled_at="$(awk -F= '$1 == "enabled_at" { print $2; exit }' "$ENABLED_MARKER")"
+    [[ "$enabled_at" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$ ]] || {
+        disable_funnel watchdog_failure 0
+        return $?
+    }
+    enabled_epoch="$("$DATE_BIN" -u -d "$enabled_at" +%s 2>/dev/null)" || {
+        disable_funnel watchdog_failure 0
+        return $?
+    }
+    now_epoch="$("$DATE_BIN" -u +%s)"
+    window_epoch=$((now_epoch - BREAKER_WINDOW_SECONDS))
+    since_epoch="$window_epoch"
+    if (( enabled_epoch > window_epoch )); then
+        since_epoch="$enabled_epoch"
+    fi
+    if ! rejected="$(
+        "$JOURNALCTL_BIN" --quiet --no-pager --output=cat \
+            --identifier="$LIMIT_LOG_TAG" \
+            --since="@$since_epoch" 2>/dev/null \
+            | awk '$0 == "rate-limited" { count++ } END { print count + 0 }'
+    )"; then
+        log "could not read the limiter event journal"
+        disable_funnel watchdog_failure 0
+        return $?
+    fi
+    [[ "$rejected" =~ ^[0-9]+$ ]] || {
+        disable_funnel watchdog_failure 0
+        return $?
+    }
+    if (( rejected >= BREAKER_REJECTIONS )); then
+        log "circuit breaker tripped after $rejected limiter rejections"
+        disable_funnel rate_limit "$rejected"
+    fi
+}
+
+show_status() {
+    local route_state=unknown
+    if funnel_is_off; then
+        route_state=inactive
+    elif funnel_is_on; then
+        route_state=active
+    fi
+    printf 'public marker: %s\n' "$([[ -e "$ENABLED_MARKER" ]] && printf enabled || printf disabled)"
+    printf 'runtime authorization: %s\n' \
+        "$([[ -e "$RUNTIME_AUTH_FILE" ]] && printf present || printf absent)"
+    printf 'funnel route: %s\n' "$route_state"
+    printf 'funnel service: %s (%s)\n' \
+        "$(service_state "$FUNNEL_SERVICE")" "$(service_enabled_state "$FUNNEL_SERVICE")"
+    printf 'nginx: %s\n' "$(service_state nginx.service)"
+    printf 'watchdog timer: %s\n' "$(service_state "$WATCHDOG_TIMER")"
+    printf 'notification retry timer: %s\n' "$(service_state "$NOTIFY_TIMER")"
+    printf 'request limits: global=%s/min api=%s/min client-api=%s/min\n' \
+        "$REQUEST_RATE_PER_MINUTE" "$API_RATE_PER_MINUTE" "$CLIENT_API_RATE_PER_MINUTE"
+    printf 'connection limits: global=%s client=%s\n' \
+        "$CONNECTION_LIMIT" "$CLIENT_CONNECTION_LIMIT"
+    printf 'breaker: %s rejections in %ss\n' "$BREAKER_REJECTIONS" "$BREAKER_WINDOW_SECONDS"
+    printf 'pending notifications: '
+    MOON_CONFIG_DIR="$CONFIG_DIR" MOON_STATE_DIR="$STATE_DIR" \
+        "$NOTIFY_BIN" pending 2>/dev/null || printf 'unknown\n'
+    printf 'notification preflight: %s\n' \
+        "$(notification_test_is_current && printf current || printf required)"
+    printf 'last transition:\n'
+    if [[ -r "$STATE_FILE" ]]; then
+        sed 's/^/  /' "$STATE_FILE"
+    else
+        printf '  none\n'
+    fi
+}
+
+case "$MODE" in
+    status)
+        show_status
+        ;;
+    on)
+        acquire_lock
+        if [[ -e "$ENABLED_MARKER" ]] \
+            && [[ -e "$RUNTIME_AUTH_FILE" ]] \
+            && [[ "$(service_state "$FUNNEL_SERVICE")" == active ]] \
+            && funnel_is_on \
+            && edge_proxy_is_responsive \
+            && [[ "$SMTP_ENABLED" == true ]] \
+            && notification_test_is_current \
+            && [[ "$(service_state "$NOTIFY_TIMER")" == active ]] \
+            && [[ "$(service_state "$WATCHDOG_TIMER")" == active ]] \
+            && [[ "$(service_state "$FIREWALL_SERVICE")" == active ]] \
+            && "$FIREWALL_BIN"; then
+            log "public ingress is already enabled"
+            exit 0
+        fi
+        if [[ "$(service_state "$FUNNEL_SERVICE")" == active ]] || ! funnel_is_off; then
+            log "refusing to reuse an existing Funnel route or unverifiable Funnel state"
+            disable_funnel activation_unverified 0 true
+            exit 1
+        fi
+        enable_funnel
+        ;;
+    off)
+        acquire_lock
+        disable_funnel operator 0
+        ;;
+    check)
+        acquire_lock
+        breaker_check
+        ;;
+    notify-test)
+        acquire_lock
+        prepare_persistent_state
+        perform_notification_test
+        ;;
+esac

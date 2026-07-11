@@ -61,7 +61,8 @@
           <h2 id="privacy-title">Privacy and caveats</h2>
           <ul>
             <li>No account, cookies, email, or server-side user profile is required.</li>
-            <li>Searches are sent to the backend for geocoding, weather, Moon geometry, and scoring.</li>
+            <li>The backend sends the location text you submit to Open-Meteo for lookup. For weather forecasts, it sends the resolved location's coordinates rounded to four decimal places.</li>
+            <li>Open-Meteo says free-API logs may contain sensitive geographic request information and are deleted after 90 days. See its <a href="https://open-meteo.com/en/terms">Terms &amp; Privacy</a>.</li>
             <li>Local hills, buildings, trees, and exact horizon obstructions are not modelled.</li>
           </ul>
         </section>
@@ -79,6 +80,16 @@
             <span class="tooltip" title="Result pages can be opened again or sent to someone else." data-tooltip="Result pages can be opened again or sent to someone else.">Share link</span>
           </div>
         </div>
+        <p class="data-attribution">
+          <strong>Data sources:</strong>
+          Weather data comes from <a href="https://open-meteo.com/">Open-Meteo</a>
+          (<a href="https://creativecommons.org/licenses/by/4.0/" rel="license">CC BY 4.0</a>).
+          Location data comes from Open-Meteo Geocoding, is based on
+          <a href="https://www.geonames.org/">GeoNames</a>, and is treated as
+          <a href="https://creativecommons.org/licenses/by-nc/4.0/" rel="license">CC BY-NC 4.0</a>
+          for this noncommercial alpha.
+          Moon Service adapts and aggregates these data and applies its own scoring.
+        </p>
         <div id="results" class="results-region" aria-live="polite" aria-busy="false"></div>
       </section>
     </div>

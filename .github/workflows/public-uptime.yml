@@ -1,0 +1,81 @@
+name: Check public uptime
+
+on:
+  schedule:
+    - cron: '*/15 * * * *'
+  workflow_dispatch:
+
+permissions: {}
+
+concurrency:
+  group: moon-service-public-uptime
+  cancel-in-progress: true
+
+jobs:
+  readiness:
+    name: Public readiness
+    if: ${{ vars.MOON_PUBLIC_BASE_URL != '' }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    env:
+      PUBLIC_BASE_URL: ${{ vars.MOON_PUBLIC_BASE_URL }}
+    steps:
+      - name: Check public readiness
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          if [[ -z "${PUBLIC_BASE_URL//[[:space:]]/}" ]]; then
+            echo "::error title=Missing uptime configuration::Set the MOON_PUBLIC_BASE_URL repository variable to the public HTTPS base URL."
+            exit 1
+          fi
+
+          if [[ ! "$PUBLIC_BASE_URL" =~ ^https://[^/?#[:space:]]+/?$ ]] \
+              || [[ "$PUBLIC_BASE_URL" == *"@"* ]]; then
+            echo "::error title=Invalid uptime configuration::MOON_PUBLIC_BASE_URL must be an HTTPS origin without credentials, a path, query parameters, or a fragment."
+            exit 1
+          fi
+
+          ready_url="${PUBLIC_BASE_URL%/}/readyz"
+          response_file="$(mktemp)"
+          trap 'rm -f "$response_file"' EXIT
+
+          max_attempts=3
+          for ((attempt = 1; attempt <= max_attempts; attempt++)); do
+            : >"$response_file"
+            http_code=""
+            if http_code="$(curl \
+                --silent \
+                --show-error \
+                --request GET \
+                --header 'Accept: application/json' \
+                --user-agent 'moon-service-public-uptime/1.0' \
+                --proto '=https' \
+                --connect-timeout 5 \
+                --max-time 10 \
+                --max-filesize 4096 \
+                --output "$response_file" \
+                --write-out '%{http_code}' \
+                "$ready_url")"; then
+              if [[ "$http_code" == "200" ]] \
+                  && jq --exit-status \
+                    '.status == "ok" and (.revision | test("^[0-9a-f]{40}$"))' \
+                    "$response_file" >/dev/null 2>&1; then
+                revision="$(jq --raw-output '.revision' "$response_file")"
+                echo "Public readiness check passed for revision $revision."
+                exit 0
+              fi
+
+              echo "::warning title=Public readiness attempt failed::Attempt $attempt of $max_attempts returned HTTP ${http_code:-unknown} or an invalid readiness payload."
+            else
+              curl_status=$?
+              echo "::warning title=Public readiness attempt failed::Attempt $attempt of $max_attempts could not complete (curl exit $curl_status)."
+            fi
+
+            if ((attempt < max_attempts)); then
+              sleep "$((attempt * 5))"
+            fi
+          done
+
+          echo "::error title=Public readiness check failed::The public /readyz endpoint did not return HTTP 200 with status=ok and a 40-hex revision after $max_attempts bounded attempts."
+          exit 1

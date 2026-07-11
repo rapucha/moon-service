@@ -1,11 +1,14 @@
 # MVP Roadmap
 
-Current status: Phase 3, the MVP app loop. The anonymous web lookup, live
-geocoding and weather path, natural Moon-window scoring, shareable results, and
-responsive opportunity UI are implemented. The current product focus is to
-show enough ranked candidates for human evaluation, calibrate the provisional
-scoring model with photographers under [#33](https://github.com/rapucha/moon-service/issues/33),
-and then complete public feeds and calendar exports under
+Current execution priority: Phase 4, alpha operations. The anonymous web
+lookup, live geocoding and weather path, natural Moon-window scoring, shareable
+results, responsive UI, physical Raspberry Pi deployment, and fail-closed #97
+public-edge implementation exist. The next milestone is to activate and verify
+that edge physically, finish [#97](https://github.com/rapucha/moon-service/issues/97),
+and close parent infrastructure issue
+[#93](https://github.com/rapucha/moon-service/issues/93). Empirical scoring
+calibration under [#33](https://github.com/rapucha/moon-service/issues/33)
+follows that stabilization; public feeds and calendar exports remain under
 [#16](https://github.com/rapucha/moon-service/issues/16).
 
 ## Phase 0: Planning Baseline
@@ -109,13 +112,16 @@ Exit criteria:
 
 ## Phase 4: Alpha Operations
 
-Status: infrastructure implementation is in progress under
+Status: final public acceptance is in progress under
+[#97](https://github.com/rapucha/moon-service/issues/97), the remaining child of
 [#93](https://github.com/rapucha/moon-service/issues/93). Logging, provider
-quota monitoring, tested multi-architecture image publication, and the
-declarative Docker Compose host boundary are available; physical-Pi validation
-and public exposure remain.
+quota monitoring, tested multi-architecture publication, exact physical-Pi
+deployment confirmation, Docker Compose recovery, visible provider attribution,
+and the fail-closed public edge are implemented. Tailscale enrollment, explicit
+Funnel activation, and public/LAN acceptance checks remain operator actions.
 
-Goal: run a small private alpha.
+Goal: run a small noncommercial tester alpha without making the home host a
+general-purpose public server.
 
 Tasks:
 
@@ -130,6 +136,13 @@ Tasks:
   listener on the operator's trusted home LAN, and use Tailscale Funnel for the
   first tester-facing HTTPS boundary under #97; do not forward a raw router
   port.
+- Send Funnel's PROXY protocol v2 stream only to loopback nginx, where an exact
+  public route allowlist, request/connection bounds, security headers, and
+  forwarded-client-aware limits protect the application and provider quota.
+- Latch Funnel off automatically when limiter rejection volume or public-route
+  state crosses the conservative alpha boundary. Notify the operator through
+  the explicitly accepted plaintext ISP relay, while using an independent
+  public `/readyz` check for off-home outage detection.
 - Keep the 32 GB SD-card host rebuildable with bounded logs/images and no
   durable application data. Document off-host secret and host recovery.
 
@@ -143,13 +156,16 @@ Exit criteria:
 Near-term implementation and decision work is tracked in GitHub issues rather
 than only in this roadmap:
 
+- [#97](https://github.com/rapucha/moon-service/issues/97): activate and verify
+  the hardened Tailscale Funnel tester edge, automated breaker, operator notice,
+  external readiness check, and recovery procedure.
+- [#93](https://github.com/rapucha/moon-service/issues/93): close the tester
+  infrastructure milestone only after #97 public and private acceptance passes.
 - [#33](https://github.com/rapucha/moon-service/issues/33): empirically
-  calibrate scoring with photographer judgments and real observations.
+  calibrate scoring with photographer judgments and real observations after the
+  tester environment is stable.
 - [#16](https://github.com/rapucha/moon-service/issues/16): add public feeds
   and iCalendar exports for real opportunities.
-- [#17](https://github.com/rapucha/moon-service/issues/17): accept Astronomy
-  Engine `2.1.19` from JitPack for the JVM backend alpha under exact pinning,
-  trusted checksum, repository filtering, license, and fallback constraints.
 
 Open supporting follow-ups:
 
@@ -163,6 +179,9 @@ Open supporting follow-ups:
 
 Completed MVP foundations include:
 
+- [#17](https://github.com/rapucha/moon-service/issues/17): accepted Astronomy
+  Engine `2.1.19` for the alpha with exact pinning, trusted checksums, repository
+  filtering, license inclusion, and a documented fallback.
 - [#14](https://github.com/rapucha/moon-service/issues/14): Open-Meteo weather
   integration.
 - [#15](https://github.com/rapucha/moon-service/issues/15): web lookup and
@@ -180,6 +199,10 @@ Completed MVP foundations include:
   observability.
 - [#87](https://github.com/rapucha/moon-service/issues/87): return up to ten
   anonymous ranked candidates while scoring remains uncalibrated.
+- [#95](https://github.com/rapucha/moon-service/issues/95): provision the
+  digest-pinned Raspberry Pi Docker Compose host.
+- [#107](https://github.com/rapucha/moon-service/issues/107): rearm deployment
+  timers reliably and confirm exact physical deployments through GitHub.
 
 ## Deferred Features
 
@@ -198,19 +221,26 @@ Completed MVP foundations include:
 - Landmark alignment and saved compositions.
 - Billing.
 
-## Current Next Product Step
+## Current Next Step
 
 The anonymous web loop now returns up to ten raw ranked candidates while
 preserving explicit caller control on the direct scoring contract. This is a
 discovery safeguard, not a scoring calibration.
 
-The next product step is [#33](https://github.com/rapucha/moon-service/issues/33):
-collect a small, inspectable set of photographer judgments and real observation
-cases, then change scoring only where that evidence supports it. After the core
-recommendations prove useful, complete public feeds and calendar exports under
-[#16](https://github.com/rapucha/moon-service/issues/16). The JitPack dependency
-decision and safeguards required before public deployment are recorded in
-[#17](https://github.com/rapucha/moon-service/issues/17).
+The immediate step is infrastructure acceptance, not scoring change: enroll and
+verify the dedicated Tailscale node, enable the already hardened public edge,
+exercise the breaker and notifications, validate public and LAN paths, finish
+[#97](https://github.com/rapucha/moon-service/issues/97), and then close
+[#93](https://github.com/rapucha/moon-service/issues/93).
+
+After that environment is stable,
+[#33](https://github.com/rapucha/moon-service/issues/33) collects a small,
+inspectable set of photographer judgments and real observation cases and changes
+scoring only where evidence supports it. After the recommendations prove useful,
+complete public feeds and calendar exports under
+[#16](https://github.com/rapucha/moon-service/issues/16). The Astronomy Engine
+dependency decision in [#17](https://github.com/rapucha/moon-service/issues/17)
+is complete and no longer blocks public-alpha acceptance.
 
 ## Implemented Backend And Prototype History
 

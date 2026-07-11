@@ -1,0 +1,11 @@
+[Unit]
+Description=Retry queued Moon Service operator notifications
+
+[Timer]
+OnActiveSec=2min
+OnUnitInactiveSec=5min
+AccuracySec=30s
+Unit=moon-service-public-notify.service
+
+[Install]
+WantedBy=timers.target

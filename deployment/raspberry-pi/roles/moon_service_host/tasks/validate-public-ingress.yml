@@ -1,0 +1,69 @@
+---
+- name: Validate public-ingress limits and notification boundary
+  ansible.builtin.assert:
+    that:
+      - moon_service_public_ingress_port | int >= 1024
+      - moon_service_public_ingress_port | int <= 65535
+      - moon_service_public_ingress_port | int != moon_service_host_port | int
+      - moon_service_public_https_port | int in [443, 8443, 10000]
+      - moon_service_public_request_rate_per_minute | int >= 1
+      - moon_service_public_request_rate_per_minute | int <= 6000
+      - moon_service_public_request_burst | int >= 1
+      - moon_service_public_request_burst | int <= 1000
+      - moon_service_public_api_rate_per_minute | int >= 1
+      - >-
+        moon_service_public_api_rate_per_minute | int
+        <= moon_service_public_request_rate_per_minute | int
+      - moon_service_public_api_burst | int >= 1
+      - >-
+        moon_service_public_api_burst | int
+        <= moon_service_public_request_burst | int
+      - moon_service_public_client_api_rate_per_minute | int >= 1
+      - >-
+        moon_service_public_client_api_rate_per_minute | int
+        <= moon_service_public_api_rate_per_minute | int
+      - moon_service_public_client_api_burst | int >= 1
+      - >-
+        moon_service_public_client_api_burst | int
+        <= moon_service_public_api_burst | int
+      - moon_service_public_connection_limit | int >= 1
+      - moon_service_public_connection_limit | int <= 1024
+      - moon_service_public_client_connection_limit | int >= 1
+      - >-
+        moon_service_public_client_connection_limit | int
+        <= moon_service_public_connection_limit | int
+      - moon_service_public_breaker_window_seconds | int >= 10
+      - moon_service_public_breaker_window_seconds | int <= 600
+      - moon_service_public_breaker_rejections | int >= 1
+      - moon_service_public_breaker_rejections | int <= 100000
+      - moon_service_public_smtp_timeout_seconds | int >= 1
+      - moon_service_public_smtp_timeout_seconds | int <= 30
+      - moon_service_public_smtp_port | int >= 1
+      - moon_service_public_smtp_port | int <= 65535
+      - moon_service_public_smtp_enabled is boolean
+      - moon_service_public_smtp_allow_plaintext is boolean
+      - >-
+        moon_service_public_smtp_enabled
+        or (not moon_service_public_smtp_allow_plaintext
+            and moon_service_public_smtp_host | length == 0
+            and moon_service_public_smtp_sender | length == 0
+            and moon_service_public_smtp_recipient | length == 0)
+      - >-
+        not moon_service_public_smtp_enabled
+        or moon_service_public_smtp_allow_plaintext
+      - >-
+        not moon_service_public_smtp_enabled
+        or moon_service_public_smtp_host
+           is match('^[A-Za-z0-9](?:[A-Za-z0-9.-]{0,251}[A-Za-z0-9])?$')
+      - >-
+        not moon_service_public_smtp_enabled
+        or moon_service_public_smtp_sender
+           is match('^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+$')
+      - >-
+        not moon_service_public_smtp_enabled
+        or moon_service_public_smtp_recipient
+           is match('^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+$')
+    fail_msg: >-
+      Public ingress requires bounded ports/rates/connections. SMTP must remain
+      fully disabled or use a complete host-IP-authorized envelope with an
+      explicit plaintext opt-in; this relay has no AUTH or STARTTLS.

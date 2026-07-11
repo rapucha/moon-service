@@ -96,6 +96,9 @@ jobs:
           bash -n deployment/raspberry-pi/roles/moon_service_host/files/moon-service-deploy
           bash -n deployment/raspberry-pi/roles/moon_service_host/files/moon-service-github-report
           bash -n deployment/raspberry-pi/roles/moon_service_host/files/moon-service-control
+          bash -n deployment/raspberry-pi/roles/moon_service_host/files/moon-service-docker-firewall
+          bash -n deployment/raspberry-pi/roles/moon_service_host/files/moon-service-public
+          bash -n deployment/raspberry-pi/roles/moon_service_host/files/moon-service-public-emergency-off
 
       - name: Install pinned Ansible Core
         run: |
@@ -126,6 +129,14 @@ jobs:
             --inventory localhost, \
             --connection local \
             tests/bind-address.runtime.yml
+
+      - name: Test public-ingress configuration boundary
+        working-directory: deployment/raspberry-pi
+        run: |
+          /tmp/moon-service-ansible/bin/ansible-playbook \
+            --inventory localhost, \
+            --connection local \
+            tests/public-ingress.runtime.yml
 
       - name: Validate rendered Compose definition
         run: |

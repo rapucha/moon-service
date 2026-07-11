@@ -10,6 +10,17 @@
       This role supports Raspberry Pi OS Lite 64-bit based on Debian 13
       (Trixie) on ARM64 only.
 
+- name: Inspect the installed public-ingress control before any host mutation
+  ansible.builtin.stat:
+    path: /usr/local/sbin/moon-service-public
+  register: _moon_service_early_public_control
+
+- name: Enter the fail-closed public maintenance window before any host mutation
+  ansible.builtin.include_tasks: public-ingress-latch-off.yml
+  when:
+    - _moon_service_early_public_control.stat.exists
+    - not ansible_check_mode
+
 - name: Validate required local inventory variables
   ansible.builtin.assert:
     that:
@@ -44,6 +55,9 @@
   vars:
     _moon_service_primary_ipv4_address: >-
       {{ (ansible_facts.default_ipv4 | default({})).address | default('') }}
+
+- name: Validate the public-ingress boundary
+  ansible.builtin.include_tasks: validate-public-ingress.yml
 
 - name: Record whether GitHub deployment reporting is configured
   ansible.builtin.set_fact:
@@ -469,6 +483,9 @@
     group: root
     mode: "0644"
 
+- name: Install the fail-closed public-ingress boundary
+  ansible.builtin.include_tasks: public-ingress-install.yml
+
 - name: Install deployment command
   ansible.builtin.copy:
     src: moon-service-deploy
@@ -696,6 +713,9 @@
   loop:
     - docker.service
     - tailscaled.service
+
+- name: Activate local public-ingress protections without enabling Funnel
+  ansible.builtin.include_tasks: public-ingress-enable.yml
 
 - name: Verify Docker detected memory-limit support
   ansible.builtin.command:

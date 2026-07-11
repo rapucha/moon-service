@@ -1,0 +1,13 @@
+---
+- name: Latch public ingress off through the validated control path
+  block:
+    - name: Disable public ingress through the normal control
+      ansible.builtin.command:
+        argv:
+          - /usr/local/sbin/moon-service-public
+          - off
+  rescue:
+    - name: Disable public transport through the configuration-independent fallback
+      ansible.builtin.command:
+        argv:
+          - /usr/local/sbin/moon-service-public-emergency-off
