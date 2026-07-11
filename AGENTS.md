@@ -158,6 +158,8 @@ A proposed PR crosses the scope gate when any of these is true:
 - More than 800 non-generated added-plus-deleted lines.
 
 Tests and supporting documentation count toward the file and line limits.
+"Generated" means reproducibly emitted by a deterministic build or
+code-generation tool. Files authored by an agent or LLM are non-generated.
 Generated, vendored, and lock files do not count toward the numeric gate, but
 the plan and PR must disclose them.
 
