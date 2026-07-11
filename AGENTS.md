@@ -118,6 +118,18 @@ the default branch, remove or disable the legacy copy and verify in a fresh
 Codex session that only the canonical path is offered. Until then, do not edit
 the legacy copy independently or claim migration cleanup is complete.
 
+### Review-Agent Callsigns
+
+When reporting delegated project reviews to the user, use these role callsigns:
+
+- **Grady Booch** — `issue-design-review`
+- **Martin Fowler** — `implementation-scope-review`
+- **Dennis Ritchie** — `second-agent-review`
+
+Each review must still use the fresh AI subagent required by its skill. These
+callsigns do not imply that the named people participate in, endorse, or supply
+views to the project.
+
 Before an agent creates a nontrivial actionable issue or treats its own draft
 as implementation authority, use `$issue-design-review` with a fresh read-only
 agent after the user has authorized subagents for the active session. This
