@@ -311,8 +311,9 @@ explicit owner-approved activation window.
 During that window:
 
 1. From one trusted household LAN client, record an unloaded latency and packet
-   loss baseline to one stable external target and confirm ordinary Internet
-   use before Funnel is enabled.
+   loss baseline to one stable external target. With the household participant
+   aware of the test, confirm a representative video call is stable before
+   Funnel is enabled.
 2. From outside the household LAN, send one finite, static-only over-limit
    probe: after the whole-site bucket is full, request the same bounded static
    asset concurrently exactly `capacity + 1` times. Verify at least one bounded
@@ -320,8 +321,9 @@ During that window:
    static request succeeds. Make only the single real provider lookup
    authorized by #123; do not live-saturate provider or
    opportunity-concurrency limits.
-3. At the same time, repeat the LAN measurement and check ordinary household
-   browsing or other active use. Use #120's deterministic tests, rather than
+3. At the same time, repeat the LAN measurement while the household participant
+   continues the video call. Treat visible or audible call degradation as
+   material household impact. Use #120's deterministic tests, rather than
    additional live provider calls, as the proof of provider-bucket and
    opportunity-concurrency behavior in the deployed revision.
 4. On material household degradation, unexpected provider work, failure to
