@@ -100,7 +100,16 @@ The main unresolved choice is now the exact first web/API contract for city look
   `rapucha` when created. Use `gh pr create --assignee rapucha --reviewer
   rapucha ...`; the repository workflow also applies this to non-draft PRs
   opened by `moon-service-agent`.
-- Session handover files are transient working notes for context resets, laptop shutdowns, or other session-boundary handoffs. Do not commit them by default; commit one only when explicitly useful as durable project state. Prefer replacing or removing old handovers instead of accumulating them.
+- Session handover files are transient working notes for context resets, laptop
+  shutdowns, or other session-boundary handoffs. When creating or updating one,
+  preserve context from the current conversation and existing tool results; do
+  not perform a fresh GitHub audit, rerun tests, or investigate already-known
+  state unless explicitly requested. Label uncertain details instead. Keep the
+  handover concise: capture the current objective, decisions and rationale,
+  pending feedback, active work, blockers, next actions, and files that must not
+  be disturbed. Do not commit handovers by default; commit one only when
+  explicitly useful as durable project state. Prefer replacing or removing old
+  handovers instead of accumulating them.
 - At the end of implementation tasks, stage all intended source, test, and documentation changes with `git add` so they are ready for commit. Leave unrelated, generated, IDE-only, or otherwise intentionally excluded files unstaged, and call them out in the final response.
 - In this environment, `git push` requires network access and sandboxed DNS has repeatedly failed. When the user asks to push any branch or remote, run the push with escalated permissions immediately instead of first attempting a sandboxed push.
 - Do not repeat a failing command, API request, or tool call unchanged unless the failure is plausibly transient, such as a timeout, network interruption, rate-limit retry hint, lock contention, or service restart. For deterministic errors, change the request based on a concrete hypothesis, reduce it to a minimal reproduction, inspect docs/help/output, or stop and explain the blocker. For plausibly transient errors, retry with exponential backoff and a small retry budget; once the next backoff delay would reach roughly 30 to 60 seconds, stop retrying and report the failure.
