@@ -19,6 +19,7 @@ import java.security.MessageDigest;
 import java.security.SecureRandom;
 import java.util.HexFormat;
 import java.util.function.Supplier;
+import java.util.regex.Pattern;
 
 @Component
 @Order(Ordered.HIGHEST_PRECEDENCE + 20)
@@ -28,6 +29,7 @@ public final class AdminAccessFilter extends OncePerRequestFilter {
     private static final int GENERATED_TOKEN_BYTES = 32;
     private static final SecureRandom SECURE_RANDOM = new SecureRandom();
     private static final HexFormat HEX = HexFormat.of();
+    private static final Pattern HOSTED_TOKEN = Pattern.compile("[0-9A-Fa-f]{64}");
 
     private final boolean adminRoutesEnabled;
     private final byte[] configuredToken;
@@ -35,12 +37,27 @@ public final class AdminAccessFilter extends OncePerRequestFilter {
     @Autowired
     public AdminAccessFilter(
             @Value("${moon.admin.token:}") String rawToken,
-            @Value("${moon.admin.generate-token:false}") boolean generateToken
+            @Value("${moon.admin.generate-token:false}") boolean generateToken,
+            @Value("${moon.hosted-alpha.enabled:false}") boolean hostedAlphaEnabled
     ) {
-        this(rawToken, generateToken, AdminAccessFilter::generateToken);
+        this(rawToken, generateToken, hostedAlphaEnabled, AdminAccessFilter::generateToken);
     }
 
     AdminAccessFilter(String rawToken, boolean generateToken, Supplier<String> generatedTokenSupplier) {
+        this(rawToken, generateToken, false, generatedTokenSupplier);
+    }
+
+    AdminAccessFilter(
+            String rawToken,
+            boolean generateToken,
+            boolean hostedAlphaEnabled,
+            Supplier<String> generatedTokenSupplier
+    ) {
+        if (hostedAlphaEnabled
+                && (generateToken || rawToken == null || !HOSTED_TOKEN.matcher(rawToken).matches())) {
+            throw new IllegalStateException(
+                    "Hosted-alpha mode requires an explicit 64-character hexadecimal admin token");
+        }
         String token = normalizeToken(rawToken);
         if (token.isEmpty() && generateToken) {
             token = normalizeToken(generatedTokenSupplier.get());

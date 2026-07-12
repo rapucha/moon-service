@@ -13,8 +13,31 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class HostedAlphaSurfaceFilterTest {
+    private static final String VALID_ADMIN_TOKEN =
+            "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
+
+    @ParameterizedTest
+    @ValueSource(strings = {
+            "", " ", "do-not-disclose",
+            "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef "
+    })
+    void rejectsInvalidHostedAdminConfiguration(String token) {
+        assertThatThrownBy(() -> new AdminAccessFilter(token, false, true, () -> "unused"))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessage("Hosted-alpha mode requires an explicit 64-character hexadecimal admin token");
+    }
+
+    @Test
+    void rejectsHostedTokenGenerationBeforeCallingTheGenerator() {
+        assertThatThrownBy(() -> new AdminAccessFilter(VALID_ADMIN_TOKEN, true, true, () -> {
+            throw new AssertionError("Hosted configuration must fail before token generation");
+        })).isInstanceOf(IllegalStateException.class)
+                .hasMessage("Hosted-alpha mode requires an explicit 64-character hexadecimal admin token");
+    }
+
     @Test
     void leavesExistingSurfaceAndHeadersUnchangedWhenDisabled() throws Exception {
         HostedAlphaSurfaceFilter filter = new HostedAlphaSurfaceFilter(false);
@@ -67,68 +90,44 @@ class HostedAlphaSurfaceFilterTest {
 
     @ParameterizedTest
     @ValueSource(strings = {
-            "/admin",
-            "/admin/",
-            "/admin/status",
-            "/api/opportunities/",
-            "/api/opportunities/search",
-            "/api/unknown",
-            "/healthz",
-            "//readyz",
-            "/readyz;unexpected=true",
-            "/READYZ"
+            "/admin", "/admin/", "/admin/other", "/admin/status/",
+            "/api/opportunities/", "/api/opportunities/search", "/api/unknown", "/healthz",
+            "//readyz", "/readyz;unexpected=true", "/READYZ"
     })
     void hidesUnapprovedPathVariants(String path) throws Exception {
-        HostedAlphaSurfaceFilter filter = new HostedAlphaSurfaceFilter(true);
-        MockHttpServletResponse response = new MockHttpServletResponse();
-        AtomicBoolean chainCalled = new AtomicBoolean(false);
-
-        filter.doFilter(request("GET", path), response, (request, servletResponse) -> chainCalled.set(true));
-
-        assertThat(chainCalled).isFalse();
-        assertThat(response.getStatus()).isEqualTo(404);
+        assertThat(rejectedResponse(request("GET", path)).getStatus()).isEqualTo(404);
     }
 
     @Test
     void rejectsUnapprovedMethodOnApprovedPath() throws Exception {
-        HostedAlphaSurfaceFilter filter = new HostedAlphaSurfaceFilter(true);
-        MockHttpServletResponse response = new MockHttpServletResponse();
-        AtomicBoolean chainCalled = new AtomicBoolean(false);
+        MockHttpServletResponse response = rejectedResponse(request("POST", "/readyz"));
 
-        filter.doFilter(request("POST", "/readyz"), response, (request, servletResponse) ->
-                chainCalled.set(true));
-
-        assertThat(chainCalled).isFalse();
         assertThat(response.getStatus()).isEqualTo(405);
         assertThat(response.getHeader("Allow")).isEqualTo("GET, HEAD");
     }
 
     @Test
     void rejectsContentLengthBodyOnApprovedPath() throws Exception {
-        HostedAlphaSurfaceFilter filter = new HostedAlphaSurfaceFilter(true);
         MockHttpServletRequest request = request("GET", "/readyz");
         request.setContent("{}".getBytes(StandardCharsets.UTF_8));
-        MockHttpServletResponse response = new MockHttpServletResponse();
 
-        filter.doFilter(request, response, (servletRequest, servletResponse) -> {
-            throw new AssertionError("Request with a body must not reach the application");
-        });
-
-        assertThat(response.getStatus()).isEqualTo(400);
+        assertThat(rejectedResponse(request).getStatus()).isEqualTo(400);
     }
 
     @Test
     void rejectsTransferEncodedBodyOnApprovedPath() throws Exception {
-        HostedAlphaSurfaceFilter filter = new HostedAlphaSurfaceFilter(true);
         MockHttpServletRequest request = request("HEAD", "/readyz");
         request.addHeader("Transfer-Encoding", "chunked");
+
+        assertThat(rejectedResponse(request).getStatus()).isEqualTo(400);
+    }
+
+    private static MockHttpServletResponse rejectedResponse(MockHttpServletRequest request) throws Exception {
         MockHttpServletResponse response = new MockHttpServletResponse();
-
-        filter.doFilter(request, response, (servletRequest, servletResponse) -> {
-            throw new AssertionError("Transfer-encoded request must not reach the application");
+        new HostedAlphaSurfaceFilter(true).doFilter(request, response, (servletRequest, servletResponse) -> {
+            throw new AssertionError("Rejected request must not reach the application");
         });
-
-        assertThat(response.getStatus()).isEqualTo(400);
+        return response;
     }
 
     private static MockHttpServletRequest request(String method, String path) {

@@ -30,44 +30,17 @@ public final class HostedAlphaSurfaceFilter extends OncePerRequestFilter {
     static final String STRICT_TRANSPORT_SECURITY = "max-age=31536000";
 
     private static final Set<String> APPROVED_PATHS = Set.of(
-            "/",
-            "/about",
-            "/about.html",
-            "/api.js",
-            "/api/opportunities",
-            "/app.js",
-            "/dom.js",
-            "/favicon.svg",
-            "/format.js",
-            "/index.html",
-            "/moonPathLightBands.js",
-            "/moonPathSilhouetteSymbols.js",
-            "/moonPathSilhouettes.js",
-            "/moonPathView.js",
-            "/moonPhaseView.js",
-            "/moonTexture.js",
-            "/opportunityCard.js",
-            "/readyz",
-            "/recentSearches.js",
-            "/responseView.js",
-            "/scoreView.js",
-            "/search",
-            "/styles.css",
-            "/sun-marker-aperture-flare.svg",
-            "/terms.js",
-            "/types.js"
+            "/", "/about", "/about.html", "/index.html", "/search",
+            "/admin/status", "/api/opportunities", "/readyz",
+            "/api.js", "/app.js", "/dom.js", "/format.js", "/terms.js", "/types.js",
+            "/favicon.svg", "/styles.css", "/sun-marker-aperture-flare.svg",
+            "/moonPathLightBands.js", "/moonPathSilhouetteSymbols.js", "/moonPathSilhouettes.js",
+            "/moonPathView.js", "/moonPhaseView.js", "/moonTexture.js", "/opportunityCard.js",
+            "/recentSearches.js", "/responseView.js", "/scoreView.js"
     );
     private static final Set<String> FORWARDED_IDENTITY_HEADERS = Set.of(
-            "cf-connecting-ip",
-            "forwarded",
-            "tailscale-app-capabilities",
-            "tailscale-user-login",
-            "tailscale-user-name",
-            "tailscale-user-profile-pic",
-            "true-client-ip",
-            "x-client-ip",
-            "x-forwarded-for",
-            "x-real-ip"
+            "cf-connecting-ip", "forwarded", "true-client-ip", "x-client-ip", "x-forwarded-for", "x-real-ip",
+            "tailscale-app-capabilities", "tailscale-user-login", "tailscale-user-name", "tailscale-user-profile-pic"
     );
 
     private final boolean enabled;
@@ -90,7 +63,11 @@ public final class HostedAlphaSurfaceFilter extends OncePerRequestFilter {
 
         addSecurityHeaders(response);
 
-        if (!APPROVED_PATHS.contains(applicationPath(request))) {
+        String path = applicationPath(request);
+        if (path.equals("/admin/status")) {
+            response.setHeader("Cache-Control", "no-store");
+        }
+        if (!APPROVED_PATHS.contains(path)) {
             reject(response, HttpServletResponse.SC_NOT_FOUND);
             return;
         }
@@ -156,9 +133,7 @@ public final class HostedAlphaSurfaceFilter extends OncePerRequestFilter {
 
         @Override
         public Enumeration<String> getHeaders(String name) {
-            return isForwardedIdentityHeader(name)
-                    ? Collections.emptyEnumeration()
-                    : super.getHeaders(name);
+            return isForwardedIdentityHeader(name) ? Collections.emptyEnumeration() : super.getHeaders(name);
         }
 
         @Override

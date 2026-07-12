@@ -21,13 +21,16 @@ import static org.assertj.core.api.Assertions.assertThat;
         properties = {
                 "moon.location.resolver=open-meteo",
                 "moon.weather.provider=open-meteo",
-                "moon.admin.token=test-admin-token",
+                "moon.admin.token=0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
                 "moon.hosted-alpha.enabled=true",
                 "moon.build.revision=hosted-alpha-test"
         })
 @AutoConfigureWebTestClient
 @ExtendWith(OutputCaptureExtension.class)
 class HostedAlphaSurfaceIntegrationTest {
+    private static final String ADMIN_TOKEN =
+            "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
+
     @Autowired
     private WebTestClient webTestClient;
 
@@ -42,27 +45,11 @@ class HostedAlphaSurfaceIntegrationTest {
 
     @ParameterizedTest
     @ValueSource(strings = {
-            "/about.html",
-            "/api.js",
-            "/app.js",
-            "/dom.js",
-            "/favicon.svg",
-            "/format.js",
-            "/index.html",
-            "/moonPathLightBands.js",
-            "/moonPathSilhouetteSymbols.js",
-            "/moonPathSilhouettes.js",
-            "/moonPathView.js",
-            "/moonPhaseView.js",
-            "/moonTexture.js",
-            "/opportunityCard.js",
-            "/recentSearches.js",
-            "/responseView.js",
-            "/scoreView.js",
-            "/styles.css",
-            "/sun-marker-aperture-flare.svg",
-            "/terms.js",
-            "/types.js"
+            "/about.html", "/index.html", "/api.js", "/app.js", "/dom.js", "/format.js",
+            "/favicon.svg", "/styles.css", "/sun-marker-aperture-flare.svg", "/terms.js", "/types.js",
+            "/moonPathLightBands.js", "/moonPathSilhouetteSymbols.js", "/moonPathSilhouettes.js",
+            "/moonPathView.js", "/moonPhaseView.js", "/moonTexture.js", "/opportunityCard.js",
+            "/recentSearches.js", "/responseView.js", "/scoreView.js"
     })
     void servesExactCurrentStaticAssetInventory(String path) {
         webTestClient.get()
@@ -92,29 +79,29 @@ class HostedAlphaSurfaceIntegrationTest {
 
     @ParameterizedTest
     @ValueSource(strings = {
-            "/admin",
-            "/admin/",
-            "/api/opportunities/",
-            "/api/opportunities/search",
-            "/api/unknown",
-            "/error",
-            "/healthz",
-            "/unknown"
+            "/admin", "/admin/", "/admin/other", "/admin/status/",
+            "/api/opportunities/", "/api/opportunities/search", "/api/unknown",
+            "/error", "/healthz", "/unknown"
     })
     void hidesUnapprovedPaths(String path) {
         expectHostedHeaders(webTestClient.get()
                 .uri(path)
+                .header(AdminAccessFilter.ADMIN_TOKEN_HEADER, ADMIN_TOKEN)
                 .exchange()
                 .expectStatus().isNotFound());
     }
 
-    @Test
-    void hidesAdminEvenWithConfiguredToken() {
-        expectHostedHeaders(webTestClient.get()
-                .uri("/admin/status")
-                .header(AdminAccessFilter.ADMIN_TOKEN_HEADER, "test-admin-token")
-                .exchange()
-                .expectStatus().isNotFound());
+    @ParameterizedTest
+    @ValueSource(strings = {"GET", "HEAD"})
+    void authenticatesAdminStatusAndPreventsCaching(String method) {
+        expectAdminHeaders(webTestClient.method(HttpMethod.valueOf(method)).uri("/admin/status").exchange()
+                .expectStatus().isUnauthorized());
+        expectAdminHeaders(webTestClient.method(HttpMethod.valueOf(method)).uri("/admin/status")
+                .header(AdminAccessFilter.ADMIN_TOKEN_HEADER, "wrong-token")
+                .exchange().expectStatus().isUnauthorized());
+        expectAdminHeaders(webTestClient.method(HttpMethod.valueOf(method)).uri("/admin/status")
+                .header(AdminAccessFilter.ADMIN_TOKEN_HEADER, ADMIN_TOKEN)
+                .exchange().expectStatus().isOk());
     }
 
     @Test
@@ -131,10 +118,11 @@ class HostedAlphaSurfaceIntegrationTest {
     @ValueSource(strings = {"POST", "PUT", "PATCH", "DELETE", "OPTIONS"})
     void rejectsUnapprovedMethodsOnApprovedPath(String method) {
         expectHostedHeaders(webTestClient.method(HttpMethod.valueOf(method))
-                .uri("/readyz")
+                .uri("/admin/status")
                 .exchange()
                 .expectStatus().isEqualTo(405)
-                .expectHeader().valueEquals("Allow", "GET, HEAD"));
+                .expectHeader().valueEquals("Allow", "GET, HEAD")
+                .expectHeader().valueEquals("Cache-Control", "no-store"));
     }
 
     @Test
@@ -148,23 +136,31 @@ class HostedAlphaSurfaceIntegrationTest {
     @Test
     void rejectsBodyOnApprovedGet() {
         expectHostedHeaders(webTestClient.method(HttpMethod.GET)
-                .uri("/readyz")
+                .uri("/admin/status")
                 .contentType(MediaType.APPLICATION_JSON)
                 .bodyValue("{}")
                 .exchange()
-                .expectStatus().isBadRequest());
+                .expectStatus().isBadRequest()
+                .expectHeader().valueEquals("Cache-Control", "no-store"));
     }
 
     @Test
-    void doesNotLogForwardedVisitorIdentity(CapturedOutput output) {
+    void doesNotLogForwardedVisitorIdentityOrAdminToken(CapturedOutput output) {
         webTestClient.get()
-                .uri("/")
+                .uri("/admin/status")
                 .header("Forwarded", "for=forwarded-identity-marker.invalid")
                 .header("X-Forwarded-For", "forwarded-identity-marker.invalid")
+                .header(AdminAccessFilter.ADMIN_TOKEN_HEADER, ADMIN_TOKEN)
                 .exchange()
                 .expectStatus().isOk();
 
-        assertThat(output).doesNotContain("forwarded-identity-marker.invalid");
+        assertThat(output)
+                .doesNotContain("forwarded-identity-marker.invalid")
+                .doesNotContain(ADMIN_TOKEN);
+    }
+
+    private static void expectAdminHeaders(WebTestClient.ResponseSpec response) {
+        expectHostedHeaders(response.expectHeader().valueEquals("Cache-Control", "no-store"));
     }
 
     private static void expectHostedHeaders(WebTestClient.ResponseSpec response) {
