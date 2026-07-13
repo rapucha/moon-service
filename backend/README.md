@@ -508,6 +508,23 @@ query-shaped flow covers the needed behavior.
 mvn test -pl backend -am
 ```
 
+### Application functional tests
+
+The `functional` JUnit tag groups the default and hosted-alpha application HTTP
+tests. Both start the real Spring application on a random port and exercise its
+filters, controllers, serialization, and static resources. They use test
+provider doubles or local fixtures and require no live provider, container,
+Raspberry Pi, LAN, or public-network access.
+
+Run only this suite with:
+
+```bash
+mvn -pl backend -am -Dgroups=functional test
+```
+
+The normal backend verification command above continues to include these
+functional tests.
+
 ## Container Smoke Test
 
 The repository includes `backend/Dockerfile` for packaging the backend runtime.

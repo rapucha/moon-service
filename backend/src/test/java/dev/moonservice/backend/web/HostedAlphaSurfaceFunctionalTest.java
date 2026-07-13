@@ -1,6 +1,7 @@
 package dev.moonservice.backend.web;
 
 import dev.moonservice.backend.observability.RequestLoggingFilter;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -27,7 +28,8 @@ import static org.assertj.core.api.Assertions.assertThat;
         })
 @AutoConfigureWebTestClient
 @ExtendWith(OutputCaptureExtension.class)
-class HostedAlphaSurfaceIntegrationTest {
+@Tag("functional")
+class HostedAlphaSurfaceFunctionalTest {
     private static final String ADMIN_TOKEN =
             "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
 
