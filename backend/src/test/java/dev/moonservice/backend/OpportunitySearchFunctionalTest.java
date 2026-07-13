@@ -9,6 +9,7 @@ import dev.moonservice.backend.observability.RequestLoggingFilter;
 import dev.moonservice.backend.observability.OpenMeteoObservability;
 import dev.moonservice.backend.weather.TestWeatherForecastProvider;
 import dev.moonservice.backend.weather.WeatherForecastProvider;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
@@ -28,10 +29,12 @@ import org.springframework.test.web.reactive.server.WebTestClient;
                 "moon.location.resolver=open-meteo",
                 "moon.weather.provider=open-meteo",
                 "moon.admin.token=test-admin-token",
+                "moon.hosted-alpha.enabled=false",
                 "moon.build.revision=test-revision"
         })
 @AutoConfigureWebTestClient
-class OpportunitySearchControllerTest {
+@Tag("functional")
+class OpportunitySearchFunctionalTest {
     @Autowired
     private WebTestClient webTestClient;
 
@@ -62,6 +65,7 @@ class OpportunitySearchControllerTest {
                         .build())
                 .exchange()
                 .expectStatus().isOk()
+                .expectHeader().doesNotExist("Content-Security-Policy")
                 .expectHeader().contentTypeCompatibleWith(MediaType.APPLICATION_JSON)
                 .expectBody()
                 .jsonPath("$.status").isEqualTo("ok")

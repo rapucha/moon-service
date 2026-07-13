@@ -107,6 +107,7 @@ reason to tune them.
 | `moon.location.resolver` | unset | Must be `open-meteo` for runtime geocoding. |
 | `moon.weather.provider` | unset | Must be `open-meteo` for runtime weather. |
 | `moon.build.revision` | `local` | Safe revision identifier returned by operational health and protected admin status. Container builds set this from `MOON_BUILD_REVISION`. |
+| `moon.hosted-alpha.enabled` | `false` | Enables the fail-closed Spring application surface for temporary Funnel hosting. Requires an explicit 64-hex-character admin token and applies to LAN and tunneled requests alike. |
 | `moon.open-meteo.timeout` | `3s` | Open-Meteo connect and read timeout. |
 | `moon.open-meteo.max-transport-retries` | `1` | Maximum retries after the first Open-Meteo attempt. |
 | `moon.open-meteo.max-retry-after` | `1s` | Largest provider `Retry-After` delay accepted for retry. |
@@ -304,6 +305,38 @@ The request log records method, path, status, duration, and request ID. It uses
 the route path only, not the raw query string, so location queries such as
 `q=...` are not written to application logs by this filter.
 
+### Hosted-alpha application surface
+
+`moon.hosted-alpha.enabled` is disabled by default. Set
+`MOON_HOSTED_ALPHA_ENABLED=true` only for a deliberately prepared hosted-alpha
+deployment. Because Docker NAT does not reliably distinguish the direct LAN
+listener from Funnel's loopback target, enabling the mode applies the same
+policy to every request reaching that application instance.
+
+The enabled policy allows only `GET` and `HEAD` for `/`, `/search`, `/about`,
+their backing HTML files, the exact static files tracked by the current build,
+`/api/opportunities`, `/readyz`, and exact `/admin/status`. Adding a static file
+does not publish it automatically; update the explicit allowlist and test
+inventory. Every other `/admin/**` path, the fixture endpoint, `/healthz`, and
+every unapproved path returns `404`, even with the admin token. An unapproved
+method on an approved path returns `405`; a framed `GET` or `HEAD` body returns
+`400` before authentication.
+
+Hosted startup requires an explicit 64-hex-character `moon.admin.token`
+generated with `openssl rand -hex 32`; this validates format, not randomness.
+Missing, malformed, surrounding-space, or generated-token configurations fail.
+Exact `/admin/status` returns `401` for a missing/wrong token, `200` for the
+configured token, and `Cache-Control: no-store` for every response.
+
+Before controller handling, the policy removes `Forwarded`, common client-IP,
+Cloudflare, and Tailscale identity/capability headers. Moon Service uses none of
+them for identity or authorization, and its outer request logger records none
+of their values. Spring-chain responses receive CSP, HSTS, frame-denial,
+no-sniff, no-referrer, permissions, and same-origin opener/resource headers.
+The CSP permits the current UI's generated data images, score-bar widths, and
+SVG silhouette-layer styles. Connector-level rejections such as disabled
+`TRACE` and malformed requests remain outside this application boundary.
+
 ### Operational health
 
 The deployment-facing health endpoints are unauthenticated and intentionally
@@ -364,10 +397,9 @@ mvn -pl backend -am spring-boot:run \
 ```
 
 Copy the generated token from the startup log and pass it in the
-`X-Moon-Admin-Token` header. This mode is opt-in so hosted runs still fail
-closed unless an operator deliberately configures an admin boundary. If both
-`moon.admin.token` and `moon.admin.generate-token=true` are set, the configured
-token wins and no generated token is logged.
+`X-Moon-Admin-Token` header. This mode is opt-in and local-development only. A
+non-hosted run uses a configured token instead when both settings are present;
+hosted-alpha mode rejects generation even when a configured token also exists.
 
 It returns process-local aggregate JSON:
 
@@ -410,23 +442,23 @@ not folded into real geocoding.
 
 The status endpoint currently exposes only aggregate operational data, but it
 is still intended for operator use. Do not put the admin token in a query
-string or browser URL. If a reverse proxy, public tunnel, or hosting provider
-also exposes `/admin/**`, keep an operator access rule there too; the backend
-header token is the minimum app-level boundary.
+string or browser URL. For the temporary tester alpha, exact `/admin/status` is
+the only publicly routable admin path and the validated header token is its
+application boundary. Production hosting should add an edge operator-access
+rule such as Cloudflare Access rather than broaden this exception.
 
 ## Alpha Hosting Notes
 
 The current backend is suitable for a single-process private alpha. Keep one
 backend replica until provider counters and caches move to a durable/shared
 store. Multiple replicas would make `/admin/status` quota usage incomplete and
-would reduce cache effectiveness. Public request rate limiting is not currently
-backend-owned. Before temporary Funnel exposure,
-[#119](https://github.com/rapucha/moon-service/issues/119) and
-[#120](https://github.com/rapucha/moon-service/issues/120) will add a
-disabled-by-default hosted surface and process-local shared limits through
-Spring-managed application components. Those controls bound accepted work and
-provider use after requests reach the Pi; they are not an inbound WAN cap.
-Cloudflare remains the later production edge.
+would reduce cache effectiveness. The disabled-by-default hosted surface is
+implemented under [#119](https://github.com/rapucha/moon-service/issues/119).
+Before temporary Funnel exposure,
+[#120](https://github.com/rapucha/moon-service/issues/120) will add process-local
+shared limits through Spring-managed application components. Those controls
+bound accepted work and provider use after requests reach the Pi; they are not
+an inbound WAN cap. Cloudflare remains the later production edge.
 
 Spring Boot shutdown is explicitly graceful with a 30-second per-phase
 timeout. Container orchestration must send `SIGTERM` and allow more than 30
@@ -475,6 +507,23 @@ query-shaped flow covers the needed behavior.
 ```bash
 mvn test -pl backend -am
 ```
+
+### Application functional tests
+
+The `functional` JUnit tag groups the default and hosted-alpha application HTTP
+tests. Both start the real Spring application on a random port and exercise its
+filters, controllers, serialization, and static resources. They use test
+provider doubles or local fixtures and require no live provider, container,
+Raspberry Pi, LAN, or public-network access.
+
+Run only this suite with:
+
+```bash
+mvn -pl backend -am -Dgroups=functional test
+```
+
+The normal backend verification command above continues to include these
+functional tests.
 
 ## Container Smoke Test
 

@@ -123,17 +123,17 @@ the two explicit endpoints, or to introduce a small loopback-only proxy. It
 must not broaden either path to `0.0.0.0`, and deployment confirmation must
 continue to use a local endpoint rather than depend on the public Funnel URL.
 
-The admin path remains private:
+The admin path remains private through #95:
 
 ```text
 GET /admin/status
 ```
 
-The backend already requires `X-Moon-Admin-Token` when admin routes are enabled.
-The Compose seed configuration leaves `/admin/**` disabled. If an operator
-adds a host-local token, the route remains private during #95. Issue #97 must
-also keep `/admin/**` off the public surface; the backend token is a minimum
-application boundary, not permission to publish the route.
+The backend already requires `X-Moon-Admin-Token` when admin routes are enabled,
+and the Compose seed leaves `/admin/**` disabled. For the temporary tester
+alpha, #119 makes exact `GET`/`HEAD /admin/status` a deliberate exception behind
+an explicit 64-hex deployment token so process-local evidence remains available;
+every other admin path stays off the public surface.
 
 ## Phase 0: Prove The Container Boundary
 
@@ -237,12 +237,13 @@ Recommended shape:
   proxy. The existing exact primary-IPv4 listener remains available only to the
   trusted LAN.
 - Public routes are limited to the web app, `/search`, `/api/opportunities`,
-  future public feed routes, and future public calendar export routes.
+  exact token-authenticated `/admin/status`, future public feed routes, and
+  future public calendar export routes.
 - The current prototype fixture endpoint, `POST /api/opportunities/search`,
   must be explicitly blocked, protected, or retired before public alpha unless
   a follow-up decision keeps it public.
-- `/admin/**` is disabled or blocked before the Funnel boundary as well as
-  protected by the backend token if enabled for private operation.
+- Every `/admin/**` route except exact authenticated `GET`/`HEAD /admin/status`
+  is blocked before controller handling.
 - No raw router port forward is required for HTTP(S) when Funnel is used.
 
 ### Tester-Alpha Shared-Uplink Decision
@@ -350,8 +351,8 @@ Exit criteria:
 
 - During the explicit #123 window, the public URL reaches only the accepted
   hosted surface through the tunnel.
-- Admin, fixture, SSH, Docker, and unrelated host surfaces are not publicly
-  reachable.
+- Missing/wrong admin tokens reveal no status data; every other admin route,
+  fixture, SSH, Docker, and unrelated host surface is not publicly reachable.
 - Excess requests receive bounded rejection before provider quotas are at risk,
   the household-impact check passes, and the exact Funnel-off path restores the
   private-only state.

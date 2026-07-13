@@ -168,7 +168,10 @@ Recommended first route:
 GET /admin/status
 ```
 
-Protect it with simple admin authentication suitable for the deployment environment, such as basic auth behind Cloudflare Access or a single admin login. Do not expose it publicly.
+Protect it with authentication suitable for the deployment environment. The
+tester alpha may expose only exact `GET`/`HEAD /admin/status` behind #119's
+validated 64-hex token; production should restore a private edge such as
+Cloudflare Access.
 
 Minimum fields:
 
