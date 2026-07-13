@@ -8,12 +8,20 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.boot.test.system.CapturedOutput;
 import org.springframework.boot.test.system.OutputCaptureExtension;
 import org.springframework.boot.webtestclient.autoconfigure.AutoConfigureWebTestClient;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Primary;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.reactive.server.WebTestClient;
+import org.mockito.Mockito;
+
+import java.time.Clock;
+import java.time.Instant;
+import java.util.concurrent.atomic.AtomicLong;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -35,6 +43,18 @@ class HostedAlphaSurfaceFunctionalTest {
 
     @Autowired
     private WebTestClient webTestClient;
+
+    @TestConfiguration
+    static class ResourceLimitClockConfiguration {
+        @Bean
+        @Primary
+        Clock resourceLimitClock() {
+            AtomicLong seconds = new AtomicLong();
+            Clock clock = Mockito.mock(Clock.class);
+            Mockito.when(clock.instant()).thenAnswer(ignored -> Instant.EPOCH.plusSeconds(seconds.getAndIncrement()));
+            return clock;
+        }
+    }
 
     @ParameterizedTest
     @ValueSource(strings = {"/", "/search?q=Prague", "/about"})

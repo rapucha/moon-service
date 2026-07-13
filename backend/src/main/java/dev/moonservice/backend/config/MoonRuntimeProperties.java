@@ -30,12 +30,18 @@ public final class MoonRuntimeProperties {
     private static final long DEFAULT_WEATHER_CACHE_MAXIMUM_SIZE = 1_000;
     private static final Duration DEFAULT_WEATHER_CACHE_AVAILABLE_TTL = Duration.ofHours(1);
     private static final Duration DEFAULT_WEATHER_CACHE_UNAVAILABLE_TTL = Duration.ofSeconds(30);
+    private static final int DEFAULT_WHOLE_SITE_CAPACITY = 40;
+    private static final Duration DEFAULT_WHOLE_SITE_REFILL_INTERVAL = Duration.ofSeconds(1);
+    private static final int DEFAULT_PROVIDER_LOOKUP_CAPACITY = 10;
+    private static final Duration DEFAULT_PROVIDER_LOOKUP_REFILL_INTERVAL = Duration.ofMinutes(1);
+    private static final int DEFAULT_OPPORTUNITY_CONCURRENCY = 2;
 
     private final Location location = new Location();
     private final Weather weather = new Weather();
     private final OpenMeteo openMeteo = new OpenMeteo();
     private final Cache cache = new Cache();
     private final ProviderQuotas providerQuotas = new ProviderQuotas();
+    private final ResourceLimits resourceLimits = new ResourceLimits();
 
     public Location getLocation() {
         return location;
@@ -55,6 +61,10 @@ public final class MoonRuntimeProperties {
 
     public ProviderQuotas getProviderQuotas() {
         return providerQuotas;
+    }
+
+    public ResourceLimits getResourceLimits() {
+        return resourceLimits;
     }
 
     public static final class Location {
@@ -246,6 +256,62 @@ public final class MoonRuntimeProperties {
             this.monthlyLimit = requirePositiveOrNull(
                     monthlyLimit,
                     "moon.provider-quotas.operations.*.monthly-limit");
+        }
+    }
+
+    public static final class ResourceLimits {
+        private int wholeSiteCapacity = DEFAULT_WHOLE_SITE_CAPACITY;
+        private Duration wholeSiteRefillInterval = DEFAULT_WHOLE_SITE_REFILL_INTERVAL;
+        private int providerLookupCapacity = DEFAULT_PROVIDER_LOOKUP_CAPACITY;
+        private Duration providerLookupRefillInterval = DEFAULT_PROVIDER_LOOKUP_REFILL_INTERVAL;
+        private int opportunityConcurrency = DEFAULT_OPPORTUNITY_CONCURRENCY;
+
+        public int getWholeSiteCapacity() {
+            return wholeSiteCapacity;
+        }
+
+        public void setWholeSiteCapacity(int wholeSiteCapacity) {
+            this.wholeSiteCapacity = requirePositive(wholeSiteCapacity, "moon.resource-limits.whole-site-capacity");
+        }
+
+        public Duration getWholeSiteRefillInterval() {
+            return wholeSiteRefillInterval;
+        }
+
+        public void setWholeSiteRefillInterval(Duration wholeSiteRefillInterval) {
+            this.wholeSiteRefillInterval = requirePositive(
+                    wholeSiteRefillInterval,
+                    "moon.resource-limits.whole-site-refill-interval");
+        }
+
+        public int getProviderLookupCapacity() {
+            return providerLookupCapacity;
+        }
+
+        public void setProviderLookupCapacity(int providerLookupCapacity) {
+            this.providerLookupCapacity = requirePositive(
+                    providerLookupCapacity,
+                    "moon.resource-limits.provider-lookup-capacity");
+        }
+
+        public Duration getProviderLookupRefillInterval() {
+            return providerLookupRefillInterval;
+        }
+
+        public void setProviderLookupRefillInterval(Duration providerLookupRefillInterval) {
+            this.providerLookupRefillInterval = requirePositive(
+                    providerLookupRefillInterval,
+                    "moon.resource-limits.provider-lookup-refill-interval");
+        }
+
+        public int getOpportunityConcurrency() {
+            return opportunityConcurrency;
+        }
+
+        public void setOpportunityConcurrency(int opportunityConcurrency) {
+            this.opportunityConcurrency = requirePositive(
+                    opportunityConcurrency,
+                    "moon.resource-limits.opportunity-concurrency");
         }
     }
 

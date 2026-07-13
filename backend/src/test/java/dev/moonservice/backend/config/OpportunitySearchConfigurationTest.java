@@ -93,6 +93,13 @@ class OpportunitySearchConfigurationTest {
                     assertThat(properties.getCache().getWeather().getMaximumSize()).isEqualTo(1_000);
                     assertThat(properties.getCache().getWeather().getAvailableTtl())
                             .isEqualTo(Duration.ofHours(1));
+                    assertThat(properties.getResourceLimits().getWholeSiteCapacity()).isEqualTo(40);
+                    assertThat(properties.getResourceLimits().getWholeSiteRefillInterval())
+                            .isEqualTo(Duration.ofSeconds(1));
+                    assertThat(properties.getResourceLimits().getProviderLookupCapacity()).isEqualTo(10);
+                    assertThat(properties.getResourceLimits().getProviderLookupRefillInterval())
+                            .isEqualTo(Duration.ofMinutes(1));
+                    assertThat(properties.getResourceLimits().getOpportunityConcurrency()).isEqualTo(2);
                 });
     }
 
@@ -113,7 +120,12 @@ class OpportunitySearchConfigurationTest {
                         "moon.cache.geocoding.maximum-size=123",
                         "moon.cache.geocoding.not-found-ttl=PT5M",
                         "moon.cache.weather.maximum-size=456",
-                        "moon.cache.weather.unavailable-ttl=PT45S")
+                        "moon.cache.weather.unavailable-ttl=PT45S",
+                        "moon.resource-limits.whole-site-capacity=80",
+                        "moon.resource-limits.whole-site-refill-interval=PT2S",
+                        "moon.resource-limits.provider-lookup-capacity=20",
+                        "moon.resource-limits.provider-lookup-refill-interval=PT2M",
+                        "moon.resource-limits.opportunity-concurrency=4")
                 .run(context -> {
                     MoonRuntimeProperties properties = context.getBean(MoonRuntimeProperties.class);
 
@@ -132,6 +144,13 @@ class OpportunitySearchConfigurationTest {
                     assertThat(properties.getCache().getGeocoding().getNotFoundTtl()).isEqualTo(Duration.ofMinutes(5));
                     assertThat(properties.getCache().getWeather().getMaximumSize()).isEqualTo(456);
                     assertThat(properties.getCache().getWeather().getUnavailableTtl()).isEqualTo(Duration.ofSeconds(45));
+                    assertThat(properties.getResourceLimits().getWholeSiteCapacity()).isEqualTo(80);
+                    assertThat(properties.getResourceLimits().getWholeSiteRefillInterval())
+                            .isEqualTo(Duration.ofSeconds(2));
+                    assertThat(properties.getResourceLimits().getProviderLookupCapacity()).isEqualTo(20);
+                    assertThat(properties.getResourceLimits().getProviderLookupRefillInterval())
+                            .isEqualTo(Duration.ofMinutes(2));
+                    assertThat(properties.getResourceLimits().getOpportunityConcurrency()).isEqualTo(4);
                 });
     }
 

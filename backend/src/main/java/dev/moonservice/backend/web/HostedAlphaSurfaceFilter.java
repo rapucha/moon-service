@@ -84,7 +84,7 @@ public final class HostedAlphaSurfaceFilter extends OncePerRequestFilter {
         filterChain.doFilter(new ForwardedIdentityIgnoringRequest(request), response);
     }
 
-    private static void addSecurityHeaders(HttpServletResponse response) {
+    static void addSecurityHeaders(HttpServletResponse response) {
         response.setHeader("Content-Security-Policy", CONTENT_SECURITY_POLICY);
         response.setHeader("Cross-Origin-Opener-Policy", "same-origin");
         response.setHeader("Cross-Origin-Resource-Policy", "same-origin");
@@ -103,7 +103,7 @@ public final class HostedAlphaSurfaceFilter extends OncePerRequestFilter {
         return request.getContentLengthLong() > 0 || request.getHeader("Transfer-Encoding") != null;
     }
 
-    private static String applicationPath(HttpServletRequest request) {
+    static String applicationPath(HttpServletRequest request) {
         String path = request.getRequestURI();
         String contextPath = request.getContextPath();
         if (contextPath != null && !contextPath.isEmpty() && path.startsWith(contextPath)) {
