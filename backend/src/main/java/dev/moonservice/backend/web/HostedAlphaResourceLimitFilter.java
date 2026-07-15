@@ -146,12 +146,14 @@ final class HostedAlphaResourceLimitFilter extends OncePerRequestFilter {
         return "127.0.0.1".equals(address) || "0:0:0:0:0:0:0:1".equals(address) || "::1".equals(address);
     }
 
-    private record RateLimitedResponse(String status, String message, long retryAfterSeconds) {
-    }
-
-    private record Admission(boolean accepted, long retryAfterSeconds) {
-    }
-
+    private record RateLimitedResponse(String status, String message, long retryAfterSeconds) {}
+    private record Admission(boolean accepted, long retryAfterSeconds) {}
+    /*
+     * Starts full and restores one token per complete interval, capped at capacity.
+     * Advancing refilledAt only by complete intervals preserves partial elapsed time;
+     * backward clock readings do not refill. Synchronized acquisition keeps refill
+     * and decrement atomic and returns a ceiling-rounded wait for the next token.
+     */
     private static final class TokenBucket {
         private final int capacity;
         private final Duration refillInterval;

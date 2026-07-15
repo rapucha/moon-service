@@ -43,7 +43,8 @@ class HostedAlphaSurfaceFunctionalTest {
 
     @Autowired
     private WebTestClient webTestClient;
-
+    // Spring injects this @Primary Clock into the real filter. One-second steps keep this
+    // shared-context surface suite from exhausting its bucket; unit tests cover timing.
     @TestConfiguration
     static class ResourceLimitClockConfiguration {
         @Bean
