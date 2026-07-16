@@ -14,6 +14,7 @@ Start Here
 - Architecture and API:
   - `docs/architecture.md`
   - `docs/api-shape.md`
+  - `docs/http-route-inventory.md`
   - `docs/self-hosting-alpha-plan.md`
   - `docs/container-image-publication.md`
   - `deployment/raspberry-pi/README.md`
@@ -34,6 +35,8 @@ Start Here
 Current Canonical API Location
 - `docs/api-shape.md` is currently the human-owned API design document.
 - It includes intended public response examples and status semantics.
+- `docs/http-route-inventory.md` is the canonical inventory of currently
+  implemented controller routes, consumers, and exposure.
 - Current implemented fixture-backed endpoint usage is documented in
   `backend/README.md`.
 

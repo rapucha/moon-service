@@ -1,5 +1,9 @@
 # First Backend/Web API Shape
 
+This document owns product API design and intended future shapes. For the
+currently implemented controller mappings, concrete consumers, and exposure,
+see the [HTTP route inventory](http-route-inventory.md).
+
 ## Goal
 
 The first API should support a single-page web experience:

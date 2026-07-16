@@ -46,6 +46,10 @@ configuration.
 Missing or unknown `moon.location.resolver` or `moon.weather.provider` values
 fail startup; the runtime backend does not include fixture provider modes.
 
+For the canonical list of implemented controller routes, their consumers, and
+default versus hosted-alpha exposure, see the
+[HTTP route inventory](../docs/http-route-inventory.md).
+
 ## Query Endpoint
 
 ```http
