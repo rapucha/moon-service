@@ -5,14 +5,28 @@
   vars:
     _test_primary_ipv4_address: 192.0.2.10
   tasks:
-    - name: Accept the safe loopback default
-      ansible.builtin.include_tasks: >-
-        ../roles/moon_service_host/tasks/validate-bind-address.yml
-      vars:
-        moon_service_bind_address: 127.0.0.1
-        _moon_service_primary_ipv4_address: "{{ _test_primary_ipv4_address }}"
+    - name: Render the fresh hosted-alpha application seed
+      ansible.builtin.set_fact:
+        _test_application_environment_seed: >-
+          {{ lookup(
+               'ansible.builtin.template',
+               playbook_dir
+               + '/../roles/moon_service_host/templates/application.env.j2'
+             ) }}
 
-    - name: Accept the managed host primary IPv4 address
+    - name: Verify the hosted-alpha seed remains inactive and secret-free
+      ansible.builtin.assert:
+        that:
+          - >-
+            _test_application_environment_seed.splitlines()
+            | select('equalto', 'MOON_HOSTED_ALPHA_ENABLED=false')
+            | list | length == 1
+          - >-
+            _test_application_environment_seed.splitlines()
+            | select('match', '^MOON_ADMIN_TOKEN=')
+            | list | length == 0
+
+    - name: Accept the explicitly configured managed host primary IPv4 address
       ansible.builtin.include_tasks: >-
         ../roles/moon_service_host/tasks/validate-bind-address.yml
       vars:
@@ -21,8 +35,23 @@
 
     - name: Initialize rejected listener results
       ansible.builtin.set_fact:
+        _test_loopback_rejected: false
         _test_wildcard_rejected: false
         _test_secondary_address_rejected: false
+        _test_ipv6_rejected: false
+
+    - name: Reject the fail-closed loopback default
+      block:
+        - name: Validate the unsupported loopback-only listener
+          ansible.builtin.include_tasks: >-
+            ../roles/moon_service_host/tasks/validate-bind-address.yml
+          vars:
+            moon_service_bind_address: 127.0.0.1
+            _moon_service_primary_ipv4_address: "{{ _test_primary_ipv4_address }}"
+      rescue:
+        - name: Record the expected loopback-only rejection
+          ansible.builtin.set_fact:
+            _test_loopback_rejected: true
 
     - name: Reject a wildcard listener
       block:
@@ -50,48 +79,28 @@
           ansible.builtin.set_fact:
             _test_secondary_address_rejected: true
 
+    - name: Reject an IPv6 listener
+      block:
+        - name: Validate an unsupported IPv6 listener
+          ansible.builtin.include_tasks: >-
+            ../roles/moon_service_host/tasks/validate-bind-address.yml
+          vars:
+            moon_service_bind_address: "::"
+            _moon_service_primary_ipv4_address: "{{ _test_primary_ipv4_address }}"
+      rescue:
+        - name: Record the expected IPv6 rejection
+          ansible.builtin.set_fact:
+            _test_ipv6_rejected: true
+
     - name: Verify unsupported listeners failed closed
       ansible.builtin.assert:
         that:
+          - _test_loopback_rejected
           - _test_wildcard_rejected
           - _test_secondary_address_rejected
+          - _test_ipv6_rejected
 
-    - name: Evaluate an exact primary-IPv4 port binding
-      ansible.builtin.include_tasks: >-
-        ../roles/moon_service_host/tasks/container-port-bindings-state.yml
-      vars:
-        moon_service_bind_address: "{{ _test_primary_ipv4_address }}"
-        moon_service_host_port: 8080
-        _moon_service_container_port_bindings_result:
-          rc: 0
-          stdout: >-
-            {"8080/tcp":[{"HostIp":"192.0.2.10","HostPort":"8080"}]}
-
-    - name: Verify the exact primary-IPv4 port binding matches
-      ansible.builtin.assert:
-        that:
-          - _moon_service_container_port_bindings_match
-          - >-
-            _moon_service_expected_container_port_bindings['8080/tcp'][0].HostPort
-            == '8080'
-
-    - name: Evaluate a stale loopback port binding
-      ansible.builtin.include_tasks: >-
-        ../roles/moon_service_host/tasks/container-port-bindings-state.yml
-      vars:
-        moon_service_bind_address: "{{ _test_primary_ipv4_address }}"
-        moon_service_host_port: 8080
-        _moon_service_container_port_bindings_result:
-          rc: 0
-          stdout: >-
-            {"8080/tcp":[{"HostIp":"127.0.0.1","HostPort":"8080"}]}
-
-    - name: Verify the stale loopback binding requires reconciliation
-      ansible.builtin.assert:
-        that:
-          - not _moon_service_container_port_bindings_match
-
-    - name: Evaluate multiple port bindings
+    - name: Evaluate the exact LAN and loopback port bindings
       ansible.builtin.include_tasks: >-
         ../roles/moon_service_host/tasks/container-port-bindings-state.yml
       vars:
@@ -102,12 +111,159 @@
           stdout: >-
             {"8080/tcp":[{"HostIp":"192.0.2.10","HostPort":"8080"},{"HostIp":"127.0.0.1","HostPort":"8080"}]}
 
-    - name: Verify multiple bindings fail the exact boundary
+    - name: Verify the exact LAN and loopback port bindings match
+      ansible.builtin.assert:
+        that:
+          - _moon_service_container_port_bindings_match
+          - >-
+            _moon_service_expected_container_port_bindings['8080/tcp']
+            | length == 2
+
+    - name: Evaluate the exact bindings in reversed Docker order
+      ansible.builtin.include_tasks: >-
+        ../roles/moon_service_host/tasks/container-port-bindings-state.yml
+      vars:
+        moon_service_bind_address: "{{ _test_primary_ipv4_address }}"
+        moon_service_host_port: 8080
+        _moon_service_container_port_bindings_result:
+          rc: 0
+          stdout: >-
+            {"8080/tcp":[{"HostIp":"127.0.0.1","HostPort":"8080"},{"HostIp":"192.0.2.10","HostPort":"8080"}]}
+
+    - name: Verify harmless Docker binding order is ignored
+      ansible.builtin.assert:
+        that:
+          - _moon_service_container_port_bindings_match
+
+    - name: Evaluate a single primary-IPv4 port binding
+      ansible.builtin.include_tasks: >-
+        ../roles/moon_service_host/tasks/container-port-bindings-state.yml
+      vars:
+        moon_service_bind_address: "{{ _test_primary_ipv4_address }}"
+        moon_service_host_port: 8080
+        _moon_service_container_port_bindings_result:
+          rc: 0
+          stdout: >-
+            {"8080/tcp":[{"HostIp":"192.0.2.10","HostPort":"8080"}]}
+
+    - name: Verify a missing loopback binding requires reconciliation
       ansible.builtin.assert:
         that:
           - not _moon_service_container_port_bindings_match
 
-    - name: Evaluate a missing container port binding
+    - name: Evaluate a single loopback port binding
+      ansible.builtin.include_tasks: >-
+        ../roles/moon_service_host/tasks/container-port-bindings-state.yml
+      vars:
+        moon_service_bind_address: "{{ _test_primary_ipv4_address }}"
+        moon_service_host_port: 8080
+        _moon_service_container_port_bindings_result:
+          rc: 0
+          stdout: >-
+            {"8080/tcp":[{"HostIp":"127.0.0.1","HostPort":"8080"}]}
+
+    - name: Verify a missing LAN binding requires reconciliation
+      ansible.builtin.assert:
+        that:
+          - not _moon_service_container_port_bindings_match
+
+    - name: Evaluate a duplicate loopback port binding
+      ansible.builtin.include_tasks: >-
+        ../roles/moon_service_host/tasks/container-port-bindings-state.yml
+      vars:
+        moon_service_bind_address: "{{ _test_primary_ipv4_address }}"
+        moon_service_host_port: 8080
+        _moon_service_container_port_bindings_result:
+          rc: 0
+          stdout: >-
+            {"8080/tcp":[{"HostIp":"127.0.0.1","HostPort":"8080"},{"HostIp":"127.0.0.1","HostPort":"8080"}]}
+
+    - name: Verify duplicate loopback bindings require reconciliation
+      ansible.builtin.assert:
+        that:
+          - not _moon_service_container_port_bindings_match
+
+    - name: Evaluate an extra secondary-IPv4 port binding
+      ansible.builtin.include_tasks: >-
+        ../roles/moon_service_host/tasks/container-port-bindings-state.yml
+      vars:
+        moon_service_bind_address: "{{ _test_primary_ipv4_address }}"
+        moon_service_host_port: 8080
+        _moon_service_container_port_bindings_result:
+          rc: 0
+          stdout: >-
+            {"8080/tcp":[{"HostIp":"192.0.2.10","HostPort":"8080"},{"HostIp":"127.0.0.1","HostPort":"8080"},{"HostIp":"192.0.2.11","HostPort":"8080"}]}
+
+    - name: Verify extra secondary-IPv4 bindings require reconciliation
+      ansible.builtin.assert:
+        that:
+          - not _moon_service_container_port_bindings_match
+
+    - name: Evaluate a wildcard port binding
+      ansible.builtin.include_tasks: >-
+        ../roles/moon_service_host/tasks/container-port-bindings-state.yml
+      vars:
+        moon_service_bind_address: "{{ _test_primary_ipv4_address }}"
+        moon_service_host_port: 8080
+        _moon_service_container_port_bindings_result:
+          rc: 0
+          stdout: >-
+            {"8080/tcp":[{"HostIp":"192.0.2.10","HostPort":"8080"},{"HostIp":"0.0.0.0","HostPort":"8080"}]}
+
+    - name: Verify wildcard bindings require reconciliation
+      ansible.builtin.assert:
+        that:
+          - not _moon_service_container_port_bindings_match
+
+    - name: Evaluate an unintended IPv6 port binding
+      ansible.builtin.include_tasks: >-
+        ../roles/moon_service_host/tasks/container-port-bindings-state.yml
+      vars:
+        moon_service_bind_address: "{{ _test_primary_ipv4_address }}"
+        moon_service_host_port: 8080
+        _moon_service_container_port_bindings_result:
+          rc: 0
+          stdout: >-
+            {"8080/tcp":[{"HostIp":"192.0.2.10","HostPort":"8080"},{"HostIp":"127.0.0.1","HostPort":"8080"},{"HostIp":"::","HostPort":"8080"}]}
+
+    - name: Verify unintended IPv6 bindings require reconciliation
+      ansible.builtin.assert:
+        that:
+          - not _moon_service_container_port_bindings_match
+
+    - name: Evaluate a wrong host-port binding
+      ansible.builtin.include_tasks: >-
+        ../roles/moon_service_host/tasks/container-port-bindings-state.yml
+      vars:
+        moon_service_bind_address: "{{ _test_primary_ipv4_address }}"
+        moon_service_host_port: 8080
+        _moon_service_container_port_bindings_result:
+          rc: 0
+          stdout: >-
+            {"8080/tcp":[{"HostIp":"192.0.2.10","HostPort":"8080"},{"HostIp":"127.0.0.1","HostPort":"8081"}]}
+
+    - name: Verify wrong host-port bindings require reconciliation
+      ansible.builtin.assert:
+        that:
+          - not _moon_service_container_port_bindings_match
+
+    - name: Evaluate an extra container-port key
+      ansible.builtin.include_tasks: >-
+        ../roles/moon_service_host/tasks/container-port-bindings-state.yml
+      vars:
+        moon_service_bind_address: "{{ _test_primary_ipv4_address }}"
+        moon_service_host_port: 8080
+        _moon_service_container_port_bindings_result:
+          rc: 0
+          stdout: >-
+            {"8080/tcp":[{"HostIp":"192.0.2.10","HostPort":"8080"},{"HostIp":"127.0.0.1","HostPort":"8080"}],"8081/tcp":[{"HostIp":"127.0.0.1","HostPort":"8081"}]}
+
+    - name: Verify extra container-port keys require reconciliation
+      ansible.builtin.assert:
+        that:
+          - not _moon_service_container_port_bindings_match
+
+    - name: Evaluate missing container port bindings
       ansible.builtin.include_tasks: >-
         ../roles/moon_service_host/tasks/container-port-bindings-state.yml
       vars:
@@ -117,7 +273,7 @@
           rc: 1
           stdout: ""
 
-    - name: Verify a missing binding fails the exact boundary
+    - name: Verify missing bindings fail the exact boundary
       ansible.builtin.assert:
         that:
           - not _moon_service_container_port_bindings_match

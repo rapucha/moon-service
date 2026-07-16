@@ -9,6 +9,7 @@ services:
       - {{ moon_service_config_dir }}/application.env
     ports:
       - "{{ moon_service_bind_address }}:{{ moon_service_host_port }}:8080"
+      - "127.0.0.1:{{ moon_service_host_port }}:8080"
     tmpfs:
       - /tmp:rw,noexec,nosuid,nodev,size=64m
     cap_drop:
