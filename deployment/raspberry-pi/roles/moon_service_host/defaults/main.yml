@@ -3,8 +3,8 @@ moon_service_image_repository: ghcr.io/rapucha/moon-service
 moon_service_image_channel: main
 moon_service_image_source: https://github.com/rapucha/moon-service
 
-# Keep the safe default on loopback. A host may explicitly select its primary
-# IPv4 address for trusted-LAN access; public ingress remains issue #97.
+# Keep the safe default fail-closed. Hosted deployment requires an explicitly
+# configured active primary IPv4 address and also publishes on loopback.
 moon_service_bind_address: 127.0.0.1
 moon_service_host_port: 8080
 moon_service_container_memory: 1536m

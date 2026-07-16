@@ -8,10 +8,11 @@ Java or container images. Follow-up
 [#107](https://github.com/rapucha/moon-service/issues/107) makes timer rearming
 reliable and adds exact physical-deployment acknowledgement to GitHub.
 
-This is the private deployment layer. It binds the application to
-`127.0.0.1:8080` by default and supports an explicit primary-IPv4 listener for
-a trusted home LAN. It opens no router port, does not enroll Tailscale, and
-does not configure Funnel. Public exposure remains issue
+This is the private deployment layer. It publishes the same application
+instance on the host's exact primary IPv4 address for a trusted home LAN and
+on `127.0.0.1:8080` as the prepared Tailscale reverse-proxy target. It opens no
+router port, does not enroll Tailscale, and does not configure Funnel. Public
+exposure remains issue
 [#97](https://github.com/rapucha/moon-service/issues/97).
 
 ## What provisioning installs
@@ -27,8 +28,8 @@ The Ansible role:
 - installs Tailscale from its official Trixie repository, starts `tailscaled`,
   and deliberately leaves the host unenrolled;
 - creates root-owned configuration, Compose, and deployment-state directories;
-- keeps the listener on loopback unless ignored host inventory explicitly
-  selects that host's active primary IPv4 address;
+- requires ignored host inventory to select that host's active primary IPv4
+  address, then publishes exactly that trusted-LAN listener plus loopback;
 - runs the application as the image's non-root UID/GID `10001` with no Linux
   capabilities, a read-only root filesystem, bounded memory/CPU/PIDs, and a
   small temporary filesystem;
@@ -122,18 +123,19 @@ never stores the PEM contents or an installation token in inventory or
 `host.env`. Omit all three only when external acknowledgement is deliberately
 disabled; a partial configuration must fail provisioning.
 
-The safe listener default is `127.0.0.1`. For direct access from a trusted LAN,
-add the Pi's active primary IPv4 address to ignored `inventory.yml`:
+Set the Pi's active primary IPv4 address in ignored `inventory.yml`:
 
 ```yaml
 moon_service_bind_address: REPLACE_WITH_PI_LAN_ADDRESS
 ```
 
-The role rejects wildcard and secondary-interface listeners. Keep the address
-stable with a DHCP reservation or static network configuration; it should
-normally match the address used by `ansible_host`. This opt-in changes only
-the Docker host binding. It does not configure a firewall, router forwarding,
-Tailscale, Funnel, TLS, or public access.
+The role fails closed if this value is absent, loopback, wildcard, a secondary
+address, or IPv6. Keep the address stable with a DHCP reservation or static
+network configuration; it should normally match the address used by
+`ansible_host`. Compose publishes the same container port on this exact address
+and on `127.0.0.1`, without a wildcard listener. This does not configure a
+firewall, router forwarding, Tailscale enrollment, Funnel, TLS, or public
+access.
 
 Do not reuse an existing administrator as the operator: the role deliberately
 locks the operator password, sets its primary group, and removes all
@@ -242,10 +244,15 @@ so keep `/root/.docker/config.json` root-only and rotate the token deliberately.
 For a public GHCR package, verify an anonymous pull instead and do not create a
 long-lived host credential.
 
-### Optional admin endpoint
+### Prepared hosted-alpha configuration
 
-The seeded environment enables live Open-Meteo geocoding and weather. It leaves
-`/admin/**` disabled. To enable it privately, create a high-entropy token and
+The seeded environment enables live Open-Meteo geocoding and weather and
+explicitly sets `MOON_HOSTED_ALPHA_ENABLED=false`. The file is created only
+when absent, so provisioning does not overwrite an existing Pi's host-only
+configuration or token.
+
+Do not enable the hosted surface during issue #122. Immediately before the
+separately approved #123 activation window, create a high-entropy token and
 edit the host-only file as the bootstrap administrator:
 
 ```bash
@@ -254,9 +261,12 @@ sudoedit /etc/moon-service/application.env
 sudo moon-service-control restart
 ```
 
-Add `MOON_ADMIN_TOKEN=<generated-value>` locally. Store the token in the chosen
-off-host secret store; never commit it or pass it in a URL. Provisioning does
-not overwrite this file on later runs.
+Set `MOON_HOSTED_ALPHA_ENABLED=true` and add
+`MOON_ADMIN_TOKEN=<generated-value>` locally. Store the token in the chosen
+off-host secret store; never commit it, print it in verification evidence, or
+pass it in a URL. Existing hosts require this manual update because Ansible
+deliberately does not overwrite `application.env`. A fresh host receives the
+same disabled seed and must also remain disabled until #123.
 
 ### Tailscale boundary
 
@@ -266,13 +276,59 @@ are explicit bootstrap-administrator actions for #97. Existing MikroTik
 WireGuard remains the remote-administration path and does not need any software
 on this Pi.
 
-The current private deployment intentionally publishes one exact host address.
-Tailscale's HTTP proxy requires a loopback backend, so #97 must either publish
-the same container on both the exact primary LAN IPv4 address and
-`127.0.0.1`, or add a loopback-only local proxy in front of the LAN-bound app.
-The binding validator must then require that exact two-address set; it must not
-accept `0.0.0.0`. The GitHub deployment callback remains outbound and local-
-health-based, so this later ingress change does not alter its trust boundary.
+The prepared deployment publishes the same container on exactly two host
+addresses: the configured primary LAN IPv4 and `127.0.0.1`, both using the
+configured host port. The exact-set validator rejects missing, wildcard,
+secondary, IPv6, wrong-port, and additional bindings. LAN access therefore
+continues without a router forwarding rule, while Tailscale receives the only
+HTTP proxy target it supports: explicit loopback. The GitHub deployment
+callback remains outbound and local-health-based, so this ingress preparation
+does not alter its trust boundary.
+
+Current Tailscale documentation requires MagicDNS, tailnet HTTPS, a Funnel
+`nodeAttrs` permission, and public HTTPS port `443`, `8443`, or `10000`.
+Interactive Funnel setup can open a browser consent flow that enables the
+missing tailnet requirements. Do not run that flow, enroll the node, or execute
+any mutating command below during issue #122. After provisioning, these
+read-only checks must still show the node logged out and no active Funnel:
+
+```bash
+sudo tailscale status
+sudo tailscale funnel status
+```
+
+The exact logged-out text can vary by client version; neither check should
+report an active tailnet connection or public listener.
+
+During the separately approved #123 window, the smallest interactive sequence
+for the prepared port is:
+
+```bash
+sudo tailscale up
+sudo tailscale status
+sudo tailscale funnel --bg --https=443 http://127.0.0.1:8080
+sudo tailscale funnel status
+```
+
+Follow only the login and Funnel-consent URLs printed by the CLI; do not create
+or store an auth key in inventory. `--bg` makes Funnel persist across daemon
+restarts and reboots, so the same window must prove the explicit off path:
+
+```bash
+sudo tailscale funnel --https=443 off
+sudo tailscale funnel status
+```
+
+The off status must show no active public Funnel. If the exact listener cannot
+be removed cleanly, keep the application private and use
+`sudo tailscale funnel reset` before rechecking status. Reserve
+`sudo tailscale logout` followed by a fresh interactive `sudo tailscale up` for
+deliberate re-enrollment recovery; logout is not a routine off switch.
+
+Funnel targets only `http://127.0.0.1:8080`; it does not publish the LAN
+listener, SSH, Docker's socket/API, or another host service. No router HTTP
+forward is needed. Issue #123 must verify those negative boundaries from
+outside the LAN before public testing continues.
 
 ### GitHub deployment reporter boundary
 
@@ -322,8 +378,7 @@ broken schedule, not a healthy timer. After an issue #107 provisioning run, the
 deploy timer must be scheduled even when it was stopped and restarted in the
 same boot.
 
-With the default loopback listener, inspect it through SSH without changing
-the router:
+Verify the loopback target through SSH without changing the router:
 
 ```bash
 ssh -L 8080:127.0.0.1:8080 moonops@REPLACE_WITH_SSH_HOST
@@ -336,16 +391,26 @@ curl --fail http://127.0.0.1:8080/readyz
 curl --fail 'http://127.0.0.1:8080/api/opportunities?q=Prague'
 ```
 
-With the trusted-LAN inventory override, access the Pi directly instead:
+Then access the same instance directly over the trusted LAN:
 
 ```bash
 curl --fail http://REPLACE_WITH_PI_LAN_ADDRESS:8080/readyz
 curl --fail 'http://REPLACE_WITH_PI_LAN_ADDRESS:8080/api/opportunities?q=Prague'
 ```
 
-Docker must publish exactly the configured primary IPv4 address, never
-`0.0.0.0`; the home router must continue to have no forwarding rule for this
-port.
+Both `/readyz` responses must report the same revision. Docker must publish
+exactly the configured primary IPv4 address and `127.0.0.1`, never `0.0.0.0`,
+an IPv6 address, or an additional port; the home router must continue to have
+no forwarding rule for this port. Inspect the exact set as the bootstrap
+administrator:
+
+```bash
+sudo docker inspect moon-service \
+  --format '{{json .HostConfig.PortBindings}}'
+```
+
+The `8080/tcp` entry must contain only the configured LAN address and
+`127.0.0.1`, each with host port `8080`. Array order is not significant.
 
 The first response must report `status: ok` and the same 40-character Git
 revision shown in `current.env`. The opportunity request is the deliberate live
@@ -371,7 +436,7 @@ not the legacy `/proc/cgroups`, for this acceptance check.
 ### Controlled live-validation sequence
 
 For the first physical run, stop after any failed step and keep the Pi within
-its configured loopback or trusted-LAN boundary:
+its exact trusted-LAN-plus-loopback boundary:
 
 1. Run the fact and SSH preflight commands before the playbook.
 2. Run provisioning once and observe the immediate catch-up deployment when it
@@ -380,7 +445,8 @@ its configured loopback or trusted-LAN boundary:
    runtime UID/GID, and exact memory limit before making a live opportunity
    request.
 4. Run the same playbook again. Review the recap and investigate unexpected
-   changes; the host and application configuration should remain intact.
+   changes; the host and application configuration should remain intact, while
+   Tailscale remains unenrolled and Funnel remains inactive.
 5. Reboot the Pi, then verify the recorded digest starts and becomes ready
    without GHCR being part of the startup path.
 6. After a later healthy `main` publication, confirm the next timer cycle starts
@@ -661,6 +727,9 @@ services/timers, and may pull/start the application.
 
 - [Install Docker Engine on Debian](https://docs.docker.com/engine/install/debian/)
 - [Tailscale packages for Debian Trixie](https://pkgs.tailscale.com/stable/#debian-trixie)
+- [Tailscale Funnel requirements](https://tailscale.com/docs/features/tailscale-funnel)
+- [Tailscale Funnel CLI](https://tailscale.com/docs/reference/tailscale-cli/funnel)
+- [Tailscale interactive enrollment CLI](https://tailscale.com/docs/reference/tailscale-cli/up)
 - [Docker local logging driver](https://docs.docker.com/engine/logging/drivers/local/)
 - [Raspberry Pi kernel command line](https://www.raspberrypi.com/documentation/computers/config_txt.html#kernel-command-line-cmdlinetxt)
 - [Raspberry Pi memory-cgroup override](https://github.com/raspberrypi/linux/issues/6980#issuecomment-3149752155)
