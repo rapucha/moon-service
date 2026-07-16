@@ -45,10 +45,16 @@ fi
 
 if [[ "$url" == */app/installations/*/access_tokens && "$method" == POST ]]; then
     printf '{"token":"ghs_test-installation-token"}\n'
-elif [[ "$url" == *'/deployments?sha='* && "$method" == GET ]]; then
+elif [[ "$url" == *'/deployments?'* && "$method" == GET ]]; then
     cat "$FAKE_GITHUB_ROOT/deployments.json"
 elif [[ "$url" == *'/statuses?per_page=1' && "$method" == GET ]]; then
-    cat "$FAKE_GITHUB_ROOT/statuses.json"
+    deployment_id="${url%/statuses?per_page=1}"
+    deployment_id="${deployment_id##*/}"
+    if [[ -f "$FAKE_GITHUB_ROOT/statuses-$deployment_id.json" ]]; then
+        cat "$FAKE_GITHUB_ROOT/statuses-$deployment_id.json"
+    else
+        cat "$FAKE_GITHUB_ROOT/statuses.json"
+    fi
 elif [[ "$url" == */statuses && "$method" == POST ]]; then
     printf '%s\n' "$body" >>"$FAKE_GITHUB_ROOT/reports.jsonl"
     printf '{"id":99,"state":%s}\n' "$(jq -c '.state' <<<"$body")"
@@ -69,6 +75,7 @@ def read_env(path: Path) -> dict[str, str]:
 
 class GitHubDeploymentReportTest(unittest.TestCase):
     digest = "sha256:" + "a" * 64
+    fingerprint = "sha256:" + "f" * 64
     revision = "1" * 40
 
     def setUp(self):
@@ -110,6 +117,8 @@ class GitHubDeploymentReportTest(unittest.TestCase):
                     "MOON_GITHUB_REPOSITORY=rapucha/moon-service",
                     "MOON_GITHUB_DEPLOYMENT_TASK=deploy:raspberry-pi",
                     "MOON_GITHUB_DEPLOYMENT_ENVIRONMENT=raspberry-pi",
+                    "MOON_GITHUB_HOST_DEPLOYMENT_TASK=provision:raspberry-pi",
+                    "MOON_GITHUB_HOST_DEPLOYMENT_ENVIRONMENT=raspberry-pi-host-config",
                     "MOON_GITHUB_APP_ID=1234",
                     "MOON_GITHUB_APP_INSTALLATION_ID=5678",
                     f"MOON_GITHUB_APP_PRIVATE_KEY_FILE={self.private_key}",
@@ -151,6 +160,18 @@ class GitHubDeploymentReportTest(unittest.TestCase):
             json.dumps(deployments), encoding="utf-8"
         )
 
+    def host_deployment(self, deployment_id: int, *, fingerprint=None):
+        return {
+            "id": deployment_id,
+            "sha": self.revision,
+            "task": "provision:raspberry-pi",
+            "environment": "raspberry-pi-host-config",
+            "payload": {
+                "schema_version": 1,
+                "host_configuration_fingerprint": fingerprint or self.fingerprint,
+            },
+        }
+
     def run_report(self, state="success", **environment):
         values = self.environment | {key: str(value) for key, value in environment.items()}
         return subprocess.run(
@@ -161,6 +182,23 @@ class GitHubDeploymentReportTest(unittest.TestCase):
                 self.digest,
                 self.revision,
                 "Pi verified the exact deployment identity",
+            ],
+            check=False,
+            capture_output=True,
+            text=True,
+            env=values,
+        )
+
+    def run_host_report(self, fingerprint=None, **environment):
+        values = self.environment | {key: str(value) for key, value in environment.items()}
+        return subprocess.run(
+            [
+                "bash",
+                str(REPORT_SCRIPT),
+                "host",
+                "success",
+                fingerprint or self.fingerprint,
+                "Pi converged to the exact tracked host configuration",
             ],
             check=False,
             capture_output=True,
@@ -204,6 +242,85 @@ class GitHubDeploymentReportTest(unittest.TestCase):
         self.assertEqual(
             "no-match", read_env(self.state / "last-github-report.env")["RESULT"]
         )
+
+    def test_image_report_ignores_an_unrelated_opaque_payload(self):
+        self.set_deployments(
+            [
+                {"id": 40, "task": "unrelated", "payload": "opaque"},
+                self.deployment(41),
+            ]
+        )
+
+        result = self.run_report()
+
+        self.assertEqual(0, result.returncode, result.stderr)
+        self.assertEqual(["success"], [item["state"] for item in self.reports()])
+        self.assertEqual(
+            "41", read_env(self.state / "last-github-report.env")["DEPLOYMENT_IDS"]
+        )
+
+    def test_reports_matching_host_fingerprint_separately(self):
+        self.set_deployments([self.host_deployment(51), self.host_deployment(52)])
+
+        result = self.run_host_report()
+
+        self.assertEqual(0, result.returncode, result.stderr)
+        self.assertEqual(["success"], [item["state"] for item in self.reports()])
+        self.assertEqual("raspberry-pi-host-config", self.reports()[0]["environment"])
+        last_report = read_env(self.state / "last-host-github-report.env")
+        self.assertEqual("reported", last_report["RESULT"])
+        self.assertEqual(self.fingerprint, last_report["FINGERPRINT"])
+        self.assertEqual("52", last_report["DEPLOYMENT_IDS"])
+        self.assertNotIn(
+            "/deployments/51/statuses", (self.root / "curl-arguments.log").read_text()
+        )
+        self.assertFalse((self.state / "last-github-report.env").exists())
+
+    def test_terminal_newest_host_request_does_not_fall_back(self):
+        self.set_deployments([self.host_deployment(51), self.host_deployment(52)])
+        (self.root / "statuses-51.json").write_text(
+            '[{"id":1,"state":"queued"}]\n', encoding="utf-8"
+        )
+        (self.root / "statuses-52.json").write_text(
+            '[{"id":2,"state":"success"}]\n', encoding="utf-8"
+        )
+
+        result = self.run_host_report()
+
+        self.assertEqual(0, result.returncode, result.stderr)
+        self.assertEqual([], self.reports())
+        last_report = read_env(self.state / "last-host-github-report.env")
+        self.assertEqual("already-terminal", last_report["RESULT"])
+        self.assertEqual("52", last_report["DEPLOYMENT_IDS"])
+        self.assertNotIn(
+            "/deployments/51/statuses", (self.root / "curl-arguments.log").read_text()
+        )
+
+    def test_host_report_rejects_mismatched_and_malformed_fingerprints(self):
+        self.set_deployments(
+            [self.host_deployment(51, fingerprint="sha256:" + "e" * 64)]
+        )
+
+        mismatch = self.run_host_report()
+        malformed = self.run_host_report("private-inventory-value")
+
+        self.assertEqual(0, mismatch.returncode, mismatch.stderr)
+        self.assertEqual(
+            "no-match", read_env(self.state / "last-host-github-report.env")["RESULT"]
+        )
+        self.assertEqual(65, malformed.returncode, malformed.stderr)
+        self.assertEqual([], self.reports())
+
+    def test_host_api_failure_remains_separate_and_retryable(self):
+        self.set_deployments([self.host_deployment(51)])
+
+        result = self.run_host_report(FAKE_GITHUB_FAIL=1)
+
+        self.assertEqual(1, result.returncode)
+        self.assertEqual(
+            "api-failed", read_env(self.state / "last-host-github-report.env")["RESULT"]
+        )
+        self.assertFalse((self.state / "last-github-report.env").exists())
 
     def test_waits_for_workflow_to_create_the_initial_queued_status(self):
         (self.root / "statuses.json").write_text("[]\n", encoding="utf-8")

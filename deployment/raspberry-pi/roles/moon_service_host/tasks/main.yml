@@ -25,6 +25,10 @@
       - moon_service_github_repository == "rapucha/moon-service"
       - moon_service_github_deployment_task == "deploy:raspberry-pi"
       - moon_service_github_deployment_environment == "raspberry-pi"
+      - moon_service_github_host_deployment_task == "provision:raspberry-pi"
+      - >-
+        moon_service_github_host_deployment_environment
+        == "raspberry-pi-host-config"
       - moon_service_github_app_private_key_path == "/etc/moon-service/github-app-private-key.pem"
       - moon_service_compose_dir == "/opt/moon-service"
       - moon_service_config_dir == "/etc/moon-service"
@@ -38,6 +42,26 @@
       SSH public-key path in the ignored inventory. Issue #95 uses the fixed
       Moon Service repository, group, host paths, and a callback timeout no
       longer than 60 seconds.
+
+- name: Calculate the tracked host-configuration fingerprint
+  ansible.builtin.set_fact:
+    _moon_service_host_configuration_fingerprint: >-
+      {{ lookup(
+           'ansible.builtin.pipe',
+           (ansible_playbook_python | quote)
+           ~ ' '
+           ~ ((playbook_dir + '/host-contract-fingerprint.py') | quote)
+         ) | trim }}
+
+- name: Validate the tracked host-configuration fingerprint
+  ansible.builtin.assert:
+    that:
+      - >-
+        _moon_service_host_configuration_fingerprint
+        is match('^sha256:[0-9a-f]{64}$')
+    fail_msg: >-
+      The controller could not derive the deterministic tracked host-role
+      fingerprint. Run provisioning from the Moon Service Git checkout.
 
 - name: Validate the application listener boundary
   ansible.builtin.include_tasks: validate-bind-address.yml
@@ -919,3 +943,31 @@
       deployment automation remains unhealthy.
   loop: "{{ _moon_service_enabled_timer_schedules.results }}"
   when: not ansible_check_mode
+
+- name: Record the applied host-configuration fingerprint
+  ansible.builtin.copy:
+    dest: "{{ moon_service_state_dir }}/applied-host-configuration.env"
+    content: |
+      MOON_HOST_CONFIGURATION_FINGERPRINT={{ _moon_service_host_configuration_fingerprint }}
+    owner: root
+    group: root
+    mode: "0600"
+  when: not ansible_check_mode
+
+- name: Report successful host-configuration convergence
+  ansible.builtin.command:
+    argv:
+      - /usr/bin/timeout
+      - --signal=TERM
+      - --kill-after=5s
+      - "{{ moon_service_github_report_timeout_seconds }}s"
+      - /usr/local/sbin/moon-service-github-report
+      - host
+      - success
+      - "{{ _moon_service_host_configuration_fingerprint }}"
+      - Pi converged to the exact tracked host-configuration fingerprint
+  changed_when: false
+  failed_when: false
+  when:
+    - not ansible_check_mode
+    - _moon_service_github_reporting_enabled

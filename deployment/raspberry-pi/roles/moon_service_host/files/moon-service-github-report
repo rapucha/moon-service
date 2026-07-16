@@ -18,6 +18,8 @@ GITHUB_REPOSITORY="${MOON_GITHUB_REPOSITORY:-rapucha/moon-service}"
 IMAGE_REPOSITORY="${MOON_IMAGE_REPOSITORY:-ghcr.io/rapucha/moon-service}"
 DEPLOYMENT_TASK="${MOON_GITHUB_DEPLOYMENT_TASK:-deploy:raspberry-pi}"
 DEPLOYMENT_ENVIRONMENT="${MOON_GITHUB_DEPLOYMENT_ENVIRONMENT:-raspberry-pi}"
+HOST_DEPLOYMENT_TASK="${MOON_GITHUB_HOST_DEPLOYMENT_TASK:-provision:raspberry-pi}"
+HOST_DEPLOYMENT_ENVIRONMENT="${MOON_GITHUB_HOST_DEPLOYMENT_ENVIRONMENT:-raspberry-pi-host-config}"
 GITHUB_APP_ID="${MOON_GITHUB_APP_ID:-}"
 GITHUB_APP_INSTALLATION_ID="${MOON_GITHUB_APP_INSTALLATION_ID:-}"
 GITHUB_APP_PRIVATE_KEY_FILE="${MOON_GITHUB_APP_PRIVATE_KEY_FILE:-}"
@@ -30,22 +32,34 @@ DATE_BIN="${MOON_DATE_BIN:-date}"
 
 usage() {
     printf 'Usage: %s {in_progress|success|failure} DIGEST REVISION DESCRIPTION\n' "$0" >&2
+    printf '       %s host success FINGERPRINT DESCRIPTION\n' "$0" >&2
     exit 64
 }
 
 [[ $# -eq 4 ]] || usage
-REQUESTED_STATE="$1"
-DIGEST="$2"
-REVISION="$3"
-DESCRIPTION="$4"
-
-case "$REQUESTED_STATE" in
-    in_progress|success|failure) ;;
-    *) usage ;;
-esac
-
-[[ "$DIGEST" =~ ^sha256:[0-9a-f]{64}$ ]] || exit 65
-[[ "$REVISION" =~ ^[0-9a-f]{40}$ ]] || exit 65
+REPORT_KIND=image
+HOST_FINGERPRINT=none
+if [[ "$1" == host ]]; then
+    REPORT_KIND=host
+    REQUESTED_STATE="$2"
+    HOST_FINGERPRINT="$3"
+    DESCRIPTION="$4"
+    DIGEST=none
+    REVISION=none
+    [[ "$REQUESTED_STATE" == success ]] || usage
+    [[ "$HOST_FINGERPRINT" =~ ^sha256:[0-9a-f]{64}$ ]] || exit 65
+else
+    REQUESTED_STATE="$1"
+    DIGEST="$2"
+    REVISION="$3"
+    DESCRIPTION="$4"
+    case "$REQUESTED_STATE" in
+        in_progress|success|failure) ;;
+        *) usage ;;
+    esac
+    [[ "$DIGEST" =~ ^sha256:[0-9a-f]{64}$ ]] || exit 65
+    [[ "$REVISION" =~ ^[0-9a-f]{40}$ ]] || exit 65
+fi
 [[ "$DESCRIPTION" != *$'\n'* && ${#DESCRIPTION} -le 140 ]] || exit 65
 
 if [[ "$REPORTING_ENABLED" == false ]]; then
@@ -57,20 +71,31 @@ fi
 [[ "$IMAGE_REPOSITORY" =~ ^ghcr\.io/[a-z0-9][a-z0-9._/-]*$ ]] || exit 65
 [[ "$DEPLOYMENT_TASK" =~ ^[A-Za-z0-9][A-Za-z0-9:._-]{0,63}$ ]] || exit 65
 [[ "$DEPLOYMENT_ENVIRONMENT" =~ ^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$ ]] || exit 65
+[[ "$HOST_DEPLOYMENT_TASK" =~ ^[A-Za-z0-9][A-Za-z0-9:._-]{0,63}$ ]] || exit 65
+[[ "$HOST_DEPLOYMENT_ENVIRONMENT" =~ ^[A-Za-z0-9][A-Za-z0-9:._-]{0,63}$ ]] || exit 65
 [[ "$GITHUB_APP_ID" =~ ^[0-9]+$ ]] || exit 65
 [[ "$GITHUB_APP_INSTALLATION_ID" =~ ^[0-9]+$ ]] || exit 65
 [[ -r "$GITHUB_APP_PRIVATE_KEY_FILE" ]] || exit 66
 [[ "$GITHUB_API_URL" =~ ^https://[A-Za-z0-9.-]+(:[0-9]+)?(/.*)?$ ]] || exit 65
 
-LAST_REPORT="$STATE_DIR/last-github-report.env"
+if [[ "$REPORT_KIND" == image ]]; then
+    LAST_REPORT="$STATE_DIR/last-github-report.env"
+    REPORT_TASK="$DEPLOYMENT_TASK"
+    REPORT_ENVIRONMENT="$DEPLOYMENT_ENVIRONMENT"
+else
+    LAST_REPORT="$STATE_DIR/last-host-github-report.env"
+    REPORT_TASK="$HOST_DEPLOYMENT_TASK"
+    REPORT_ENVIRONMENT="$HOST_DEPLOYMENT_ENVIRONMENT"
+fi
 mkdir -p "$STATE_DIR"
 chmod 0700 "$STATE_DIR"
-AUTH_HEADER_FILE="$(mktemp "$STATE_DIR/.github-auth.XXXXXX")"
-chmod 0600 "$AUTH_HEADER_FILE"
-trap 'rm -f "$AUTH_HEADER_FILE"' EXIT
+AUTH_HEADER_FILE=
+trap '[[ -z "$AUTH_HEADER_FILE" ]] || rm -f "$AUTH_HEADER_FILE"' EXIT
 trap 'exit 129' HUP
 trap 'exit 130' INT
 trap 'exit 143' TERM
+AUTH_HEADER_FILE="$(mktemp "$STATE_DIR/.github-auth.XXXXXX")"
+chmod 0600 "$AUTH_HEADER_FILE"
 
 record_report() {
     local result="$1"
@@ -81,8 +106,12 @@ record_report() {
         printf 'RESULT=%s\n' "$result"
         printf 'STATE=%s\n' "$REQUESTED_STATE"
         printf 'AT=%s\n' "$("$DATE_BIN" -u +%Y-%m-%dT%H:%M:%SZ)"
-        printf 'DIGEST=%s\n' "$DIGEST"
-        printf 'REVISION=%s\n' "$REVISION"
+        if [[ "$REPORT_KIND" == image ]]; then
+            printf 'DIGEST=%s\n' "$DIGEST"
+            printf 'REVISION=%s\n' "$REVISION"
+        else
+            printf 'FINGERPRINT=%s\n' "$HOST_FINGERPRINT"
+        fi
         printf 'DEPLOYMENT_IDS=%s\n' "$deployment_ids"
     } >"$temporary"
     chmod 0600 "$temporary"
@@ -171,10 +200,12 @@ token="$(create_installation_token)" || {
     exit 1
 }
 
-deployments_json="$(
-    github_api_get "$token" \
-        "/repos/$GITHUB_REPOSITORY/deployments?sha=$REVISION&per_page=100"
-)" || {
+if [[ "$REPORT_KIND" == image ]]; then
+    deployments_path="/repos/$GITHUB_REPOSITORY/deployments?sha=$REVISION&per_page=100"
+else
+    deployments_path="/repos/$GITHUB_REPOSITORY/deployments?environment=$HOST_DEPLOYMENT_ENVIRONMENT&per_page=100"
+fi
+deployments_json="$(github_api_get "$token" "$deployments_path")" || {
     record_report api-failed
     exit 1
 }
@@ -183,26 +214,41 @@ deployments_json="$(
     exit 1
 }
 
-mapfile -t deployment_ids < <(
-    "$JQ_BIN" -r \
-        --arg task "$DEPLOYMENT_TASK" \
-        --arg environment "$DEPLOYMENT_ENVIRONMENT" \
-        --arg repository "$IMAGE_REPOSITORY" \
-        --arg digest "$DIGEST" \
-        --arg revision "$REVISION" '
-        map(select(.task == $task))
-        | map(select(.environment == $environment))
-        | map(select(.sha == $revision))
-        | map(select(.payload.schema_version == 1))
+if [[ "$REPORT_KIND" == image ]]; then
+    deployment_filter='map(select(.sha == $revision))
         | map(select(.payload.image_repository == $repository))
         | map(select(.payload.image_digest == $digest))
-        | map(select(.payload.image_revision == $revision))
-        | sort_by(.id)
-        | reverse
-        | .[].id
-        | select(type == "number")
-    ' <<<"$deployments_json"
-)
+        | map(select(.payload.image_revision == $revision))'
+    deployment_limit='.'
+else
+    deployment_filter='map(select(.payload.host_configuration_fingerprint == $fingerprint))'
+    deployment_limit='.[0:1]'
+fi
+deployment_ids_output="$(
+    "$JQ_BIN" -r \
+        --arg task "$REPORT_TASK" \
+        --arg environment "$REPORT_ENVIRONMENT" \
+        --arg repository "$IMAGE_REPOSITORY" \
+        --arg digest "$DIGEST" \
+        --arg revision "$REVISION" \
+        --arg fingerprint "$HOST_FINGERPRINT" \
+        "map(select(type == \"object\"))
+        | map(select(.task == \$task))
+        | map(select(.environment == \$environment))
+        | map(select((.payload | type) == \"object\"))
+        | map(select(.payload.schema_version == 1))
+        | $deployment_filter
+        | sort_by(.id) | reverse | $deployment_limit
+        | .[].id | select(type == \"number\")" \
+        <<<"$deployments_json"
+)" || {
+    record_report api-failed
+    exit 1
+}
+deployment_ids=()
+if [[ -n "$deployment_ids_output" ]]; then
+    mapfile -t deployment_ids <<<"$deployment_ids_output"
+fi
 
 if (( ${#deployment_ids[@]} == 0 )); then
     record_report no-match
@@ -268,7 +314,7 @@ for deployment_id in "${deployment_ids[@]}"; do
         "$JQ_BIN" -cn \
             --arg state "$REQUESTED_STATE" \
             --arg description "$DESCRIPTION" \
-            --arg environment "$DEPLOYMENT_ENVIRONMENT" \
+            --arg environment "$REPORT_ENVIRONMENT" \
             '{
               state: $state,
               environment: $environment,

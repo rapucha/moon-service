@@ -559,6 +559,40 @@ A 15-minute waiter timeout does not post a terminal `error` status. A Pi success
 that arrives late therefore remains authoritative, and a confirm-only workflow
 rerun can validate the stored creation attempt and accept it.
 
+### Separate host-configuration convergence
+
+The green `raspberry-pi` application Deployment does not claim that a later
+Ansible role change has been applied. The host-convergence consumer reserves
+environment `raspberry-pi-host-config`, task `provision:raspberry-pi`, for that
+independent point-in-time state. This slice does not create those requests; the
+separate workflow producer tracked in issue #145 must land after the consumer.
+Until then, provisioning records a nonfatal `no-match` callback result.
+
+The fingerprint covers the path-framed bytes of every Git-tracked file under
+`deployment/raspberry-pi/roles/moon_service_host/`, sorted by repository-relative
+path. Its versioned SHA-256 framing excludes ignored inventory, controller keys,
+addresses, and all other private inputs. Reproduce the working-tree identity
+from the repository root with:
+
+```bash
+python3 deployment/raspberry-pi/host-contract-fingerprint.py
+```
+
+Provisioning calculates the same identity on the controller. Only after all
+role tasks and final exact memory, listener, readiness, and finite-timer checks
+succeed does it atomically replace `applied-host-configuration.env` and ask the
+existing repository-scoped GitHub App to report success for the newest exact
+matching queued request. An interruption before the final assertions retains
+the previous applied identity. After persistence, reporting is independent: an
+API failure retains the newly applied local identity and leaves the GitHub
+request retryable by a later idempotent playbook run.
+
+After the producer is enabled, this signal proves that one fingerprint
+converged at a point in time. It is not continuous monitoring and does not make
+GitHub Actions execute Ansible, reach the Pi inbound, or learn private inventory
+values. A green application Deployment and queued host-configuration Deployment
+may then correctly coexist.
+
 A failed candidate is recorded in `rejected.env`. Later timer runs do not
 reintroduce two-minute outages by retrying the same bad digest. A newly
 published digest is tried normally. After correcting a host-only problem, use
@@ -576,6 +610,10 @@ State is under `/var/lib/moon-service`:
 - `last-result.env`: latest update/control outcome;
 - `last-github-report.env`: latest callback result, status, exact identity, and
   matching Deployment IDs, without tokens or private-key material;
+- `applied-host-configuration.env`: last fingerprint recorded only after full
+  Ansible convergence;
+- `last-host-github-report.env`: latest non-secret host-convergence callback
+  result and matching Deployment IDs;
 - `automatic-updates-held`: present after a manual rollback;
 - `memory-limit-remediation`: prevents automation from being re-enabled after
   an interrupted or failed host memory-limit repair;
