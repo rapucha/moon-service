@@ -143,6 +143,27 @@ allows a late exact success to remain visible; a confirm-only rerun can validate
 the stored creation attempt and accept that status without creating a new image
 deployment.
 
+## Independent Host-Configuration Status
+
+Application deployment success remains scoped to the exact image identity. A
+separate non-production GitHub Deployment uses environment
+`raspberry-pi-host-config` and task `provision:raspberry-pi` to show whether the
+tracked Ansible host role has been applied.
+
+After promotion, a parallel workflow job calculates the versioned SHA-256
+fingerprint of the path-framed tracked bytes under
+`deployment/raspberry-pi/roles/moon_service_host/`. When the newest valid host
+request overall has the same fingerprint, the job reuses its authoritative
+success or unfinished state; otherwise it queues a new request and supersedes
+older unfinished requests. It does not wait for manual provisioning and cannot
+block the existing image confirmation job.
+
+The playbook records the applied fingerprint only after its final convergence
+assertions and uses the existing outbound deployment-reporter App to complete
+an exact matching request. No inventory address, key, token, or rendered
+private value enters the fingerprint or Deployment payload. This is
+point-in-time configuration evidence, not continuous monitoring.
+
 ## One-Time Repository Setup
 
 Before enabling the main-only confirmation gate, install the deployment-reporter

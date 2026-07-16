@@ -562,11 +562,11 @@ rerun can validate the stored creation attempt and accept it.
 ### Separate host-configuration convergence
 
 The green `raspberry-pi` application Deployment does not claim that a later
-Ansible role change has been applied. The host-convergence consumer reserves
-environment `raspberry-pi-host-config`, task `provision:raspberry-pi`, for that
-independent point-in-time state. This slice does not create those requests; the
-separate workflow producer tracked in issue #145 must land after the consumer.
-Until then, provisioning records a nonfatal `no-match` callback result.
+Ansible role change has been applied. After image promotion, a parallel workflow
+job queues or reuses independent point-in-time state in environment
+`raspberry-pi-host-config`, task `provision:raspberry-pi`. It does not run
+Ansible or block image publication and confirmation; manual provisioning remains
+the consumer that completes the exact request.
 
 The fingerprint covers the path-framed bytes of every Git-tracked file under
 `deployment/raspberry-pi/roles/moon_service_host/`, sorted by repository-relative
@@ -587,11 +587,10 @@ the previous applied identity. After persistence, reporting is independent: an
 API failure retains the newly applied local identity and leaves the GitHub
 request retryable by a later idempotent playbook run.
 
-After the producer is enabled, this signal proves that one fingerprint
-converged at a point in time. It is not continuous monitoring and does not make
-GitHub Actions execute Ansible, reach the Pi inbound, or learn private inventory
-values. A green application Deployment and queued host-configuration Deployment
-may then correctly coexist.
+This signal proves that one fingerprint converged at a point in time. It is not
+continuous monitoring and does not make GitHub Actions execute Ansible, reach
+the Pi inbound, or learn private inventory values. A green application
+Deployment and queued host-configuration Deployment may correctly coexist.
 
 A failed candidate is recorded in `rejected.env`. Later timer runs do not
 reintroduce two-minute outages by retrying the same bad digest. A newly
