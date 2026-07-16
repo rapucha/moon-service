@@ -61,8 +61,11 @@ suggested best time inside that window.
 
 - `startsAt` and `endsAt` describe the natural interval where the Moon is visible
   for the location and remains inside the configured visible-Moon ceiling.
-- `suggestedAt` is the strongest moment found inside that interval according to
-  the v0 rule-based score.
+- The target contract defines `suggestedAt` as the strongest moment inside the
+  interval according to the full v0 rule-based score.
+- The current implementation selects `suggestedAt` from five-minute candidates
+  using Moon-altitude fit plus sunlight fit. Illumination, weather, and forecast
+  confidence affect the later window ranking, not this time selection.
 - The service should not present `suggestedAt` as a guaranteed best photograph,
   exact landmark alignment, or exact local-horizon visibility time.
 - UI, feed, and calendar wording should say that local hills, buildings, trees,
@@ -114,6 +117,10 @@ Future recurring event context:
 - Source confidence and active date range.
 
 ## V0 Weather Assessment
+
+This section describes the target V0 segmentation model. The current engine
+uses the hourly forecast record covering `suggestedAt`; it does not yet split
+and merge natural windows at weather-change boundaries.
 
 Assess weather by forecast change intervals, not by a fixed Moon/Sun sampling
 cadence.
@@ -175,6 +182,11 @@ current-condition display or short-term precipitation refinement, but they
 should not drive the first scoring contract.
 
 ## V0 Selection Rules
+
+These are target policy rules. In the current implementation, only the
+thin-crescent near-conjunction rule below hard-rejects a retained natural
+window. Weather and visibility contribute to its score, and there is no minimum
+total-score threshold.
 
 Reject opportunities when:
 
@@ -249,6 +261,11 @@ Sort candidate windows by:
 - Forecast confidence, including forecast age and distance into the horizon.
 - Earlier local time when quality is otherwise similar.
 
+The current implementation realizes this direction with five additive
+component scores—Moon altitude, sunlight, illumination, weather, and forecast
+confidence. It orders total score descending, uses earlier `suggestedAt` as the
+tie-breaker, and applies the result limit without a minimum-score cutoff.
+
 Moon altitude assessment:
 
 - Prefer portions near 1 to 6 degrees for classic horizon compositions.
@@ -292,6 +309,49 @@ Forecast confidence:
 
 - Use confidence to reduce alert urgency.
 - If confidence is not available, expose a neutral confidence state rather than fabricating precision.
+
+## Implemented V0 Evaluation Flow
+
+The diagram below describes executable behavior, not every target rule above.
+For browser GET, the engine obtains an hourly forecast before entering this
+pipeline and uses the record covering each retained window's `suggestedAt`.
+Direct POST instead uses the fixed Prague fixture weather.
+
+```mermaid
+flowchart TD
+    A["Resolved or fixture location, request, and weather source"] --> B["Generate natural visible-Moon pass windows from ephemeris"]
+    B --> C{"Any generated windows?"}
+    C -- No --> N["No scored candidates"]
+    C -- Yes --> D["For each window, choose suggestedAt by Moon-altitude plus sunlight fit"]
+    D --> E["For browser GET: discard an ended window or move suggestedAt to now or later; direct POST keeps it"]
+    E --> F{"Window retained?"}
+    F -- No --> X["Omit the ended window"]
+    F -- Yes --> G{"Thin crescent near conjunction?"}
+    G -- Yes --> R["Record a rejected window"]
+    G -- No --> H["Get weather at suggestedAt: hourly record for GET or fixture for POST"]
+    H --> I["Score altitude, sunlight, illumination, weather, and forecast confidence"]
+    I --> J["Add the summed-score candidate"]
+    X --> P["After all generated windows"]
+    R --> P
+    J --> P
+    N --> K["Sort total descending; earlier suggestedAt breaks ties"]
+    P --> K["Sort total descending; earlier suggestedAt breaks ties"]
+    K --> L["Apply the default or caller limit; no minimum score"]
+    L --> M["Format status ok and opportunities, possibly empty"]
+```
+
+In prose: generation can yield no windows; live GET adjustment can remove every
+ended window; and the visibility rule can reject every retained window. Each
+case still produces a successful `ok` response with an empty opportunity list.
+Weather currently lowers or raises a component score rather than rejecting a
+window. The only explicit rejection is Moon illumination below 1 percent
+together with Sun-Moon separation below 8 degrees.
+
+The implementation authority is the
+[window generator](../prototypes/jvm-scoring/src/main/java/dev/moonservice/scoringprototype/window/WindowGenerator.java),
+[live-window selector](../backend/src/main/java/dev/moonservice/backend/opportunity/scoring/LiveOpportunityWindowSelector.java),
+[opportunity pipeline](../prototypes/jvm-scoring/src/main/java/dev/moonservice/scoringprototype/service/OpportunityService.java),
+and [scoring model](../prototypes/jvm-scoring/src/main/java/dev/moonservice/scoringprototype/scoring/ScoringModel.java).
 
 ## V0 Scoring Policy Tests
 
