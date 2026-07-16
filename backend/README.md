@@ -367,6 +367,8 @@ one-location, seven-day, eight-variable weather request counts as one call under
 the published [pricing rules](https://open-meteo.com/en/pricing). A restart
 restores both bursts, so this is not a durable calendar-day quota. No Tomcat
 connector limit or network-shaping guarantee is implied.
+The two-page [resource-admission diagrams](../docs/diagrams/hosted-alpha-resource-limits.pdf)
+show the filter sequence and TokenBucket refill, consumption, and retry mechanics.
 
 ### Operational health
 
