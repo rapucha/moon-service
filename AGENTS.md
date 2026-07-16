@@ -134,6 +134,7 @@ When reporting delegated project reviews to the user, use these role callsigns:
 - **Grady Booch** — `issue-design-review`
 - **Martin Fowler** — `implementation-scope-review`
 - **Dennis Ritchie** — `second-agent-review`
+- **Bruce Schneier** — `sensitive-information-review`
 
 Each review must still use the fresh AI subagent required by its skill. These
 callsigns do not imply that the named people participate in, endorse, or supply
@@ -274,6 +275,36 @@ intended diff and use `$second-agent-review` with a fresh read-only agent. Triag
 every finding, fix accepted findings narrowly, record reasons for rejected or
 deferred findings, rerun relevant checks, and summarize the review outcome in
 the PR.
+
+Before any agent-authored push and again before the final handoff of a
+nontrivial PR, use `$sensitive-information-review` with a fresh read-only agent.
+The pre-push review must use the exact source ref and actual remote destination;
+the final-PR review must use the actual base and head. Both reviews inspect all
+commit messages and every introduced or modified blob version in the selected
+publication range, including intermediate versions absent from the final diff.
+They also inspect relevant agent-authored PR text and accessible in-scope
+attachments, including PDFs and other documents. Git LFS pointer blobs require
+inspection of their referenced payloads. Do not substitute a net diff or broaden
+the review into unrelated local secrets and uncommitted work.
+
+Immediately before the relevant publication step, re-resolve the complete push
+refspec set for a push, the reviewed refs/object IDs, and the reviewed in-scope
+PR surface state. Any changed ref, refspec, push option, relevant PR text,
+comment, reply, or attachment invalidates the verdict and requires a fresh
+review; never publish against a stale `clear`. Record any pre-push result before
+the final review, then report the final verdict out of band without adding a PR
+comment that would invalidate it.
+
+The sensitive-information reviewer returns `clear`, `review_required`, or
+`block`. A `block` verdict stops the push or final PR handoff. Treat
+`review_required` as unresolved until the owner decides or full coverage is
+restored; never present it as a passed gate. Report candidates only through
+opaque review-local IDs and sanitized locations, never by reproducing or
+fingerprinting the value. Missing document tooling, encryption, malformed or
+unsupported content, unsafe extraction, or exceeded inspection bounds prevents
+a `clear` result. The reviewer never executes active content or performs
+remediation. Pre-commit use is optional and occurs only when explicitly
+requested; it does not replace either mandatory publication review.
 
 Treat implementation work as nontrivial when it changes runtime behavior,
 public contracts, scoring or data transformation, provider/privacy/security

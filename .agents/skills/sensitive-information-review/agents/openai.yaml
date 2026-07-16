@@ -1,0 +1,4 @@
+interface:
+  display_name: "Sensitive Information Review"
+  short_description: "Scan outgoing work and documents for sensitive data"
+  default_prompt: "Use $sensitive-information-review to inspect outgoing commits, PR material, and attached documents before publication."
