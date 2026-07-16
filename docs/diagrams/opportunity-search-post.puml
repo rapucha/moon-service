@@ -1,0 +1,40 @@
+@startuml
+skinparam defaultFontName "DejaVu Sans"
+skinparam defaultFontSize 15
+skinparam shadowing false
+skinparam roundcorner 8
+skinparam sequenceMessageAlign left
+skinparam responseMessageBelowArrow true
+hide footbox
+
+title Direct POST /api/opportunities/search
+autonumber 1 "<b>[00]"
+
+actor "Prototype or test caller" as Caller
+participant "Controller" as API
+participant "Opportunity engine\nand scoring pipeline" as Engine
+
+note over Caller, Engine
+  The browser does not use this ordinary-mode path.
+  It accepts only the Prague fixture and fixture weather;
+  no live geocoding or weather provider is called.
+end note
+
+Caller -> API: POST direct scoring JSON
+API -> API: Parse and validate the request body
+
+alt Malformed, incomplete, or invalid fields
+  API --> Caller: 400 invalid_request
+else Valid request shape
+  API -> Engine: Evaluate prototype request
+  alt Unsupported fixture or out-of-range value
+    Engine --> API: Invalid request
+    API --> Caller: 400 invalid_request
+  else Valid Prague request
+    Engine -> Engine: Generate and score with caller horizon, ceiling, and limit
+    Engine --> API: Opportunity result
+    API --> Caller: 200 opportunity result
+  end
+end
+
+@enduml

@@ -1,0 +1,69 @@
+@startuml
+!pragma layout smetana
+skinparam defaultFontName "DejaVu Sans"
+skinparam defaultFontSize 15
+skinparam shadowing false
+skinparam roundcorner 8
+skinparam ArrowColor #455A64
+skinparam activity {
+  BackgroundColor #F8FAFC
+  BorderColor #455A64
+  DiamondBackgroundColor #FFF8E1
+  DiamondBorderColor #8D6E63
+  StartColor #455A64
+  EndColor #455A64
+}
+
+title Implemented V0 opportunity evaluation
+
+start
+:Resolved or fixture location,
+request, and weather source;
+:Generate natural visible-Moon
+pass windows from ephemeris;
+
+if (Any generated windows?) then (yes)
+  while (Unprocessed window remains?) is (yes)
+    :Choose **suggestedAt** from
+    Moon-altitude + sunlight fit;
+
+    if (Browser GET?) then (yes)
+      :Discard an ended window, or move
+      **suggestedAt** to now or later;
+    else (direct POST)
+      :Keep the fixture window unchanged;
+    endif
+
+    if (Window retained?) then (yes)
+      if (Thin crescent near conjunction?) then (yes)
+        :Record a rejected window;
+      else (no)
+        :Select weather at **suggestedAt**:
+        hourly GET record or POST fixture;
+        :Score five components:
+        altitude, sunlight, illumination,
+        weather, and forecast confidence;
+        :Add the summed-score candidate;
+      endif
+    else (no)
+      :Omit the ended window;
+    endif
+  endwhile (no)
+else (no)
+  :No scored candidates;
+endif
+
+:Sort total descending;
+:Break ties by earlier **suggestedAt**;
+:Apply default or caller limit;
+note right: No minimum total-score threshold
+:Format **status: ok** and opportunities;
+note right
+  The opportunity list may be empty when:
+  * no natural windows were generated;
+  * no live portion remained; or
+  * every retained window was rejected.
+end note
+stop
+
+@enduml

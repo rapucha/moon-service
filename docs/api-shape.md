@@ -63,8 +63,9 @@ GET /api/opportunities?q=Praha&lang=cs
 
 `locationId`:
 
-- Optional later parameter for a selected canonical real location or curated fictional location.
-- Useful after `ambiguous_location` so the user can choose a candidate without repeating fuzzy geocoding.
+- Optional alternative to `q` for a selected canonical real location.
+- The current backend accepts provider-backed IDs returned after
+  `ambiguous_location`; curated fictional IDs remain a future contract.
 
 ## Response Statuses
 
@@ -82,13 +83,23 @@ rate_limited
 Meanings:
 
 - `ok`: resolved one location and completed the lookup. For real locations, `opportunities` may contain results or be empty.
-- `ambiguous_location`: multiple plausible real or fictional candidates; user must choose.
-- `location_not_found`: no real geocoding result and no fictional match.
+- `ambiguous_location`: multiple plausible candidates; the current backend
+  returns real geocoding candidates only, while fictional candidates remain a
+  future contract.
+- `location_not_found`: no real geocoding result. The current backend has no
+  fictional fallback.
 - `invalid_request`: missing, empty after trimming, too long, malformed, or unsupported input.
-- `temporarily_unavailable`: geocoding, weather, ephemeris, scoring, or cache dependency failed or timed out.
+- `temporarily_unavailable`: the current backend could not complete geocoding
+  or weather lookup. The target contract may apply the same state to other
+  required dependencies.
 - `rate_limited`: request was valid, but the client or service exceeded an application-level rate limit.
 
-For a resolved real location, `status: "ok"` with `opportunities: []` means scoring completed successfully, but no opportunity passed the current filters/threshold in the forecast window. Dependency failures should not be represented as an empty list.
+For a resolved real location, `status: "ok"` with `opportunities: []` means
+evaluation completed successfully but produced no scored result. Today that can
+mean no natural windows were generated, no live portion remained, or every
+retained window was rejected by the thin-crescent visibility rule. There is no
+minimum total-score threshold. Dependency failures should not be represented as
+an empty list.
 
 HTTP status codes can stay conventional:
 
@@ -363,15 +374,20 @@ Response rules:
   fall back to the containing opportunity's `moon` summary.
 - Do not expose ephemeris sampling cadence such as `stepMinutes` in the public
   API.
-- Weather fields on an opportunity are aggregates over the merged weather
+
+The current engine selects the hourly forecast record covering `suggestedAt`;
+the response's weather summary and aggregate-shaped fields currently describe
+that one record. The target V0 weather-window contract is broader:
+
+- Weather fields on an opportunity should aggregate the merged weather
   interval. V0 uses hourly weather fields because cloud cover is the primary
   scoring input and Open-Meteo exposes cloud-cover layers hourly.
-- Split natural visible-Moon windows at provider forecast change boundaries when
-  those changes affect the recommendation.
-- Merge adjacent intervals when the derived weather class and
+- Natural visible-Moon windows should split at provider forecast change
+  boundaries when those changes affect the recommendation.
+- Adjacent intervals should merge when the derived weather class and
   decision-relevant facts are equivalent.
-- A single opportunity may cover a broad interval when the Moon remains visible
-  and the forecast state is stable.
+- A single opportunity may then cover a broad interval when the Moon remains
+  visible and the forecast state is stable.
 - Avoid wording that implies minute-level weather certainty.
 
 ## Preview Response Examples
@@ -958,9 +974,44 @@ RSS/Atom:
 - Browser may keep recent searches locally with `localStorage`.
 - Backend logs should avoid raw query strings and exact coordinates where possible.
 
-## Internal Service Boundary
+## Implemented Opportunity-Search Sequence
 
-Even with a single opportunity search endpoint, keep internal responsibilities separate:
+The browser uses only `GET /api/opportunities`; the direct POST contract shown
+at the bottom is for ordinary-mode prototype and test callers. In hosted-alpha
+mode, resource admission can return `429` before this application sequence
+begins; the separate [resource-admission diagrams](diagrams/hosted-alpha-resource-limits.pdf)
+cover that filter, its token buckets, and its concurrency permit.
+
+### Browser GET
+
+[![Browser GET opportunity-search sequence](diagrams/opportunity-search-get.svg)](diagrams/opportunity-search-get.svg)
+
+[PlantUML source](diagrams/opportunity-search-get.puml)
+
+### Direct Prototype POST
+
+[![Direct prototype POST opportunity-search sequence](diagrams/opportunity-search-post.svg)](diagrams/opportunity-search-post.svg)
+
+[PlantUML source](diagrams/opportunity-search-post.puml)
+
+In prose: GET validates one lookup input, resolves it through a status-aware
+cache, stops on an ambiguous, missing, or unavailable location, then obtains a
+cached hourly forecast before running the opportunity pipeline. A successful
+pipeline may return an empty list. POST bypasses both live provider paths and
+uses the scoring prototype's sole `prague-cz` fixture and fixed fixture weather.
+
+The implementation authority is the
+[controller](../backend/src/main/java/dev/moonservice/backend/web/OpportunitySearchController.java),
+[search service](../backend/src/main/java/dev/moonservice/backend/opportunity/OpportunitySearchService.java),
+[location cache](../backend/src/main/java/dev/moonservice/backend/location/CachingLocationResolver.java),
+[scoring engine](../backend/src/main/java/dev/moonservice/backend/opportunity/scoring/ScoringOpportunitySearchEngine.java),
+and [weather cache](../backend/src/main/java/dev/moonservice/backend/weather/CachingWeatherForecastProvider.java).
+
+## Target Internal Service Boundary
+
+Even with a single opportunity search endpoint, keep target responsibilities
+separate. Fictional lookup, feed/calendar assembly, and recurring-event search
+below are not implemented by the current opportunity path.
 
 ```text
 opportunity_search
