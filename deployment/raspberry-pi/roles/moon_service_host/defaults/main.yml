@@ -19,6 +19,8 @@ moon_service_github_report_timeout_seconds: 20
 moon_service_github_repository: rapucha/moon-service
 moon_service_github_deployment_task: deploy:raspberry-pi
 moon_service_github_deployment_environment: raspberry-pi
+moon_service_github_host_deployment_task: provision:raspberry-pi
+moon_service_github_host_deployment_environment: raspberry-pi-host-config
 moon_service_github_app_id: ""
 moon_service_github_app_installation_id: ""
 moon_service_github_app_private_key_file: ""
