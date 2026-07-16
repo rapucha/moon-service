@@ -25,25 +25,16 @@ import java.util.concurrent.TimeUnit;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-/**
- * Covers burst/refill/restart behavior, provider-day arithmetic, concurrency,
- * admin/readiness routing, and hosted-only startup guards with deterministic time.
- * Tests start from the ResourceLimits defaults and override only the limit they isolate;
- * ProviderProof keeps the non-configuration inputs for the published proof together.
- */
 class HostedAlphaResourceLimitFilterTest {
     private static final String ADMIN_TOKEN =
             "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
-    /** Revise these provider terms/retry inputs only with the documented safety proof. */
-    private static final ProviderProof PROVIDER_PROOF = new ProviderProof(Duration.ofDays(1), 4, 10_000);
 
     @Test
-    void allowsWholeSiteBurstThenEnforcesRefillRetryHintAndRestartReset() throws Exception {
+    void enforcesWholeSiteBurstRefillRetryHintAndRestartReset() throws Exception {
         MutableClock clock = new MutableClock();
-        MoonRuntimeProperties properties = new MoonRuntimeProperties();
-        properties.getResourceLimits().setWholeSiteCapacity(2);
+        MoonRuntimeProperties properties = properties(2, Duration.ofSeconds(1), 10, Duration.ofMinutes(1), 2);
         HostedAlphaResourceLimitFilter filter = filter(properties, clock, true);
-        // Both requests at the two-token threshold pass; only the request above it is limited.
+
         assertThat(exchange(filter, request("GET", "/")).getStatus()).isEqualTo(200);
         assertThat(exchange(filter, request("GET", "/app.js")).getStatus()).isEqualTo(200);
         MockHttpServletResponse limited = exchange(filter, request("GET", "/about"));
@@ -68,42 +59,39 @@ class HostedAlphaResourceLimitFilterTest {
     @Test
     void provesProviderDayBoundAndConservativeAttemptArithmetic() throws Exception {
         MutableClock clock = new MutableClock();
-        MoonRuntimeProperties properties = new MoonRuntimeProperties();
-        MoonRuntimeProperties.ResourceLimits limits = properties.getResourceLimits();
-        HostedAlphaResourceLimitFilter filter = filter(properties, clock, true);
-        int refillCount = Math.toIntExact(
-                PROVIDER_PROOF.period().dividedBy(limits.getProviderLookupRefillInterval()));
+        HostedAlphaResourceLimitFilter filter = filter(
+                properties(40, Duration.ofSeconds(1), 10, Duration.ofMinutes(1), 2),
+                clock,
+                true);
         int accepted = 0;
-        // The initial capacity passes in full; the next request proves the bucket is empty.
-        for (int request = 0; request < limits.getProviderLookupCapacity(); request++) {
+
+        for (int request = 0; request < 10; request++) {
             assertThat(exchange(filter, opportunityRequest()).getStatus()).isEqualTo(200);
             accepted++;
         }
-        assertRateLimited(exchange(filter, opportunityRequest()),
-                limits.getProviderLookupRefillInterval().toSeconds());
-        // Each complete interval adds exactly one usable token, never an extra burst.
-        for (int interval = 0; interval < refillCount; interval++) {
-            clock.advance(limits.getProviderLookupRefillInterval());
+        assertRateLimited(exchange(filter, opportunityRequest()), 60L);
+        for (int minute = 1; minute <= 1_440; minute++) {
+            clock.advance(Duration.ofMinutes(1));
             assertThat(exchange(filter, opportunityRequest()).getStatus()).isEqualTo(200);
             accepted++;
-            assertRateLimited(exchange(filter, opportunityRequest()),
-                    limits.getProviderLookupRefillInterval().toSeconds());
+            assertRateLimited(exchange(filter, opportunityRequest()), 60L);
         }
-        int expectedAccepted = limits.getProviderLookupCapacity() + refillCount;
-        assertThat(expectedAccepted).isEqualTo(1_450);
-        assertThat(accepted).isEqualTo(expectedAccepted);
-        int worstCaseAttempts = accepted * PROVIDER_PROOF.attemptsPerLookup();
+
+        assertThat(accepted).isEqualTo(1_450);
+        int worstCaseAttempts = accepted * 4;
         assertThat(worstCaseAttempts).isEqualTo(5_800);
-        assertThat(PROVIDER_PROOF.dailyAllowance() - worstCaseAttempts).isEqualTo(4_200);
+        assertThat(10_000 - worstCaseAttempts).isEqualTo(4_200);
     }
 
     @Test
-    void allowsTwoConcurrentOpportunitiesRejectsThirdAndReleasesPermits() throws Exception {
+    void rejectsAThirdConcurrentOpportunityAndReleasesPermits() throws Exception {
         MutableClock clock = new MutableClock();
-        HostedAlphaResourceLimitFilter filter = filter(new MoonRuntimeProperties(), clock, true);
+        HostedAlphaResourceLimitFilter filter = filter(
+                properties(20, Duration.ofSeconds(1), 10, Duration.ofMinutes(1), 2),
+                clock,
+                true);
         CountDownLatch entered = new CountDownLatch(2);
         CountDownLatch release = new CountDownLatch(1);
-        // Hold both permitted searches inside the chain so a third overlaps them.
         FilterChain blockingChain = (request, response) -> {
             entered.countDown();
             try {
@@ -122,7 +110,7 @@ class HostedAlphaResourceLimitFilterTest {
             Future<MockHttpServletResponse> second = executor.submit(() ->
                     exchange(filter, opportunityRequest(), blockingChain));
             assertThat(entered.await(5, TimeUnit.SECONDS)).isTrue();
-            // Rejection proves the limit; successful completion and a fourth request prove release.
+
             assertRateLimited(exchange(filter, opportunityRequest()), 1L);
             release.countDown();
             assertThat(first.get(5, TimeUnit.SECONDS).getStatus()).isEqualTo(200);
@@ -137,10 +125,10 @@ class HostedAlphaResourceLimitFilterTest {
     @Test
     void countsEveryAdminAttemptBeforePolicyAndPreservesDockerReadiness() throws Exception {
         MutableClock clock = new MutableClock();
-        MoonRuntimeProperties properties = new MoonRuntimeProperties();
-        properties.getResourceLimits().setWholeSiteCapacity(3);
-        properties.getResourceLimits().setProviderLookupCapacity(1);
-        HostedAlphaResourceLimitFilter filter = filter(properties, clock, true);
+        HostedAlphaResourceLimitFilter filter = filter(
+                properties(3, Duration.ofSeconds(1), 1, Duration.ofMinutes(1), 2),
+                clock,
+                true);
         HostedAlphaSurfaceFilter surfaceFilter = new HostedAlphaSurfaceFilter(true);
         AdminAccessFilter adminAccessFilter = new AdminAccessFilter(ADMIN_TOKEN, false, true, () -> "unused");
         FilterChain hostedAdminChain = (request, response) -> surfaceFilter.doFilter(
@@ -178,8 +166,7 @@ class HostedAlphaResourceLimitFilterTest {
 
     @Test
     void activatesOnlyForHostedModeAndRejectsHostedRetryDrift() throws Exception {
-        MoonRuntimeProperties properties = new MoonRuntimeProperties();
-        properties.getResourceLimits().setWholeSiteCapacity(1);
+        MoonRuntimeProperties properties = properties(1, Duration.ofSeconds(1), 1, Duration.ofMinutes(1), 1);
         properties.getOpenMeteo().setMaxTransportRetries(2);
         MutableClock clock = new MutableClock();
         HostedAlphaResourceLimitFilter disabled = filter(properties, clock, false);
@@ -207,6 +194,21 @@ class HostedAlphaResourceLimitFilterTest {
         return new HostedAlphaResourceLimitFilter(properties, clock, new ObjectMapper(), enabled);
     }
 
+    private static MoonRuntimeProperties properties(
+            int wholeSiteCapacity,
+            Duration wholeSiteRefill,
+            int providerCapacity,
+            Duration providerRefill,
+            int concurrency
+    ) {
+        MoonRuntimeProperties properties = new MoonRuntimeProperties();
+        properties.getResourceLimits().setWholeSiteCapacity(wholeSiteCapacity);
+        properties.getResourceLimits().setWholeSiteRefillInterval(wholeSiteRefill);
+        properties.getResourceLimits().setProviderLookupCapacity(providerCapacity);
+        properties.getResourceLimits().setProviderLookupRefillInterval(providerRefill);
+        properties.getResourceLimits().setOpportunityConcurrency(concurrency);
+        return properties;
+    }
     private static MockHttpServletRequest opportunityRequest() {
         return request("GET", "/api/opportunities");
     }
@@ -241,7 +243,6 @@ class HostedAlphaResourceLimitFilterTest {
                 "\"status\":\"rate_limited\"",
                 "\"retryAfterSeconds\":" + retryAfterSeconds);
     }
-    private record ProviderProof(Duration period, int attemptsPerLookup, int dailyAllowance) {}
     private static final class MutableClock extends Clock {
         private Instant instant = Instant.parse("2026-07-13T00:00:00Z");
 

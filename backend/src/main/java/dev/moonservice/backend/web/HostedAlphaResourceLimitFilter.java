@@ -77,7 +77,7 @@ final class HostedAlphaResourceLimitFilter extends OncePerRequestFilter {
         }
 
         String path = HostedAlphaSurfaceFilter.applicationPath(request);
-        Admission wholeSiteAdmission = wholeSiteBucket.tryAcquire(clock.instant());
+        Admission wholeSiteAdmission = wholeSiteBucket.consumeTokenIfAvailable(clock.instant());
         if (!wholeSiteAdmission.accepted()) {
             reject(request, response, path, wholeSiteAdmission.retryAfterSeconds());
             return;
@@ -93,7 +93,7 @@ final class HostedAlphaResourceLimitFilter extends OncePerRequestFilter {
             return;
         }
         try {
-            Admission providerAdmission = providerLookupBucket.tryAcquire(clock.instant());
+            Admission providerAdmission = providerLookupBucket.consumeTokenIfAvailable(clock.instant());
             if (!providerAdmission.accepted()) {
                 reject(request, response, path, providerAdmission.retryAfterSeconds());
                 return;
@@ -146,14 +146,12 @@ final class HostedAlphaResourceLimitFilter extends OncePerRequestFilter {
         return "127.0.0.1".equals(address) || "0:0:0:0:0:0:0:1".equals(address) || "::1".equals(address);
     }
 
-    private record RateLimitedResponse(String status, String message, long retryAfterSeconds) {}
-    private record Admission(boolean accepted, long retryAfterSeconds) {}
-    /*
-     * Starts full and restores one token per complete interval, capped at capacity.
-     * Advancing refilledAt only by complete intervals preserves partial elapsed time;
-     * backward clock readings do not refill. Synchronized acquisition keeps refill
-     * and decrement atomic and returns a ceiling-rounded wait for the next token.
-     */
+    private record RateLimitedResponse(String status, String message, long retryAfterSeconds) {
+    }
+
+    private record Admission(boolean accepted, long retryAfterSeconds) {
+    }
+
     private static final class TokenBucket {
         private final int capacity;
         private final Duration refillInterval;
@@ -167,7 +165,7 @@ final class HostedAlphaResourceLimitFilter extends OncePerRequestFilter {
             this.refilledAt = startedAt;
         }
 
-        private synchronized Admission tryAcquire(Instant now) {
+        private synchronized Admission consumeTokenIfAvailable(Instant now) {
             refill(now);
             if (tokens > 0) {
                 tokens--;
