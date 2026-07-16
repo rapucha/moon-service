@@ -289,27 +289,38 @@ every finding, fix accepted findings narrowly, record reasons for rejected or
 deferred findings, rerun relevant checks, and summarize the review outcome in
 the PR.
 
-Before any agent-authored push and again before the final handoff of a
-nontrivial PR, use `$sensitive-information-review` with a fresh read-only agent.
-The pre-push review must use the exact source ref and actual remote destination;
-the final-PR review must use the actual base and head. Both reviews inspect all
-commit messages and every introduced or modified blob version in the selected
-publication range, including intermediate versions absent from the final diff.
-They also inspect relevant agent-authored PR text and accessible in-scope
-attachments, including PDFs and other documents. Git LFS pointer blobs require
-inspection of their referenced payloads. Do not substitute a net diff or broaden
-the review into unrelated local secrets and uncommitted work.
+Before any agent-authored push, use `$sensitive-information-review` with a fresh
+read-only agent on the exact source ref, actual remote destination, complete
+refspecs, and push options. Inspect all commit messages and every introduced or
+modified blob version in the outgoing range, including intermediate versions
+absent from the final diff. Git LFS pointer blobs require inspection of their
+referenced payloads. Do not substitute a net diff or broaden the review into
+unrelated local secrets and uncommitted work.
 
-Immediately before the relevant publication step, re-resolve the complete push
-refspec set for a push, the reviewed refs/object IDs, and the reviewed in-scope
-PR surface state. Any changed ref, refspec, push option, relevant PR text,
-comment, reply, or attachment invalidates the verdict and requires a fresh
-review; never publish against a stale `clear`. Record any pre-push result before
-the final review, then report the final verdict out of band without adding a PR
-comment that would invalidate it.
+Before an agent creates a nontrivial PR or publishes a relevant agent-authored
+mutation to its surface, use the same skill on the exact unpublished title,
+body, relevant comment or reply, and
+attachment bytes plus their intended repository and PR destination. Settled
+Git and PR-surface inputs may be reviewed together before their corresponding
+publication steps. Before PR creation, prove complete merge-base-to-head
+coverage from recorded full object IDs and reachability; inspect any commits or
+blobs not covered by matching `clear` pre-push reviews. For an existing PR,
+treat its live text and discussion only as read-only context and review only the
+new outgoing material. Review attachments, including PDFs and other documents,
+before upload; review a later outgoing reference to a service-generated URL as
+part of that later text.
+
+Immediately before each publication step, re-resolve the applicable refs,
+refspecs, push options, destination, and exact unpublished bytes. A change to an
+unpublished reviewed input invalidates the verdict and requires a fresh review;
+publishing those exact inputs does not. A later PR mutation gets its own
+pre-publication review of only its new outgoing content. Do not run a mandatory
+sensitive-information review after publication or merely for final handoff. At
+handoff, verify refs, checks, and PR state read-only and report the recorded
+pre-publication verdicts without another PR mutation.
 
 The sensitive-information reviewer returns `clear`, `review_required`, or
-`block`. A `block` verdict stops the push or final PR handoff. Treat
+`block`. A `block` verdict stops the applicable push or PR publication step. Treat
 `review_required` as unresolved until the owner decides or full coverage is
 restored; never present it as a passed gate. Report candidates only through
 opaque review-local IDs and sanitized locations, never by reproducing or
@@ -317,7 +328,10 @@ fingerprinting the value. Missing document tooling, encryption, malformed or
 unsupported content, unsafe extraction, or exceeded inspection bounds prevents
 a `clear` result. The reviewer never executes active content or performs
 remediation. Pre-commit use is optional and occurs only when explicitly
-requested; it does not replace either mandatory publication review.
+requested; it does not replace mandatory pre-push or outgoing-PR review. If a
+credible sensitive value is discovered after publication, stop further
+publication and report the existing owner-directed incident actions rather than
+describing the retrospective audit as a gate.
 
 Treat implementation work as nontrivial when it changes runtime behavior,
 public contracts, scoring or data transformation, provider/privacy/security

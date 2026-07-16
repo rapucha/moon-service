@@ -1,6 +1,6 @@
 ---
 name: sensitive-information-review
-description: Run a fresh read-only publication review for secrets, credentials, unexpected PII, and sensitive content in source, Git history, PR text, PDFs, office documents, images, archives, and other attachments. Use before an agent-authored push or final nontrivial PR handoff, when explicitly asked for a pre-commit sensitive-data check, or when outgoing documents need privacy scrutiny.
+description: Run a fresh read-only pre-publication review for secrets, credentials, unexpected PII, and sensitive content in source, Git history, unpublished PR text, PDFs, office documents, images, archives, and other attachments. Use before an agent-authored push, nontrivial PR creation, or relevant agent-authored mutation to a nontrivial PR, when explicitly asked for a pre-commit sensitive-data check, or when outgoing documents need privacy scrutiny.
 ---
 
 # Sensitive Information Review
@@ -37,7 +37,7 @@ return `review_required`; do not reduce the promised coverage silently.
 Use only when the user explicitly requests it. Inspect exactly the staged index
 and a proposed commit message supplied by the primary agent. Do not include
 unstaged or unrelated untracked files. This mode is advisory and does not
-replace either mandatory publication gate.
+replace either mandatory pre-publication gate.
 
 ### Mandatory pre-push
 
@@ -56,16 +56,30 @@ destination. For a new destination, use the intended PR-base merge base as the
 bounded exclusion and disclose the assumption. Inspect annotated tag messages
 and objects. Exclude unrelated staged, unstaged, and untracked work.
 
-### Mandatory final PR
+### Mandatory outgoing PR publication
 
-Require the actual PR base and head refs/object IDs. Resolve and record the
-merge base. Inspect the range from that boundary through the head, even when
-some commits are already on the remote. Also inspect:
+Select the exact operation: PR creation, title/body update, relevant comment or
+review reply, attachment upload, or a settled batch of those mutations. Require:
 
-- the PR title and body;
-- agent-authored PR comments and review replies relevant to the change; and
-- accessible files linked or attached by the user or PR within the accepted
-  review scope.
+- the exact unpublished text or attachment bytes and the intended repository,
+  PR, and operation for every outgoing item;
+- for PR creation, the proposed base and head refs/object IDs and resolved merge
+  base; and
+- recorded full object IDs and reachability evidence for any prior `clear`
+  pre-push reviews claimed to cover that base-to-head graph.
+
+For PR creation, reconstruct and inspect every commit and blob in the proposed
+merge-base-to-head range not covered by matching pre-push evidence. A verdict
+label without the exact recorded range is not coverage. Inspect the proposed
+title, body, relevant outgoing comments or replies, and attachment content
+before publishing them.
+
+For a mutation to an existing PR, use its live surface only as read-only context
+for the destination and publication purpose. Inspect only the exact new or
+changed outgoing material and attachments; do not rescan already-public PR text,
+discussion, or Git history. Review attachment bytes before upload. If later
+outgoing text contains a service-generated attachment URL, review that text as
+its own mutation.
 
 Do not scan unrelated repository history, unrelated comments or links, user
 home files, environment variables, shell history, credential stores, or
@@ -73,12 +87,13 @@ unrelated local work.
 
 ## Reconstruct Git Publication Content
 
-Record the complete publication plan, refs, and full object IDs before
-inspection. Use Git object reachability, not only `git diff`, so content added
-and removed in a later commit is retained in the review. Run every traversal
-and object read with `git --no-replace-objects`. Replacement refs, grafts,
-shallow boundaries, or other history-rewriting metadata that cannot be shown to
-match the transferred graph are a coverage gap and yield `review_required`.
+For pre-push and uncovered PR-creation Git ranges, record the complete
+publication plan, refs, and full object IDs before inspection. Use Git object
+reachability, not only `git diff`, so content added and removed in a later commit
+is retained in the review. Run every traversal and object read with
+`git --no-replace-objects`. Replacement refs, grafts, shallow boundaries, or
+other history-rewriting metadata that cannot be shown to match the transferred
+graph are a coverage gap and yield `review_required`.
 
 1. Enumerate every commit in the selected range in chronological order. Inspect
    each full commit message through a redacting inspection path; do not print
@@ -180,8 +195,8 @@ rather than treating every match as private.
 Return exactly one verdict value:
 
 - `block` — a credible credential or private key, or clearly unauthorized
-  sensitive personal data. The primary agent must not push or complete the PR
-  handoff.
+  sensitive personal data. The primary agent must not perform the reviewed
+  publication step.
 - `review_required` — intent is ambiguous, or a required surface is
   inaccessible, unreadable, encrypted, unsupported, malformed, too large for
   bounded inspection, or uninspected because tooling is missing. Do not present
@@ -203,7 +218,8 @@ Lead with:
 Verdict: clear | review_required | block
 
 Scope:
-- Mode, source/head, destination/base, boundary, and reviewed remote material
+- Mode, operation, source/head, destination/base, boundary, and reviewed
+  unpublished material
 
 Coverage:
 - Commit messages, path events, blob versions, PR surfaces, documents, tools,
@@ -225,13 +241,15 @@ what was inspected and what policy exclusions were applied.
 ## Primary-Agent Follow-Up
 
 - Triage every finding without asking the reviewer to mutate work.
-- Re-run a fresh review after remediation if publication contents changed.
-- Immediately before publication, re-resolve the complete refspec set, refs,
-  object IDs, PR base/head, and relevant PR surface identities/content through
-  the same redacting path. Any mismatch or added refspec invalidates the verdict
-  and requires a fresh review.
+- Re-run a fresh review after remediation if unpublished contents changed.
+- Immediately before publication, re-resolve the applicable refspecs, refs,
+  object IDs, destination, operation, and exact unpublished bytes through the
+  same redacting path. Any pre-publication mismatch invalidates the verdict and
+  requires a fresh review.
 - Treat `review_required` as unresolved until the owner decides or full coverage
   becomes available.
-- A pre-push outcome may be recorded in the PR before the final-PR review. Report
-  the final-PR outcome out of band; do not mutate a reviewed PR after `clear` and
-  thereby invalidate the verdict being handed off.
+- Publishing the exact reviewed inputs completes that gate and does not
+  invalidate its recorded verdict. Review a later PR mutation separately using
+  only its new outgoing content. Do not run a mandatory review after publication
+  or merely for final handoff; report recorded pre-publication outcomes and
+  verify final refs, checks, and PR state read-only.
