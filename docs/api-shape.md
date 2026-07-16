@@ -982,76 +982,17 @@ mode, resource admission can return `429` before this application sequence
 begins; the separate [resource-admission diagrams](diagrams/hosted-alpha-resource-limits.pdf)
 cover that filter, its token buckets, and its concurrency permit.
 
-```mermaid
-sequenceDiagram
-    actor Caller as HTTP caller
-    participant API as Controller and search service
-    participant Location as Geocoding cache
-    participant Geocoding as Open-Meteo geocoding
-    participant Engine as Opportunity engine and scoring pipeline
-    participant Weather as Weather cache
-    participant WeatherAPI as Open-Meteo weather
+### Browser GET
 
-    Caller->>API: Browser GET with q or locationId
-    API->>API: Validate exactly one bounded input
-    alt Missing, invalid, or both inputs
-        API-->>Caller: 400 invalid_request
-    else Valid input
-        API->>Location: Resolve normalized query or location ID
-        alt Provider-backed cache miss
-            Location->>Geocoding: Resolve through Open-Meteo
-            Geocoding-->>Location: Resolution
-        else Cache hit
-            Note over Location: No outbound geocoding call
-        else Invalid or non-provider location ID
-            Note over Location: Resolve as not found without an outbound call
-        end
-        Location-->>API: Resolved, ambiguous, not found, or unavailable
-        alt Ambiguous
-            API-->>Caller: 200 ambiguous_location with real candidates
-        else Not found
-            API-->>Caller: 200 location_not_found
-        else Geocoding unavailable
-            API-->>Caller: 503 temporarily_unavailable
-        else Resolved
-            API->>Engine: Location, defaults, and current time
-            Engine->>Weather: Forecast for the search horizon
-            alt Weather cache miss
-                Weather->>WeatherAPI: Fetch hourly forecast
-                WeatherAPI-->>Weather: Forecast or unavailable
-            else Weather cache hit
-                Note over Weather: No outbound weather call
-            end
-            Weather-->>Engine: Forecast or unavailable
-            alt Weather unavailable
-                Engine-->>API: Weather lookup failure
-                API-->>Caller: 503 temporarily_unavailable
-            else Forecast available
-                Engine->>Engine: Generate, adjust, reject, score, sort, and limit
-                Engine-->>API: Ranked opportunities, possibly empty
-                API-->>Caller: 200 ok
-            end
-        end
-    end
+[![Browser GET opportunity-search sequence](diagrams/opportunity-search-get.svg)](diagrams/opportunity-search-get.svg)
 
-    Note over Caller,Engine: Separate direct prototype path — the browser does not use it
-    Caller->>API: Ordinary-mode POST with direct scoring JSON
-    API->>API: Parse and validate the JSON body
-    alt Malformed or incomplete request body
-        API-->>Caller: 400 invalid_request
-    else Valid request shape
-        API->>Engine: Evaluate prototype request
-        alt Unsupported fixture or out-of-range value
-            Engine-->>API: Invalid request
-            API-->>Caller: 400 invalid_request
-        else Valid Prague request
-            Note over API,Engine: Prague fixture and fixture weather — no live location or weather lookup
-            Engine->>Engine: Generate and score with caller horizon, ceiling, and limit
-            Engine-->>API: Opportunity result
-            API-->>Caller: 200 opportunity result
-        end
-    end
-```
+[PlantUML source](diagrams/opportunity-search-get.puml)
+
+### Direct Prototype POST
+
+[![Direct prototype POST opportunity-search sequence](diagrams/opportunity-search-post.svg)](diagrams/opportunity-search-post.svg)
+
+[PlantUML source](diagrams/opportunity-search-post.puml)
 
 In prose: GET validates one lookup input, resolves it through a status-aware
 cache, stops on an ambiguous, missing, or unavailable location, then obtains a

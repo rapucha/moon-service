@@ -1,0 +1,75 @@
+@startuml
+skinparam defaultFontName "DejaVu Sans"
+skinparam defaultFontSize 16
+skinparam shadowing false
+skinparam roundcorner 8
+skinparam sequenceMessageAlign left
+skinparam responseMessageBelowArrow true
+skinparam BoxPadding 8
+hide footbox
+
+title Browser GET /api/opportunities
+autonumber 1 "<b>[00]"
+
+actor "HTTP caller" as Caller
+participant "Controller, search service,\nand opportunity engine" as Service
+database "Geocoding\ncache" as Location
+database "Weather\ncache" as Weather
+
+note over Caller, Service
+  Hosted-alpha resource admission runs before this sequence
+  and may return 429 before the controller is invoked.
+end note
+
+Caller -> Service: GET with q or locationId
+Service -> Service: Validate exactly one bounded input
+
+alt Missing, invalid, or both inputs
+  Service --> Caller: 400 invalid_request
+else Valid input
+  group Resolve location
+    Service -> Location: Normalized query or location ID
+    alt Provider-backed cache miss
+      Location ->]: Resolve through Open-Meteo geocoding
+      Location <-]: Resolution
+    else Cache hit
+      note over Location: No outbound geocoding call
+    else Invalid or non-provider location ID
+      note over Location
+        Resolve as not found without
+        an outbound provider call
+      end note
+    end
+    Location --> Service: Resolved, ambiguous, not found, or unavailable
+  end
+
+  alt Ambiguous
+    Service --> Caller: 200 ambiguous_location with candidates
+  else Not found
+    Service --> Caller: 200 location_not_found
+  else Geocoding unavailable
+    Service --> Caller: 503 temporarily_unavailable
+  else Resolved
+    Service -> Service: Start engine with location, defaults, and current time
+
+    group Obtain forecast
+      Service -> Weather: Forecast for the search horizon
+      alt Weather cache miss
+        Weather ->]: Fetch Open-Meteo hourly forecast
+        Weather <-]: Forecast or unavailable
+      else Weather cache hit
+        note over Weather: No outbound weather call
+      end
+      Weather --> Service: Forecast or unavailable
+    end
+
+    alt Weather unavailable
+      Service --> Caller: 503 temporarily_unavailable
+    else Forecast available
+      Service -> Service: Generate, adjust, reject, score, sort, and limit
+      Service --> Caller: 200 ok with opportunities, possibly empty
+    end
+  end
+end
+
+@enduml

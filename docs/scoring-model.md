@@ -317,28 +317,9 @@ For browser GET, the engine obtains an hourly forecast before entering this
 pipeline and uses the record covering each retained window's `suggestedAt`.
 Direct POST instead uses the fixed Prague fixture weather.
 
-```mermaid
-flowchart TD
-    A["Resolved or fixture location, request, and weather source"] --> B["Generate natural visible-Moon pass windows from ephemeris"]
-    B --> C{"Any generated windows?"}
-    C -- No --> N["No scored candidates"]
-    C -- Yes --> D["For each window, choose suggestedAt by Moon-altitude plus sunlight fit"]
-    D --> E["For browser GET: discard an ended window or move suggestedAt to now or later; direct POST keeps it"]
-    E --> F{"Window retained?"}
-    F -- No --> X["Omit the ended window"]
-    F -- Yes --> G{"Thin crescent near conjunction?"}
-    G -- Yes --> R["Record a rejected window"]
-    G -- No --> H["Get weather at suggestedAt: hourly record for GET or fixture for POST"]
-    H --> I["Score altitude, sunlight, illumination, weather, and forecast confidence"]
-    I --> J["Add the summed-score candidate"]
-    X --> P["After all generated windows"]
-    R --> P
-    J --> P
-    N --> K["Sort total descending; earlier suggestedAt breaks ties"]
-    P --> K["Sort total descending; earlier suggestedAt breaks ties"]
-    K --> L["Apply the default or caller limit; no minimum score"]
-    L --> M["Format status ok and opportunities, possibly empty"]
-```
+[![Implemented V0 opportunity-evaluation flow](diagrams/scoring-flow.svg)](diagrams/scoring-flow.svg)
+
+[PlantUML source](diagrams/scoring-flow.puml)
 
 In prose: generation can yield no windows; live GET adjustment can remove every
 ended window; and the visibility rule can reject every retained window. Each
