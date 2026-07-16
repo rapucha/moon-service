@@ -108,6 +108,11 @@ reason to tune them.
 | `moon.weather.provider` | unset | Must be `open-meteo` for runtime weather. |
 | `moon.build.revision` | `local` | Safe revision identifier returned by operational health and protected admin status. Container builds set this from `MOON_BUILD_REVISION`. |
 | `moon.hosted-alpha.enabled` | `false` | Enables the fail-closed Spring application surface for temporary Funnel hosting. Requires an explicit 64-hex-character admin token and applies to LAN and tunneled requests alike. |
+| `moon.resource-limits.whole-site-capacity` | `40` | Maximum initial or accumulated hosted-alpha request burst shared by the process. |
+| `moon.resource-limits.whole-site-refill-interval` | `1s` | Interval that restores one shared whole-site token. |
+| `moon.resource-limits.provider-lookup-capacity` | `10` | Maximum initial or accumulated burst of accepted provider-backed lookups. |
+| `moon.resource-limits.provider-lookup-refill-interval` | `1m` | Interval that restores one provider-backed lookup token. |
+| `moon.resource-limits.opportunity-concurrency` | `2` | Maximum provider-backed opportunity searches executing concurrently. |
 | `moon.open-meteo.timeout` | `3s` | Open-Meteo connect and read timeout. |
 | `moon.open-meteo.max-transport-retries` | `1` | Maximum retries after the first Open-Meteo attempt. |
 | `moon.open-meteo.max-retry-after` | `1s` | Largest provider `Retry-After` delay accepted for retry. |
@@ -336,6 +341,34 @@ no-sniff, no-referrer, permissions, and same-origin opener/resource headers.
 The CSP permits the current UI's generated data images, score-bar widths, and
 SVG silhouette-layer styles. Connector-level rejections such as disabled
 `TRACE` and malformed requests remain outside this application boundary.
+
+### Hosted-alpha resource bounds
+
+Hosted-alpha mode adds one process-local admission boundary before the hosted
+surface and admin authentication. Every request except the exact Docker
+readiness probe shares the whole-site bucket. Exact `/admin/status` attempts
+consume that capacity even when their method, body, or token is rejected; an
+admin `429` remains `no-store` and carries the hosted security headers.
+
+Exact `GET`/`HEAD /api/opportunities` requests also require one provider token
+and one of two concurrent search permits before controller or provider work.
+The fixture POST, static files, admin status, and readiness do not consume those
+two resources. A rejection returns HTTP `429`, canonical `rate_limited` JSON,
+and a numeric `Retry-After` hint. The Docker carve-out is only bodyless
+`GET /readyz` from loopback with `Host: localhost`; public readiness requests
+remain inside the whole-site bound.
+
+Hosted startup rejects a weaker resource setting or more than one configured
+Open-Meteo retry. Ten initial tokens plus 1,440 minute refills admit 1,450 lookups in an
+uninterrupted 24-hour run. Conservatively counting two geocoding and two weather
+attempts per lookup gives 5,800 calls, 4,200 below Open-Meteo's current
+[10,000-call threshold](https://open-meteo.com/en/terms). The current fixed
+one-location, seven-day, eight-variable weather request counts as one call under
+the published [pricing rules](https://open-meteo.com/en/pricing). A restart
+restores both bursts, so this is not a durable calendar-day quota. No Tomcat
+connector limit or network-shaping guarantee is implied.
+The two-page [resource-admission diagrams](../docs/diagrams/hosted-alpha-resource-limits.pdf)
+show the filter sequence and TokenBucket refill, consumption, and retry mechanics.
 
 ### Operational health
 
