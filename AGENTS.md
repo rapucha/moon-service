@@ -91,6 +91,19 @@ The main unresolved choice is now the exact first web/API contract for city look
   imperative instruction, such as "do it", "go ahead", "implement", "update",
   or "create". If the wording is ambiguous, ask what outcome is required before
   changing files or external state.
+- For visual or document-format work where readability, layout, rendering, or
+  format remains unresolved, distinguish a temporary local preview from durable
+  PR-ready delivery. Within an already-authorized task, an affirmative format
+  selection authorizes only the smallest useful preview; questions and
+  feasibility checks remain non-mutating. Keep previews untracked, normally
+  under `/tmp`, use only already-available tooling without installs, downloads,
+  manifests, or dependencies, avoid external mutations, and validate only
+  enough to make the preview trustworthy. Preview acceptance approves the
+  visual, not durable repository mutation or publication; that outcome must
+  already be authorized or explicitly confirmed, after which every normal
+  issue, branch, review, generated-output, push, and pull-request gate applies.
+  Do not add a redundant preview pause when durable delivery was explicit and
+  the visual choice was already settled.
 - Use GitHub issues as the source of truth for actionable implementation work, technical debt, follow-ups, and decision tasks. Product and architecture docs should capture strategy and decisions, but the next implementation step should come from an open issue unless the user explicitly asks for exploratory work first.
 - Use the existing `enhancement` and `documentation` labels for feature and docs work. Use `mvp`, `tech-debt`, `decision`, `blocked`, and `follow-up` labels when they clarify issue triage.
 - For issue-backed implementation work, use a branch name that mentions the issue number, preferably `issue-<number>-short-topic`, and update the issue to link to the branch where the work is being done.
