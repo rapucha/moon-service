@@ -22,6 +22,15 @@ Remaining caveats:
 - For the first MVP, use explicit search/submit rather than per-keystroke autocomplete.
 - Initial validation found that Open-Meteo Geocoding handles many raw Unicode city names, including diacritics, Cyrillic, Chinese, Hindi, Thai, Arabic, and Hebrew examples. It did not resolve tested Japanese-script or Korean-script queries such as `東京`, `京都`, `大阪`, `とうきょう`, or `서울`. If broad native-script city search remains part of the v0 promise, add a curated alias/transliteration layer before considering a secondary provider.
 
+### Alpha attribution and provider processing
+
+Re-verified against the primary provider sources on 2026-07-17:
+
+- The Open-Meteo [Geocoding API documentation](https://open-meteo.com/en/docs/geocoding-api) identifies GeoNames as the location-data source.
+- Open-Meteo's [licence](https://open-meteo.com/en/licence) lists the GeoNames database under CC BY and requires attribution. [GeoNames' own terms](https://www.geonames.org/export/) require credit with a link or other reference and allow commercial data use.
+- The current Open-Meteo free API remains limited to noncommercial use. A commercial Moon Service launch still requires a separately approved provider plan even though GeoNames itself permits commercial use.
+- The browser sends a city search to Moon Service. The backend then sends the query to Open-Meteo Geocoding, so Open-Meteo receives the backend address and query rather than a direct browser request. The lookup-page disclosure explains this provider processing without adding analytics or visitor tracking.
+
 ## Internationalization
 
 Location search must support raw Unicode input. Users may have an English browser locale but type a local-language or non-Latin place name, such as `Praha`, `Muenchen`, `München`, `Kraków`, `Αθήνα`, `東京`, or `京都`.
