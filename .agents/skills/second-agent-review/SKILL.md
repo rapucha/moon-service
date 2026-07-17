@@ -32,6 +32,8 @@ Before requesting the review, the primary agent should:
 - Run the smallest meaningful validation commands, unless blocked.
 - Check the worktree state and identify the intended diff to review.
 - Keep unrelated user or generated changes separate when possible.
+- Read `.agents/review-policy.md` before applying project gates, triggers,
+  measures, or planning estimates.
 
 ## When To Use
 
@@ -64,8 +66,12 @@ Prefer these inputs:
 - The staged diff, branch diff, or exact file list under review.
 - The accepted change category, scope review, explicit source-issue authority, and
   any approved exception or owner-accepted enumerated split plan.
-- Generated, vendored, and lock-file counts, churn, sizes, reproduction commands,
-  and validation evidence when present.
+- Expected paths, other paths that might be needed and why, the expected
+  file-count range, actual paths and count, and any meaningful difference.
+  Include informational churn; code-line base counts, results, and deltas;
+  documentation authority classes, sizes, and triggers; and generated,
+  vendored, and lock-file counts, sizes, reproduction commands, and validation
+  evidence when present.
 - The validation commands already run and their outcomes.
 - Any intentionally untracked/generated files that should be ignored.
 
@@ -79,26 +85,41 @@ Ask the second agent to review, not edit. Use a prompt like this:
 
 ```text
 Use a read-only code-review stance. Review the provided diff against the
-project instructions and relevant docs. Do not modify files.
+project instructions, `.agents/review-policy.md`, and relevant docs. Read the
+policy before applying its gates or triggers. Do not modify files.
 
 Check scope before implementation quality:
 
 1. Compare the staged diff with the accepted outcome, change category, acceptance
    criteria, and approved exceptions. Flag unaccepted concerns even when the
-   diff remains below numeric gates.
-2. Verify ordinary and generated/vendored/lock measurements and reproduction
-   evidence against project policy. Treat mixed or agent/LLM-authored files as
-   ordinary.
-3. Look for unrequested refactors, incidental fixes, opportunistic cleanup,
+   diff remains below its hard gates. Do not flag an extra, missing, or replaced
+   planned path by itself. Check whether the difference changes behavior,
+   concerns, dependencies, output classes, or a hard gate.
+2. Verify ordinary file counts, informational churn, code-line base and result
+   counts, oversized-file deltas and exceptions, and generated/vendored/lock
+   measurements against project policy. Record meaningful differences from the
+   planned file range without treating unused range as scope. Treat mixed or
+   agent/LLM-authored files as ordinary.
+3. For each changed document, verify its authority class, resulting nonblank
+   lines, changed nonblank lines, and review trigger. When focused review is
+   required, check for removed constraints, contradictions, new authority,
+   repeated rules, mismatch with code, and unclear structure. Documentation
+   size alone does not require a split.
+4. Look for unrequested refactors, incidental fixes, opportunistic cleanup,
    speculative extensibility, unrelated tests/docs, and abstractions without a
    current accepted production use or established boundary.
-4. Flag manifest, lock, workflow, provider, account, network, runtime, build, or
+5. Flag manifest, lock, workflow, provider, account, network, runtime, build, or
    test dependencies that lack explicit source authority.
-5. Then prioritize concrete bugs, behavior regressions, public contract drift,
+6. Then prioritize concrete bugs, behavior regressions, public contract drift,
    missing or weak tests, privacy/security/provider risks, UI/layout risks,
    documentation mismatches, and validation gaps.
+7. Review changed agent-authored prose for plain language. Flag wording only
+   when a simpler version keeps the same meaning, and suggest that version.
+   Keep exact contract language and needed technical terms. Code comments
+   should explain why rather than restate obvious code.
 
-Ignore style preferences unless they cause maintainability or user-facing risk.
+Do not turn the plain-language rule into personal style preferences, a word
+limit, or a readability score.
 
 For each finding, include severity, file and line reference when possible,
 why it matters, and the smallest practical fix. If there are no findings,
@@ -108,6 +129,9 @@ say that clearly and mention any residual test or validation risk.
 The reviewer output should lead with findings ordered by severity. It should
 not include broad implementation rewrites unless a rewrite is the smallest
 practical fix for a real issue.
+
+Use short, direct sentences in the review itself. Avoid formal filler and
+decorative metaphors.
 
 ## Primary Agent Follow-Up
 

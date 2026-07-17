@@ -53,6 +53,8 @@ The main unresolved choice is now the exact first web/API contract for city look
 - `docs/weather-provider-research.md`: weather provider recommendation, caching, and privacy notes.
 - `docs/geocoding-research.md`: geocoding provider recommendation and city/location lookup privacy notes.
 - `docs/mvp-roadmap.md`: milestone plan and implementation order.
+- `.agents/review-policy.md`: canonical review gates, triggers, measures, and
+  planning-estimate rules.
 - `prototypes/jvm-scoring/`: minimal Maven JVM scoring/ephemeris prototype with fixture tests.
 - `backend/`: first Spring Boot backend module, currently fixture-backed through the scoring prototype.
 
@@ -64,7 +66,19 @@ The main unresolved choice is now the exact first web/API contract for city look
   make tests shorter. Keep production API surface aligned with real runtime
   use. Put test-only construction convenience in test helpers or builders
   unless there is a concrete production caller or established local pattern.
-- State technical judgment directly. Agreement should include reasoning; disagreement should be plain and actionable.
+- State technical judgment directly. Agreement should include reasoning;
+  disagreement should be plain and actionable.
+- Use plain language in agent-authored issue and pull-request text, GitHub
+  comments and replies, review summaries, commit messages, code comments, and
+  project or agent-policy documentation. Put one main idea in a sentence. Use
+  common, concrete words and short paragraphs when they stay exact. Keep
+  technical terms when they add needed precision. Avoid chains of nouns,
+  formal filler, abstract lead-ins, and decorative metaphors. When flagging
+  hard-to-read text, suggest simpler wording. Keep required template fields,
+  but write their content like a colleague. This is a review rule, not a word
+  limit, readability score, or style-linter requirement.
+- Code comments should explain why code exists or why a choice was made. Do not
+  restate obvious code. Prefer one or two direct sentences when that is enough.
 - Do not introduce mandatory accounts without documenting user value and recovery behavior.
 - Do not permanently store user locations server-side unless saved alerts require it and the privacy model is updated.
 - Design device identity recovery before relying on anonymous device-bound accounts.
@@ -134,6 +148,11 @@ The canonical definitions of project-specific review skills live under
 request workflow. Treat copies outside the repository as temporary installed
 artifacts, not as an independently editable source of truth.
 
+The review numbers, their effects, and the rules for planning estimates live in
+[`.agents/review-policy.md`](.agents/review-policy.md). Any review skill that
+applies those rules must read that file. Do not repeat its numbers in
+`AGENTS.md` or a skill.
+
 A skill migration is not complete while a same-named legacy copy remains
 discoverable outside the repository. After the repository-local version reaches
 the default branch, remove or disable the legacy copy and verify in a fresh
@@ -178,63 +197,38 @@ may change.
 
 ## Change Categories and Gates
 
-Before issue-backed implementation, categorize the accepted work and record its
-coherent outcome, independently reviewable concerns or subsystems, likely files,
-estimated added-plus-deleted lines, and acceptance-criterion ownership. Select
-the change category from the accepted issue before editing; do not relabel work
-later to obtain a larger allowance. Ambiguous or mixed work uses the stricter
-applicable gate or splits.
+Use [`.agents/review-policy.md`](.agents/review-policy.md) for change
+categories, concern and file gates, code-file limits, documentation triggers,
+output budgets, counting rules, and required evidence.
 
-The default gates are:
+Before issue-backed implementation, record the accepted outcome, independently
+reviewable concerns or subsystems, expected paths, other paths that may be
+needed and why, an expected ordinary-file count range, informational
+ordinary-churn estimate, expected code-file results, documentation measures,
+output classes, and acceptance-criterion ownership.
 
-| Change category | Maximum concerns or subsystems | Maximum ordinary files | Maximum ordinary lines |
-| --- | ---: | ---: | ---: |
-| Bug fix | 1 | 6 | 300 |
-| New feature or default | 2 supporting one accepted outcome | 10 | 600 |
-| Documentation-only | 1 | 6 | 400 |
+Likely paths and count ranges forecast the implementation. They are not a fixed
+list and do not authorize more work. A different path or count does not need
+reauthorization or another scope review by itself. It must still serve the
+accepted outcome and stay within the accepted concerns, dependencies, output
+classes, and hard gates. Record the actual paths and count after staging.
+Explain any meaningful difference from the plan.
 
-Documentation-only work changes no runtime, policy or workflow, configuration,
-CI, or tooling behavior. Those changes use the new-feature/default category. An
-authorized refactor uses the feature file and line limits but may contain only
-one concern. Operations and dependency work use the feature limits plus the
-explicit dependency or operational authority required below; file spread does
-not earn a larger allowance.
+Select the change category from accepted authority before editing. Do not
+relabel work later to obtain a larger allowance. Ambiguous or mixed work uses
+the stricter applicable gate or splits. Room under a limit never authorizes an
+unaccepted concern.
 
-Examples of distinct concerns include backend behavior, frontend UX,
-deployment/operations, CI/automation, and provider/privacy policy. Code, tests,
-and documentation that directly support one accepted behavior remain the same
-concern, but they count toward ordinary file and line totals. Numeric headroom
-never authorizes an unaccepted concern.
-
-"Ordinary" means every changed file that does not qualify as generated,
-vendored, or a lock file. Those three categories have independent budgets:
-
-- Generated output: 8 changed files, 20,000 textual added-plus-deleted lines,
-  and 512 KiB aggregate resulting size.
-- Vendored output: zero by default. When the accepted issue explicitly
-  authorizes vendoring, 2 changed files and 1 MiB aggregate resulting size.
-- Lock files: 1 changed file, 2,000 textual added-plus-deleted lines, and
-  256 KiB resulting size.
-
-"Generated" means a tracked deterministic command emits the complete file
-byte-for-byte from tracked inputs. A mixed authored/generated file is ordinary,
-and every agent- or LLM-authored file is ordinary. The manifest that triggers a
-lock-file change is also ordinary.
-
-Plans and PRs that change generated output must record its paths, generator and
-version, inputs, exact command, counts, textual churn, resulting bytes, clean
-regeneration result, and semantic validation. Visual snapshots require a pinned
-reproducible environment. Authorized vendoring must record provenance,
-immutable version or hash, license, and why repository storage is required.
-Lock-file evidence must record the package-manager version and reproduction
-command.
+Ordinary churn is information. Documentation size conditions are review
+triggers, not scope gates. Apply the documentation authority rules and staged
+review requirements in the policy.
 
 ## Scope Growth and Mutation Authority
 
-Do not use available numeric budget to enlarge accepted work. Stop before
-editing and obtain new scope authority when accepted behavior cannot be
-delivered safely without an unrequested refactor, incidental fix, new concern,
-or new dependency. In particular:
+Do not use room under a limit to enlarge accepted work. Stop before editing and
+obtain new scope authority when accepted behavior cannot be delivered safely
+without an unrequested refactor, incidental fix, new concern, or new dependency.
+In particular:
 
 - Omit an unrequested refactor when the accepted behavior can be delivered
   safely without it. If it is genuinely required, explain why and re-estimate.
@@ -268,20 +262,27 @@ identify dependencies, and recommend merge order. If a planning agent is
 unavailable or not authorized, pause oversized work and report the blocker; do
 not silently waive the review.
 
-Default to `split_required` whenever a gate is crossed. Keeping oversized work
-in one PR requires the exact exceeded gate and measured values, an
-inseparability or safety rationale recorded on the issue, and explicit approval
-from the user or repository owner. General approval of an issue or PR is not a
-blanket exception. For an owner-accepted split plan, create and link only its
-authorized child issues before implementation, keep the parent issue open, give
-each PR one coherent outcome, and make every slice independently safe and
-mergeable. Leave unfinished capabilities disabled by default.
+Documentation review thresholds are not scope gates. Crossing one does not by
+itself require another scope review or a split.
 
-Re-evaluate the gate during implementation. If the actual diff crosses it or a
-new independently reviewable concern, output category, or dependency appears,
+Default to `split_required` whenever a hard gate is crossed. Hard gates cover
+concerns, ordinary files, resulting code-file size, and the separate generated,
+vendored, and lock-file budgets. Keeping oversized work in one PR requires the
+exact exceeded gate and measured values, an inseparability or safety rationale
+recorded on the issue, and explicit approval from the user or repository owner.
+General approval of an issue or PR is not a blanket exception. For an
+owner-accepted split plan, create and link only its authorized child issues
+before implementation, keep the parent issue open, give each PR one coherent
+outcome, and make every slice independently safe and mergeable. Leave unfinished
+capabilities disabled by default.
+
+Re-evaluate hard gates during implementation. If the actual diff crosses one or
+a new independently reviewable concern, output category, or dependency appears,
 stop and rerun `$implementation-scope-review`. Split the work unless keeping one
 PR satisfies the recorded exception requirements above; never silently expand
-or recategorize the current PR.
+or recategorize the current PR. If a documentation threshold is crossed, record
+the measures and arrange the focused staged review without rerunning scope
+review for size alone.
 
 Before opening or finalizing a nontrivial implementation PR, stage the complete
 intended diff and use `$second-agent-review` with a fresh read-only agent. Triage
@@ -337,8 +338,8 @@ Treat implementation work as nontrivial when it changes runtime behavior,
 public contracts, scoring or data transformation, provider/privacy/security
 boundaries, deployment or CI behavior, migrations, or multiple files with
 coupled behavior. Tiny mechanical edits and wording-only documentation changes
-may skip the staged-diff review, but the PR must record why review was not
-required.
+may skip the staged-diff review only when the documentation authority and size
+rules do not require it. The PR must record why review was not required.
 
 ## Suggested Tooling Direction
 
