@@ -18,6 +18,15 @@ DEPLOY_SCRIPT = (
     / "files"
     / "moon-service-deploy"
 )
+REJECTED_AT = "2026-07-18T12:34:56Z"
+REJECTED_KEYS = {
+    "MOON_IMAGE_REPOSITORY",
+    "MOON_IMAGE_DIGEST",
+    "MOON_IMAGE_REVISION",
+    "MOON_DEPLOYED_AT",
+    "MOON_REJECTION_STAGE",
+    "MOON_REJECTED_AT",
+}
 
 
 FAKE_DOCKER = r"""#!/usr/bin/env bash
@@ -73,7 +82,9 @@ if [[ "$1" == inspect ]]; then
     if [[ "$3" == *State.Status* ]]; then
         printf 'running\n'
     elif [[ "$3" == *State.Health* ]]; then
-        if [[ "$revision" == "${FAKE_UNHEALTHY_REVISION:-none}" ]]; then
+        if [[ "$revision" == "${FAKE_UNHEALTHY_REVISION:-none}" \
+            || ( "$revision" == "${FAKE_FINAL_READINESS_FAIL_REVISION:-none}" \
+                && -f "$FAKE_DOCKER_STATE/identity-checked-$revision" ) ]]; then
             printf 'unhealthy\n'
         else
             printf 'healthy\n'
@@ -81,6 +92,7 @@ if [[ "$1" == inspect ]]; then
     elif [[ "$3" == *Config.Image* ]]; then
         printf 'ghcr.io/rapucha/moon-service@%s\n' "$reported_digest"
     elif [[ "$3" == *Config.Labels* ]]; then
+        touch "$FAKE_DOCKER_STATE/identity-checked-$revision"
         printf '{"dev.moonservice.image-digest":"%s","dev.moonservice.revision":"%s"}\n' \
             "$reported_digest" "$reported_revision"
     else
@@ -120,6 +132,12 @@ FAKE_CURL = r"""#!/usr/bin/env bash
 set -euo pipefail
 revision="$(cat "$FAKE_DOCKER_STATE/active-revision")"
 printf '{"status":"ok","revision":"%s"}\n' "$revision"
+"""
+
+
+FAKE_DATE = f"""#!/usr/bin/env bash
+set -euo pipefail
+printf '{REJECTED_AT}\\n'
 """
 
 
@@ -175,6 +193,9 @@ class DeploymentStateTest(unittest.TestCase):
         self.fake_curl = self.root / "curl"
         self.fake_curl.write_text(FAKE_CURL, encoding="utf-8")
         self.fake_curl.chmod(0o755)
+        self.fake_date = self.root / "date"
+        self.fake_date.write_text(FAKE_DATE, encoding="utf-8")
+        self.fake_date.chmod(0o755)
         self.fake_github_report = self.root / "github-report"
         self.fake_github_report.write_text(FAKE_GITHUB_REPORT, encoding="utf-8")
         self.fake_github_report.chmod(0o755)
@@ -186,6 +207,7 @@ class DeploymentStateTest(unittest.TestCase):
                 "MOON_COMPOSE_FILE": str(self.compose),
                 "MOON_CONFIG_DIR": str(self.config),
                 "MOON_CURL_BIN": str(self.fake_curl),
+                "MOON_DATE_BIN": str(self.fake_date),
                 "MOON_DOCKER_BIN": str(self.fake_docker),
                 "MOON_GITHUB_REPORT_BIN": str(self.fake_github_report),
                 "MOON_READY_INTERVAL_SECONDS": "0",
@@ -211,6 +233,17 @@ class DeploymentStateTest(unittest.TestCase):
             text=True,
             env=values,
         )
+
+    def assert_rejected(self, digest: str, revision: str, stage: str):
+        rejected = read_env(self.state / "rejected.env")
+        self.assertEqual(REJECTED_KEYS, set(rejected))
+        self.assertEqual("ghcr.io/rapucha/moon-service", rejected["MOON_IMAGE_REPOSITORY"])
+        self.assertEqual(digest, rejected["MOON_IMAGE_DIGEST"])
+        self.assertEqual(revision, rejected["MOON_IMAGE_REVISION"])
+        self.assertEqual(REJECTED_AT, rejected["MOON_DEPLOYED_AT"])
+        self.assertEqual(stage, rejected["MOON_REJECTION_STAGE"])
+        self.assertRegex(rejected["MOON_REJECTED_AT"], r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$")
+        self.assertEqual(REJECTED_AT, rejected["MOON_REJECTED_AT"])
 
     def test_initial_deployment_records_immutable_identity(self):
         digest, revision = self.set_manifest("a", "1")
@@ -338,16 +371,25 @@ class DeploymentStateTest(unittest.TestCase):
 
         self.assertEqual(1, result.returncode)
         self.assertEqual(first_revision, (self.root / "active-revision").read_text().strip())
-        self.assertEqual(
-            candidate_digest,
-            read_env(self.state / "rejected.env")["MOON_IMAGE_DIGEST"],
-        )
+        self.assert_rejected(candidate_digest, candidate_revision, "identity")
         self.assertTrue(
             (self.root / "github-reports.log")
             .read_text()
             .splitlines()[-1]
             .startswith(f"failure {candidate_digest} {candidate_revision} ")
         )
+
+    def test_candidate_compose_failure_records_stage_and_rolls_back(self):
+        _, current_revision = self.set_manifest("a", "1")
+        self.assertEqual(0, self.run_deploy().returncode)
+        candidate_digest, candidate_revision = self.set_manifest("b", "2")
+
+        result = self.run_deploy(FAKE_COMPOSE_FAIL_REVISION=candidate_revision)
+
+        self.assertEqual(1, result.returncode)
+        self.assertEqual(current_revision, (self.root / "active-revision").read_text().strip())
+        self.assert_rejected(candidate_digest, candidate_revision, "compose")
+        self.assertEqual("rolled-back", read_env(self.state / "last-result.env")["RESULT"])
 
     def test_unhealthy_candidate_rolls_back_once_and_is_quarantined(self):
         _, current_revision = self.set_manifest("a", "1")
@@ -358,8 +400,9 @@ class DeploymentStateTest(unittest.TestCase):
 
         self.assertEqual(1, failed.returncode)
         self.assertEqual(current_revision, (self.root / "active-revision").read_text().strip())
-        self.assertEqual(candidate_digest, read_env(self.state / "rejected.env")["MOON_IMAGE_DIGEST"])
+        self.assert_rejected(candidate_digest, candidate_revision, "readiness")
         self.assertEqual("rolled-back", read_env(self.state / "last-result.env")["RESULT"])
+        rejected_before = (self.state / "rejected.env").read_text(encoding="utf-8")
         pulls_before = sum(
             line.startswith("pull ") for line in (self.root / "commands.log").read_text().splitlines()
         )
@@ -372,6 +415,44 @@ class DeploymentStateTest(unittest.TestCase):
         )
         self.assertEqual(pulls_before, pulls_after)
         self.assertEqual("skipped", read_env(self.state / "last-result.env")["RESULT"])
+        self.assertEqual(rejected_before, (self.state / "rejected.env").read_text(encoding="utf-8"))
+
+        third_digest, _ = self.set_manifest("c", "3")
+        self.assertEqual(0, self.run_deploy().returncode)
+        self.assertEqual(third_digest, read_env(self.state / "current.env")["MOON_IMAGE_DIGEST"])
+        self.assertFalse((self.state / "rejected.env").exists())
+
+    def test_final_readiness_recheck_records_readiness_stage(self):
+        self.set_manifest("a", "1")
+        self.assertEqual(0, self.run_deploy().returncode)
+        candidate_digest, candidate_revision = self.set_manifest("b", "2")
+
+        result = self.run_deploy(FAKE_FINAL_READINESS_FAIL_REVISION=candidate_revision)
+
+        self.assertEqual(1, result.returncode)
+        self.assert_rejected(candidate_digest, candidate_revision, "readiness")
+
+    def test_legacy_rejected_state_remains_compatible_with_resume(self):
+        _, current_revision = self.set_manifest("a", "1")
+        self.assertEqual(0, self.run_deploy().returncode)
+        candidate_digest, candidate_revision = self.set_manifest("b", "2")
+        (self.state / "rejected.env").write_text(
+            "MOON_IMAGE_REPOSITORY=ghcr.io/rapucha/moon-service\n"
+            f"MOON_IMAGE_DIGEST={candidate_digest}\n"
+            f"MOON_IMAGE_REVISION={candidate_revision}\n"
+            f"MOON_DEPLOYED_AT={REJECTED_AT}\n",
+            encoding="utf-8",
+        )
+
+        skipped = self.run_deploy()
+        self.assertEqual(0, skipped.returncode, skipped.stderr)
+        self.assertEqual(current_revision, (self.root / "active-revision").read_text().strip())
+        self.assertEqual("skipped", read_env(self.state / "last-result.env")["RESULT"])
+
+        resumed = self.run_deploy("resume")
+        self.assertEqual(0, resumed.returncode, resumed.stderr)
+        self.assertEqual(candidate_revision, (self.root / "active-revision").read_text().strip())
+        self.assertFalse((self.state / "rejected.env").exists())
 
     def test_registry_failure_keeps_current_revision_running(self):
         _, revision = self.set_manifest("a", "1")
@@ -452,14 +533,14 @@ class DeploymentStateTest(unittest.TestCase):
     def test_boot_reconciliation_restores_previous_when_current_is_unhealthy(self):
         _, first_revision = self.set_manifest("a", "1")
         self.assertEqual(0, self.run_deploy().returncode)
-        _, second_revision = self.set_manifest("b", "2")
+        second_digest, second_revision = self.set_manifest("b", "2")
         self.assertEqual(0, self.run_deploy().returncode)
 
         result = self.run_deploy(FAKE_UNHEALTHY_REVISION=second_revision)
 
         self.assertEqual(0, result.returncode, result.stderr)
         self.assertEqual(first_revision, read_env(self.state / "current.env")["MOON_IMAGE_REVISION"])
-        self.assertEqual(second_revision, read_env(self.state / "rejected.env")["MOON_IMAGE_REVISION"])
+        self.assert_rejected(second_digest, second_revision, "readiness")
         self.assertEqual(first_revision, (self.root / "active-revision").read_text().strip())
         self.assertEqual("boot-rollback", read_env(self.state / "last-result.env")["RESULT"])
 
