@@ -25,6 +25,15 @@ Remaining caveats:
 - The free API is non-commercial, rate-limited, has no uptime guarantee, and requires attribution through the underlying CC BY 4.0 weather data license.
 - Open-Meteo may log IP addresses and request URLs, which can include coordinates, for troubleshooting. Their terms state these logs are deleted after 90 days.
 
+### Alpha attribution and provider processing
+
+Re-verified against the primary provider sources on 2026-07-17:
+
+- Open-Meteo's [licence](https://open-meteo.com/en/licence) places API data under CC BY 4.0 and requires a visible Open-Meteo link next to displayed data.
+- The [free API terms](https://open-meteo.com/en/terms) allow noncommercial use within the published limits. Open-Meteo's [pricing](https://open-meteo.com/en/pricing) says commercial use requires a subscription and customer API key.
+- Moon Service calls Open-Meteo from its backend. The provider receives the backend address and forecast coordinates rather than a direct browser request. Open-Meteo says troubleshooting logs may contain IP addresses and request data, including coordinates, and are deleted after 90 days.
+- The public lookup page credits Open-Meteo, links to the licence, identifies the noncommercial tester alpha, and states that commercial launch requires a separately approved provider plan. These are static links and copy; they add no analytics or visitor tracking.
+
 ## Recommended MVP Boundary
 
 Use a small backend/proxy for weather access in the MVP, even if the first endpoint remains stateless.
