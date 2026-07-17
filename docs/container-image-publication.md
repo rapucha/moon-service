@@ -145,37 +145,26 @@ deployment.
 
 ## Independent Host-Configuration Status
 
-Application deployment success remains scoped to the exact image identity. A
-separate non-production GitHub Deployment uses environment
-`raspberry-pi-host-config` and task `provision:raspberry-pi` to show whether the
-tracked Ansible host role has been applied.
+Application success remains scoped to the exact image. A separate non-production
+`raspberry-pi-host-config` / `provision:raspberry-pi` Deployment shows whether the
+tracked Ansible role was applied.
 
-The first producer-enabled workflow queues the current fingerprint. On later
-pushes, the existing serialized promotion job exposes the revision it observed
-at GHCR `main` before its decision. A parallel post-promotion job validates that
-revision and the push's prior revision as ancestors of the exact promoted
-revision, selects the older linearly related baseline, and queues only when that
-net range changes the tracked role or `host-contract-fingerprint.py`. This
-covers a host-changing promotion that GitHub replaced while it was pending. The
-lightweight host jobs do not share a concurrency group, so GitHub cannot replace
-a pending host signal with a later application-only one.
+The first producer-enabled workflow queues the current fingerprint. Later, a
+parallel job validates the push and pre-promotion GHCR revisions as ancestors of
+the exact promotion, selects the older baseline, and queues only for role or
+fingerprint-helper changes. Jobs may overlap so GitHub cannot replace a pending
+signal with a later application-only one.
 
-The producer calculates the versioned SHA-256 fingerprint of the path-framed
-tracked role bytes and posts a new queued request. It does not wait for manual
-provisioning, undo completed promotion, or block the sibling image-confirmation
-job; its own failure remains visible in the workflow result.
+The producer fingerprints the tracked role and posts a queued request. It does
+not wait for provisioning or block image promotion or confirmation.
 
-The playbook records the applied fingerprint only after its final convergence
-assertions and uses the existing outbound deployment-reporter App to complete
-an exact matching request. No inventory address, key, token, or rendered
-private value enters the fingerprint or Deployment payload. This is
-point-in-time configuration evidence, not continuous monitoring.
+After final assertions, the playbook records the applied fingerprint and uses
+the outbound reporter App to complete an exact request. No private inventory,
+address, key, token, or rendered value enters the fingerprint or payload. This
+is point-in-time evidence, not continuous monitoring.
 
-The producer does not list or reconcile historical host requests. An overlapping
-job or rerun may therefore create another queued record for the same fingerprint,
-and an older duplicate may remain visible after the playbook completes the
-newest exact match. Application-only ranges after the initial activation do not
-create a host request.
+Historical requests are not reconciled: overlaps may create duplicates, and the
+playbook completes the newest exact match. Application-only ranges after activation create none.
 
 ## One-Time Repository Setup
 
