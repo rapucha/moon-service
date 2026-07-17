@@ -143,6 +143,29 @@ allows a late exact success to remain visible; a confirm-only rerun can validate
 the stored creation attempt and accept that status without creating a new image
 deployment.
 
+## Independent Host-Configuration Status
+
+Application success remains scoped to the exact image. A separate non-production
+`raspberry-pi-host-config` / `provision:raspberry-pi` Deployment shows whether the
+tracked Ansible role was applied.
+
+The first producer-enabled workflow queues the current fingerprint. Later, a
+parallel job validates the push and pre-promotion GHCR revisions as ancestors of
+the exact promotion, selects the older baseline, and queues only for role or
+fingerprint-helper changes. Jobs may overlap so GitHub cannot replace a pending
+signal with a later application-only one.
+
+The producer fingerprints the tracked role and posts a queued request. It does
+not wait for provisioning or block image promotion or confirmation.
+
+After final assertions, the playbook records the applied fingerprint and uses
+the outbound reporter App to complete an exact request. No private inventory,
+address, key, token, or rendered value enters the fingerprint or payload. This
+is point-in-time evidence, not continuous monitoring.
+
+Historical requests are not reconciled: overlaps may create duplicates, and the
+playbook completes the newest exact match. Application-only ranges after activation create none.
+
 ## One-Time Repository Setup
 
 Before enabling the main-only confirmation gate, install the deployment-reporter

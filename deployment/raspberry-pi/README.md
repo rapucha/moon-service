@@ -561,12 +561,11 @@ rerun can validate the stored creation attempt and accept it.
 
 ### Separate host-configuration convergence
 
-The green `raspberry-pi` application Deployment does not claim that a later
-Ansible role change has been applied. The host-convergence consumer reserves
-environment `raspberry-pi-host-config`, task `provision:raspberry-pi`, for that
-independent point-in-time state. This slice does not create those requests; the
-separate workflow producer tracked in issue #145 must land after the consumer.
-Until then, provisioning records a nonfatal `no-match` callback result.
+The green `raspberry-pi` application Deployment does not claim that the Ansible
+role was applied. The first producer-enabled workflow queues the current host;
+later jobs queue only for validated role or fingerprint-helper changes. The
+older push/GHCR baseline prevents a replaced promotion from hiding such a
+change. Manual provisioning completes the separate host-configuration request.
 
 The fingerprint covers the path-framed bytes of every Git-tracked file under
 `deployment/raspberry-pi/roles/moon_service_host/`, sorted by repository-relative
@@ -587,11 +586,11 @@ the previous applied identity. After persistence, reporting is independent: an
 API failure retains the newly applied local identity and leaves the GitHub
 request retryable by a later idempotent playbook run.
 
-After the producer is enabled, this signal proves that one fingerprint
-converged at a point in time. It is not continuous monitoring and does not make
-GitHub Actions execute Ansible, reach the Pi inbound, or learn private inventory
-values. A green application Deployment and queued host-configuration Deployment
-may then correctly coexist.
+This is point-in-time evidence, not monitoring: GitHub Actions does not execute
+Ansible, reach the Pi inbound, or learn private inventory. Host jobs may overlap
+to avoid replacement of a pending signal, so reruns can create duplicate queued
+records. Provisioning completes the newest exact match; application-only ranges
+after activation create no request.
 
 A failed candidate is recorded in `rejected.env`. Later timer runs do not
 reintroduce two-minute outages by retrying the same bad digest. A newly
