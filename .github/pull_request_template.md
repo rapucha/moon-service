@@ -11,9 +11,14 @@
 
 - Coherent outcome:
 - Change category and rationale:
+- Review policy source: `.agents/review-policy.md`
 - Applicable hard gates (concerns / ordinary files / resulting code sizes):
 - Independently reviewable concerns or subsystems:
-- Ordinary files changed:
+- Expected paths:
+- Other paths that might be needed and why: None
+- Expected ordinary-file count range:
+- Actual ordinary paths and count:
+- Meaningful difference from the path or count estimate: None
 - Ordinary churn (added + deleted, informational only):
 - Code-file sizes:
   - Path / type / base / result / delta / limit / approved maximum if excepted

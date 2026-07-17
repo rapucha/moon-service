@@ -26,6 +26,8 @@ This is an issue-design review. It does not replace
 - Keep the review read-only: do not create or edit issues, files, branches, pull
   requests, or other external state.
 - Review the target project's authority before applying generic heuristics.
+- Read `.agents/review-policy.md` before applying project gates, triggers,
+  measures, or planning estimates.
 - If project policy requires this review and a fresh agent is unavailable,
   pause and report the blocker rather than waiving the gate.
 - Ask the user only when a missing answer materially changes the proposed work;
@@ -46,10 +48,11 @@ answer:
   to test the premise.
 - Existing issues or pull requests that may duplicate, supersede, or own part
   of the work.
-- The proposed repository change category; expected ordinary files and
-  informational churn; expected code-file sizes; base counts and deltas for
-  existing oversized files; documentation measures; generated, vendored, and
-  lock-file output; and authority for any follow-up issue or dependency.
+- The proposed repository change category; expected paths; other paths that may
+  be needed and why; an expected ordinary-file count range; informational
+  churn; expected code-file sizes; base counts and deltas for existing
+  oversized files; documentation measures; generated, vendored, and lock-file
+  output; and authority for any follow-up issue or dependency.
 - Known dependencies, rollout constraints, assumptions, and owner decisions.
 
 ## Review Method
@@ -82,8 +85,9 @@ answer:
    gate: concerns, ordinary files, resulting code-file sizes, and separate
    generated, vendored, and lock-file budgets. Record ordinary line churn as
    information. Check documentation authority and size rules without treating
-   their review thresholds as scope gates. Do not choose a more generous
-   category to fit an estimate.
+   their review thresholds as scope gates. Treat paths and count ranges as
+   forecasts, not a fixed list or permission to add work. Do not choose a more
+   generous category to fit an estimate.
 9. Identify incidental findings, opportunistic cleanup, unrelated tests/docs,
    and dependencies not authorized by the user's request or existing source
    issue. Remove them or return `revise`; room under a limit is not authority.
@@ -138,12 +142,15 @@ Acceptance authority:
 Scope assessment:
 - Change category: <repository-defined category and why>
 - Concerns/subsystems: <count and names>
-- Ordinary files/churn: <file estimate and informational added-plus-deleted lines>
+- Expected paths: <likely paths; other paths that may be needed and why>
+- Ordinary files: <expected count range>
+- Ordinary churn: <informational added-plus-deleted range>
 - Code sizes: <paths, types, base counts, expected results, deltas, and limits>
 - Documentation review: <authority classes, resulting/changed nonblank lines, and triggers>
 - Generated/vendored/lock output: <budget assessment or none>
 - Scope-authority findings: <unrequested work, dependency, follow-up authority, or none>
-- Triggered gates: <list or none>
+- Hard-gate crossings: <list or none>
+- Review triggers: <list or none>
 
 Acceptance-quality findings:
 - <missing, untestable, solution-biased, or complete criterion>
@@ -172,9 +179,10 @@ Use a prompt like:
 ```text
 Use a read-only issue-design-review stance. Review the draft issue and relevant
 project authority before it is created or treated as implementation authority.
-Do not edit files or external state. Challenge the premise, alternatives,
-hidden dependencies, owner decisions, scope authority, YAGNI, and acceptance
-criteria. Trace every material criterion to user intent, evidence, a current
+Read `.agents/review-policy.md` before applying its gates or triggers. Do not
+edit files or external state. Challenge the premise, alternatives, hidden
+dependencies, owner decisions, scope authority, YAGNI, and acceptance criteria.
+Trace every material criterion to user intent, evidence, a current
 correctness/safety need, or an explicit decision. Identify the minimum
 end-to-end capability and separate unsupported optional hardening. Apply the
 repository change category, hard scope gates, documentation review rules, and
@@ -195,6 +203,8 @@ and suggest simpler wording when it preserves the meaning.
   parent open, and keep prerequisite decisions ahead of implementation.
 - Preserve the reviewer output as evidence, but do not treat it as owner
   approval for a material decision.
+- Treat planned paths and counts as estimates unless accepted issue text makes
+  a path part of the outcome. Do not treat a likely path list as fixed.
 - Reviewer suggestions do not authorize incidental follow-up issues. Without
   explicit user/owner instruction, explicit source-issue authority, or an
   owner-accepted enumerated split plan, report the observation without mutating

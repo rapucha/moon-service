@@ -53,6 +53,8 @@ The main unresolved choice is now the exact first web/API contract for city look
 - `docs/weather-provider-research.md`: weather provider recommendation, caching, and privacy notes.
 - `docs/geocoding-research.md`: geocoding provider recommendation and city/location lookup privacy notes.
 - `docs/mvp-roadmap.md`: milestone plan and implementation order.
+- `.agents/review-policy.md`: canonical review gates, triggers, measures, and
+  planning-estimate rules.
 - `prototypes/jvm-scoring/`: minimal Maven JVM scoring/ephemeris prototype with fixture tests.
 - `backend/`: first Spring Boot backend module, currently fixture-backed through the scoring prototype.
 
@@ -146,6 +148,11 @@ The canonical definitions of project-specific review skills live under
 request workflow. Treat copies outside the repository as temporary installed
 artifacts, not as an independently editable source of truth.
 
+The review numbers, their effects, and the rules for planning estimates live in
+[`.agents/review-policy.md`](.agents/review-policy.md). Any review skill that
+applies those rules must read that file. Do not repeat its numbers in
+`AGENTS.md` or a skill.
+
 A skill migration is not complete while a same-named legacy copy remains
 discoverable outside the repository. After the repository-local version reaches
 the default branch, remove or disable the legacy copy and verify in a fresh
@@ -190,151 +197,31 @@ may change.
 
 ## Change Categories and Gates
 
-Before issue-backed implementation, categorize the accepted work and record its
-coherent outcome, independently reviewable concerns or subsystems, likely files,
-estimated added-plus-deleted ordinary lines, expected resulting code-file sizes,
-base counts and expected deltas for existing oversized files, documentation
-review measures, and acceptance-criterion ownership. Ordinary line churn is
-planning information, not a hard gate. Select the change category from the
-accepted issue before editing; do not relabel work later to obtain a larger
-allowance. Ambiguous or mixed work uses the stricter applicable gate or splits.
+Use [`.agents/review-policy.md`](.agents/review-policy.md) for change
+categories, concern and file gates, code-file limits, documentation triggers,
+output budgets, counting rules, and required evidence.
 
-The default gates are:
+Before issue-backed implementation, record the accepted outcome, independently
+reviewable concerns or subsystems, expected paths, other paths that may be
+needed and why, an expected ordinary-file count range, informational
+ordinary-churn estimate, expected code-file results, documentation measures,
+output classes, and acceptance-criterion ownership.
 
-| Change category | Maximum concerns or subsystems | Maximum ordinary files |
-| --- | ---: | ---: |
-| Bug fix | 1 | 6 |
-| New feature or default | 2 supporting one accepted outcome | 10 |
-| Documentation-only | 1 | 6 |
+Likely paths and count ranges forecast the implementation. They are not a fixed
+list and do not authorize more work. A different path or count does not need
+reauthorization or another scope review by itself. It must still serve the
+accepted outcome and stay within the accepted concerns, dependencies, output
+classes, and hard gates. Record the actual paths and count after staging.
+Explain any meaningful difference from the plan.
 
-Documentation-only work changes no runtime, policy or workflow, configuration,
-CI, or tooling behavior. Those changes use the new-feature/default category. An
-authorized refactor uses the feature file limit and applicable code-size limit
-but may contain only one concern. Operations and dependency work use the feature
-limits plus the explicit dependency or operational authority required below;
-file spread does not earn a larger allowance.
+Select the change category from accepted authority before editing. Do not
+relabel work later to obtain a larger allowance. Ambiguous or mixed work uses
+the stricter applicable gate or splits. Room under a limit never authorizes an
+unaccepted concern.
 
-Examples of distinct concerns include backend behavior, frontend UX,
-deployment/operations, CI/automation, and provider/privacy policy. Code, tests,
-and documentation that directly support one accepted behavior remain the same
-concern, but they count toward the ordinary file total. Room under a limit never
-authorizes an unaccepted concern.
-
-"Ordinary" means every changed file that does not qualify as generated,
-vendored, or a lock file. Record total added plus deleted ordinary lines, but
-use that total only as information. It does not block a pull request, force a
-split, or trigger another scope review.
-
-### Code-File Size
-
-Use the resulting size of each code file:
-
-| File type | Maximum code lines |
-| --- | ---: |
-| Production/runtime code, including scripts, configuration, and workflows | 400 |
-| Test and prototype code | 600 |
-
-A code line is a physical nonblank line that contains code or configuration
-after comment-only content is ignored. The limits are inclusive.
-
-- Blank and comment-only lines do not count as code.
-- A line that mixes code and a comment counts as code.
-- Block comments and documentation-only docstrings do not count. A docstring or
-  string used as runtime data does count.
-- Each nonblank source line inside a multiline runtime string counts.
-- Shebangs, YAML configuration, and commands inside workflow `run:` blocks count
-  as code.
-- Embedded code that is executed counts as code. An ordinary string literal
-  counts once as its host-language line.
-- When classification is unclear, count the line as code. A mixed file uses the
-  stricter applicable limit.
-- Test and prototype files use the 600-line limit unless they also contain
-  production or runtime behavior.
-- Normal formatting still applies. Do not pack statements or dense expressions
-  onto fewer lines only to pass the limit.
-
-New files and files below their limit must finish within it. An existing
-oversized file may change when its code-line count does not grow. Do not remove
-unrelated code merely to offset growth. A zero code-line delta for an existing
-oversized file stays within the gate.
-
-If accepted work must grow an oversized file, stop before editing. Record the
-exact base count, an expected maximum, the reason, and explicit owner approval
-through the normal exception process. After staging, record the actual count.
-If it exceeds the approved maximum, stop and obtain new approval.
-
-The limit does not vary by pull-request category. File maintainability is the
-same in a bug fix and a feature.
-
-### Documentation Review
-
-Classify authored documentation by what it can change:
-
-- **Control documents:** `AGENTS.md`, `SKILL.md`, pull-request templates,
-  workflow rules, and API or operations rules.
-- **Decision documents:** architecture, product, privacy, and similar records.
-- **Explanatory documents:** guides, indexes, and navigation that do not carry
-  rules or decisions.
-
-For every changed authored document, report its resulting nonblank lines and
-its added plus deleted nonblank lines. A focused documentation review is
-required when:
-
-- an update changes at least 150 nonblank lines;
-- a new or changed document crosses from below 600 to at least 600 nonblank
-  lines; or
-- a document already at or above 600 nonblank lines grows.
-
-A small correction to an existing document above 600 lines does not trigger
-size review when the file does not grow and the update stays below 150 changed
-nonblank lines.
-
-Authority can require review before either size threshold. Every substantive
-change to a control document gets an independent staged-diff review. Every
-change that adds, removes, or changes a decision in a decision document gets
-that review. Pure spelling, formatting, or wording changes may skip it when
-they do not change meaning.
-
-One independent staged-diff review can satisfy both the authority and size
-rules. Crossing a documentation threshold requires a short change summary and
-focused checks. It does not block the change, force a split, or trigger another
-scope review by itself. Check for removed constraints, contradictions, new
-authority, repeated rules, mismatch with the code, and unclear structure.
-
-Code fences count toward document size. Treat each executable embedded block as
-its file type under the code-size rule. When comment-only lines or
-documentation-only docstrings change, measure those prose lines separately from
-code and apply the documentation thresholds. Check a mixed prose/code file
-under both rules.
-
-Truly generated reference documentation keeps the generated-output budgets and
-regeneration evidence instead of the authored-document thresholds. Its tracked
-inputs remain ordinary files.
-
-Size tells us how much review a document needs. Authority tells us whether
-review is mandatory.
-
-Generated, vendored, and lock files have independent budgets:
-
-- Generated output: 8 changed files, 20,000 textual added-plus-deleted lines,
-  and 512 KiB aggregate resulting size.
-- Vendored output: zero by default. When the accepted issue explicitly
-  authorizes vendoring, 2 changed files and 1 MiB aggregate resulting size.
-- Lock files: 1 changed file, 2,000 textual added-plus-deleted lines, and
-  256 KiB resulting size.
-
-"Generated" means a tracked deterministic command emits the complete file
-byte-for-byte from tracked inputs. A mixed authored/generated file is ordinary,
-and every agent- or LLM-authored file is ordinary. The manifest that triggers a
-lock-file change is also ordinary.
-
-Plans and PRs that change generated output must record its paths, generator and
-version, inputs, exact command, counts, textual churn, resulting bytes, clean
-regeneration result, and semantic validation. Visual snapshots require a pinned
-reproducible environment. Authorized vendoring must record provenance,
-immutable version or hash, license, and why repository storage is required.
-Lock-file evidence must record the package-manager version and reproduction
-command.
+Ordinary churn is information. Documentation size conditions are review
+triggers, not scope gates. Apply the documentation authority rules and staged
+review requirements in the policy.
 
 ## Scope Growth and Mutation Authority
 

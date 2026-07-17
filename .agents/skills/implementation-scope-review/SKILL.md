@@ -31,6 +31,8 @@ review does not replace this PR-packaging review.
   blocker instead of returning a scope verdict.
 - Do not edit files, create issues, change branches, or mutate external state.
 - Review the target project instructions before applying generic heuristics.
+- Read `.agents/review-policy.md` before applying project gates, triggers,
+  measures, or planning estimates.
 - Ask for missing information only when it would materially change the verdict;
   otherwise state a bounded assumption.
 
@@ -45,9 +47,11 @@ answer:
 - Project authority such as `AGENTS.md`, contribution rules, and PR template.
 - Only the product, architecture, API, privacy, or deployment documents needed
   to understand the work.
-- Any proposed file list, subsystem estimate, ordinary churn estimate,
-  expected code-file sizes, base counts and deltas for existing oversized
-  files, documentation measures, rollout constraint, or known dependency.
+- Expected paths; other paths that may be needed and why; an expected
+  ordinary-file count range; a subsystem estimate; an informational
+  ordinary-churn range; expected code-file sizes; base counts and deltas for
+  existing oversized files; documentation measures; rollout constraints; and
+  known dependencies.
 - The change category selected from the accepted issue, plus any generated,
   vendored, or lock-file paths and reproduction information.
 - Existing parent or child issues that may already own part of the scope.
@@ -75,15 +79,17 @@ answer:
    documentation supporting one behavior as one concern; do not merge distinct
    backend, frontend, deployment, CI, provider, privacy, or rollout decisions
    merely because one issue mentions them.
-6. Estimate affected ordinary files and informational added-plus-deleted lines.
-   List each changed code file with its type, base count, expected result, delta,
-   and applicable limit. For an existing oversized file, state whether the
-   expected delta is zero or an approved exception is required. Record each
-   changed document's authority class, resulting nonblank lines, changed
-   nonblank lines, and review trigger. Count generated, vendored, and lock
-   changes separately using every repository dimension, including resulting
-   bytes where required. Treat mixed authored/generated and agent/LLM-authored
-   files as ordinary.
+6. Record expected paths and other paths that may be needed, with the reason for
+   each one. Estimate an ordinary-file count range and informational
+   added-plus-deleted-line range. These forecast the implementation; they are
+   not a fixed path list or permission to add work. List each changed code file
+   with its type, base count, expected result, delta, and applicable limit.
+   For an existing oversized file, state whether the expected delta is zero or
+   an approved exception is required. Record each changed document's authority
+   class, resulting nonblank lines, changed nonblank lines, and review trigger.
+   Count generated, vendored, and lock changes separately using every
+   repository dimension, including resulting bytes where required. Treat mixed
+   authored/generated and agent/LLM-authored files as ordinary.
 7. Check scope authority separately from the remaining room under a limit.
    Identify unrequested refactors, incidental fixes, speculative abstractions
    or extension points, opportunistic cleanup, unrelated tests/docs, and
@@ -125,14 +131,16 @@ Gate assessment:
 - Change category: <repository-defined category and why>
 - Applicable hard gates: <concerns, ordinary files, resulting code sizes, and output budgets>
 - Concerns/subsystems: <count and names>
-- Ordinary files: <estimate>
-- Ordinary churn: <informational estimate or bounded range>
+- Expected paths: <likely paths; other paths that may be needed and why>
+- Ordinary files: <expected count range>
+- Ordinary churn: <informational estimated range>
 - Code sizes: <paths, types, base counts, expected results, deltas, and limits>
 - Documentation review: <paths, authority classes, resulting/changed nonblank lines, and triggers>
 - Generated output: <files/lines/bytes/reproduction or none>
 - Vendored output: <files/bytes/authority/provenance or none>
 - Lock files: <files/lines/bytes/reproduction or none>
-- Triggered gates: <list or none>
+- Hard-gate crossings: <list or none>
+- Review triggers: <list or none>
 
 Scope-authority assessment:
 - <unrequested work, abstraction/YAGNI, incidental finding, dependency, or none>
@@ -169,8 +177,9 @@ Use a prompt like:
 
 ```text
 Use a read-only planning-review stance. Review the issue and relevant project
-authority before implementation. Do not edit files or external state. Apply
-the repository change category, hard scope gates, documentation review rules,
+authority before implementation. Read `.agents/review-policy.md` before
+applying its gates or triggers. Do not edit files or external state. Apply the
+repository change category, hard scope gates, documentation review rules,
 output budgets, and semantic stop/replan controls. Treat ordinary churn as
 information. Check the smallest useful outcome first. Separate optional work.
 For each slice, ask whether it remains useful if later slices never land. Allow
@@ -194,4 +203,8 @@ language.
   focused-review requirement without splitting for size alone.
 - Re-run scope review if the actual diff crosses a hard gate or gains a new
   concern, output category, or dependency.
+- Do not rerun it for a path or count difference alone when the actual work
+  keeps the accepted outcome, concerns, dependencies, output classes, and hard
+  gates. Record the actual paths and count in the pull request. Explain any
+  meaningful difference from the plan.
 - Do not treat planning approval as code-review approval.

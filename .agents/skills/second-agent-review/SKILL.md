@@ -32,6 +32,8 @@ Before requesting the review, the primary agent should:
 - Run the smallest meaningful validation commands, unless blocked.
 - Check the worktree state and identify the intended diff to review.
 - Keep unrelated user or generated changes separate when possible.
+- Read `.agents/review-policy.md` before applying project gates, triggers,
+  measures, or planning estimates.
 
 ## When To Use
 
@@ -64,10 +66,12 @@ Prefer these inputs:
 - The staged diff, branch diff, or exact file list under review.
 - The accepted change category, scope review, explicit source-issue authority, and
   any approved exception or owner-accepted enumerated split plan.
-- Ordinary file counts and informational churn; code-line base counts, results,
-  and deltas; documentation authority classes, sizes, and triggers; and
-  generated, vendored, and lock-file counts, sizes, reproduction commands, and
-  validation evidence when present.
+- Expected paths, other paths that might be needed and why, the expected
+  file-count range, actual paths and count, and any meaningful difference.
+  Include informational churn; code-line base counts, results, and deltas;
+  documentation authority classes, sizes, and triggers; and generated,
+  vendored, and lock-file counts, sizes, reproduction commands, and validation
+  evidence when present.
 - The validation commands already run and their outcomes.
 - Any intentionally untracked/generated files that should be ignored.
 
@@ -81,17 +85,21 @@ Ask the second agent to review, not edit. Use a prompt like this:
 
 ```text
 Use a read-only code-review stance. Review the provided diff against the
-project instructions and relevant docs. Do not modify files.
+project instructions, `.agents/review-policy.md`, and relevant docs. Read the
+policy before applying its gates or triggers. Do not modify files.
 
 Check scope before implementation quality:
 
 1. Compare the staged diff with the accepted outcome, change category, acceptance
    criteria, and approved exceptions. Flag unaccepted concerns even when the
-   diff remains below its hard gates.
+   diff remains below its hard gates. Do not flag an extra, missing, or replaced
+   planned path by itself. Check whether the difference changes behavior,
+   concerns, dependencies, output classes, or a hard gate.
 2. Verify ordinary file counts, informational churn, code-line base and result
    counts, oversized-file deltas and exceptions, and generated/vendored/lock
-   measurements against project policy. Treat mixed or agent/LLM-authored files
-   as ordinary.
+   measurements against project policy. Record meaningful differences from the
+   planned file range without treating unused range as scope. Treat mixed or
+   agent/LLM-authored files as ordinary.
 3. For each changed document, verify its authority class, resulting nonblank
    lines, changed nonblank lines, and review trigger. When focused review is
    required, check for removed constraints, contradictions, new authority,
