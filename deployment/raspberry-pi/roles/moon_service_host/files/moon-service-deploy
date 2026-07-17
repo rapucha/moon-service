@@ -120,11 +120,13 @@ write_state() {
 }
 
 copy_state() {
-    local source="$1"
-    local target="$2"
-    local temporary
+    local source="$1" target="$2" rejection_stage="${3:-}" temporary
     temporary="$(mktemp "$STATE_DIR/.state-copy.XXXXXX")"
     cp "$source" "$temporary"
+    if [[ -n "$rejection_stage" ]]; then
+        printf 'MOON_REJECTION_STAGE=%s\nMOON_REJECTED_AT=%s\n' \
+            "$rejection_stage" "$("$DATE_BIN" -u +%Y-%m-%dT%H:%M:%SZ)" >>"$temporary"
+    fi
     chmod 0600 "$temporary"
     mv -f "$temporary" "$target"
 }
@@ -156,6 +158,7 @@ compose_up() {
     local state_file="$1"
     local recreate="${2:-false}"
     local -a command
+    REJECTION_STAGE=compose
     command=(
         "$DOCKER_BIN" compose
         --project-name "$COMPOSE_PROJECT"
@@ -200,6 +203,7 @@ deployment_identity_once() {
     local expected_digest="$2"
     local expected_revision="$3"
     local configured_image labels_json
+    REJECTION_STAGE=identity
     valid_state "$state_file" || return 1
     [[ "$(state_value "$state_file" MOON_IMAGE_DIGEST)" == "$expected_digest" ]] || return 1
     [[ "$(state_value "$state_file" MOON_IMAGE_REVISION)" == "$expected_revision" ]] || return 1
@@ -216,6 +220,7 @@ deployment_identity_once() {
         .["dev.moonservice.image-digest"] == $digest
         and .["dev.moonservice.revision"] == $revision
     ' <<<"$labels_json" >/dev/null || return 1
+    REJECTION_STAGE=readiness
     ready_once "$expected_revision"
 }
 
@@ -235,6 +240,7 @@ report_deployment_status() {
 wait_until_ready() {
     local expected_revision="$1"
     local deadline=$((SECONDS + READY_TIMEOUT_SECONDS))
+    REJECTION_STAGE=readiness
     while true; do
         if ready_once "$expected_revision"; then
             return 0
@@ -246,18 +252,23 @@ wait_until_ready() {
     done
 }
 
+verify_deployment() {
+    local state_file="$1" digest="$2" revision="$3" recreate="${4:-false}"
+    compose_up "$state_file" "$recreate" \
+        && wait_until_ready "$revision" \
+        && deployment_identity_once "$state_file" "$digest" "$revision"
+}
+
 restore_previous_after_current_failure() {
-    local failed_digest failed_revision previous_revision
+    local failed_stage="$1" failed_digest failed_revision previous_digest previous_revision
     valid_state "$PREVIOUS_STATE" || return 1
     failed_digest="$(state_value "$CURRENT_STATE" MOON_IMAGE_DIGEST)"
     failed_revision="$(state_value "$CURRENT_STATE" MOON_IMAGE_REVISION)"
+    previous_digest="$(state_value "$PREVIOUS_STATE" MOON_IMAGE_DIGEST)"
     previous_revision="$(state_value "$PREVIOUS_STATE" MOON_IMAGE_REVISION)"
     log "current revision $failed_revision is not ready; trying previous revision $previous_revision"
-    compose_up "$PREVIOUS_STATE" true || return 1
-    wait_until_ready "$previous_revision" || return 1
-    deployment_identity_once "$PREVIOUS_STATE" \
-        "$(state_value "$PREVIOUS_STATE" MOON_IMAGE_DIGEST)" "$previous_revision" || return 1
-    copy_state "$CURRENT_STATE" "$REJECTED_STATE"
+    verify_deployment "$PREVIOUS_STATE" "$previous_digest" "$previous_revision" true || return 1
+    copy_state "$CURRENT_STATE" "$REJECTED_STATE" "$failed_stage"
     mv -f "$PREVIOUS_STATE" "$CURRENT_STATE"
     record_result boot-rollback current-unhealthy "$failed_digest" "$failed_revision"
     report_deployment_status failure "$failed_digest" "$failed_revision" \
@@ -282,12 +293,10 @@ ensure_current_running() {
     # Compose configuration before doing network work. This also restores the
     # last known-good revision when an update was interrupted after container
     # replacement but before state commit.
-    if compose_up "$CURRENT_STATE" false \
-        && wait_until_ready "$revision" \
-        && deployment_identity_once "$CURRENT_STATE" "$digest" "$revision"; then
+    if verify_deployment "$CURRENT_STATE" "$digest" "$revision"; then
         return 0
     fi
-    if restore_previous_after_current_failure; then
+    if restore_previous_after_current_failure "$REJECTION_STAGE"; then
         return 0
     fi
     record_result failed current-and-previous-unhealthy "$digest" "$revision"
@@ -296,16 +305,13 @@ ensure_current_running() {
 }
 
 restore_current_after_candidate_failure() {
-    local candidate_digest="$1"
-    local candidate_revision="$2"
+    local candidate_digest="$1" candidate_revision="$2"
     if valid_state "$CURRENT_STATE"; then
-        local current_revision
+        local current_digest current_revision
+        current_digest="$(state_value "$CURRENT_STATE" MOON_IMAGE_DIGEST)"
         current_revision="$(state_value "$CURRENT_STATE" MOON_IMAGE_REVISION)"
         log "candidate $candidate_revision failed readiness; restoring $current_revision"
-        if compose_up "$CURRENT_STATE" true \
-            && wait_until_ready "$current_revision" \
-            && deployment_identity_once "$CURRENT_STATE" \
-                "$(state_value "$CURRENT_STATE" MOON_IMAGE_DIGEST)" "$current_revision"; then
+        if verify_deployment "$CURRENT_STATE" "$current_digest" "$current_revision" true; then
             record_result rolled-back candidate-unhealthy "$candidate_digest" "$candidate_revision"
             return 0
         fi
@@ -356,9 +362,7 @@ restart_current() {
     fi
     digest="$(state_value "$CURRENT_STATE" MOON_IMAGE_DIGEST)"
     revision="$(state_value "$CURRENT_STATE" MOON_IMAGE_REVISION)"
-    if compose_up "$CURRENT_STATE" true \
-        && wait_until_ready "$revision" \
-        && deployment_identity_once "$CURRENT_STATE" "$digest" "$revision"; then
+    if verify_deployment "$CURRENT_STATE" "$digest" "$revision" true; then
         record_result restarted operator-request "$digest" "$revision"
         return 0
     fi
@@ -380,9 +384,7 @@ manual_rollback() {
     previous_digest="$(state_value "$PREVIOUS_STATE" MOON_IMAGE_DIGEST)"
     previous_revision="$(state_value "$PREVIOUS_STATE" MOON_IMAGE_REVISION)"
 
-    if ! compose_up "$PREVIOUS_STATE" true \
-        || ! wait_until_ready "$previous_revision" \
-        || ! deployment_identity_once "$PREVIOUS_STATE" "$previous_digest" "$previous_revision"; then
+    if ! verify_deployment "$PREVIOUS_STATE" "$previous_digest" "$previous_revision" true; then
         log "manual rollback target failed; restoring current revision $current_revision"
         compose_up "$CURRENT_STATE" true >/dev/null 2>&1 || true
         wait_until_ready "$current_revision" >/dev/null 2>&1 || true
@@ -506,10 +508,8 @@ if ! "$DOCKER_BIN" pull "$IMAGE_REPOSITORY@$candidate_digest"; then
 fi
 
 write_state "$CANDIDATE_STATE" "$candidate_digest" "$candidate_revision"
-if ! compose_up "$CANDIDATE_STATE" true \
-    || ! wait_until_ready "$candidate_revision" \
-    || ! deployment_identity_once "$CANDIDATE_STATE" "$candidate_digest" "$candidate_revision"; then
-    copy_state "$CANDIDATE_STATE" "$REJECTED_STATE"
+if ! verify_deployment "$CANDIDATE_STATE" "$candidate_digest" "$candidate_revision" true; then
+    copy_state "$CANDIDATE_STATE" "$REJECTED_STATE" "$REJECTION_STAGE"
     restore_current_after_candidate_failure "$candidate_digest" "$candidate_revision" || true
     report_deployment_status failure "$candidate_digest" "$candidate_revision" \
         "Pi rejected the candidate and restored its known-good image"

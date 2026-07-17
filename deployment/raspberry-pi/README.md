@@ -597,6 +597,13 @@ reintroduce two-minute outages by retrying the same bad digest. A newly
 published digest is tried normally. After correcting a host-only problem, use
 `resume` to clear the rejection and retry immediately.
 
+Every new rejection also records `MOON_REJECTION_STAGE` and `MOON_REJECTED_AT`.
+`compose` means Compose startup failed; `readiness` covers container health,
+`/readyz`, its JSON check, and the final post-identity readiness recheck; and
+`identity` covers recorded state, the immutable image reference, or required
+labels after initial readiness. The timestamp is UTC `YYYY-MM-DDTHH:MM:SSZ`.
+Inspect both fields before `resume`. Legacy rejected-state files remain valid.
+
 If GHCR or the network is unavailable, discovery/pull is deferred only after
 the last recorded local digest is reconciled. The running service does not
 depend on registry availability.
@@ -605,7 +612,7 @@ State is under `/var/lib/moon-service`:
 
 - `current.env`: active known-good digest and revision;
 - `previous.env`: one rollback generation;
-- `rejected.env`: candidate that failed readiness;
+- `rejected.env`: quarantined image identity, verification stage, and UTC time;
 - `last-result.env`: latest update/control outcome;
 - `last-github-report.env`: latest callback result, status, exact identity, and
   matching Deployment IDs, without tokens or private-key material;
@@ -707,10 +714,10 @@ as rejected, and continues on the previous revision.
 
 ### Bad image
 
-Automatic readiness failure restores current and records the candidate in
-`rejected.env`. Inspect `status` and `logs`. Do not use `resume` until the
-failure was host-specific or a corrected image has been published. A corrected
-new digest needs no operator action.
+Automatic candidate verification failure restores current and records the
+candidate in `rejected.env`. Inspect its rejection stage and time, `status`, and
+`logs`. Do not use `resume` until the failure was host-specific or a corrected
+image has been published. A corrected new digest needs no operator action.
 
 ### Bad local configuration
 
