@@ -64,7 +64,19 @@ The main unresolved choice is now the exact first web/API contract for city look
   make tests shorter. Keep production API surface aligned with real runtime
   use. Put test-only construction convenience in test helpers or builders
   unless there is a concrete production caller or established local pattern.
-- State technical judgment directly. Agreement should include reasoning; disagreement should be plain and actionable.
+- State technical judgment directly. Agreement should include reasoning;
+  disagreement should be plain and actionable.
+- Use plain language in agent-authored issue and pull-request text, GitHub
+  comments and replies, review summaries, commit messages, code comments, and
+  project or agent-policy documentation. Put one main idea in a sentence. Use
+  common, concrete words and short paragraphs when they stay exact. Keep
+  technical terms when they add needed precision. Avoid chains of nouns,
+  formal filler, abstract lead-ins, and decorative metaphors. When flagging
+  hard-to-read text, suggest simpler wording. Keep required template fields,
+  but write their content like a colleague. This is a review rule, not a word
+  limit, readability score, or style-linter requirement.
+- Code comments should explain why code exists or why a choice was made. Do not
+  restate obvious code. Prefer one or two direct sentences when that is enough.
 - Do not introduce mandatory accounts without documenting user value and recovery behavior.
 - Do not permanently store user locations server-side unless saved alerts require it and the privacy model is updated.
 - Design device identity recovery before relying on anonymous device-bound accounts.
@@ -180,34 +192,129 @@ may change.
 
 Before issue-backed implementation, categorize the accepted work and record its
 coherent outcome, independently reviewable concerns or subsystems, likely files,
-estimated added-plus-deleted lines, and acceptance-criterion ownership. Select
-the change category from the accepted issue before editing; do not relabel work
-later to obtain a larger allowance. Ambiguous or mixed work uses the stricter
-applicable gate or splits.
+estimated added-plus-deleted ordinary lines, expected resulting code-file sizes,
+base counts and expected deltas for existing oversized files, documentation
+review measures, and acceptance-criterion ownership. Ordinary line churn is
+planning information, not a hard gate. Select the change category from the
+accepted issue before editing; do not relabel work later to obtain a larger
+allowance. Ambiguous or mixed work uses the stricter applicable gate or splits.
 
 The default gates are:
 
-| Change category | Maximum concerns or subsystems | Maximum ordinary files | Maximum ordinary lines |
-| --- | ---: | ---: | ---: |
-| Bug fix | 1 | 6 | 300 |
-| New feature or default | 2 supporting one accepted outcome | 10 | 600 |
-| Documentation-only | 1 | 6 | 400 |
+| Change category | Maximum concerns or subsystems | Maximum ordinary files |
+| --- | ---: | ---: |
+| Bug fix | 1 | 6 |
+| New feature or default | 2 supporting one accepted outcome | 10 |
+| Documentation-only | 1 | 6 |
 
 Documentation-only work changes no runtime, policy or workflow, configuration,
 CI, or tooling behavior. Those changes use the new-feature/default category. An
-authorized refactor uses the feature file and line limits but may contain only
-one concern. Operations and dependency work use the feature limits plus the
-explicit dependency or operational authority required below; file spread does
-not earn a larger allowance.
+authorized refactor uses the feature file limit and applicable code-size limit
+but may contain only one concern. Operations and dependency work use the feature
+limits plus the explicit dependency or operational authority required below;
+file spread does not earn a larger allowance.
 
 Examples of distinct concerns include backend behavior, frontend UX,
 deployment/operations, CI/automation, and provider/privacy policy. Code, tests,
 and documentation that directly support one accepted behavior remain the same
-concern, but they count toward ordinary file and line totals. Numeric headroom
-never authorizes an unaccepted concern.
+concern, but they count toward the ordinary file total. Room under a limit never
+authorizes an unaccepted concern.
 
 "Ordinary" means every changed file that does not qualify as generated,
-vendored, or a lock file. Those three categories have independent budgets:
+vendored, or a lock file. Record total added plus deleted ordinary lines, but
+use that total only as information. It does not block a pull request, force a
+split, or trigger another scope review.
+
+### Code-File Size
+
+Use the resulting size of each code file:
+
+| File type | Maximum code lines |
+| --- | ---: |
+| Production/runtime code, including scripts, configuration, and workflows | 400 |
+| Test and prototype code | 600 |
+
+A code line is a physical nonblank line that contains code or configuration
+after comment-only content is ignored. The limits are inclusive.
+
+- Blank and comment-only lines do not count as code.
+- A line that mixes code and a comment counts as code.
+- Block comments and documentation-only docstrings do not count. A docstring or
+  string used as runtime data does count.
+- Each nonblank source line inside a multiline runtime string counts.
+- Shebangs, YAML configuration, and commands inside workflow `run:` blocks count
+  as code.
+- Embedded code that is executed counts as code. An ordinary string literal
+  counts once as its host-language line.
+- When classification is unclear, count the line as code. A mixed file uses the
+  stricter applicable limit.
+- Test and prototype files use the 600-line limit unless they also contain
+  production or runtime behavior.
+- Normal formatting still applies. Do not pack statements or dense expressions
+  onto fewer lines only to pass the limit.
+
+New files and files below their limit must finish within it. An existing
+oversized file may change when its code-line count does not grow. Do not remove
+unrelated code merely to offset growth. A zero code-line delta for an existing
+oversized file stays within the gate.
+
+If accepted work must grow an oversized file, stop before editing. Record the
+exact base count, an expected maximum, the reason, and explicit owner approval
+through the normal exception process. After staging, record the actual count.
+If it exceeds the approved maximum, stop and obtain new approval.
+
+The limit does not vary by pull-request category. File maintainability is the
+same in a bug fix and a feature.
+
+### Documentation Review
+
+Classify authored documentation by what it can change:
+
+- **Control documents:** `AGENTS.md`, `SKILL.md`, pull-request templates,
+  workflow rules, and API or operations rules.
+- **Decision documents:** architecture, product, privacy, and similar records.
+- **Explanatory documents:** guides, indexes, and navigation that do not carry
+  rules or decisions.
+
+For every changed authored document, report its resulting nonblank lines and
+its added plus deleted nonblank lines. A focused documentation review is
+required when:
+
+- an update changes at least 150 nonblank lines;
+- a new or changed document crosses from below 600 to at least 600 nonblank
+  lines; or
+- a document already at or above 600 nonblank lines grows.
+
+A small correction to an existing document above 600 lines does not trigger
+size review when the file does not grow and the update stays below 150 changed
+nonblank lines.
+
+Authority can require review before either size threshold. Every substantive
+change to a control document gets an independent staged-diff review. Every
+change that adds, removes, or changes a decision in a decision document gets
+that review. Pure spelling, formatting, or wording changes may skip it when
+they do not change meaning.
+
+One independent staged-diff review can satisfy both the authority and size
+rules. Crossing a documentation threshold requires a short change summary and
+focused checks. It does not block the change, force a split, or trigger another
+scope review by itself. Check for removed constraints, contradictions, new
+authority, repeated rules, mismatch with the code, and unclear structure.
+
+Code fences count toward document size. Treat each executable embedded block as
+its file type under the code-size rule. When comment-only lines or
+documentation-only docstrings change, measure those prose lines separately from
+code and apply the documentation thresholds. Check a mixed prose/code file
+under both rules.
+
+Truly generated reference documentation keeps the generated-output budgets and
+regeneration evidence instead of the authored-document thresholds. Its tracked
+inputs remain ordinary files.
+
+Size tells us how much review a document needs. Authority tells us whether
+review is mandatory.
+
+Generated, vendored, and lock files have independent budgets:
 
 - Generated output: 8 changed files, 20,000 textual added-plus-deleted lines,
   and 512 KiB aggregate resulting size.
@@ -231,10 +338,10 @@ command.
 
 ## Scope Growth and Mutation Authority
 
-Do not use available numeric budget to enlarge accepted work. Stop before
-editing and obtain new scope authority when accepted behavior cannot be
-delivered safely without an unrequested refactor, incidental fix, new concern,
-or new dependency. In particular:
+Do not use room under a limit to enlarge accepted work. Stop before editing and
+obtain new scope authority when accepted behavior cannot be delivered safely
+without an unrequested refactor, incidental fix, new concern, or new dependency.
+In particular:
 
 - Omit an unrequested refactor when the accepted behavior can be delivered
   safely without it. If it is genuinely required, explain why and re-estimate.
@@ -268,20 +375,27 @@ identify dependencies, and recommend merge order. If a planning agent is
 unavailable or not authorized, pause oversized work and report the blocker; do
 not silently waive the review.
 
-Default to `split_required` whenever a gate is crossed. Keeping oversized work
-in one PR requires the exact exceeded gate and measured values, an
-inseparability or safety rationale recorded on the issue, and explicit approval
-from the user or repository owner. General approval of an issue or PR is not a
-blanket exception. For an owner-accepted split plan, create and link only its
-authorized child issues before implementation, keep the parent issue open, give
-each PR one coherent outcome, and make every slice independently safe and
-mergeable. Leave unfinished capabilities disabled by default.
+Documentation review thresholds are not scope gates. Crossing one does not by
+itself require another scope review or a split.
 
-Re-evaluate the gate during implementation. If the actual diff crosses it or a
-new independently reviewable concern, output category, or dependency appears,
+Default to `split_required` whenever a hard gate is crossed. Hard gates cover
+concerns, ordinary files, resulting code-file size, and the separate generated,
+vendored, and lock-file budgets. Keeping oversized work in one PR requires the
+exact exceeded gate and measured values, an inseparability or safety rationale
+recorded on the issue, and explicit approval from the user or repository owner.
+General approval of an issue or PR is not a blanket exception. For an
+owner-accepted split plan, create and link only its authorized child issues
+before implementation, keep the parent issue open, give each PR one coherent
+outcome, and make every slice independently safe and mergeable. Leave unfinished
+capabilities disabled by default.
+
+Re-evaluate hard gates during implementation. If the actual diff crosses one or
+a new independently reviewable concern, output category, or dependency appears,
 stop and rerun `$implementation-scope-review`. Split the work unless keeping one
 PR satisfies the recorded exception requirements above; never silently expand
-or recategorize the current PR.
+or recategorize the current PR. If a documentation threshold is crossed, record
+the measures and arrange the focused staged review without rerunning scope
+review for size alone.
 
 Before opening or finalizing a nontrivial implementation PR, stage the complete
 intended diff and use `$second-agent-review` with a fresh read-only agent. Triage
@@ -337,8 +451,8 @@ Treat implementation work as nontrivial when it changes runtime behavior,
 public contracts, scoring or data transformation, provider/privacy/security
 boundaries, deployment or CI behavior, migrations, or multiple files with
 coupled behavior. Tiny mechanical edits and wording-only documentation changes
-may skip the staged-diff review, but the PR must record why review was not
-required.
+may skip the staged-diff review only when the documentation authority and size
+rules do not require it. The PR must record why review was not required.
 
 ## Suggested Tooling Direction
 

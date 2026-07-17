@@ -46,8 +46,10 @@ answer:
   to test the premise.
 - Existing issues or pull requests that may duplicate, supersede, or own part
   of the work.
-- The proposed repository change category; estimated ordinary, generated, vendored,
-  and lock-file output; and authority for any follow-up issue or dependency.
+- The proposed repository change category; expected ordinary files and
+  informational churn; expected code-file sizes; base counts and deltas for
+  existing oversized files; documentation measures; generated, vendored, and
+  lock-file output; and authority for any follow-up issue or dependency.
 - Known dependencies, rollout constraints, assumptions, and owner decisions.
 
 ## Review Method
@@ -76,17 +78,22 @@ answer:
 7. Separate owner decisions from implementation details. Do not mark a draft
    ready while a material product, architecture, privacy, cost, or operational
    choice is implicit or unauthorized.
-8. Categorize the proposed work from its outcome and apply every repository gate:
-   concerns, ordinary files/lines, and separate generated, vendored, and
-   lock-file budgets. Do not choose a more generous category to fit an estimate.
+8. Categorize the proposed work from its outcome and apply every repository
+   gate: concerns, ordinary files, resulting code-file sizes, and separate
+   generated, vendored, and lock-file budgets. Record ordinary line churn as
+   information. Check documentation authority and size rules without treating
+   their review thresholds as scope gates. Do not choose a more generous
+   category to fit an estimate.
 9. Identify incidental findings, opportunistic cleanup, unrelated tests/docs,
    and dependencies not authorized by the user's request or existing source
-   issue. Remove them or return `revise`; numeric headroom is not authority.
+   issue. Remove them or return `revise`; room under a limit is not authority.
 10. Split distinct outcomes, decision work, or independently deliverable
    concerns rather than hiding them under one issue.
-11. Test acceptance criteria for observable outcomes, completeness, feasibility,
-    solution bias, and authority traceability. Identify prerequisites,
-    dependency order, rollback boundaries, and disabled-by-default needs.
+11. Test acceptance criteria for observable outcomes, completeness,
+    feasibility, solution bias, and authority traceability. Identify
+    prerequisites, dependency order, rollback boundaries, and
+    disabled-by-default needs. For agent-authored issue text, flag wording that
+    can be simpler without losing meaning and propose a direct replacement.
 12. Return exactly one verdict: `ready`, `revise`, or `split_required`.
 
 ## Verdict Rules
@@ -98,12 +105,13 @@ answer:
   dependencies, boundaries, scope authority, or acceptance criteria need
   correction before it is created or acted upon.
 - `split_required`: the draft combines independently reviewable outcomes,
-  crosses a project scope gate, or mixes a prerequisite decision with
-  implementation that should not begin before that decision.
+  crosses a hard project scope gate, or mixes a prerequisite decision with
+  implementation that should not begin before that decision. A documentation
+  review threshold alone does not require a split.
 
 Default to `revise` when a material owner decision is missing. Default to
-`split_required` when a repository gate is crossed unless the project records
-an approved exception through its normal workflow.
+`split_required` when a hard repository gate is crossed unless the project
+records an approved exception through its normal workflow.
 
 ## Output Contract
 
@@ -130,7 +138,9 @@ Acceptance authority:
 Scope assessment:
 - Change category: <repository-defined category and why>
 - Concerns/subsystems: <count and names>
-- Expected files/lines: <estimate or bounded range>
+- Ordinary files/churn: <file estimate and informational added-plus-deleted lines>
+- Code sizes: <paths, types, base counts, expected results, deltas, and limits>
+- Documentation review: <authority classes, resulting/changed nonblank lines, and triggers>
 - Generated/vendored/lock output: <budget assessment or none>
 - Scope-authority findings: <unrequested work, dependency, follow-up authority, or none>
 - Triggered gates: <list or none>
@@ -152,6 +162,9 @@ For `ready`, explain why one issue is coherent. For `revise`, provide the
 smallest corrections needed. For `split_required`, map every proposed
 acceptance criterion to the smallest practical ordered issue set.
 
+Use short, direct sentences. Keep exact technical terms when they are needed.
+Avoid formal filler and decorative metaphors.
+
 ## Reviewer Prompt
 
 Use a prompt like:
@@ -164,9 +177,11 @@ hidden dependencies, owner decisions, scope authority, YAGNI, and acceptance
 criteria. Trace every material criterion to user intent, evidence, a current
 correctness/safety need, or an explicit decision. Identify the minimum
 end-to-end capability and separate unsupported optional hardening. Apply the
-repository change category and all ordinary/output gates and return exactly
-ready, revise, or split_required. Do not assume the drafting agent's proposed
-solution or its own acceptance criteria are authoritative.
+repository change category, hard scope gates, documentation review rules, and
+output budgets. Treat ordinary churn as information. Return exactly ready,
+revise, or split_required. Do not assume the drafting agent's proposed solution
+or its own acceptance criteria are authoritative. Use plain, direct language
+and suggest simpler wording when it preserves the meaning.
 ```
 
 ## Primary-Agent Follow-Up
