@@ -9,7 +9,10 @@ description: Run an independent read-only design review of a draft GitHub issue 
 
 Review an issue draft before it becomes external project state or implementation
 authority. Challenge whether the issue is the right work, not merely how its
-accepted work should be packaged into pull requests.
+accepted work should be packaged into pull requests. Prevent an agent-authored
+draft from manufacturing scope authority by converting optional robustness into
+required acceptance criteria without user intent, evidence, correctness, or
+safety need.
 
 This is an issue-design review. It does not replace
 `$implementation-scope-review` before implementation or
@@ -35,6 +38,8 @@ answer:
 
 - The proposed issue title and complete draft body.
 - The user's request, evidence, failure, or feedback that motivated the draft.
+- The trace from each material acceptance criterion to that request, evidence,
+  an established contract, or an explicit owner decision.
 - Project authority such as `AGENTS.md`, contribution rules, and relevant issue
   templates.
 - Only the product, architecture, privacy, deployment, or API documents needed
@@ -55,29 +60,40 @@ answer:
    or cases where no action is warranted. Reject speculative abstractions,
    extension points, cleanup, or refactors that the stated outcome does not
    require.
-4. Surface hidden decisions and dependencies, including new runtime components,
+4. Classify proposed behavior as the minimum end-to-end capability, behavior
+   required for current correctness or safety, or optional hardening. Require a
+   concrete authority or evidence trace for each material criterion; the draft's
+   own wording is not authority. Treat deduplication, pagination, recovery,
+   reconciliation, supersession, generalized extensibility, and hypothetical
+   scale handling as optional unless the inputs demonstrate otherwise.
+5. Prefer an issue whose first deliverable is the smallest observable
+   user-visible or operational outcome. Defer optional hardening rather than
+   embedding it in the core issue. Do not create or presume a follow-up issue
+   unless the user, source authority, or an owner-accepted split authorizes it.
+6. Surface hidden decisions and dependencies, including new runtime components,
    providers, accounts, stored data, privacy obligations, network exposure,
    deployment or rollback work, CI, and ongoing operations.
-5. Separate owner decisions from implementation details. Do not mark a draft
+7. Separate owner decisions from implementation details. Do not mark a draft
    ready while a material product, architecture, privacy, cost, or operational
    choice is implicit or unauthorized.
-6. Categorize the proposed work from its outcome and apply every repository gate:
+8. Categorize the proposed work from its outcome and apply every repository gate:
    concerns, ordinary files/lines, and separate generated, vendored, and
    lock-file budgets. Do not choose a more generous category to fit an estimate.
-7. Identify incidental findings, opportunistic cleanup, unrelated tests/docs,
+9. Identify incidental findings, opportunistic cleanup, unrelated tests/docs,
    and dependencies not authorized by the user's request or existing source
    issue. Remove them or return `revise`; numeric headroom is not authority.
-8. Split distinct outcomes, decision work, or independently deliverable
+10. Split distinct outcomes, decision work, or independently deliverable
    concerns rather than hiding them under one issue.
-9. Test acceptance criteria for observable outcomes, completeness, feasibility,
-   and solution bias. Identify prerequisites, dependency order, rollback
-   boundaries, and disabled-by-default needs.
-10. Return exactly one verdict: `ready`, `revise`, or `split_required`.
+11. Test acceptance criteria for observable outcomes, completeness, feasibility,
+    solution bias, and authority traceability. Identify prerequisites,
+    dependency order, rollback boundaries, and disabled-by-default needs.
+12. Return exactly one verdict: `ready`, `revise`, or `split_required`.
 
 ## Verdict Rules
 
 - `ready`: the problem is supported, the scope is coherent, material decisions
-  are explicit and authorized, and acceptance criteria are testable.
+  and criteria are explicit and authorized, optional hardening is justified or
+  excluded, and acceptance criteria are testable.
 - `revise`: one coherent issue remains appropriate, but its premise, choices,
   dependencies, boundaries, scope authority, or acceptance criteria need
   correction before it is created or acted upon.
@@ -99,12 +115,17 @@ Verdict: ready | revise | split_required
 Problem and evidence:
 - Intended outcome: <single outcome>
 - Evidence: <why this issue is needed>
+- Minimum end-to-end capability: <smallest observable useful result>
 
 Ownership and duplication:
 - Existing authority: <issue, PR, decision, or none>
 
 Decisions and hidden dependencies:
 - <decision/dependency; owner approval state>
+
+Acceptance authority:
+- <material criterion> -> <user intent, evidence, correctness/safety need, owner decision, or unsupported>
+- Optional hardening: <excluded, justified in current scope, or separately authorized>
 
 Scope assessment:
 - Change category: <repository-defined category and why>
@@ -140,9 +161,12 @@ Use a read-only issue-design-review stance. Review the draft issue and relevant
 project authority before it is created or treated as implementation authority.
 Do not edit files or external state. Challenge the premise, alternatives,
 hidden dependencies, owner decisions, scope authority, YAGNI, and acceptance
-criteria. Apply the repository change category and all ordinary/output gates and
-return exactly ready, revise, or split_required. Do not assume the drafting
-agent's proposed solution is correct.
+criteria. Trace every material criterion to user intent, evidence, a current
+correctness/safety need, or an explicit decision. Identify the minimum
+end-to-end capability and separate unsupported optional hardening. Apply the
+repository change category and all ordinary/output gates and return exactly
+ready, revise, or split_required. Do not assume the drafting agent's proposed
+solution or its own acceptance criteria are authoritative.
 ```
 
 ## Primary-Agent Follow-Up
