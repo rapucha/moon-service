@@ -562,11 +562,16 @@ rerun can validate the stored creation attempt and accept it.
 ### Separate host-configuration convergence
 
 The green `raspberry-pi` application Deployment does not claim that a later
-Ansible role change has been applied. After image promotion, a parallel workflow
-job queues or reuses independent point-in-time state in environment
-`raspberry-pi-host-config`, task `provision:raspberry-pi`. It does not run
-Ansible or block image publication and confirmation; manual provisioning remains
-the consumer that completes the exact request.
+Ansible role change has been applied. The first producer-enabled workflow queues
+the current host fingerprint. After that, a parallel post-promotion job queues
+independent point-in-time state only when the validated promoted range changes
+the tracked role or its fingerprint helper. The range starts at the older of
+the push's prior commit and the revision observed at GHCR `main` before the
+promotion decision, so a replaced pending promotion cannot hide a host change.
+The request uses environment
+`raspberry-pi-host-config` and task `provision:raspberry-pi`. The job does not run
+Ansible, undo image publication, or block the sibling application confirmation;
+manual provisioning remains the consumer that completes the exact request.
 
 The fingerprint covers the path-framed bytes of every Git-tracked file under
 `deployment/raspberry-pi/roles/moon_service_host/`, sorted by repository-relative
@@ -591,6 +596,14 @@ This signal proves that one fingerprint converged at a point in time. It is not
 continuous monitoring and does not make GitHub Actions execute Ansible, reach
 the Pi inbound, or learn private inventory values. A green application
 Deployment and queued host-configuration Deployment may correctly coexist.
+
+The producer deliberately does not reconcile GitHub history. Its lightweight
+jobs may overlap so GitHub cannot replace an older pending host signal. Rerunning
+the first activation or another host-changing workflow may therefore create a
+second queued record for the same fingerprint. Provisioning completes the newest
+exact match; an older duplicate may remain queued until future operational
+evidence justifies cleanup behavior. Application-only ranges after activation
+create no host request.
 
 A failed candidate is recorded in `rejected.env`. Later timer runs do not
 reintroduce two-minute outages by retrying the same bad digest. A newly

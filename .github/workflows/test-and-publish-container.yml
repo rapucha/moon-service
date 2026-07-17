@@ -355,6 +355,7 @@ jobs:
     outputs:
       deployment_id: ${{ steps.create-deployment.outputs.deployment_id }}
       digest: ${{ steps.verify-main.outputs.digest }}
+      previous_revision: ${{ steps.promotion.outputs.previous_revision }}
       reporter_login: ${{ steps.create-deployment.outputs.reporter_login }}
       revision: ${{ steps.verify-main.outputs.revision }}
       run_attempt: ${{ steps.create-deployment.outputs.run_attempt }}
@@ -387,6 +388,7 @@ jobs:
         env:
           CANDIDATE_DIGEST: ${{ needs.publish-image.outputs.digest }}
           MAIN_REF: ${{ env.IMAGE_NAME }}:main
+          PUSH_BEFORE_REVISION: ${{ github.event.before }}
         run: |
           set -euo pipefail
           [[ "$CANDIDATE_DIGEST" =~ ^sha256:[0-9a-f]{64}$ ]]
@@ -400,6 +402,7 @@ jobs:
             current_source="$(jq -er '.annotations["org.opencontainers.image.source"]' <<<"$manifest_json")"
             [[ "$current_revision" =~ ^[0-9a-f]{40}$ ]]
             [[ "$current_source" == "$IMAGE_SOURCE" ]]
+            echo "previous_revision=$current_revision" >>"$GITHUB_OUTPUT"
 
             if [[ "$current_revision" == "$GITHUB_SHA" ]] \
                 || git merge-base --is-ancestor "$current_revision" "$GITHUB_SHA"; then
@@ -421,6 +424,7 @@ jobs:
             fi
           elif grep -Eqi '(manifest unknown|not found)' "$error_file"; then
             {
+              echo "previous_revision=$PUSH_BEFORE_REVISION"
               echo "promote=true"
               echo "expected_digest=$CANDIDATE_DIGEST"
               echo "expected_revision=$GITHUB_SHA"
@@ -655,9 +659,6 @@ jobs:
     permissions:
       contents: read
       deployments: write
-    concurrency:
-      group: moon-service-raspberry-pi-host-config
-      cancel-in-progress: false
     steps:
       - name: Check out the promoted revision
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
@@ -666,9 +667,10 @@ jobs:
           persist-credentials: false
           ref: ${{ needs.promote-main.outputs.revision }}
 
-      - name: Create or reuse the host-configuration request
+      - name: Create the conditional host-configuration request
         env:
-          EXPECTED_REPORTER_LOGIN: ${{ vars.MOON_PI_DEPLOYMENT_REPORTER_LOGIN }}
+          HOST_PREVIOUS_PROMOTED_REVISION: ${{ needs.promote-main.outputs.previous_revision }}
+          HOST_PUSH_BEFORE_REVISION: ${{ github.event.before }}
           HOST_REVISION: ${{ needs.promote-main.outputs.revision }}
           GH_TOKEN: ${{ github.token }}
         run: python3 deployment/raspberry-pi/host-deployment-request.py
