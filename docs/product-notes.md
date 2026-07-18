@@ -121,6 +121,44 @@ Email plus saved location preferences is personal data. Do not add email alerts 
 
 Reddit can be used for manual community validation or a project-owned subreddit later. Do not auto-post to existing subreddits without moderator approval. Mastodon and Bluesky are not planned for now.
 
+## Calibration Feedback Boundary
+
+Moon Service may collect optional reports from alpha testers to evaluate loaded
+recommendations and record useful conditions that a tester found independently.
+The purpose is an inspectable calibration set, not user profiling, engagement
+tracking, or a general feedback inbox. Issue
+[#33](https://github.com/rapucha/moon-service/issues/33) owns collection,
+curation, and any later evidence-backed scoring work.
+
+Submitting calibration feedback requires no account. That does not make a
+stored report anonymous. Notes, city-level location, and timing may contain or
+reveal identifying information. The form should tell testers to avoid names,
+exact addresses, and other personal details that are not needed to understand
+the observation.
+
+When feedback storage is enabled, a report may retain only:
+
+- Client and server feedback UUIDs.
+- Normalized entered and corrected timing, timezone, source, and confidence.
+- A canonical city-level location.
+- Structured ratings and the required free-text notes.
+- The selected recommendation snapshot when the report reviews one.
+- The server-recomputed astronomy snapshot, application revision, submission
+  time, and idempotency hash.
+
+Moon Service-controlled feedback records and application or access logs must
+not retain raw request bodies, IP addresses, forwarded identity, or User-Agent
+values for feedback requests. This boundary does not claim that notes,
+location, or timing are non-identifying.
+
+Storage is disabled by default and capped at 2,000 reports. There is no
+automatic retention period. Reports remain until an operator deletes them.
+Database or NFS loss may lose this alpha calibration evidence, and that narrow
+risk is accepted. It does not relax backup, recovery, consent, or deletion
+requirements for future personal data, saved alerts, or other durable product
+state. A storage failure may disable feedback, but it must not affect normal
+opportunity lookup or readiness.
+
 ## Terrain Caveat
 
 The MVP can use observer elevation from geocoding when available, but it should not claim to account for local horizon obstruction. In hilly cities or near mountains, the Moon or Sun may appear later or disappear earlier than the geometric horizon suggests. Terrain horizon modeling should wait until users can choose an exact shooting position.

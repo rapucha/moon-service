@@ -132,6 +132,35 @@ Recommended boundary:
 - Email alerts remain later because they require storing email plus location preferences.
 - Installed-client local notifications remain a later milestone for recurring personal alerts.
 
+### Calibration feedback boundary
+
+Empirical calibration under
+[#33](https://github.com/rapucha/moon-service/issues/33) is a narrow exception
+to the default no-permanent-location-storage rule. An alpha tester may submit
+an accountless recommendation review or reverse observation. The report stores
+a canonical city-level location and the accepted timing, ratings, notes, and
+reproducibility snapshots. Free text, location, and time may still identify a
+person, so the system must not describe stored reports as anonymous.
+
+The feedback store is optional PostgreSQL, disabled by default, and separate
+from lookup caches and provider counters. It retains at most 2,000 reports
+until an operator deletes them. Moon Service-controlled feedback records and
+application or access logs exclude raw request bodies, IP addresses, forwarded
+identity, and User-Agent values for feedback requests.
+
+Feedback availability is not application readiness. Missing configuration, a
+database outage, a full report table, or NFS loss may disable collection, but
+must not prevent startup, opportunity lookup, liveness, or readiness. Loss of
+the feedback database is an accepted alpha calibration risk. It is not a
+general exception to backup and recovery requirements for personal data or
+other durable product state.
+
+Delivery is ordered so the governance and public contract land before the
+disabled persistence seam, public endpoints, browser flow, private deployment,
+activation, and collection. Corpus curation and any scoring or suggested-time
+change remain separate evidence-gated work. The ordered path is recorded in
+`docs/mvp-roadmap.md`.
+
 ### Frontend source boundary
 
 Browser source ownership is separate from backend source ownership. Authored

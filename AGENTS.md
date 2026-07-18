@@ -84,7 +84,11 @@ The main unresolved choice is now the exact first web/API contract for city look
 - Code comments should explain why code exists or why a choice was made. Do not
   restate obvious code. Prefer one or two direct sentences when that is enough.
 - Do not introduce mandatory accounts without documenting user value and recovery behavior.
-- Do not permanently store user locations server-side unless saved alerts require it and the privacy model is updated.
+- Do not permanently store lookup locations server-side. The only current
+  exception is the disabled, bounded city-level calibration-feedback store
+  approved under issue #33 and documented in `docs/product-notes.md` and
+  `docs/architecture.md`. Saved alerts still require their own updated privacy
+  model.
 - Design device identity recovery before relying on anonymous device-bound accounts.
 - Treat platform backup, background scheduling, and push services as
   conveniences with iOS/Android assumptions, not universal guarantees.

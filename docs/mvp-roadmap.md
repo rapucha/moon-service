@@ -223,8 +223,43 @@ discovery safeguard, not a scoring calibration.
 
 The next product step is [#33](https://github.com/rapucha/moon-service/issues/33):
 collect a small, inspectable set of photographer judgments and real observation
-cases, then change scoring only where that evidence supports it. After the core
-recommendations prove useful, complete public feeds and calendar exports under
+cases, then change scoring only where that evidence supports it.
+
+The calibration-feedback initiative is delivered in this order:
+
+1. Document the purpose, privacy and storage boundary, accepted feedback-loss
+   risk, evidence governance, and roadmap under
+   [#162](https://github.com/rapucha/moon-service/issues/162).
+2. Document the exact API, timing, validation, UUID, historical-preview, and
+   browser contracts under
+   [#163](https://github.com/rapucha/moon-service/issues/163).
+3. Add disabled optional persistence with migrations, idempotency, the row
+   cap, and database-isolation tests.
+4. Add the capability and final-submission API with validation, admission,
+   stable errors, and the logging boundary.
+5. Add bounded historical astronomy reconstruction and local-time resolution.
+6. Add immediate recommendation reviews and reverse observations in the web
+   UI.
+7. Add an explicit, bounded browser save-for-review queue.
+8. Provision disabled private PostgreSQL on NFS with the accepted alpha risk.
+9. Wire the application to the private database without making lookup or
+   readiness depend on it.
+10. Add private statistics, deterministic export, and confirmed deletion tools.
+
+Every implementation capability stays disabled until its prerequisites and
+safe availability behavior exist. After all required implementation children
+merge, controlled host activation proves lookup and readiness with PostgreSQL
+stopped before enabling feedback. Collection begins only after that check.
+
+The owner later decides when evidence is sufficient. A separate reviewed child
+curates selected cases into an authored corpus. Scoring and window-selection
+changes are separate children and exist only when that corpus supports them.
+If it supports no behavior change, record provisional acceptance, calibration
+gaps, and remaining uncertainty before closing #33. The parent remains open
+through collection and corpus curation.
+
+After the core recommendations prove useful, complete public feeds and
+calendar exports under
 [#16](https://github.com/rapucha/moon-service/issues/16). The JitPack dependency
 decision and safeguards required before public deployment are recorded in
 [#17](https://github.com/rapucha/moon-service/issues/17).

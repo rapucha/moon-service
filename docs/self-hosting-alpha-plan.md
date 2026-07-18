@@ -69,6 +69,27 @@ timer rearming and exact GitHub deployment confirmation are follow-up
   Add a database when private feeds, saved locations, alert subscriptions,
   durable counters, or durable cache state require it.
 
+### Calibration feedback exception
+
+Issue [#33](https://github.com/rapucha/moon-service/issues/33) establishes one
+narrow alpha exception to the general backup and restore rule. Optional
+calibration feedback may use private NFS-backed PostgreSQL before a restore
+drill because the owner accepts losing that evidence. The store remains
+disabled by default, holds at most 2,000 reports, and retains them until manual
+operator deletion.
+
+This exception applies only to calibration reports. It does not cover saved
+locations, accounts, alert subscriptions, private feed tokens, or other
+personal or durable product data. Those uses still require tested backup and
+restore behavior before the service relies on them.
+
+Feedback storage is also outside the application availability boundary. An
+unmounted NFS path, unavailable database, or full report table may disable
+feedback. It must not prevent the application from starting, serving
+opportunity lookups, or reporting provider-independent readiness. The private
+database deployment, application wiring, and controlled activation remain
+separate reviewed work under #33.
+
 ## Current Tester-Alpha Topology
 
 ```text
@@ -224,7 +245,8 @@ Backup matrix before public alpha:
 | Process-local caches | No | Rebuildable from provider calls. |
 | Process-local provider counters | No | Useful live visibility, not durable truth. |
 | Disposable logs | No | Keep short retention unless debugging a specific issue. |
-| Future Postgres data | Yes | Only after a restore drill exists. |
+| Calibration feedback | No | Accepted bounded-loss evidence under #33; keep it off the SD card and never treat it as durable product state. |
+| Other future Postgres data | Yes | Only after a restore drill exists. |
 
 ## Phase 2: Tailscale Funnel Public Edge
 
@@ -427,6 +449,11 @@ Expected future store:
 - App-owned schema, separate from any k3s datastore.
 - Logical backups tested before storing personal data or private feed tokens.
 
+Calibration feedback is the only approved pre-restore-drill exception. It is
+bounded, manually retained, and explicitly disposable if the NFS share or
+database fails. This exception does not make PostgreSQL a dependency of the
+current lookup or readiness paths.
+
 Do not use the application database as a shortcut for early deployment:
 
 - Provider counters can remain process-local during a single-process alpha.
@@ -438,7 +465,8 @@ If Postgres must run on the same SD-card-backed Pi later:
 - Treat it as alpha-grade only.
 - Store the data directory on the NFS-backed storage pool, not on the Pi SD
   card.
-- Store only data that is backed up off-card and can tolerate restore lag.
+- Except for the bounded calibration-feedback evidence above, store only data
+  that is backed up off-card and can tolerate restore lag.
 - Keep write volume low.
 - Prefer logical dumps to an off-card destination.
 - Test restore before relying on alerts, private feed tokens, or saved
@@ -462,7 +490,8 @@ Better future options when budget allows:
 Do not add these until a follow-up issue makes them necessary:
 
 - Production Helm chart or Kustomize layout.
-- Postgres, Flyway/Liquibase, or database credentials.
+- Postgres, Flyway/Liquibase, or database credentials outside the ordered,
+  disabled calibration-feedback children under #33.
 - Redis or distributed rate limiting.
 - Local WAF rules.
 - Multi-node HA control plane.
