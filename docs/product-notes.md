@@ -194,7 +194,7 @@ We could not find that place on Earth or in the usual imaginary maps. Try a city
 
 Avoid mandatory accounts initially.
 
-Preferred future identity model, if an installed client or recurring personal alerts are added:
+Preferred future identity model, if server-backed saved alerts or identity are added:
 
 - Anonymous device identity created at install.
 - Local credential storage using the selected platform's protected storage.
@@ -206,9 +206,14 @@ Device-only identity must not become a trap. Recovery should be designed early, 
 
 ## Later Product Ideas
 
-- Possible cross-platform installed client with saved locations and reliable
-  local notifications; React Native/Expo is the leading candidate to evaluate
-  under [#109](https://github.com/rapucha/moon-service/issues/109).
+- A later Expo iOS/Android companion, only after the web, feed, and calendar
+  flow is complete and testers show recurring demand. Keep saved places
+  device-only and notifications local-first. Share contracts, validation,
+  formatting, domain logic, design rules, assets, and suitable simple
+  components with the web app. Keep complex views, URLs, storage,
+  notifications, permissions, and distribution platform-specific. Cached
+  results and bounded offline Moon calculations are allowed, but the backend
+  remains authoritative for weather-backed scoring.
 - Map view with Moon azimuth corridor.
 - Shooting-position to subject-position planning.
 - Focal length and composition hints.
