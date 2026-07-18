@@ -74,8 +74,11 @@ Recommended web-first path:
 
 Possible installed-client path:
 
-- Create a minimal iOS/Android prototype later with one saved location only if
-  the client-platform decision in #109 calls for it.
+- After the web, feed, and calendar flow is complete and testers show recurring
+  demand, build a focused Expo iOS/Android companion. Keep the web app
+  first-class. Device-only saved places, local-first notifications, cached
+  results, and bounded offline Moon calculations are in scope for that later
+  companion. The backend remains authoritative for weather-backed scoring.
 - Compute or request natural low-Moon windows.
 - Display ranked opportunities.
 - Skip account, push, and sync.
@@ -162,9 +165,9 @@ Open supporting follow-ups:
   context for future interests and recurring events.
 - [#5](https://github.com/rapucha/moon-service/issues/5): decouple controller
   tests from provider identity details.
-- [#109](https://github.com/rapucha/moon-service/issues/109): decide whether a
-  future React Native/Expo client should replace or coexist with the current
-  responsive web UI.
+- [#109](https://github.com/rapucha/moon-service/issues/109): documented the
+  later Expo iOS/Android companion strategy. It coexists with the first-class
+  web app.
 
 Completed MVP foundations include:
 

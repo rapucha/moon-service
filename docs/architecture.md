@@ -4,11 +4,9 @@
 
 The leading architecture is backend-backed with a web-first discovery surface.
 The first useful product lets a user enter a city/location and see the next
-promising Moon opportunity. A later installed client may add saved locations
-and reliable local alerts, but its framework is deliberately unresolved.
-React Native with Expo is the leading cross-platform candidate to evaluate in
-[#109](https://github.com/rapucha/moon-service/issues/109), not a current
-implementation commitment.
+promising Moon opportunity. Keep the web app first-class. After the web, feed,
+and calendar flow is complete and testers show recurring demand, build a
+focused iOS/Android companion with Expo.
 
 ```text
 Web MVP
@@ -34,8 +32,20 @@ Installed client later
   - preferences
   - opportunity list UI
   - local notifications
-  - optional local ephemeris preview only if offline value is proven
+  - bounded offline Moon calculations
 ```
+
+## Future Client Boundary
+
+The Expo companion and web app may share contracts, validation, formatting,
+domain logic, design rules, assets, and suitable simple components. Complex
+views, web semantics and URLs, storage, notifications, permissions, and
+distribution stay platform-specific.
+
+Saved places remain device-only. Notifications are local-first. The client may
+cache results and perform bounded offline Moon calculations. Weather-backed
+scoring remains authoritative in the backend, so an offline calculation cannot
+replace a backend-scored opportunity.
 
 The backend should not require accounts for the first lookup endpoint.
 
@@ -205,14 +215,16 @@ Backend:
 - Weather provider client.
 - Ephemeris and scoring engine.
 
-Installed client, decision pending under #109:
+Installed client, after the web, feed, and calendar flow is complete and
+testers show recurring demand:
 
-- Evaluate React Native with Expo for shared web, iOS, and Android application
-  code without assuming every view or platform service will be shared.
+- Use Expo for a focused iOS/Android companion while retaining the web app.
 - Keep canonical geocoding, weather, ephemeris, and scoring in the backend by
   default.
 - Treat local notifications, background work, secure storage, permissions,
   backup, and distribution as explicit platform seams.
+- Allow bounded offline Moon calculations, but keep weather-backed scoring
+  authoritative in the backend.
 - Retain the current responsive web UI unless a separately reviewed migration
   demonstrates enough value.
 
@@ -222,14 +234,14 @@ Installed client, decision pending under #109:
 - Geocoding provider: Open-Meteo Geocoding is the first candidate for city/town lookup; exact-address autocomplete remains out of scope.
 - Internationalized search: raw Unicode input must work even when browser locale is generic or English.
 - Ephemeris implementation: Astronomy Engine `2.1.19` is accepted for the JVM
-  backend under `docs/ephemeris-research.md`; a future client consumes backend
-  results unless offline calculations earn a separate decision.
+  backend under `docs/ephemeris-research.md`; a future client may perform
+  bounded offline Moon calculations, but uses backend weather-backed scoring.
 - Weather provider: Open-Meteo is the first candidate; still validate forecast quality and whether alpha use is strictly non-commercial.
 - Weather cache: whether to use Postgres immediately or begin with a simpler cache during the first scoring prototype.
 - Admin/ops storage: where provider call counters, cache metrics, and recent errors live before a full database exists.
 - Identity timing: no identity for one-off lookup; add optional email or anonymous identity only when saved alerts require it.
-- Client delivery: whether React Native/Expo should replace or coexist with the
-  current web UI is tracked by #109.
+- Client delivery: Expo is a later iOS/Android companion. It does not replace
+  the current web UI.
 - Notification timing: RSS/Atom and `.ics` first; email and installed-client
   local notifications later.
 - Recurring event context: whether to begin with user-entered approximate

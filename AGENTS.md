@@ -34,10 +34,14 @@ The current likely direction is:
 
 - Web MVP: city/location entry, next opportunity display, shareable result page, RSS/Atom feeds, and `.ics` export.
 - Small backend: geocoding, weather integration, scoring rules, weather cache, candidate Moon opportunity generation, and provider abstraction.
-- Installed client later: saved locations, local preferences, and local
-  notifications only after the web value is proven. React Native with Expo is
-  the leading cross-platform candidate to evaluate, not a selected stack;
-  track the decision in [#109](https://github.com/rapucha/moon-service/issues/109).
+- Installed client later: keep the web app first-class. After the web, feed,
+  and calendar flow is complete and testers show recurring demand, use Expo
+  for a focused iOS/Android companion. Share contracts, validation, formatting,
+  domain logic, design rules, assets, and suitable simple components. Keep
+  complex views, web semantics and URLs, storage, notifications, permissions,
+  and distribution platform-specific. Saved places stay on device; notifications
+  are local-first; results may be cached; bounded offline Moon calculations are
+  allowed. Weather-backed scoring remains authoritative in the backend.
 
 The main unresolved choice is now the exact first web/API contract for city lookup, opportunity results, RSS/Atom feeds, and `.ics` export.
 
@@ -346,8 +350,9 @@ rules do not require it. The PR must record why review was not required.
 As implementation continues, the expected stack remains:
 
 - Backend: Java, Spring Boot, Postgres, Flyway or Liquibase.
-- Installed client: undecided. Evaluate React Native/Expo against the existing
-  web UI and native-platform requirements under issue #109 before scaffolding.
+- Installed client: a later focused Expo iOS/Android companion that keeps the
+  web app first-class. Do not scaffold it until the web, feed, and calendar
+  flow is complete and testers show recurring demand.
 - Local infrastructure: Docker Compose for Postgres and integration dependencies.
 
 Do not add Postgres, migrations, an installed client, or local infrastructure
