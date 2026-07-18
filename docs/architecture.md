@@ -132,6 +132,16 @@ Recommended boundary:
 - Email alerts remain later because they require storing email plus location preferences.
 - Installed-client local notifications remain a later milestone for recurring personal alerts.
 
+### Frontend source boundary
+
+Browser source ownership is separate from backend source ownership. Authored
+and mixed browser files live under `frontend/src/`, directly served SVG assets
+live under `frontend/assets/`, and deterministic generated browser modules live
+under `frontend/generated/`. The backend Maven build flattens those directories
+into classpath `/static`, so Spring Boot continues to serve the same public URLs.
+Root Node tooling and `tests/ui/` remain shared repository tooling rather than
+a separate installed frontend package.
+
 Tracked issues now cover the first missing pieces of this boundary:
 coordinate-backed opportunities
 ([#13](https://github.com/rapucha/moon-service/issues/13)),

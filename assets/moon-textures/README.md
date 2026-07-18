@@ -1,7 +1,7 @@
 # Moon texture source and provenance
 
 The compact Moon renderer uses a 128×64 grayscale luminance map embedded in
-`backend/src/main/resources/static/moonTexture.js`. The exact 2048×1024 source
+`frontend/src/moonTexture.js`. The exact 2048×1024 source
 JPEG is tracked here so the runtime derivative can be rebuilt and audited
 without depending on a mutable remote URL.
 

@@ -181,6 +181,9 @@ Completed MVP foundations include:
   integration.
 - [#15](https://github.com/rapucha/moon-service/issues/15): web lookup and
   shareable results.
+- [#67](https://github.com/rapucha/moon-service/issues/67): separate browser
+  source ownership from backend resources while preserving Spring Boot's
+  public static surface.
 - [#18](https://github.com/rapucha/moon-service/issues/18): v0 scoring policy.
 - [#19](https://github.com/rapucha/moon-service/issues/19): alpha hosting and
   backup boundary.

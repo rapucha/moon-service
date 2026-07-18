@@ -13,7 +13,7 @@ export default [
   },
   js.configs.recommended,
   {
-    files: ["backend/src/main/resources/static/*.js"],
+    files: ["frontend/src/*.js", "frontend/generated/*.js"],
     languageOptions: {
       ecmaVersion: 2022,
       sourceType: "module",
