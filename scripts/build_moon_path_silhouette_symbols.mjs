@@ -5,7 +5,7 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 
 const DEFAULT_ASSET_ROOT = new URL("../assets/moon-path-silhouettes/", import.meta.url);
 const DEFAULT_MANIFEST_URL = new URL("manifest.json", DEFAULT_ASSET_ROOT);
-const DEFAULT_OUTPUT_URL = new URL("../backend/src/main/resources/static/moonPathSilhouetteSymbols.js", import.meta.url);
+const DEFAULT_OUTPUT_URL = new URL("../frontend/generated/moonPathSilhouetteSymbols.js", import.meta.url);
 
 const ALLOWED_SVG_ROOT_ATTRIBUTES = new Set(["viewBox", "xmlns"]);
 const ALLOWED_PATH_ATTRIBUTES = new Set(["class", "d"]);

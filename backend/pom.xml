@@ -40,6 +40,23 @@
   </dependencies>
 
   <build>
+    <resources>
+      <resource>
+        <directory>src/main/resources</directory>
+      </resource>
+      <resource>
+        <directory>${project.basedir}/../frontend/src</directory>
+        <targetPath>static</targetPath>
+      </resource>
+      <resource>
+        <directory>${project.basedir}/../frontend/assets</directory>
+        <targetPath>static</targetPath>
+      </resource>
+      <resource>
+        <directory>${project.basedir}/../frontend/generated</directory>
+        <targetPath>static</targetPath>
+      </resource>
+    </resources>
     <plugins>
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>

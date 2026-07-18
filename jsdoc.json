@@ -1,6 +1,6 @@
 {
   "source": {
-    "include": ["backend/src/main/resources/static"],
+    "include": ["frontend/src", "frontend/generated"],
     "includePattern": ".+\\.js$"
   },
   "opts": {

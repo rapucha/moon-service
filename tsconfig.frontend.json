@@ -6,13 +6,15 @@
     "module": "ES2022",
     "moduleResolution": "bundler",
     "noEmit": true,
+    "rootDirs": ["frontend/src", "frontend/generated"],
     "skipLibCheck": true,
     "strict": false,
     "target": "ES2022",
     "types": ["node"]
   },
   "include": [
-    "backend/src/main/resources/static/*.js",
+    "frontend/src/*.js",
+    "frontend/generated/*.js",
     "tests/ui/**/*.js",
     "scripts/*.mjs",
     "playwright.config.js",

@@ -102,9 +102,9 @@ and [hosted-alpha functional tests](../backend/src/test/java/dev/moonservice/bac
 - **Exposure:** available on the ordinary listener; allowlisted but subject to
   the whole-site admission bound in hosted-alpha mode.
 - **References:** [controller](../backend/src/main/java/dev/moonservice/backend/web/WebPageController.java),
-  [browser flow](../backend/src/main/resources/static/app.js),
-  [browser storage](../backend/src/main/resources/static/recentSearches.js),
-  [share paths](../backend/src/main/resources/static/api.js).
+  [browser flow](../frontend/src/app.js),
+  [browser storage](../frontend/src/recentSearches.js),
+  [share paths](../frontend/src/api.js).
 
 ### `GET /about`
 
@@ -117,7 +117,7 @@ and [hosted-alpha functional tests](../backend/src/test/java/dev/moonservice/bac
 - **Exposure:** available on the ordinary listener; allowlisted but subject to
   the whole-site admission bound in hosted-alpha mode.
 - **References:** [controller](../backend/src/main/java/dev/moonservice/backend/web/WebPageController.java),
-  [page](../backend/src/main/resources/static/about.html).
+  [page](../frontend/src/about.html).
 
 ## Product and prototype APIs
 
@@ -257,8 +257,9 @@ and [hosted-alpha functional tests](../backend/src/test/java/dev/moonservice/bac
 
 ## Deliberate non-routes
 
-- Files under `backend/src/main/resources/static/` support the three browser
-  mappings but are not independent controller operations in this inventory.
+- Files under `frontend/src/`, `frontend/assets/`, and `frontend/generated/`
+  are packaged into classpath `/static`. They support the three browser mappings
+  but are not independent controller operations in this inventory.
 - `/error` is Spring Boot's internal error-dispatch path, not an application
   controller mapping. `/test/slow` exists only in `GracefulShutdownTest`.
 - `/l/{location}`, `/feeds/*.atom`, `/calendars/*.ics`, and `/o/*.ics` are

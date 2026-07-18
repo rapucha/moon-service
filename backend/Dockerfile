@@ -12,6 +12,7 @@ RUN --mount=type=cache,target=/root/.m2 \
     mvn -B -pl backend -am dependency:go-offline
 
 COPY backend/src backend/src
+COPY frontend frontend
 COPY prototypes/jvm-scoring/src prototypes/jvm-scoring/src
 
 RUN --mount=type=cache,target=/root/.m2 \

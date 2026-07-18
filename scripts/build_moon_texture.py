@@ -21,7 +21,7 @@ except ModuleNotFoundError as exc:  # pragma: no cover - exercised only without 
 
 REPOSITORY_ROOT = Path(__file__).resolve().parent.parent
 SOURCE_PATH = REPOSITORY_ROOT / "assets/moon-textures/lroc_color_2k.jpg"
-OUTPUT_PATH = REPOSITORY_ROOT / "backend/src/main/resources/static/moonTexture.js"
+OUTPUT_PATH = REPOSITORY_ROOT / "frontend/src/moonTexture.js"
 
 SOURCE_WIDTH = 2048
 SOURCE_HEIGHT = 1024

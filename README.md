@@ -70,6 +70,9 @@ process, but they are cleared on restart and are not shared across instances.
 - `scripts/scoring_contract_spike.py`: retained Python spike for checking the v0 scoring contract with fixture data.
 - `scripts/real_data_scoring_spike.py`: retained Python spike that combines live JPL Horizons ephemeris samples with live Open-Meteo weather.
 - `live-tests/`: pytest-based manual checks for external provider drift.
+- `frontend/`: browser sources, directly served assets, generated browser
+  modules, and the source-boundary guide. Maven packages its three content
+  directories into classpath `/static` without changing public URLs.
 - `backend/`: first Spring Boot backend module, currently exposing
   fixture-backed query and direct opportunity-search endpoints outside
   `prototypes/`.

@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { lightBandSegments } from "../backend/src/main/resources/static/moonPathLightBands.js";
+import { lightBandSegments } from "../frontend/src/moonPathLightBands.js";
 
 const canberraSunrisePoints = chartPoints([
   point("2026-07-10T17:39:00Z", -18.0, "night"),

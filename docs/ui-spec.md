@@ -75,6 +75,12 @@ terrain horizon, obstruction, and shooting-position limitations.
 The current MVP should stay as static HTML, CSS, and plain JavaScript modules.
 Do not jump to a heavier SPA framework only to support near-term UI polishing.
 
+Authored and mixed browser files live under `frontend/src/`. Directly served
+SVG assets live under `frontend/assets/`, and deterministic generated browser
+modules live under `frontend/generated/`. Maven flattens all three directories
+into classpath `/static`, preserving their root-relative public URLs. Root Node
+tooling and `tests/ui/` stay at the repository root.
+
 The frontend module split is intended to keep future UI changes manageable:
 
 - `app.js`: bootstrapping, events, lookup flow;
@@ -245,10 +251,9 @@ time data and not location-aware scenery. They sit behind Moon markers and axis
 labels, inside the altitude plot clip, so users can compare a low Moon altitude
 against familiar rough objects without reading the silhouettes as chart ticks.
 
-The runtime engine lives in
-`backend/src/main/resources/static/moonPathSilhouettes.js`. It is symbol-based:
-the runtime places sanitized SVG symbols from
-`backend/src/main/resources/static/moonPathSilhouetteSymbols.js` instead of
+The runtime engine lives in `frontend/src/moonPathSilhouettes.js`. It is
+symbol-based: the runtime places sanitized SVG symbols from
+`frontend/generated/moonPathSilhouetteSymbols.js` instead of
 constructing building/tree paths directly in the chart code.
 
 The symbol catalog is generated from source assets under
@@ -324,9 +329,8 @@ Symbol source locations:
   current generic pack.
 - Symbol metadata lives in `assets/moon-path-silhouettes/manifest.json`.
 - The generated runtime catalog is
-  `backend/src/main/resources/static/moonPathSilhouetteSymbols.js`.
-- Runtime placement and animation live in
-  `backend/src/main/resources/static/moonPathSilhouettes.js`.
+  `frontend/generated/moonPathSilhouetteSymbols.js`.
+- Runtime placement and animation live in `frontend/src/moonPathSilhouettes.js`.
 
 Figure parameters:
 
