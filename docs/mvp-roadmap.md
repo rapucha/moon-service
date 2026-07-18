@@ -2,10 +2,14 @@
 
 Current status: Phase 3, the MVP app loop. The anonymous web lookup, live
 geocoding and weather path, natural Moon-window scoring, shareable results, and
-responsive opportunity UI are implemented. The current product focus is to
-show enough ranked candidates for human evaluation, calibrate the provisional
-scoring model with photographers under [#33](https://github.com/rapucha/moon-service/issues/33),
-and then complete public feeds and calendar exports under
+responsive opportunity UI are implemented. Phase 4 infrastructure is complete:
+the tested application deploys automatically to the Raspberry Pi and the
+bounded tester-alpha Funnel is enabled. Follow-up #158 preserves the postponed
+household-impact measurement without blocking the alpha. The current product
+focus is to show enough ranked candidates for human evaluation, calibrate the
+provisional scoring model with photographers under
+[#33](https://github.com/rapucha/moon-service/issues/33), and then complete
+public feeds and calendar exports under
 [#16](https://github.com/rapucha/moon-service/issues/16).
 
 ## Phase 0: Planning Baseline
@@ -109,13 +113,15 @@ Exit criteria:
 
 ## Phase 4: Alpha Operations
 
-Status: infrastructure implementation is in progress under
-[#93](https://github.com/rapucha/moon-service/issues/93). Logging, provider
-quota monitoring, tested multi-architecture image publication, and the
-declarative Docker Compose host boundary are available; physical-Pi validation
-and public exposure remain.
+Status: completed for the tester-alpha infrastructure under
+[#93](https://github.com/rapucha/moon-service/issues/93) and
+[#97](https://github.com/rapucha/moon-service/issues/97). Logging, provider
+quota monitoring, tested multi-architecture image publication, automatic
+Raspberry Pi deployment, rollback, and the bounded public Funnel are active.
+The controlled household-impact measurement remains a nonblocking follow-up in
+[#158](https://github.com/rapucha/moon-service/issues/158).
 
-Goal: run a small private alpha.
+Goal: run a small tester alpha.
 
 Tasks:
 
@@ -147,12 +153,11 @@ than only in this roadmap:
   calibrate scoring with photographer judgments and real observations.
 - [#16](https://github.com/rapucha/moon-service/issues/16): add public feeds
   and iCalendar exports for real opportunities.
-- [#17](https://github.com/rapucha/moon-service/issues/17): accept Astronomy
-  Engine `2.1.19` from JitPack for the JVM backend alpha under exact pinning,
-  trusted checksum, repository filtering, license, and fallback constraints.
 
 Open supporting follow-ups:
 
+- [#158](https://github.com/rapucha/moon-service/issues/158): measure household
+  impact during one controlled outside-household Funnel burst.
 - [#3](https://github.com/rapucha/moon-service/issues/3): extensible scoring
   context for future interests and recurring events.
 - [#5](https://github.com/rapucha/moon-service/issues/5): decouple controller
@@ -163,6 +168,12 @@ Open supporting follow-ups:
 
 Completed MVP foundations include:
 
+- [#93](https://github.com/rapucha/moon-service/issues/93): continuously deploy
+  the self-hosted tester alpha.
+- [#97](https://github.com/rapucha/moon-service/issues/97): expose and verify
+  the tester alpha through Tailscale Funnel.
+- [#17](https://github.com/rapucha/moon-service/issues/17): accept Astronomy
+  Engine `2.1.19` from JitPack under the alpha build constraints.
 - [#14](https://github.com/rapucha/moon-service/issues/14): Open-Meteo weather
   integration.
 - [#15](https://github.com/rapucha/moon-service/issues/15): web lookup and

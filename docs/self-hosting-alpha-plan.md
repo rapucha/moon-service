@@ -43,18 +43,18 @@ timer rearming and exact GitHub deployment confirmation are follow-up
   separate states. The Pi must report the exact healthy revision and immutable
   digest back to its GitHub Deployment before the main workflow calls the
   deployment successful.
-- Install Tailscale without enrollment during host provisioning. Issue
-  [#97](https://github.com/rapucha/moon-service/issues/97) owns the later
-  Tailscale Funnel public HTTPS boundary. Preserve direct LAN access by adding
-  an exact loopback listener or loopback proxy for Funnel rather than replacing
-  the LAN listener with a wildcard bind.
+- Install Tailscale without enrollment during host provisioning. Enrollment
+  and Funnel remain explicit operator actions. The tester-alpha host now uses
+  the verified #97 public boundary: HTTPS port `443` proxies only to
+  `http://127.0.0.1:8080`, while the exact trusted-LAN listener remains in
+  place.
 - Keep one backend instance at first because provider counters and caches are
   currently process-local. For the temporary tester alpha, use one shared,
   process-local request boundary inside the Spring application. Do not add
   visitor identity or per-client fairness. Cloudflare remains the later
   production edge.
-- Before Funnel activation, add the fail-closed hosted surface and the
-  Spring-managed limits selected under
+- Use the fail-closed hosted surface and the Spring-managed limits delivered
+  under
   [#118](https://github.com/rapucha/moon-service/issues/118) and
   [#120](https://github.com/rapucha/moon-service/issues/120). These controls
   bound accepted application work, responses, and provider calls after a
@@ -69,7 +69,7 @@ timer rearming and exact GitHub deployment confirmation are follow-up
   Add a database when private feeds, saved locations, alert subscriptions,
   durable counters, or durable cache state require it.
 
-## Current Private Alpha Topology
+## Current Tester-Alpha Topology
 
 ```text
 operator browser
@@ -78,6 +78,11 @@ operator browser
   -> one exact host listener on the Raspberry Pi
   -> one Docker Compose Spring Boot container
   -> Open-Meteo geocoding/weather over outbound HTTPS
+
+public tester browser
+  -> Tailscale Funnel HTTPS 443
+  -> exact 127.0.0.1:8080 proxy target
+  -> the same Docker Compose Spring Boot container
 
 GitHub-hosted Actions
   -> tested AMD64/ARM64 image in GHCR
@@ -97,8 +102,8 @@ GitHub-hosted Actions
 ```
 
 The home router does not forward application, SSH, Docker, admin, database, or
-other Pi ports. Public tester access is a later outbound Tailscale Funnel under
-#97; the Funnel URL is public ingress, not an authentication boundary.
+other Pi ports. Public tester access uses outbound-established Tailscale Funnel
+under #97. The Funnel URL is public ingress, not an authentication boundary.
 
 The callback path is independent of application ingress: the Pi initiates
 outbound HTTPS to GitHub after checking Docker health, the recorded digest, and
@@ -108,31 +113,29 @@ remains the host's desired-state source, so a GitHub App or Deployments API
 outage cannot block an otherwise healthy local update; it instead makes the
 external workflow time out without confirmation.
 
-Issue #97 will add a separate public-ingress shape without opening a router
-port:
+Issue #97 delivered this public-ingress shape without opening a router port:
 
 ```text
 trusted LAN client -> exact primary-LAN-IPv4:8080 ----+
                                                        +-> one Compose container
-Tailscale Funnel -> exact 127.0.0.1:8080 or local proxy+
+Tailscale Funnel -> exact 127.0.0.1:8080 ------------+
 ```
 
-The current deployment intentionally has one exact host listener. Funnel's
-loopback target requires #97 to teach Compose and binding verification about
-the two explicit endpoints, or to introduce a small loopback-only proxy. It
-must not broaden either path to `0.0.0.0`, and deployment confirmation must
-continue to use a local endpoint rather than depend on the public Funnel URL.
+The deployment has two exact host listeners: the configured primary LAN IPv4
+and loopback. It does not use `0.0.0.0` or a local reverse proxy. Deployment
+confirmation continues to use the local endpoint rather than depend on the
+public Funnel URL.
 
-The admin path remains private through #95:
+The temporary hosted-alpha operator path is:
 
 ```text
 GET /admin/status
 ```
 
-The backend already requires `X-Moon-Admin-Token` when admin routes are enabled,
-and the Compose seed leaves `/admin/**` disabled. For the temporary tester
-alpha, #119 makes exact `GET`/`HEAD /admin/status` a deliberate exception behind
-an explicit 64-hex deployment token so process-local evidence remains available;
+The backend requires `X-Moon-Admin-Token`. The Compose seed leaves
+`/admin/**` disabled on a fresh host. The active tester-alpha configuration
+makes exact `GET`/`HEAD /admin/status` a deliberate exception behind an
+explicit 64-hex deployment token so process-local evidence remains available;
 every other admin path stays off the public surface.
 
 ## Phase 0: Prove The Container Boundary
@@ -223,25 +226,26 @@ Backup matrix before public alpha:
 | Disposable logs | No | Keep short retention unless debugging a specific issue. |
 | Future Postgres data | Yes | Only after a restore drill exists. |
 
-## Deferred Phase 2: Tailscale Funnel Public Edge
+## Phase 2: Tailscale Funnel Public Edge
+
+Status: active for the tester alpha since the #123 verification on 2026-07-18.
 
 Goal: expose only a bounded public app surface through an outbound-established
 tunnel, without a raw router port forward and without claiming that local
 application rejection can stop traffic already carried over the home ISP link.
 
-Recommended shape:
+Implemented shape:
 
 - Tailscale Funnel terminates public HTTPS and reaches the Pi over Tailscale's
   outbound-established connectivity; the home router has no HTTP port forward.
-- Funnel proxies to an exact loopback listener or a loopback-only local reverse
-  proxy. The existing exact primary-IPv4 listener remains available only to the
-  trusted LAN.
-- Public routes are limited to the web app, `/search`, `/api/opportunities`,
-  exact token-authenticated `/admin/status`, future public feed routes, and
-  future public calendar export routes.
-- The current prototype fixture endpoint, `POST /api/opportunities/search`,
-  must be explicitly blocked, protected, or retired before public alpha unless
-  a follow-up decision keeps it public.
+- Funnel proxies directly to `http://127.0.0.1:8080`. The existing exact
+  primary-IPv4 listener remains available only to the trusted LAN.
+- Public routes are limited to the web app and its static assets, `/search`,
+  `/api/opportunities`, provider-independent `/readyz`, and exact
+  token-authenticated `/admin/status`.
+- The prototype fixture endpoint, `POST /api/opportunities/search`, is blocked.
+  Future feed and calendar routes require their own accepted public limits
+  before they can join the hosted allowlist.
 - Every `/admin/**` route except exact authenticated `GET`/`HEAD /admin/status`
   is blocked before controller handling.
 - No raw router port forward is required for HTTP(S) when Funnel is used.
@@ -272,7 +276,7 @@ The control and observation points are deliberately separate:
 | Spring request/work limits | Inside the Spring Boot process on the Pi, after the request has reached the embedded server | Bounds admitted application requests, concurrent opportunity work, bounded responses, and provider calls | An inbound Mbps cap or prevention of bytes already crossing the ISP access link |
 | Household-impact observation | A trusted LAN client sharing the same router and ISP connection while test load originates outside the LAN | Shows whether the allowed alpha load materially harms ordinary household latency or usability | An enforcement mechanism or protection from traffic outside the controlled test |
 
-The planned application values are request and work limits, not external
+The deployed application values are request and work limits, not external
 Funnel restrictions:
 
 - One shared whole-site token bucket refills at 60 requests per minute (one
@@ -284,13 +288,12 @@ Funnel restrictions:
   refills once per minute. It protects Open-Meteo usage and is not a home-uplink
   bandwidth measurement.
 
-Issue [#119](https://github.com/rapucha/moon-service/issues/119) owns the
+Issue [#119](https://github.com/rapucha/moon-service/issues/119) delivered the
 disabled-by-default route, method, body, header, admin, and fixture boundary.
-Issue [#120](https://github.com/rapucha/moon-service/issues/120) owns the actual
+Issue [#120](https://github.com/rapucha/moon-service/issues/120) delivered the
 Spring implementation, deterministic limiter and concurrency tests, provider
-arithmetic, `429` behavior, and Docker-readiness carve-out. Until those issues
-are merged and deployed, these values describe policy rather than current
-runtime behavior.
+arithmetic, `429` behavior, and Docker-readiness carve-out. Both are merged and
+deployed.
 
 Other hosted-surface controls remain narrow:
 
@@ -300,43 +303,25 @@ Other hosted-surface controls remain narrow:
 - Future feed and calendar routes must join an explicit shared bound before
   public exposure; their caching and polling policy remains future work.
 
-### Safe Activation Check
+### Activation Result And Follow-Up
 
-Public activation remains blocked until #119, #120,
-[#121](https://github.com/rapucha/moon-service/issues/121), and
-[#122](https://github.com/rapucha/moon-service/issues/122) are merged and the
-required revision is deployed. Issue
-[#123](https://github.com/rapucha/moon-service/issues/123) then requires a new,
-explicit owner-approved activation window.
+Issues #119 through #122 were merged and deployed before activation. Issue
+[#123](https://github.com/rapucha/moon-service/issues/123) then verified the
+focused public surface, security headers, exact authenticated status behavior,
+one real provider-backed lookup, and the explicit Funnel off/on recovery path.
+The healthy exact handler was left enabled.
 
-During that window:
+The owner moved the controlled outside-household static burst and video-call
+observation to nonblocking follow-up
+[#158](https://github.com/rapucha/moon-service/issues/158). That issue must
+leave Funnel off on degradation, unexpected provider work, missing rejection,
+or unrelated exposure. Success restores the previously approved Funnel state.
+It does not add an inbound Mbps guarantee.
 
-1. From one trusted household LAN client, record an unloaded latency and packet
-   loss baseline to one stable external target. With the household participant
-   aware of the test, confirm a representative video call is stable before
-   Funnel is enabled.
-2. From outside the household LAN, send one finite, static-only over-limit
-   probe: after the whole-site bucket is full, request the same bounded static
-   asset concurrently exactly `capacity + 1` times. Verify at least one bounded
-   HTTP `429` response, wait for the configured refill interval, and verify one
-   static request succeeds. Make only the single real provider lookup
-   authorized by #123; do not live-saturate provider or
-   opportunity-concurrency limits.
-3. At the same time, repeat the LAN measurement while the household participant
-   continues the video call. Treat visible or audible call degradation as
-   material household impact. Use #120's deterministic tests, rather than
-   additional live provider calls, as the proof of provider-bucket and
-   opportunity-concurrency behavior in the deployed revision.
-4. On material household degradation, unexpected provider work, failure to
-   reject the static over-limit probe, or unrelated public exposure, stop the
-   test immediately and run the exact Funnel-off procedure prepared by #122.
-5. At the end of every window, including a successful one, run that same
-   Funnel-off procedure. Verify that public access stops while LAN access and
-   deployment health remain intact.
-
-Every check leaves Funnel off. A failed check blocks reactivation.
-Reconsidering a MikroTik/router cap or host shaping requires a new reviewed
-issue and explicit mutation authority; #118 does not authorize either change.
+The exact status, withdrawal, restoration, and re-enrollment commands live in
+the [Raspberry Pi runbook](../deployment/raspberry-pi/README.md). Reconsidering
+a MikroTik/router cap or host shaping requires a new reviewed issue and explicit
+mutation authority; #118 does not authorize either change.
 
 WAF stance:
 
@@ -347,41 +332,41 @@ WAF stance:
   input surface becomes more complex than city lookup, feeds, and calendar
   exports.
 
-Exit criteria:
+Exit criteria met for activation:
 
 - During the explicit #123 window, the public URL reaches only the accepted
   hosted surface through the tunnel.
 - Missing/wrong admin tokens reveal no status data; every other admin route,
   fixture, SSH, Docker, and unrelated host surface is not publicly reachable.
-- Excess requests receive bounded rejection before provider quotas are at risk,
-  the household-impact check passes, and the exact Funnel-off path restores the
-  private-only state.
+- Request and provider safeguards are deployed, and the exact Funnel-off path
+  was verified without harming LAN health. The separate household-impact
+  measurement remains tracked by #158 and is not an activation gate.
 
 ## Phase 3: App-Level Abuse And Provider Protection
+
+Status: implemented for the tester alpha.
 
 Goal: keep accepted Open-Meteo usage, application work, and generated traffic
 bounded. This phase does not claim to cap inbound WAN traffic.
 
-The backend already has useful alpha primitives:
+The backend has these alpha controls:
 
 - Request logs avoid raw query strings by default.
 - Runtime geocoding and weather caches are process-local.
 - Concurrent identical cache misses share one upstream provider call inside one
   backend process.
 - `/admin/status` exposes provider counters, cache stats, and quota windows.
-
-Remaining application work:
-
-- Add the shared Spring-managed whole-site, opportunity-concurrency, and
-  provider-backed lookup limits selected above.
-- Return documented `status: "rate_limited"` with HTTP `429`.
-- Keep Open-Meteo quota limits configurable and visible in `/admin/status`.
-- Add operator-visible current public rate-limit settings.
+- Shared Spring-managed whole-site, opportunity-concurrency, and provider-backed
+  lookup limits enforce the values selected above.
+- Rejected product lookups return documented `status: "rate_limited"` with HTTP
+  `429`. Whole-site exhaustion can return that bounded response before static or
+  hidden-route handling.
+- Open-Meteo quota limits remain configurable and visible in `/admin/status`.
 - Preserve the v0 rule that the browser does not call geocoding on every
   keystroke.
 - Keep cache TTLs and maximum sizes visible in backend configuration.
 
-Exit criteria:
+Exit criteria met:
 
 - Repeated searches for the same city hit caches instead of increasing provider
   counters.
