@@ -8,11 +8,12 @@ Java or container images. Follow-up
 [#107](https://github.com/rapucha/moon-service/issues/107) makes timer rearming
 reliable and adds exact physical-deployment acknowledgement to GitHub.
 
-This is the private deployment layer. It publishes the same application
-instance on the host's exact primary IPv4 address for a trusted home LAN and
-on `127.0.0.1:8080` as the prepared Tailscale reverse-proxy target. It opens no
-router port, does not enroll Tailscale, and does not configure Funnel. Public
-exposure remains issue
+This deployment publishes the same application instance on the host's exact
+primary IPv4 address for a trusted home LAN and on `127.0.0.1:8080` for
+Tailscale Funnel. The role opens no router port and does not manage Tailscale
+enrollment or Funnel state. Those remain explicit operator actions. The
+tester-alpha Funnel was activated and verified under
+[#123](https://github.com/rapucha/moon-service/issues/123) as the final step of
 [#97](https://github.com/rapucha/moon-service/issues/97).
 
 ## What provisioning installs
@@ -251,9 +252,9 @@ explicitly sets `MOON_HOSTED_ALPHA_ENABLED=false`. The file is created only
 when absent, so provisioning does not overwrite an existing Pi's host-only
 configuration or token.
 
-Do not enable the hosted surface during issue #122. Immediately before the
-separately approved #123 activation window, create a high-entropy token and
-edit the host-only file as the bootstrap administrator:
+The active tester alpha uses the hosted surface. On a fresh or rebuilt host,
+create a high-entropy token and edit the host-only file as the bootstrap
+administrator before restoring Funnel:
 
 ```bash
 openssl rand -hex 32
@@ -266,15 +267,16 @@ Set `MOON_HOSTED_ALPHA_ENABLED=true` and add
 off-host secret store; never commit it, print it in verification evidence, or
 pass it in a URL. Existing hosts require this manual update because Ansible
 deliberately does not overwrite `application.env`. A fresh host receives the
-same disabled seed and must also remain disabled until #123.
+disabled seed. Keep Funnel off until the hosted configuration is enabled and
+the local readiness check passes.
 
 ### Tailscale boundary
 
 Provisioning installs the package and enables `tailscaled` only. Do not add a
 Tailscale auth key to inventory. Tailnet enrollment and Funnel configuration
-are explicit bootstrap-administrator actions for #97. Existing MikroTik
-WireGuard remains the remote-administration path and does not need any software
-on this Pi.
+are explicit bootstrap-administrator actions. Existing MikroTik WireGuard
+remains the remote-administration path and does not need any software on this
+Pi.
 
 The prepared deployment publishes the same container on exactly two host
 addresses: the configured primary LAN IPv4 and `127.0.0.1`, both using the
@@ -287,21 +289,25 @@ does not alter its trust boundary.
 
 Current Tailscale documentation requires MagicDNS, tailnet HTTPS, a Funnel
 `nodeAttrs` permission, and public HTTPS port `443`, `8443`, or `10000`.
-Interactive Funnel setup can open a browser consent flow that enables the
-missing tailnet requirements. Do not run that flow, enroll the node, or execute
-any mutating command below during issue #122. After provisioning, these
-read-only checks must still show the node logged out and no active Funnel:
+Interactive enrollment or Funnel setup can open a browser consent flow. Follow
+only URLs printed by the CLI. Do not create or store an auth key in inventory.
+
+Check the current state without changing it:
 
 ```bash
 sudo tailscale status
 sudo tailscale funnel status
 ```
 
-The exact logged-out text can vary by client version; neither check should
-report an active tailnet connection or public listener.
+The expected tester-alpha state is an online tailnet node and one Funnel HTTPS
+listener on port `443` with one proxy target:
 
-During the separately approved #123 window, the smallest interactive sequence
-for the prepared port is:
+```text
+https://<node-name>.<tailnet>.ts.net:443 -> http://127.0.0.1:8080
+```
+
+On first enrollment or deliberate re-enrollment, use the interactive login,
+then restore only that exact handler:
 
 ```bash
 sudo tailscale up
@@ -310,25 +316,35 @@ sudo tailscale funnel --bg --https=443 http://127.0.0.1:8080
 sudo tailscale funnel status
 ```
 
-Follow only the login and Funnel-consent URLs printed by the CLI; do not create
-or store an auth key in inventory. `--bg` makes Funnel persist across daemon
-restarts and reboots, so the same window must prove the explicit off path:
+`--bg` makes Funnel persist across daemon restarts and reboots. To withdraw
+public access without changing LAN access or logging the node out:
 
 ```bash
 sudo tailscale funnel --https=443 off
 sudo tailscale funnel status
 ```
 
-The off status must show no active public Funnel. If the exact listener cannot
-be removed cleanly, keep the application private and use
-`sudo tailscale funnel reset` before rechecking status. Reserve
+The off status must show no active public Funnel. Keep Funnel off after an
+unexpected route, unhealthy service, or failed verification. Check local
+readiness before restoring the exact handler:
+
+```bash
+sudo moon-service-control revision
+sudo tailscale funnel --bg --https=443 http://127.0.0.1:8080
+sudo tailscale funnel status
+```
+
+If the listener cannot be removed cleanly, keep the application private and
+use `sudo tailscale funnel reset` before rechecking status. Reserve
 `sudo tailscale logout` followed by a fresh interactive `sudo tailscale up` for
 deliberate re-enrollment recovery; logout is not a routine off switch.
 
 Funnel targets only `http://127.0.0.1:8080`; it does not publish the LAN
 listener, SSH, Docker's socket/API, or another host service. No router HTTP
-forward is needed. Issue #123 must verify those negative boundaries from
-outside the LAN before public testing continues.
+forward is needed. Issue #123 verified those negative boundaries, one real
+lookup, and the off/on recovery path. Follow-up
+[#158](https://github.com/rapucha/moon-service/issues/158) owns the postponed
+household-uplink and video-call measurement. It is not an activation gate.
 
 ### GitHub deployment reporter boundary
 
@@ -445,8 +461,8 @@ its exact trusted-LAN-plus-loopback boundary:
    runtime UID/GID, and exact memory limit before making a live opportunity
    request.
 4. Run the same playbook again. Review the recap and investigate unexpected
-   changes; the host and application configuration should remain intact, while
-   Tailscale remains unenrolled and Funnel remains inactive.
+   changes. The host and application configuration should remain intact.
+   Tailscale enrollment and operator-managed Funnel state must remain unchanged.
 5. Reboot the Pi, then verify the recorded digest starts and becomes ready
    without GHCR being part of the startup path.
 6. After a later healthy `main` publication, confirm the next timer cycle starts
@@ -726,6 +742,15 @@ was rejected solely because of that configuration, run `resume` after the
 restart/configuration check. Re-running Ansible intentionally does not replace
 the local file.
 
+### Funnel or public-route failure
+
+Withdraw Funnel first with `sudo tailscale funnel --https=443 off`, then require
+`sudo tailscale funnel status` to show no public handler. Confirm local service
+health with `sudo moon-service-control revision` and inspect only the needed
+bounded logs. Restore the exact HTTPS-to-loopback handler only after the cause
+is understood and the hosted service is healthy. Do not use `tailscale logout`
+as an incident switch.
+
 ### Corrupt deployment state
 
 The updater fails closed when `current.env` exists but has an invalid
@@ -739,8 +764,10 @@ not silently turn a moving tag into current state.
 There is no durable application data in this deployment. Flash a fresh
 supported image, restore SSH/sudo access, rerun Ansible from the controller,
 restore the admin token and optional private GHCR credential from their
-off-host stores, and allow the Pi to pull the current published digest. Record
-the previously deployed digest off-host if reproducing that exact version may
+off-host stores, and allow the Pi to pull the current published digest. Verify
+local readiness, interactively re-enroll Tailscale if needed, and restore only
+the exact HTTPS `443` to `http://127.0.0.1:8080` Funnel handler. Record the
+previously deployed digest off-host if reproducing that exact version may
 matter. Process-local caches and provider counters restart empty by design.
 
 ## Local verification of repository changes
