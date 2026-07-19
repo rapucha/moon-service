@@ -490,6 +490,13 @@ that one record. The target V0 weather-window contract is broader:
       "localTimeZone": "Europe/Prague",
       "score": 82,
       "confidence": "medium",
+      "components": {
+        "moonAltitudeFit": 30,
+        "sunLightFit": 24,
+        "moonIlluminationFit": 15,
+        "weatherFit": 9,
+        "forecastConfidence": 4
+      },
       "moon": {
         "altitudeDegrees": 4.2,
         "azimuthDegrees": 126.5,
@@ -610,8 +617,12 @@ that one record. The target V0 weather-window contract is broader:
         "cloudCoverMeanPercent": 38,
         "cloudCoverMaxPercent": 52,
         "lowCloudCoverMaxPercent": 20,
+        "midCloudCoverMaxPercent": 35,
+        "highCloudCoverMaxPercent": 40,
         "precipitationProbabilityMaxPercent": 5,
+        "precipitationMm": 0.0,
         "visibilityMinMeters": 18000,
+        "weatherCode": 2,
         "summary": "partly cloudy"
       },
       "exposureBalance": {
@@ -899,6 +910,570 @@ Example:
   }
 ]
 ```
+
+## Calibration Feedback API
+
+Issue [#33](https://github.com/rapucha/moon-service/issues/33) owns the
+calibration-feedback initiative. This section is the version 1 public contract;
+the routes are not implemented yet. Existing opportunity `id` and
+`moonPass.id` values remain unchanged.
+
+### Shared transport and values
+
+All three routes return JSON with integer `schemaVersion: 1`, an RFC 3339 UTC
+`serverTime`, and `Cache-Control: no-store`. Requests use UTF-8
+`application/json`; an optional `charset=utf-8` is allowed. Other media types,
+content encodings, duplicate or unknown members, non-finite numbers, and
+malformed Unicode are rejected. Body limits count received bytes before JSON
+parsing. A declared or streamed body over the limit is rejected without
+parsing the excess.
+
+Preview and submission use the same self-reported location record:
+
+```json
+{
+  "kind": "real_location",
+  "id": "openmeteo:prague-cz",
+  "displayName": "Prague / Praha, Czech Republic",
+  "latitude": 50.0755,
+  "longitude": 14.4378,
+  "elevationMeters": 250,
+  "timezone": "Europe/Prague",
+  "countryCode": "CZ"
+}
+```
+
+This shape is `ReportedLocation`:
+
+```text
+ReportedLocation {
+  kind: real_location
+  id: string
+  displayName: string
+  latitude: number
+  longitude: number
+  elevationMeters: integer
+  timezone: IANA zone
+  countryCode: two-letter uppercase country code
+}
+```
+
+The browser builds this record only from a selected `real_location` lookup
+result and copies the fields unchanged. It never requests device-location or
+GPS permission. A tester may first select any city, including one for a past
+observation elsewhere.
+
+The API accepts no other location members. It requires the exact
+`real_location` kind, nonblank strings without leading or trailing Unicode
+White_Space, finite latitude from `-90` through `90`, finite longitude from
+`-180` through `180`, a signed 32-bit integer elevation, a recognized IANA
+timezone, and a two-letter uppercase country code. It applies Unicode NFC to
+`id` and `displayName`. It does not verify that the values came from lookup or
+describe a city; direct API callers are trusted alpha testers.
+
+Preview and submission call neither the location resolver nor a geocoder and
+do not populate the resolver cache. “City-level” is a cooperating browser and
+tester promise, not a server-enforced guarantee. Successful preview responses
+return the normalized record. Stored location and recomputed astronomy
+represent the tester's claim, not independently verified location evidence.
+Fabricated evidence is an accepted alpha risk.
+
+Timing is a tagged union. `now` has no client time fields:
+
+```json
+{ "kind": "now" }
+```
+
+The server captures one receipt instant after the bounded body is received and
+uses it for a new `now` preview or report. Its accepted timing has
+`source: "server_receipt"` and `confidence: "exact"`.
+
+`past` preserves what the tester first entered and the correction used for the
+calculation:
+
+```json
+{
+  "kind": "past",
+  "enteredLocalDateTime": "2025-10-26T02:30:00",
+  "correctedLocalDateTime": "2025-10-26T02:25:00",
+  "timezone": "Europe/Prague",
+  "utcOffset": "+02:00",
+  "source": "camera_metadata",
+  "confidence": "within_5_minutes"
+}
+```
+
+The request variants are:
+
+```text
+NowTiming {
+  kind: now
+}
+
+PastTiming {
+  kind: past
+  enteredLocalDateTime: local date-time
+  correctedLocalDateTime: local date-time
+  timezone: IANA zone
+  utcOffset: zone offset  // omitted only when the corrected value is unambiguous
+  source: PastSource
+  confidence: PastConfidence
+}
+```
+
+Local date-times use exactly `YYYY-MM-DDTHH:mm:ss`, with no zone, offset, or
+fraction. They use the proleptic Gregorian calendar and four-digit years
+`0001-9999`. `timezone` must equal the selected location timezone. `utcOffset`
+uses the zone's canonical `Z`, `±HH:MM`, or historical `±HH:MM:SS` form. It may
+be omitted when `correctedLocalDateTime` has one valid offset and is required
+when it has two. Both successful operations return the corrected value's
+resolved offset and UTC `resolvedAt`; only final submission stores them.
+
+Past `source` is one of:
+
+```text
+camera_metadata
+phone_metadata
+written_record
+memory
+other
+```
+
+Past `confidence` is one of:
+
+```text
+exact
+within_5_minutes
+within_30_minutes
+within_2_hours
+date_only
+```
+
+The source values form `PastSource`; the confidence values form
+`PastConfidence`.
+
+`date_only` still needs a corrected time so astronomy can be reconstructed; it
+records that the time is not reliable. Only the corrected value is resolved,
+checked for a gap or overlap, and compared with receipt plus five minutes;
+equality is accepted. The entered value gets syntax and date-range validation
+only and is then preserved. Browser-clock comparisons are warnings. Resolving
+an allowed corrected date may produce a UTC instant in adjacent ISO year `0000`
+or `+10000`; UTC response values use ISO 8601 expanded-year form. The search is
+clipped where converting an edge to the selected location timezone would leave
+local year `0001-9999`.
+
+`exact` means the source timestamp is trusted to its displayed second. Each
+`within_*` value is the tester's maximum estimated absolute error. These labels
+record evidence quality; they do not change the reconstructed instant.
+
+A corrected time in a daylight-saving gap is rejected. A corrected overlap
+without `utcOffset` returns both valid offsets in `validUtcOffsets`, ordered by
+the UTC instants they produce, so the browser can ask the tester to choose. The
+original entered value does not change during correction or offset selection.
+
+### Capability
+
+```http
+GET /api/calibration-feedback/v1/capability
+```
+
+The route always returns `200` and does not require feedback storage to be
+available:
+
+```json
+{
+  "schemaVersion": 1,
+  "serverTime": "2026-07-19T12:00:00Z",
+  "featureState": "enabled",
+  "previewAvailability": "available",
+  "submissionAvailability": "unavailable"
+}
+```
+
+`featureState` is `enabled` or `disabled`. Each availability is `available`,
+`disabled`, or `unavailable`: `disabled` means the relevant feature is not
+enabled, while `unavailable` means it is enabled but cannot currently serve a
+request. A disabled feature reports both operations as `disabled`; an enabled
+feature may report the two operations independently. Transient token or
+concurrency exhaustion does not change availability. The response never
+exposes database type, configuration, health, capacity, counts, or failure text.
+
+| Condition | Preview availability | Submission availability |
+| --- | --- | --- |
+| Feedback feature disabled | `disabled` | `disabled` |
+| Feature enabled, preview disabled | `disabled` | Determined independently |
+| Preview enabled and operational | `available` | Determined independently |
+| Preview enabled but unable to calculate | `unavailable` | Determined independently |
+| Submission storage not configured | Determined independently | `disabled` |
+| Storage configured, reachable, and below capacity | Determined independently | `available` |
+| Storage down or full | Determined independently | `unavailable` |
+
+Availability describes a new operation, not a reservation. When submission is
+`unavailable`, an explicit exact retry may still return `200` if the original
+row exists and the only unavailable condition is full capacity. A database
+outage cannot replay until storage is reachable.
+
+### Historical astronomy preview
+
+```http
+POST /api/calibration-feedback/v1/preview
+```
+
+The request is at most 4 KiB (4,096 bytes) and contains only `schemaVersion`,
+`location`, and `timing`. Ratings, notes, recommendation data, client preview
+facts, and other fields are invalid. A valid request is non-persisting and
+calls no weather provider.
+
+```text
+PreviewRequest {
+  schemaVersion: 1
+  location: ReportedLocation
+  timing: NowTiming | PastTiming
+}
+```
+
+The success response has this shape and returns at most one visible Moon pass:
+
+```text
+PreviewResponse {
+  schemaVersion: 1
+  serverTime
+  location: ReportedLocation
+  acceptedTiming: ResolvedNowTiming | ResolvedPastTiming
+  searchStartsAt: UTC instant
+  searchEndsAt: UTC instant
+  facts: AstronomyFacts
+  pass: VisiblePass | NoVisiblePass
+}
+
+ResolvedNowTiming {
+  kind: now
+  resolvedLocalDateTime: local date-time
+  timezone: IANA zone
+  utcOffset: zone offset
+  source: server_receipt
+  confidence: exact
+  resolvedAt: UTC instant
+}
+
+ResolvedPastTiming {
+  kind: past
+  enteredLocalDateTime: local date-time
+  correctedLocalDateTime: local date-time
+  timezone: IANA zone
+  utcOffset: zone offset
+  source: PastSource
+  confidence: PastConfidence
+  resolvedAt: UTC instant
+}
+
+AstronomyFacts {
+  at: UTC instant
+  moonAltitudeDegrees: number
+  moonAzimuthDegrees: number
+  moonIlluminationPercent: number
+  moonPhaseAngleDegrees: number
+  brightLimbTiltDegrees: number | null
+  northPoleTiltDegrees: number | null
+  sunAltitudeDegrees: number
+  sunAzimuthDegrees: number
+  lightBucket: daylight | golden_hour | civil_twilight | nautical_twilight | night
+}
+
+VisiblePass {
+  state: enclosing | nearest
+  startsAt: UTC instant
+  endsAt: UTC instant
+  startBoundary: moonrise | search_start
+  endBoundary: moonset | search_end
+  sampleCount: integer
+  samples: AstronomyFacts[]
+}
+
+NoVisiblePass {
+  state: none
+  reason: no_visible_pass_in_search_range
+  sampleCount: 0
+  samples: []
+}
+```
+
+`facts.at` equals `acceptedTiming.resolvedAt`. Tilt meanings stay the same as
+in opportunity astronomy facts.
+
+`pass.state` is `enclosing` when the accepted instant lies in the pass,
+`nearest` for the closest pass otherwise, or `none`. Samples are chronological.
+A no-pass response still contains the normal location, search edges, accepted
+timing, and instant facts; its pass fragment is:
+
+```json
+{
+  "pass": {
+    "state": "none",
+    "reason": "no_visible_pass_in_search_range",
+    "sampleCount": 0,
+    "samples": []
+  }
+}
+```
+
+The nominal search interval is the inclusive instant range from
+`resolvedAt - 36h` to `resolvedAt + 36h`, clipped only at the local-year edges
+defined above. The coarse display set contains `resolvedAt`, every
+`resolvedAt ± n × 30 minutes` inside the clipped range, and each clipped edge
+when it is not already on that grid. Identical instants are deduplicated and
+sorted. The full range has 145 coarse facts; clipping cannot increase that
+count. The center fact is reused for `facts` and is not extra. Visibility means
+apparent refracted Moon-center altitude greater than `0°`; exact zero is a
+crossing.
+
+The coarse display set is not the authority for detecting a pass. A bounded
+ephemeris horizon-event search enumerates every Moon-center `0°` crossing in
+the search interval. It must detect a complete rise-and-set pair even when both
+adjacent coarse facts are not visible. The search accepts at most eight ordered
+crossing results. If the event solver fails or would exceed that bound, the
+server returns `503 feedback_unavailable` rather than a false no-pass result.
+
+Visibility at `searchStartsAt` plus the ordered rise and set crossings forms
+the passes. A pass touching an interval edge uses `search_start` or
+`search_end` for that boundary. The pass containing `resolvedAt` wins.
+Otherwise, the pass with the nearest refined boundary wins; an equal-distance
+tie chooses the earlier pass. `state: none` is valid only when the authoritative
+event search and the visibility state prove that no part of a pass lies in the
+search interval.
+
+Each crossing bracket is narrowed to at most one second with at most 11
+bisections after a bracket of at most 30 minutes is known. The first visible
+whole-second instant is used for a rise and the last visible whole-second
+instant for a set. Event-solver, comparison, and bisection evaluations are not
+response samples. The response array contains the selected pass's visible
+coarse facts plus up to two refined boundary facts, in time order and with
+duplicate instants emitted once. Therefore `samples` contains at most 147 facts
+and `sampleCount` equals its array length.
+
+Preview admission is shared by every visitor to one application instance. Its
+bucket starts full, has capacity 12, and restores one whole token per complete
+five-second interval measured by a monotonic clock, capped at 12. One
+non-blocking concurrency permit is available. After validation, the server
+acquires the permit and a token; only an admitted calculation consumes one.
+Token exhaustion returns `429` with `Retry-After` equal to the ceiling of
+seconds until the next token. A busy permit returns `429` with `Retry-After: 1`.
+The permit is released on every completion or rejection. No identity, IP
+address, forwarded identity, or User-Agent participates.
+
+Refill uses the number of complete intervals since the last refill mark and
+advances that mark by those intervals, retaining any partial interval. A
+process restart creates a new full in-memory bucket; neither limiter is shared
+between application instances.
+
+Preview invokes neither feedback persistence, location resolution, geocoding,
+nor weather. It creates no feedback record or location-cache entry. Moon
+Service-controlled logs retain no preview location or timing value and no raw
+preview body or identity metadata.
+
+### Final submission
+
+```http
+POST /api/calibration-feedback/v1/submissions
+```
+
+The request is at most 16 KiB (16,384 bytes). Browser use is same-origin. The
+route sends no permissive CORS headers and provides no cross-origin preflight
+support; non-browser clients remain subject to this public contract. The
+browser creates a UUIDv4 `clientSubmissionId` for one logical normalized
+payload.
+
+```text
+SubmissionRequest {
+  schemaVersion: 1
+  clientSubmissionId: UUIDv4
+  mode: recommendation_review | observation
+  location: ReportedLocation
+  timing: NowTiming | PastTiming
+  ratings: Ratings
+  notes: string
+  recommendationSnapshot: CompactOpportunity  // recommendation_review only
+}
+```
+
+`mode` is `recommendation_review` or `observation`. Ratings have these exact
+values:
+
+- `overall`: `positive|marginal|negative`
+- `moon`: `clear|partial|not_visible|unknown`
+- `ambientLight`: `sufficient|marginal|insufficient|unknown`
+- `weather`: `better|matched|worse|not_compared`
+- `horizon`: `none|minor|blocked|unknown`
+
+Notes are required. The server changes CRLF or CR line endings to LF, applies
+Unicode NFC, trims leading and trailing Unicode White_Space, rejects unpaired
+surrogates, and then requires 10-4,000 Unicode code points inclusive. A code
+point is not a UTF-16 unit, byte, or grapheme cluster. The normalized note is
+stored; validation and logs never repeat it.
+
+A recommendation review requires this complete compact copy of the selected
+opportunity:
+
+```text
+CompactOpportunity {
+  generatedAt
+  id
+  windowKind
+  moonPass { id, startsAt, endsAt }
+  startsAt
+  suggestedAt: UTC instant | null
+  endsAt
+  localTimeZone
+  score: integer
+  confidence: low | medium | high
+  components {
+    moonAltitudeFit, sunLightFit, moonIlluminationFit,
+    weatherFit, forecastConfidence
+  }
+  moon {
+    altitudeDegrees, azimuthDegrees, illuminationPercent, phaseAngleDegrees,
+    brightLimbTiltDegrees: number | null,
+    northPoleTiltDegrees: number | null, phaseName
+  }
+  sun { altitudeDegrees, azimuthDegrees, lightBucket }
+  weather {
+    sourceResolution, segmentKind,
+    cloudCoverMeanPercent, cloudCoverMaxPercent,
+    lowCloudCoverMaxPercent, midCloudCoverMaxPercent,
+    highCloudCoverMaxPercent, precipitationProbabilityMaxPercent,
+    precipitationMm, visibilityMinMeters, weatherCode, summary
+  }
+  exposureBalance { label, text }
+  reason
+}
+```
+
+Member names, values, and number types are copied from the opportunity
+response. `moonPass.path`, `moonPath`, `links`, and page-level messages are
+excluded. The server requires pass start ≤ opportunity start ≤ opportunity end ≤ pass end
+and, when present, opportunity start ≤ suggested time ≤ opportunity end. It
+also requires `localTimeZone` to match the reported location. The snapshot is
+claimed recommendation context, never recomputed astronomy.
+
+An `observation` forbids `recommendationSnapshot` and accepts only
+`ratings.weather: "not_compared"`. The server does not call a weather provider
+for either mode. It recomputes and stores an instant Moon, Sun, and light
+snapshot from the normalized reported location and `resolvedAt`; preview facts
+are not an accepted request member. The location and recomputed facts remain
+the tester's claim rather than verified observation evidence. The server also
+supplies the application revision, submission time, server report UUID, and
+idempotency hash rather than accepting them from the client.
+
+Normalization for idempotency is deterministic:
+
+- UUIDs use lowercase canonical text; `clientSubmissionId` must be UUIDv4.
+- Object member order and insignificant JSON whitespace do not matter.
+- Enums use the exact lowercase spellings above.
+- UTC instants use `Z`; offsets and local times use the formats above.
+- Finite JSON numbers compare by mathematical value, with negative zero
+  normalized to zero and insignificant trailing zeros removed.
+- Reported-location and snapshot strings use Unicode NFC and must have no
+  leading or trailing whitespace. Location `kind`, timezone, and country code
+  retain their validated exact spellings. Notes use their separate rule.
+- Absent and `null` are different. A member may be `null` only where the source
+  opportunity contract says it is nullable.
+
+The idempotency hash covers the normalized schema version, mode, complete
+reported location, timing request, ratings, note, and allowed recommendation
+snapshot. It excludes `clientSubmissionId`, receipt and submission times,
+server recomputation, application revision, and server-generated values. In
+particular, `now` hashes as `{"kind":"now"}` so an exact retry does not become a
+different report merely because its later receipt time changed.
+
+For `now`, the request that successfully creates the row supplies the stored
+receipt instant. A replay returns that original instant. If an earlier attempt
+created no row, a later exact retry may create one with its later receipt
+instant. Changing to a remembered clock time instead is a new `past` payload
+and needs a new client UUID.
+
+After transport, validation, and normalization, the server checks storage and
+the client UUID before write admission. An available exact replay returns even
+when the store is full; replay and conflict do not consume a token. A known
+disabled, unavailable, or full store also consumes no token. One
+instance-global whole-token bucket starts full, is shared by all visitors, has
+capacity 12, and restores one token for each complete hour measured by a
+monotonic clock, capped at 12. It uses the same discrete refill and restart
+rules as the preview bucket. A new logical report consumes a token immediately
+before recomputation and the atomic write. A race to full capacity or downstream
+failure after admission does not restore it. Exhaustion returns `429`;
+`Retry-After` is the ceiling of seconds until the next token. The limiter uses
+no visitor identity or request metadata.
+
+A new normalized payload and client UUID returns `201` with `status: "created"`
+and a server-generated UUIDv4 `serverReportId`. An admitted exact replay returns
+`200`, `status: "replayed"`, and the same server ID. Reusing the client UUID with
+different normalized content returns `409`; submitting that changed report
+requires a new client UUID. Disabled storage, database failure, or
+configured-capacity refusal all return the same public `503`; the response does
+not reveal which condition occurred or any capacity detail.
+
+Create and replay responses have the same fields; only HTTP status and `status`
+differ:
+
+```json
+{
+  "schemaVersion": 1,
+  "serverTime": "2026-07-19T12:00:00Z",
+  "status": "created",
+  "clientSubmissionId": "6d36a45c-5f58-4d78-afee-8685e66d6b2c",
+  "serverReportId": "7344d2f9-a788-42b5-8a48-125fc09d2a20",
+  "submittedAt": "2026-07-19T12:00:00Z"
+}
+```
+
+For replay, `submittedAt` remains the original submission time.
+
+### Error contract
+
+Errors use this shape and never echo raw request values:
+
+```json
+{
+  "schemaVersion": 1,
+  "serverTime": "2026-07-19T12:00:00Z",
+  "error": {
+    "code": "ambiguous_local_time",
+    "message": "Choose one of the valid UTC offsets.",
+    "field": "timing.utcOffset",
+    "validUtcOffsets": ["+02:00", "+01:00"]
+  }
+}
+```
+
+`error.field`, `validUtcOffsets`, and `retryAfterSeconds` are present only when
+they apply. Field names use the dotted request path shown above.
+
+Stable mappings are:
+
+| HTTP | Code | Meaning |
+| --- | --- | --- |
+| `400` | `invalid_json` | JSON is malformed or has duplicate members. |
+| `400` | `invalid_request` | Schema version, member, type, UUID, enum, format, or numeric range is invalid. |
+| `413` | `request_too_large` | The route byte limit was exceeded. |
+| `415` | `unsupported_media_type` | The media type or content encoding is unsupported. |
+| `422` | `invalid_location` | The reported location shape, value, range, or timezone is invalid. |
+| `422` | `invalid_report` | Notes, ratings, mode coupling, snapshot, or chronology is invalid. |
+| `422` | `future_time` | The resolved instant is over five minutes after server receipt. |
+| `422` | `nonexistent_local_time` | The corrected local time is in a DST gap. |
+| `422` | `ambiguous_local_time` | A DST overlap needs one of the returned offsets. |
+| `422` | `invalid_utc_offset` | The supplied offset is not valid for that local time and zone. |
+| `409` | `client_submission_conflict` | The client UUID already names different normalized content. |
+| `429` | `rate_limited` | The applicable token bucket has no token. |
+| `429` | `preview_busy` | The one preview calculation permit is occupied. |
+| `503` | `feedback_unavailable` | The requested feedback operation is disabled or unavailable. |
+
+Every `429` includes an integer `Retry-After` header and matching
+`error.retryAfterSeconds`. Clients may retry only after an explicit tester
+action. Moon Service-controlled submission logs may retain normal
+non-sensitive route metadata such as method, route, status, duration, request
+ID, outcome, and aggregate storage warnings. They do not retain location,
+timing, ratings, notes, snapshots, either feedback UUID, raw request bodies, IP
+addresses, forwarded identity, or User-Agent values.
 
 ## Future Event-Aware Search
 
