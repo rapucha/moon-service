@@ -37,16 +37,7 @@ final class JdbcCalibrationFeedbackRepository implements CalibrationFeedbackRepo
                 server_report_id,
                 client_submission_id,
                 schema_version,
-                report_mode,
-                timing_kind,
-                entered_local_datetime,
-                corrected_local_datetime,
-                resolved_local_datetime,
-                timing_timezone,
-                utc_offset_seconds,
-                timing_source,
-                timing_confidence,
-                resolved_at,
+                opportunity_id,
                 location_id,
                 location_display_name,
                 latitude,
@@ -54,13 +45,9 @@ final class JdbcCalibrationFeedbackRepository implements CalibrationFeedbackRepo
                 elevation_meters,
                 location_timezone,
                 country_code,
-                overall_rating,
-                moon_rating,
-                ambient_light_rating,
-                weather_rating,
-                horizon_rating,
+                ambient_light,
+                crescent_visibility,
                 notes,
-                recommendation_snapshot,
                 astronomy_snapshot,
                 application_revision,
                 idempotency_hash,
@@ -69,16 +56,7 @@ final class JdbcCalibrationFeedbackRepository implements CalibrationFeedbackRepo
                 :serverReportId,
                 :clientSubmissionId,
                 :schemaVersion,
-                :reportMode,
-                :timingKind,
-                :enteredLocalDateTime,
-                :correctedLocalDateTime,
-                :resolvedLocalDateTime,
-                :timingTimezone,
-                :utcOffsetSeconds,
-                :timingSource,
-                :timingConfidence,
-                :resolvedAt,
+                :opportunityId,
                 :locationId,
                 :locationDisplayName,
                 :latitude,
@@ -86,13 +64,9 @@ final class JdbcCalibrationFeedbackRepository implements CalibrationFeedbackRepo
                 :elevationMeters,
                 :locationTimezone,
                 :countryCode,
-                :overallRating,
-                :moonRating,
-                :ambientLightRating,
-                :weatherRating,
-                :horizonRating,
+                :ambientLight,
+                :crescentVisibility,
                 :notes,
-                CAST(:recommendationSnapshot AS jsonb),
                 CAST(:astronomySnapshot AS jsonb),
                 :applicationRevision,
                 :idempotencyHash,
@@ -259,23 +233,12 @@ final class JdbcCalibrationFeedbackRepository implements CalibrationFeedbackRepo
     }
 
     private static MapSqlParameterSource parameters(UUID serverReportId, CalibrationFeedbackReport report) {
-        CalibrationFeedbackReport.NormalizedTiming timing = report.timing();
         CalibrationFeedbackReport.CanonicalLocation location = report.location();
-        CalibrationFeedbackReport.Ratings ratings = report.ratings();
         return new MapSqlParameterSource()
                 .addValue("serverReportId", serverReportId)
                 .addValue("clientSubmissionId", report.clientSubmissionId())
                 .addValue("schemaVersion", report.schemaVersion())
-                .addValue("reportMode", report.mode().wireValue())
-                .addValue("timingKind", timing.kind().wireValue())
-                .addValue("enteredLocalDateTime", timing.enteredLocalDateTime())
-                .addValue("correctedLocalDateTime", timing.correctedLocalDateTime())
-                .addValue("resolvedLocalDateTime", timing.resolvedLocalDateTime())
-                .addValue("timingTimezone", timing.timezone().getId())
-                .addValue("utcOffsetSeconds", timing.utcOffset().getTotalSeconds())
-                .addValue("timingSource", timing.source().wireValue())
-                .addValue("timingConfidence", timing.confidence().wireValue())
-                .addValue("resolvedAt", utc(timing.resolvedAt()), Types.TIMESTAMP_WITH_TIMEZONE)
+                .addValue("opportunityId", report.opportunityId())
                 .addValue("locationId", location.id())
                 .addValue("locationDisplayName", location.displayName())
                 .addValue("latitude", location.latitude())
@@ -283,17 +246,17 @@ final class JdbcCalibrationFeedbackRepository implements CalibrationFeedbackRepo
                 .addValue("elevationMeters", location.elevationMeters())
                 .addValue("locationTimezone", location.timezone().getId())
                 .addValue("countryCode", location.countryCode())
-                .addValue("overallRating", ratings.overall().wireValue())
-                .addValue("moonRating", ratings.moon().wireValue())
-                .addValue("ambientLightRating", ratings.ambientLight().wireValue())
-                .addValue("weatherRating", ratings.weather().wireValue())
-                .addValue("horizonRating", ratings.horizon().wireValue())
-                .addValue("notes", report.notes())
-                .addValue("recommendationSnapshot", report.recommendationSnapshot(), Types.VARCHAR)
+                .addValue("ambientLight", wireValue(report.ambientLight()), Types.VARCHAR)
+                .addValue("crescentVisibility", wireValue(report.crescentVisibility()), Types.VARCHAR)
+                .addValue("notes", report.notes(), Types.VARCHAR)
                 .addValue("astronomySnapshot", report.astronomySnapshot(), Types.VARCHAR)
                 .addValue("applicationRevision", report.applicationRevision())
                 .addValue("idempotencyHash", report.idempotencyHash())
                 .addValue("submittedAt", utc(report.submittedAt()), Types.TIMESTAMP_WITH_TIMEZONE);
+    }
+
+    private static String wireValue(CalibrationFeedbackReport.WireValue value) {
+        return value == null ? null : value.wireValue();
     }
 
     private static OffsetDateTime utc(java.time.Instant instant) {

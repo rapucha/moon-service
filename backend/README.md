@@ -178,12 +178,20 @@ disabled. An invalid capacity, unsupported JDBC scheme, migration failure, or
 database outage makes only feedback persistence unavailable.
 
 With complete settings, a private Hikari pool runs the Flyway migration and
-opens the bounded repository. The migration stores normalized timing,
-canonical city-level location, ratings, notes, recommendation context when
-allowed, server-recomputed astronomy, application revision, both feedback
-UUIDs, and the idempotency hash. It creates no account, visitor-identity,
-request-body, IP-address, forwarded-identity, or User-Agent field. Reports stay
-until a later operator tool deletes one by server report UUID.
+opens the bounded repository. Each row stores the loaded opportunity ID, canonical
+city-level location, one server receipt instant, optional ambient-light and
+crescent-visibility evidence, optional normalized notes, the current astronomy
+snapshot, application revision, `serverReportId`, `clientSubmissionId`, and the
+idempotency hash. At least one evidence field is required; omitted fields stay
+null instead of becoming an `unknown` rating.
+
+Notes may use any language, mixed scripts, and emoji. Stored notes must be NFC,
+have no outer Unicode whitespace or U+0000, and contain 1–4,000 Unicode code
+points. Request normalization and idempotency-hash construction belong to #165;
+this repository enforces the normalized stored shape. The schema creates no
+account, visitor identity, request-body, IP-address, forwarded-identity, or
+User-Agent field. Reports stay until a later operator tool deletes one by
+`serverReportId`.
 
 Capacity defaults to 2,000 and can be lowered for a deployment. Exact replay
 and changed-payload conflict checks happen before capacity refusal. A database
