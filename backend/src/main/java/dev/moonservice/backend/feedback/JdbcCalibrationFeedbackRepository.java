@@ -39,16 +39,13 @@ final class JdbcCalibrationFeedbackRepository implements CalibrationFeedbackRepo
                 schema_version,
                 opportunity_id,
                 location_id,
-                location_display_name,
-                latitude,
-                longitude,
-                elevation_meters,
-                location_timezone,
-                country_code,
                 ambient_light,
                 crescent_visibility,
                 notes,
-                astronomy_snapshot,
+                moon_altitude_degrees,
+                moon_illumination_percent,
+                sun_altitude_degrees,
+                light_bucket,
                 application_revision,
                 idempotency_hash,
                 submitted_at
@@ -58,16 +55,13 @@ final class JdbcCalibrationFeedbackRepository implements CalibrationFeedbackRepo
                 :schemaVersion,
                 :opportunityId,
                 :locationId,
-                :locationDisplayName,
-                :latitude,
-                :longitude,
-                :elevationMeters,
-                :locationTimezone,
-                :countryCode,
                 :ambientLight,
                 :crescentVisibility,
                 :notes,
-                CAST(:astronomySnapshot AS jsonb),
+                :moonAltitudeDegrees,
+                :moonIlluminationPercent,
+                :sunAltitudeDegrees,
+                :lightBucket,
                 :applicationRevision,
                 :idempotencyHash,
                 :submittedAt
@@ -233,30 +227,29 @@ final class JdbcCalibrationFeedbackRepository implements CalibrationFeedbackRepo
     }
 
     private static MapSqlParameterSource parameters(UUID serverReportId, CalibrationFeedbackReport report) {
-        CalibrationFeedbackReport.CanonicalLocation location = report.location();
+        CalibrationFeedbackReport.AstronomyFacts astronomy = report.astronomyFacts();
         return new MapSqlParameterSource()
                 .addValue("serverReportId", serverReportId)
                 .addValue("clientSubmissionId", report.clientSubmissionId())
                 .addValue("schemaVersion", report.schemaVersion())
                 .addValue("opportunityId", report.opportunityId())
-                .addValue("locationId", location.id())
-                .addValue("locationDisplayName", location.displayName())
-                .addValue("latitude", location.latitude())
-                .addValue("longitude", location.longitude())
-                .addValue("elevationMeters", location.elevationMeters())
-                .addValue("locationTimezone", location.timezone().getId())
-                .addValue("countryCode", location.countryCode())
-                .addValue("ambientLight", wireValue(report.ambientLight()), Types.VARCHAR)
-                .addValue("crescentVisibility", wireValue(report.crescentVisibility()), Types.VARCHAR)
+                .addValue("locationId", report.locationId())
+                .addValue(
+                        "ambientLight",
+                        report.ambientLight() == null ? null : report.ambientLight().name(),
+                        Types.VARCHAR)
+                .addValue(
+                        "crescentVisibility",
+                        report.crescentVisibility() == null ? null : report.crescentVisibility().name(),
+                        Types.VARCHAR)
                 .addValue("notes", report.notes(), Types.VARCHAR)
-                .addValue("astronomySnapshot", report.astronomySnapshot(), Types.VARCHAR)
+                .addValue("moonAltitudeDegrees", astronomy.moonAltitudeDegrees())
+                .addValue("moonIlluminationPercent", astronomy.moonIlluminationPercent())
+                .addValue("sunAltitudeDegrees", astronomy.sunAltitudeDegrees())
+                .addValue("lightBucket", astronomy.lightBucket().name())
                 .addValue("applicationRevision", report.applicationRevision())
                 .addValue("idempotencyHash", report.idempotencyHash())
                 .addValue("submittedAt", utc(report.submittedAt()), Types.TIMESTAMP_WITH_TIMEZONE);
-    }
-
-    private static String wireValue(CalibrationFeedbackReport.WireValue value) {
-        return value == null ? null : value.wireValue();
     }
 
     private static OffsetDateTime utc(java.time.Instant instant) {

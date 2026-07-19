@@ -14,7 +14,6 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 import org.testcontainers.postgresql.PostgreSQLContainer;
 import org.testcontainers.utility.DockerImageName;
 
-import java.math.BigDecimal;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.ResultSet;
@@ -22,7 +21,6 @@ import java.sql.SQLException;
 import java.sql.Statement;
 import java.time.Instant;
 import java.time.OffsetDateTime;
-import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -92,27 +90,22 @@ class JdbcCalibrationFeedbackRepositoryIntegrationTest {
                 assertThat(singleInt(statement, "SELECT count(*) FROM flyway_schema_history")).isEqualTo(1);
                 assertThat(singleInt(statement, "SELECT count(*) FROM calibration_feedback_report")).isEqualTo(3);
                 try (ResultSet row = statement.executeQuery("""
-                        SELECT opportunity_id, location_id, location_display_name, latitude, longitude,
-                               elevation_meters, location_timezone, country_code, ambient_light,
-                               crescent_visibility, notes, astronomy_snapshot::text,
+                        SELECT opportunity_id, location_id, ambient_light, crescent_visibility, notes,
+                               moon_altitude_degrees, moon_illumination_percent, sun_altitude_degrees, light_bucket,
                                application_revision, idempotency_hash, submitted_at
                         FROM calibration_feedback_report
                         WHERE client_submission_id = '00000000-0000-4000-8000-000000000001'
                         """)) {
                     assertThat(row.next()).isTrue();
                     assertThat(row.getString("opportunity_id")).isEqualTo("opportunity-1");
-                    assertThat(row.getString("location_id")).isEqualTo("prague-cz");
-                    assertThat(row.getString("location_display_name")).isEqualTo("Prague, Czechia");
-                    assertThat(row.getBigDecimal("latitude")).isEqualByComparingTo("50.08804");
-                    assertThat(row.getBigDecimal("longitude")).isEqualByComparingTo("14.42076");
-                    assertThat(row.getInt("elevation_meters")).isEqualTo(202);
-                    assertThat(row.getString("location_timezone")).isEqualTo("Europe/Prague");
-                    assertThat(row.getString("country_code")).isEqualTo("CZ");
-                    assertThat(row.getString("ambient_light")).isEqualTo("too_bright");
-                    assertThat(row.getString("crescent_visibility")).isEqualTo("too_small_to_see");
+                    assertThat(row.getString("location_id")).isEqualTo("moon-service-3067696");
+                    assertThat(row.getString("ambient_light")).isEqualTo("TOO_BRIGHT");
+                    assertThat(row.getString("crescent_visibility")).isEqualTo("TOO_SMALL_TO_SEE");
                     assertThat(row.getString("notes")).isEqualTo(mixed.notes());
-                    assertThat(row.getString("astronomy_snapshot"))
-                            .isEqualTo("{\"light\": \"civil_twilight\", \"moonAltitude\": 4.2}");
+                    assertThat(row.getDouble("moon_altitude_degrees")).isEqualTo(4.2);
+                    assertThat(row.getDouble("moon_illumination_percent")).isEqualTo(3.1);
+                    assertThat(row.getDouble("sun_altitude_degrees")).isEqualTo(-4.0);
+                    assertThat(row.getString("light_bucket")).isEqualTo("CIVIL_TWILIGHT");
                     assertThat(row.getString("application_revision")).isEqualTo("test-revision");
                     assertThat(row.getBytes("idempotency_hash")).isEqualTo(mixed.idempotencyHash());
                     assertThat(row.getObject("submitted_at", OffsetDateTime.class).toInstant())
@@ -134,13 +127,25 @@ class JdbcCalibrationFeedbackRepositoryIntegrationTest {
                         WHERE client_submission_id = '00000000-0000-4000-8000-000000000003'
                         """)) {
                     assertThat(structured.next()).isTrue();
-                    assertThat(structured.getString("ambient_light")).isEqualTo("too_dark");
-                    assertThat(structured.getString("crescent_visibility")).isEqualTo("visible");
+                    assertThat(structured.getString("ambient_light")).isEqualTo("TOO_DARK");
+                    assertThat(structured.getString("crescent_visibility")).isEqualTo("VISIBLE");
                     assertThat(structured.getObject("notes")).isNull();
                 }
                 assertThatThrownBy(() -> statement.executeUpdate("""
                         UPDATE calibration_feedback_report
                         SET ambient_light = NULL, crescent_visibility = NULL, notes = NULL
+                        WHERE client_submission_id = '00000000-0000-4000-8000-000000000003'
+                        """))
+                        .isInstanceOf(SQLException.class);
+                assertThatThrownBy(() -> statement.executeUpdate("""
+                        UPDATE calibration_feedback_report
+                        SET moon_altitude_degrees = 91.0
+                        WHERE client_submission_id = '00000000-0000-4000-8000-000000000003'
+                        """))
+                        .isInstanceOf(SQLException.class);
+                assertThatThrownBy(() -> statement.executeUpdate("""
+                        UPDATE calibration_feedback_report
+                        SET light_bucket = 'civil_twilight'
                         WHERE client_submission_id = '00000000-0000-4000-8000-000000000003'
                         """))
                         .isInstanceOf(SQLException.class);
@@ -214,6 +219,21 @@ class JdbcCalibrationFeedbackRepositoryIntegrationTest {
                 null))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("UUIDv4");
+        assertThatThrownBy(() -> new CalibrationFeedbackReport.AstronomyFacts(
+                Double.NaN, 3.1, -4.0, CalibrationFeedbackReport.LightBucket.CIVIL_TWILIGHT))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("moonAltitudeDegrees");
+        assertThatThrownBy(() -> new CalibrationFeedbackReport.AstronomyFacts(
+                4.2, 100.1, -4.0, CalibrationFeedbackReport.LightBucket.CIVIL_TWILIGHT))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("moonIlluminationPercent");
+        assertThatThrownBy(() -> new CalibrationFeedbackReport.AstronomyFacts(
+                4.2, 3.1, Double.POSITIVE_INFINITY, CalibrationFeedbackReport.LightBucket.CIVIL_TWILIGHT))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("sunAltitudeDegrees");
+        assertThatThrownBy(() -> new CalibrationFeedbackReport.AstronomyFacts(4.2, 3.1, -4.0, null))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("lightBucket");
     }
 
     @Test
@@ -276,7 +296,7 @@ class JdbcCalibrationFeedbackRepositoryIntegrationTest {
                 .contains("event=startup state=full used=10 capacity=10 remaining=0")
                 .doesNotContain(privateMarker.toString())
                 .doesNotContain("opportunity-9")
-                .doesNotContain("prague-cz");
+                .doesNotContain("moon-service-3067696");
     }
 
     @Test
@@ -376,18 +396,15 @@ class JdbcCalibrationFeedbackRepositoryIntegrationTest {
                 1,
                 clientId,
                 "opportunity-" + index,
-                new CalibrationFeedbackReport.CanonicalLocation(
-                        "prague-cz",
-                        "Prague, Czechia",
-                        new BigDecimal("50.08804"),
-                        new BigDecimal("14.42076"),
-                        202,
-                        ZoneId.of("Europe/Prague"),
-                        "CZ"),
+                "moon-service-3067696",
                 ambientLight,
                 crescentVisibility,
                 notes,
-                "{\"moonAltitude\":4.2,\"light\":\"civil_twilight\"}",
+                new CalibrationFeedbackReport.AstronomyFacts(
+                        4.2,
+                        3.1,
+                        -4.0,
+                        CalibrationFeedbackReport.LightBucket.CIVIL_TWILIGHT),
                 "test-revision",
                 hash,
                 Instant.parse("2026-07-19T12:00:00Z")
@@ -434,16 +451,13 @@ class JdbcCalibrationFeedbackRepositoryIntegrationTest {
                 "schema_version",
                 "opportunity_id",
                 "location_id",
-                "location_display_name",
-                "latitude",
-                "longitude",
-                "elevation_meters",
-                "location_timezone",
-                "country_code",
                 "ambient_light",
                 "crescent_visibility",
                 "notes",
-                "astronomy_snapshot",
+                "moon_altitude_degrees",
+                "moon_illumination_percent",
+                "sun_altitude_degrees",
+                "light_bucket",
                 "application_revision",
                 "idempotency_hash",
                 "submitted_at");

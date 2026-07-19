@@ -1,11 +1,8 @@
 package dev.moonservice.backend.feedback;
 
-import java.math.BigDecimal;
 import java.text.Normalizer;
 import java.time.Instant;
-import java.time.ZoneId;
 import java.time.temporal.ChronoUnit;
-import java.util.Locale;
 import java.util.Objects;
 import java.util.UUID;
 
@@ -13,11 +10,11 @@ public record CalibrationFeedbackReport(
         int schemaVersion,
         UUID clientSubmissionId,
         String opportunityId,
-        CanonicalLocation location,
+        String locationId,
         AmbientLight ambientLight,
         CrescentVisibility crescentVisibility,
         String notes,
-        String astronomySnapshot,
+        AstronomyFacts astronomyFacts,
         String applicationRevision,
         byte[] idempotencyHash,
         Instant submittedAt
@@ -28,13 +25,15 @@ public record CalibrationFeedbackReport(
         }
         requireUuidV4(clientSubmissionId, "clientSubmissionId");
         requireOpportunityId(opportunityId);
-        Objects.requireNonNull(location, "location");
+        requireLocationId(locationId);
         notes = requireNormalizedNotes(notes);
         if (ambientLight == null && crescentVisibility == null && notes == null) {
             throw new IllegalArgumentException("At least one feedback field must be present.");
         }
-        requireText(astronomySnapshot, "astronomySnapshot");
-        requireText(applicationRevision, "applicationRevision");
+        if (astronomyFacts == null) {
+            throw new IllegalArgumentException("astronomyFacts must be present.");
+        }
+        requireApplicationRevision(applicationRevision);
         if (idempotencyHash == null || idempotencyHash.length != 32) {
             throw new IllegalArgumentException("idempotencyHash must contain 32 bytes.");
         }
@@ -48,49 +47,50 @@ public record CalibrationFeedbackReport(
         return idempotencyHash.clone();
     }
 
-    public enum AmbientLight implements WireValue {
+    public enum AmbientLight {
         GOOD,
         TOO_BRIGHT,
         TOO_DARK
     }
 
-    public enum CrescentVisibility implements WireValue {
+    public enum CrescentVisibility {
         VISIBLE,
         TOO_SMALL_TO_SEE
     }
 
-    public record CanonicalLocation(
-            String id,
-            String displayName,
-            BigDecimal latitude,
-            BigDecimal longitude,
-            int elevationMeters,
-            ZoneId timezone,
-            String countryCode
-    ) {
-        public CanonicalLocation {
-            requireLocationId(id);
-            requireText(displayName, "displayName");
-            Objects.requireNonNull(latitude, "latitude");
-            Objects.requireNonNull(longitude, "longitude");
-            Objects.requireNonNull(timezone, "timezone");
-            if (latitude.compareTo(BigDecimal.valueOf(-90)) < 0
-                    || latitude.compareTo(BigDecimal.valueOf(90)) > 0) {
-                throw new IllegalArgumentException("latitude must be between -90 and 90.");
-            }
-            if (longitude.compareTo(BigDecimal.valueOf(-180)) < 0
-                    || longitude.compareTo(BigDecimal.valueOf(180)) > 0) {
-                throw new IllegalArgumentException("longitude must be between -180 and 180.");
-            }
-            if (countryCode == null || !countryCode.matches("[A-Z]{2}")) {
-                throw new IllegalArgumentException("countryCode must contain two uppercase ASCII letters.");
-            }
-        }
+    public enum LightBucket {
+        DAYLIGHT,
+        GOLDEN_HOUR,
+        CIVIL_TWILIGHT,
+        NAUTICAL_TWILIGHT,
+        NIGHT
     }
 
-    public interface WireValue {
-        default String wireValue() {
-            return ((Enum<?>) this).name().toLowerCase(Locale.ROOT);
+    public record AstronomyFacts(
+            double moonAltitudeDegrees,
+            double moonIlluminationPercent,
+            double sunAltitudeDegrees,
+            LightBucket lightBucket
+    ) {
+        public AstronomyFacts {
+            if (!Double.isFinite(moonAltitudeDegrees)
+                    || moonAltitudeDegrees < -90.0
+                    || moonAltitudeDegrees > 90.0) {
+                throw new IllegalArgumentException("moonAltitudeDegrees must be between -90 and 90.");
+            }
+            if (!Double.isFinite(moonIlluminationPercent)
+                    || moonIlluminationPercent < 0.0
+                    || moonIlluminationPercent > 100.0) {
+                throw new IllegalArgumentException("moonIlluminationPercent must be between 0 and 100.");
+            }
+            if (!Double.isFinite(sunAltitudeDegrees)
+                    || sunAltitudeDegrees < -90.0
+                    || sunAltitudeDegrees > 90.0) {
+                throw new IllegalArgumentException("sunAltitudeDegrees must be between -90 and 90.");
+            }
+            if (lightBucket == null) {
+                throw new IllegalArgumentException("lightBucket must be present.");
+            }
         }
     }
 
@@ -101,7 +101,9 @@ public record CalibrationFeedbackReport(
     }
 
     private static void requireOpportunityId(String value) {
-        requireText(value, "opportunityId");
+        if (value == null || value.isBlank()) {
+            throw new IllegalArgumentException("opportunityId must not be blank.");
+        }
         requireWellFormedUtf16(value, "opportunityId");
         if (isUnicodeWhitespace(value.codePointAt(0))
                 || isUnicodeWhitespace(value.codePointBefore(value.length()))) {
@@ -115,7 +117,9 @@ public record CalibrationFeedbackReport(
     }
 
     private static void requireLocationId(String value) {
-        requireText(value, "locationId");
+        if (value == null || value.isBlank()) {
+            throw new IllegalArgumentException("locationId must not be blank.");
+        }
         requireWellFormedUtf16(value, "locationId");
         int count = value.codePointCount(0, value.length());
         if (count > 100 || isUnicodeWhitespace(value.codePointAt(0))
@@ -127,6 +131,12 @@ public record CalibrationFeedbackReport(
                 throw new IllegalArgumentException("locationId cannot contain control characters.");
             }
         });
+    }
+
+    private static void requireApplicationRevision(String value) {
+        if (value == null || value.isBlank()) {
+            throw new IllegalArgumentException("applicationRevision must not be blank.");
+        }
     }
 
     private static String requireNormalizedNotes(String value) {
@@ -156,12 +166,6 @@ public record CalibrationFeedbackReport(
             } else if (Character.isLowSurrogate(current)) {
                 throw new IllegalArgumentException(field + " cannot contain unpaired surrogates.");
             }
-        }
-    }
-
-    private static void requireText(String value, String field) {
-        if (value == null || value.isBlank()) {
-            throw new IllegalArgumentException(field + " must not be blank.");
         }
     }
 

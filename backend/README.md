@@ -178,12 +178,13 @@ disabled. An invalid capacity, unsupported JDBC scheme, migration failure, or
 database outage makes only feedback persistence unavailable.
 
 With complete settings, a private Hikari pool runs the Flyway migration and
-opens the bounded repository. Each row stores the loaded opportunity ID, canonical
-city-level location, one server receipt instant, optional ambient-light and
-crescent-visibility evidence, optional normalized notes, the current astronomy
-snapshot, application revision, `serverReportId`, `clientSubmissionId`, and the
-idempotency hash. At least one evidence field is required; omitted fields stay
-null instead of becoming an `unknown` rating.
+opens the bounded repository. Each row stores the loaded opportunity ID, its
+backend location ID, one server receipt instant, optional ambient-light and
+crescent-visibility evidence, optional normalized notes, server-computed Moon
+altitude and illumination, Sun altitude, the light bucket, application revision,
+`serverReportId`, `clientSubmissionId`, and the idempotency hash. At least one
+evidence field is required; omitted fields stay null instead of becoming an
+`unknown` rating.
 
 Notes may use any language, mixed scripts, and emoji. Stored notes must be NFC,
 have no outer Unicode whitespace or U+0000, and contain 1–4,000 Unicode code
