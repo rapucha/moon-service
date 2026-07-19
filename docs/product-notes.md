@@ -151,12 +151,15 @@ not retain raw request bodies, IP addresses, forwarded identity, or User-Agent
 values for feedback requests. This boundary does not claim that notes,
 location, or timing are non-identifying.
 
-Storage is disabled by default and capped at 2,000 reports. There is no
-automatic retention period. Reports remain until an operator deletes them.
-Database or NFS loss may lose this alpha calibration evidence, and that narrow
-risk is accepted. It does not relax backup, recovery, consent, or deletion
-requirements for future personal data, saved alerts, or other durable product
-state. A storage failure may disable feedback, but it must not affect normal
+Storage is disabled by default and has a configurable limit. There is no
+unlimited mode or automatic retention period. Reports remain until an operator
+deletes them. The storage and operator-warning rules are defined in
+[the architecture](architecture.md#calibration-feedback-storage).
+
+Database or NFS loss may lose this alpha calibration evidence, and that risk is
+accepted. This decision applies only to calibration reports. Any future
+important or personal stored data needs its own backup and recovery decision.
+A storage failure may disable feedback, but it must not affect normal
 opportunity lookup or readiness.
 
 ## Terrain Caveat

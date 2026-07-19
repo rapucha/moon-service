@@ -225,35 +225,45 @@ The next product step is [#33](https://github.com/rapucha/moon-service/issues/33
 collect a small, inspectable set of photographer judgments and real observation
 cases, then change scoring only where that evidence supports it.
 
-The calibration-feedback initiative is delivered in this order:
+The work is split into these GitHub issues:
 
-1. Document the purpose, privacy and storage boundary, accepted feedback-loss
-   risk, evidence governance, and roadmap under
-   [#162](https://github.com/rapucha/moon-service/issues/162).
-2. Document the exact API, timing, validation, UUID, historical-preview, and
-   browser contracts under
-   [#163](https://github.com/rapucha/moon-service/issues/163).
-3. Add disabled optional persistence with migrations, idempotency, the row
-   cap, and database-isolation tests.
-4. Add the capability and final-submission API with validation, admission,
-   stable errors, and the logging boundary.
-5. Add bounded historical astronomy reconstruction and local-time resolution.
-6. Add immediate recommendation reviews and reverse observations in the web
-   UI.
-7. Add an explicit, bounded browser save-for-review queue.
-8. Provision disabled private PostgreSQL on NFS with the accepted alpha risk.
-9. Wire the application to the private database without making lookup or
-   readiness depend on it.
-10. Add private statistics, deterministic export, and confirmed deletion tools.
+1. [#162](https://github.com/rapucha/moon-service/issues/162) documents the
+   purpose, privacy, storage, accepted feedback-loss risk, evidence rules, and
+   roadmap.
+2. [#163](https://github.com/rapucha/moon-service/issues/163) documents the API,
+   timing, validation, UUID, historical-preview, and browser contracts.
+3. [#164](https://github.com/rapucha/moon-service/issues/164) adds optional
+   persistence, migrations, idempotency, a configurable limit, operator
+   warnings as the store fills, and database-isolation tests.
+4. [#165](https://github.com/rapucha/moon-service/issues/165) adds the capability
+   and final-submission API, validation, admission, stable errors, and the
+   logging boundary.
+5. [#167](https://github.com/rapucha/moon-service/issues/167) adds bounded
+   historical astronomy reconstruction and local-time resolution.
+6. [#168](https://github.com/rapucha/moon-service/issues/168) adds immediate
+   recommendation reviews and reverse observations in the web UI.
+7. [#169](https://github.com/rapucha/moon-service/issues/169) adds an explicit
+   browser save-for-review queue. It deduplicates by opportunity ID. When 20
+   distinct reviews are saved, saving a new distinct review removes the one
+   saved earliest and tells the tester which review was replaced. Viewing a
+   recommendation does not save it.
+8. [#170](https://github.com/rapucha/moon-service/issues/170) provisions
+   PostgreSQL on NFS without publishing a host or internet port. The application
+   will reach it through a dedicated Docker network.
+9. A reviewed GitHub issue will connect the application to PostgreSQL without
+   making lookup or readiness depend on the database.
+10. [#171](https://github.com/rapucha/moon-service/issues/171) adds host-only
+    operator statistics, deterministic export, and confirmed deletion.
 
-Every implementation capability stays disabled until its prerequisites and
-safe availability behavior exist. After all required implementation children
-merge, controlled host activation proves lookup and readiness with PostgreSQL
-stopped before enabling feedback. Collection begins only after that check.
+Each feature stays disabled until the PRs for the issues it depends on merge.
+After the PRs for all ten issues merge, controlled host activation first proves
+that lookup and readiness work with PostgreSQL stopped. Feedback collection
+begins only after that check passes.
 
-The owner later decides when evidence is sufficient. A separate reviewed child
-curates selected cases into an authored corpus. Scoring and window-selection
-changes are separate children and exist only when that corpus supports them.
+The owner later decides when evidence is sufficient. A separate reviewed
+GitHub issue will curate selected cases into an authored corpus. Scoring and
+window-selection changes get their own GitHub issues only when that corpus
+supports them.
 If it supports no behavior change, record provisional acceptance, calibration
 gaps, and remaining uncertainty before closing #33. The parent remains open
 through collection and corpus curation.

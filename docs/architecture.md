@@ -132,34 +132,37 @@ Recommended boundary:
 - Email alerts remain later because they require storing email plus location preferences.
 - Installed-client local notifications remain a later milestone for recurring personal alerts.
 
-### Calibration feedback boundary
+### Calibration feedback storage
 
-Empirical calibration under
-[#33](https://github.com/rapucha/moon-service/issues/33) is a narrow exception
-to the default no-permanent-location-storage rule. An alpha tester may submit
-an accountless recommendation review or reverse observation. The report stores
-a canonical city-level location and the accepted timing, ratings, notes, and
-reproducibility snapshots. Free text, location, and time may still identify a
-person, so the system must not describe stored reports as anonymous.
+Issue [#33](https://github.com/rapucha/moon-service/issues/33) allows optional
+alpha calibration reports. [Product notes](product-notes.md#calibration-feedback-boundary)
+define why Moon Service collects them, what a report may contain, and the
+privacy rules.
 
-The feedback store is optional PostgreSQL, disabled by default, and separate
-from lookup caches and provider counters. It retains at most 2,000 reports
-until an operator deletes them. Moon Service-controlled feedback records and
-application or access logs exclude raw request bodies, IP addresses, forwarded
-identity, and User-Agent values for feedback requests.
+The reports use optional PostgreSQL storage that is off by default and separate
+from lookup caches and provider counters. One positive startup setting controls
+the maximum number of reports and defaults to 2,000. There is no unlimited
+setting. The store is `near` when its report count reaches 90% of capacity,
+rounded up to the next whole report, but remains below capacity. It is `full`
+when the count is at least capacity, and `full` takes precedence over `near`.
 
-Feedback availability is not application readiness. Missing configuration, a
-database outage, a full report table, or NFS loss may disable collection, but
-must not prevent startup, opportunity lookup, liveness, or readiness. Loss of
-the feedback database is an accepted alpha calibration risk. It is not a
-general exception to backup and recovery requirements for personal data or
-other durable product state.
+The operator warning includes only the state and the used, total, and remaining
+counts. The persistence work writes this structured warning when enabled
+storage starts in `near` or `full`, and when a write changes the state into
+`near` or `full`. The warning contains no report text or tester data.
 
-Delivery is ordered so the governance and public contract land before the
-disabled persistence seam, public endpoints, browser flow, private deployment,
-activation, and collection. Corpus curation and any scoring or suggested-time
-change remain separate evidence-gated work. The ordered path is recorded in
-`docs/mvp-roadmap.md`.
+PostgreSQL publishes no host or internet port. Moon Service connects through a
+dedicated Docker network. Missing configuration, a database or NFS outage, or
+a full store may stop feedback collection, but must not prevent application
+startup, opportunity lookup, liveness, or readiness. Losing this alpha evidence
+is accepted. Any future important or personal stored data needs its own backup
+and recovery decision.
+
+First agree the product and API contracts. Then add storage, endpoints, browser
+flows, and deployment through the GitHub issues in `docs/mvp-roadmap.md`.
+Enable collection only after the PRs for those issues merge and the host check
+passes. Change scoring or suggested times later only when collected evidence
+supports the change.
 
 ### Frontend source boundary
 
