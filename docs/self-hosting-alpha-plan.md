@@ -69,6 +69,22 @@ timer rearming and exact GitHub deployment confirmation are follow-up
   Add a database when private feeds, saved locations, alert subscriptions,
   durable counters, or durable cache state require it.
 
+### Calibration feedback may be lost
+
+Issue [#33](https://github.com/rapucha/moon-service/issues/33) allows optional
+calibration feedback to use NFS-backed PostgreSQL before a restore drill because
+the owner accepts losing this alpha evidence. Storage remains off by default,
+has a configurable limit, and keeps reports until an operator deletes them.
+
+This accepted loss applies only to calibration reports. Any future important or
+personal stored data needs its own backup and recovery decision before Moon
+Service relies on it.
+
+An unmounted NFS path, unavailable database, or full store may stop feedback.
+It must not prevent the application from starting, serving opportunity lookups,
+or reporting provider-independent readiness. Database deployment, application
+wiring, and controlled activation remain separate GitHub issues under #33.
+
 ## Current Tester-Alpha Topology
 
 ```text
@@ -224,7 +240,8 @@ Backup matrix before public alpha:
 | Process-local caches | No | Rebuildable from provider calls. |
 | Process-local provider counters | No | Useful live visibility, not durable truth. |
 | Disposable logs | No | Keep short retention unless debugging a specific issue. |
-| Future Postgres data | Yes | Only after a restore drill exists. |
+| Calibration feedback | No | Accepted loss described in [Calibration feedback may be lost](#calibration-feedback-may-be-lost); keep it off the SD card. |
+| Other future Postgres data | Yes | Only after a restore drill exists. |
 
 ## Phase 2: Tailscale Funnel Public Edge
 
@@ -438,7 +455,9 @@ If Postgres must run on the same SD-card-backed Pi later:
 - Treat it as alpha-grade only.
 - Store the data directory on the NFS-backed storage pool, not on the Pi SD
   card.
-- Store only data that is backed up off-card and can tolerate restore lag.
+- For data other than the calibration feedback covered by the accepted-loss
+  decision above, store only data that is backed up off-card and can tolerate
+  restore lag.
 - Keep write volume low.
 - Prefer logical dumps to an off-card destination.
 - Test restore before relying on alerts, private feed tokens, or saved
@@ -462,7 +481,8 @@ Better future options when budget allows:
 Do not add these until a follow-up issue makes them necessary:
 
 - Production Helm chart or Kustomize layout.
-- Postgres, Flyway/Liquibase, or database credentials.
+- Additional Postgres, migration, or database-credential work not already
+  approved by the calibration-feedback issues under #33.
 - Redis or distributed rate limiting.
 - Local WAF rules.
 - Multi-node HA control plane.

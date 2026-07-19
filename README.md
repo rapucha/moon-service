@@ -34,7 +34,10 @@ scaffolded stack.
 - Astronomy Engine `2.1.19` as the accepted JVM backend ephemeris dependency
   for the MVP/alpha under the pinning and fallback policy in
   `docs/ephemeris-research.md`.
-- Browser `localStorage` may hold recent searches; the backend should not permanently store user locations in v0.
+- Browser `localStorage` may hold recent searches; the backend does not
+  permanently store ordinary lookup locations in v0. The only current
+  exception is the optional, disabled, bounded city-level calibration-feedback
+  store approved under [#33](https://github.com/rapucha/moon-service/issues/33).
 
 ## Provider-Call Protections
 

@@ -132,6 +132,38 @@ Recommended boundary:
 - Email alerts remain later because they require storing email plus location preferences.
 - Installed-client local notifications remain a later milestone for recurring personal alerts.
 
+### Calibration feedback storage
+
+Issue [#33](https://github.com/rapucha/moon-service/issues/33) allows optional
+alpha calibration reports. [Product notes](product-notes.md#calibration-feedback-boundary)
+define why Moon Service collects them, what a report may contain, and the
+privacy rules.
+
+The reports use optional PostgreSQL storage that is off by default and separate
+from lookup caches and provider counters. One positive startup setting controls
+the maximum number of reports and defaults to 2,000. There is no unlimited
+setting. The store is `near` when its report count reaches 90% of capacity,
+rounded up to the next whole report, but remains below capacity. It is `full`
+when the count is at least capacity, and `full` takes precedence over `near`.
+
+The operator warning includes only the state and the used, total, and remaining
+counts. The persistence work writes this structured warning when enabled
+storage starts in `near` or `full`, and when a write changes the state into
+`near` or `full`. The warning contains no report text or tester data.
+
+PostgreSQL publishes no host or internet port. Moon Service connects through a
+dedicated Docker network. Missing configuration, a database or NFS outage, or
+a full store may stop feedback collection, but must not prevent application
+startup, opportunity lookup, liveness, or readiness. Losing this alpha evidence
+is accepted. Any future important or personal stored data needs its own backup
+and recovery decision.
+
+First agree the product and API contracts. Then add storage, endpoints, browser
+flows, and deployment through the GitHub issues in `docs/mvp-roadmap.md`.
+Enable collection only after the PRs for those issues merge and the host check
+passes. Change scoring or suggested times later only when collected evidence
+supports the change.
+
 ### Frontend source boundary
 
 Browser source ownership is separate from backend source ownership. Authored

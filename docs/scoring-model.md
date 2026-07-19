@@ -363,6 +363,41 @@ replace empirical calibration against real observations or historical photos,
 which is tracked separately by
 [#33](https://github.com/rapucha/moon-service/issues/33).
 
+## Empirical Calibration Governance
+
+Calibration feedback is evidence for later judgment, not an automatic input to
+the live score. Keep raw reports out of fixtures and source control. After a
+period of collection, an owner-selected corpus may publish only authored,
+reviewed cases with new case IDs, coordinates rounded to three decimals,
+paraphrased notes, and preserved timing confidence.
+
+The owner decides when the evidence is sufficient for curation. There is no
+numeric report quota. Positive, marginal, and negative examples are useful,
+but a missing outcome class does not block inspection when it is recorded as
+an explicit calibration gap. The corpus must also state selection limits and
+remaining uncertainty.
+
+Timing confidence limits what a report can support:
+
+- Precise, consistent timestamps may support a precise suggested-time change.
+- Broad or uncertain timing may support qualitative scoring, wording, or
+  caveat changes.
+- Evidence uncertain by hours, or marked `date_only`, cannot justify moving a
+  recommendation by a precise number of minutes.
+
+Keep two later change types separate:
+
+- Scoring work changes weights, thresholds, classifications, or explanations.
+- Window-selection work changes how the suggested instant is chosen inside an
+  opportunity window.
+
+Create either change only after a reviewed corpus supports it, and link the
+change back to specific authored cases. Preserve the v0 policy tests unless
+the evidence justifies changing their stated product judgment. If the corpus
+supports neither type of change, document that current behavior remains
+provisionally acceptable, name the remaining uncertainty and calibration gaps,
+and then close #33 without manufacturing a score adjustment.
+
 ## Future Recurring Event Context
 
 Some opportunities are valuable because a repeatable real-world subject may
