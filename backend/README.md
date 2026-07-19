@@ -40,9 +40,9 @@ feeds, and calendar exports deliberately out of scope.
 - HTTP `400` error mapping for malformed JSON and invalid opportunity search
   requests.
 
-This module intentionally does not yet include persistence, durable/shared
-caches, accounts, cookies, feeds, calendar generation, or deployment
-configuration.
+Persistence is limited to the disabled-by-default calibration-feedback
+repository described below. Durable/shared caches, accounts, cookies, feeds,
+calendar generation, and deployment configuration remain out of scope.
 Missing or unknown `moon.location.resolver` or `moon.weather.provider` values
 fail startup; the runtime backend does not include fixture provider modes.
 
@@ -83,7 +83,8 @@ below tune that Open-Meteo runtime path and keep their defaults in code, so
 local runs work without an external config file after provider selection is
 set. Spring binds them from command-line arguments, environment variables, or
 configuration files. The checked-in `application.properties` defines only the
-shared deployment lifecycle defaults: graceful shutdown and its timeout.
+shared deployment lifecycle defaults and prevents Spring's generic JDBC and
+Flyway auto-configuration from creating an implicit database dependency.
 Duration values accept Spring duration syntax such as `3s` or ISO-8601 values
 such as `PT3S`.
 
@@ -138,6 +139,11 @@ reason to tune them.
 | `moon.provider-quotas.operations.<id>.hourly-limit` | unknown | Optional known hourly call limit. |
 | `moon.provider-quotas.operations.<id>.daily-limit` | unknown | Optional known daily call limit. |
 | `moon.provider-quotas.operations.<id>.monthly-limit` | unknown | Optional known monthly call limit. |
+| `moon.feedback.persistence.enabled` | `false` | Opts into the private calibration-feedback store only when all connection settings are also present. |
+| `moon.feedback.persistence.jdbc-url` | unset | Private PostgreSQL JDBC URL. Other database schemes keep persistence unavailable. |
+| `moon.feedback.persistence.username` | unset | Private PostgreSQL role used only by feedback persistence. |
+| `moon.feedback.persistence.password` | unset | Host-supplied feedback database secret. Never commit it or put it in command history. |
+| `moon.feedback.persistence.capacity` | `2000` | Positive report limit up to 2,000. Invalid values keep persistence unavailable. |
 
 Quota limits are configuration, not code constants, so operators can switch
 provider plans without rebuilding. The backend always registers
@@ -161,6 +167,35 @@ Example placeholder for a later LLM-backed fictional-location fallback:
 --moon.provider-quotas.operations.fictional-location-llm.daily-limit=100
 --moon.provider-quotas.operations.fictional-location-llm.monthly-limit=1000
 ```
+
+### Disabled calibration-feedback persistence
+
+The calibration-feedback repository is disabled by default and exposes no
+public route in this implementation slice. Enabling it requires
+`moon.feedback.persistence.enabled=true`, a PostgreSQL JDBC URL, a username,
+and a nonempty password. Missing connection settings leave the repository
+disabled. An invalid capacity, unsupported JDBC scheme, migration failure, or
+database outage makes only feedback persistence unavailable.
+
+With complete settings, a private Hikari pool runs the Flyway migration and
+opens the bounded repository. The migration stores normalized timing,
+canonical city-level location, ratings, notes, recommendation context when
+allowed, server-recomputed astronomy, application revision, both feedback
+UUIDs, and the idempotency hash. It creates no account, visitor-identity,
+request-body, IP-address, forwarded-identity, or User-Agent field. Reports stay
+until a later operator tool deletes one by server report UUID.
+
+Capacity defaults to 2,000 and can be lowered for a deployment. Exact replay
+and changed-payload conflict checks happen before capacity refusal. A database
+row lock serializes create and delete operations so concurrent writers cannot
+cross the configured limit. Aggregate warnings contain only state and counts
+when enabled storage starts near or full, or a create moves it into either
+state.
+
+The application does not publish the feedback `DataSource` as its general
+database. Failed feedback startup or later database calls return repository
+outcomes instead of changing application availability. Opportunity lookup,
+`/healthz`, and `/readyz` do not call this repository.
 
 ## Browser Lookup Page
 
