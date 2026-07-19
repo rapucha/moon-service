@@ -1,10 +1,11 @@
-# Opportunity Diagram Sources
+# Diagram Sources
 
 The `.puml` files in this directory are the editable source of truth. The SVG
 files are generated reading copies and must not be edited directly.
 
 | PlantUML source | Generated SVG |
 | --- | --- |
+| `calibration-feedback-sequence.puml` | `calibration-feedback-sequence.svg` |
 | `opportunity-search-get.puml` | `opportunity-search-get.svg` |
 | `opportunity-search-post.puml` | `opportunity-search-post.svg` |
 | `scoring-flow.puml` | `scoring-flow.svg` |
@@ -24,10 +25,10 @@ Download the JAR to `/tmp/plantuml-1.2026.6.jar`, confirm its size and SHA-256,
 then run this command from the repository root:
 
 ```bash
-java -Djava.awt.headless=true -jar /tmp/plantuml-1.2026.6.jar --format svg --charset UTF-8 docs/diagrams/opportunity-search-get.puml docs/diagrams/opportunity-search-post.puml docs/diagrams/scoring-flow.puml
+java -Djava.awt.headless=true -jar /tmp/plantuml-1.2026.6.jar --format svg --charset UTF-8 docs/diagrams/calibration-feedback-sequence.puml docs/diagrams/opportunity-search-get.puml docs/diagrams/opportunity-search-post.puml docs/diagrams/scoring-flow.puml
 ```
 
-The command must replace all three SVGs byte-for-byte from the tracked inputs.
+The command must replace all four SVGs byte-for-byte from the tracked inputs.
 Run it twice and compare the SVG checksums to verify deterministic regeneration.
 Also inspect each full-size SVG and each image at ordinary Markdown reading
 width; labels must be unclipped and branches distinguishable.
