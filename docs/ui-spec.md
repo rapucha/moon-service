@@ -161,41 +161,50 @@ city the tester chooses through the existing lookup.
 
 When capability allows reporting, every currently loaded real recommendation
 exposes `Review this recommendation`. The form retains that opportunity's
-existing `id`, `moonPass.id`, reported location, and compact snapshot. It does
-not change or mint opportunity or pass identifiers. Fictional results cannot
-open the form.
+existing `id`, `moonPass.id`, `location.id`, resolved city display, and compact
+snapshot. It does not change or mint opportunity, pass, or location identifiers.
+Fictional results cannot open the form.
 
-A separate `Report an observation` action uses the current selected real
-location. A tester can look up another city before opening it, including for a
-historical report. It is unavailable until lookup resolves a real location and
-never starts a second location flow. It has no recommendation snapshot. Its
-weather comparison is fixed to `not_compared` and is explained rather than
-shown as an editable rating.
+A separate `Report an observation` action may start with the current selected
+real city. It also lets the tester type and select another city, including for
+a historical report, by reusing the existing opportunity query and ambiguous-
+candidate selection. It does not add a feedback-only lookup endpoint, resolver,
+or provider. Preview remains unavailable until that flow selects a real
+location. The report has no recommendation snapshot. Its weather comparison
+is fixed to `not_compared` and is explained rather than shown as an editable
+rating.
 
 The form collects the five ratings and required notes only after location and
 timing are ready. A recommendation review preserves its loaded snapshot even
 when the tester corrects the observation time. Changing the selected
 recommendation starts a different form rather than silently replacing it.
-The browser copies the selected real-location fields into `ReportedLocation`.
-The UI says that the alpha report is self-reported and is not independently
-location-verified.
+The browser sends only the selected `locationId`; coordinates, elevation,
+timezone, country, and display name are not request inputs. Preview displays
+the canonical city returned by the server. The UI says that choosing a city
+does not prove the tester was there and that the observation is self-reported.
+It never requests device-location or GPS permission.
 
 ### Timing and reconstruction
 
 The tester chooses `Now` or `Past`. `Now` explains that the server receipt time,
-not the browser clock, is authoritative. `Past` collects the original local
-date and time, a corrected local date and time, source, confidence, and the
-location's IANA timezone. The original value remains visible and unchanged
-while the correction is edited. Past controls must accept four-digit years
-`0001-9999`; use a validated text or segmented fallback where a native date-time
-control cannot represent that full range.
+not the browser clock, is authoritative. After preview, show that same instant
+in the reported city's local time and, when useful, browser-local time. Label
+both zones so they cannot be mistaken for different observations.
+
+`Past` collects the original local date and time, a corrected local date and
+time, source, and confidence. It shows the selected city's server-resolved IANA
+timezone but does not let the client submit or edit that zone. The original
+value remains visible and unchanged while the correction is edited. Past
+controls must accept four-digit years `0001-9999`; use a validated text or
+segmented fallback where a native date-time control cannot represent that full
+range.
 
 `Preview conditions` is an explicit action and is the default trigger. An
 implementation may also issue one debounced preview after all fields are valid
 and input has settled for at least 500 ms. It must cancel a pending call on a
-new edit and must never call on every keystroke. Preview sends location and
-timing only; ratings, notes, recommendation data, and queue metadata never
-enter that request.
+new edit and must never call on every keystroke. Preview sends only
+`locationId` and the timing union; ratings, notes,
+recommendation data, and queue metadata never enter that request.
 
 A successful preview shows the accepted local time and UTC offset, Moon facts,
 Sun facts, light bucket, and whether the pass encloses the accepted time or is
@@ -204,23 +213,35 @@ no-pass result still shows instant facts and says plainly that no visible pass
 was found in the displayed search interval, normally 36 hours on either side.
 It does not imply that weather was checked.
 
-The browser keeps a local freshness key containing mode, location, timing,
+The browser keeps a local freshness key containing mode, `locationId`, timing,
 selected offset, and, for a recommendation review, the compact-snapshot hash.
 It ignores a response unless that key still matches, although mode and snapshot
 are not sent to preview. Ratings and notes do not make a reconstruction stale.
 
-Editing the location or any timing field, including entered time, corrected
-time, timezone, offset, source, or confidence, marks the reconstruction stale.
+Editing the selected city or any timing field, including entered time,
+corrected time, offset, source, or confidence, marks the reconstruction stale.
 Final submission stays unavailable until a new preview succeeds for the current
 values. Repeated correction and preview do not save a report. Preview output is
 display-only; final submission never sends it back as trusted facts.
 
-A daylight-saving gap attaches an error to the corrected local time. An overlap
-shows both returned UTC offsets as radio choices, with the resulting UTC instant
-and offset in each label. The tester must choose before preview. A browser-clock
+During a spring clock change, some local times never happen. The UI attaches
+that gap error to the corrected local time and asks for a real clock time.
+During an autumn change, one local time can happen twice. The UI shows both
+returned UTC offsets as radio choices, with the resulting UTC instant and
+offset in each label, and requires a choice before preview. A browser-clock
 future check is a warning; only the server's five-minute rule rejects the time.
 For `Now`, the UI also says that preview and final receipt instants can differ
 slightly and that final submission recomputes the facts.
+
+### End-to-end sequence
+
+This sequence uses the existing city lookup and the feedback routes from the
+OpenAPI contract. Preview facts are display-only and never become stored
+evidence.
+
+[![Calibration feedback preview and submission sequence](diagrams/calibration-feedback-sequence.svg)](diagrams/calibration-feedback-sequence.svg)
+
+[PlantUML source](diagrams/calibration-feedback-sequence.puml)
 
 ### Accessible interaction
 
@@ -240,10 +261,11 @@ automatic retry.
 
 The page reads capability before offering the flow. A disabled operation has a
 short explanation and no active submit control. An unavailable operation keeps
-the form and uses the same generic public wording whether storage is down or
-full. The UI never guesses or displays database state, capacity, or counts.
-New submissions remain unavailable, but a frozen attempted payload may still
-offer an explicit exact retry because a full store can replay an existing row.
+the form and uses the same generic public wording whether location resolution
+or storage is unavailable. The UI never guesses or displays the cause,
+database state, capacity, or counts. New submissions remain unavailable, but a
+frozen attempted payload may still offer an explicit exact retry because a
+known row can replay without fresh resolution or capacity.
 
 Inline invalid states preserve all safe input. Rate-limited and preview-busy
 states preserve input and allow another explicit attempt after `Retry-After`.
@@ -305,9 +327,9 @@ attempted payload creates a new UUID before another request. Success or explicit
 deletion removes the entry; nothing is submitted in the background.
 
 After reload, a past preview remains current only when its schema version and
-complete mode, location, timing, selected-offset, and compact-snapshot freshness
-key still match. A restored `now` preview is always stale because the next
-request has a new server receipt instant. Restored preview facts remain
+complete mode, `locationId`, timing, selected-offset, and compact-snapshot
+freshness key still match. A restored `now` preview is always stale because the
+next request has a new server receipt instant. Restored preview facts remain
 display-only and never enter final submission as trusted evidence.
 
 Disabled local storage, quota failure, and corrupt entries are nonfatal and

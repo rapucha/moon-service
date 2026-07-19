@@ -1,0 +1,66 @@
+@startuml
+skinparam defaultFontName "DejaVu Sans"
+skinparam defaultFontSize 15
+skinparam shadowing false
+skinparam roundcorner 8
+skinparam sequenceMessageAlign left
+skinparam responseMessageBelowArrow true
+hide footbox
+
+title Calibration feedback preview and submission
+autonumber 1 "<b>[00]"
+
+actor Tester
+participant Browser
+participant "Existing city lookup" as Lookup
+participant "Feedback API" as Feedback
+participant "Cached location resolver" as Resolver
+participant Astronomy
+participant "Feedback store" as Store
+
+alt Recommendation review
+  Browser -> Browser: Reuse loaded location.id and snapshot
+else Reverse observation
+  Tester -> Browser: Type a city
+  Browser -> Lookup: Use existing query and candidate flow
+  Lookup --> Browser: Selected real locationId
+end
+
+loop Correct and preview until accepted
+  Browser -> Feedback: POST preview(locationId, timing)
+  Feedback -> Resolver: resolveLocationId(locationId)
+  Resolver --> Feedback: Canonical city and timezone
+  alt Spring DST gap
+    Feedback --> Browser: 422 nonexistent_local_time
+    Tester -> Browser: Enter a real clock time
+  else Autumn DST overlap
+    Feedback --> Browser: 422 and both valid offsets
+    Tester -> Browser: Select one occurrence
+  else Resolved time
+    Feedback -> Astronomy: Reconstruct bounded facts and pass
+    Astronomy --> Feedback: Moon, Sun, light, and pass state
+    Feedback --> Browser: 200 preview; no feedback record
+  end
+end
+
+Tester -> Browser: Submit ratings and notes
+Browser -> Feedback: POST submissions\n(exact UUID and frozen payload)
+Feedback -> Store: Check client UUID and payload hash
+alt Exact replay
+  Store --> Feedback: Existing server report
+else Changed payload conflict
+  Store --> Feedback: UUID belongs to different content
+else New report
+  Feedback -> Resolver: Resolve locationId again
+  Feedback -> Astronomy: Recompute accepted instant facts
+  Feedback -> Store: Persist canonical city and report
+end
+
+alt Response reaches browser
+  Feedback --> Browser: 200 replayed / 409 conflict / 201 created
+else Network outcome is unknown
+  Tester -> Browser: Retry exact UUID and frozen payload
+  Browser -> Feedback: Repeat the same submission
+end
+
+@enduml

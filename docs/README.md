@@ -14,6 +14,7 @@ Start Here
 - Architecture and API:
   - `docs/architecture.md`
   - `docs/api-shape.md`
+  - `docs/openapi/calibration-feedback-v1.yaml`
   - `docs/http-route-inventory.md`
   - `docs/self-hosting-alpha-plan.md`
   - `docs/container-image-publication.md`
@@ -35,6 +36,9 @@ Start Here
 Current Canonical API Location
 - `docs/api-shape.md` is currently the human-owned API design document.
 - It includes intended public response examples and status semantics.
+- `docs/openapi/calibration-feedback-v1.yaml` is the canonical wire contract
+  for calibration feedback; its two local component files are authored inputs,
+  not generated output or runtime dependencies.
 - `docs/http-route-inventory.md` is the canonical inventory of currently
   implemented controller routes, consumers, and exposure.
 - Current implemented fixture-backed endpoint usage is documented in
