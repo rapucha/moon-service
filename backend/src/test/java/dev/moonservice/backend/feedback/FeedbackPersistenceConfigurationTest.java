@@ -31,6 +31,7 @@ import static org.assertj.core.api.Assertions.assertThat;
         properties = {
                 "moon.location.resolver=open-meteo",
                 "moon.weather.provider=open-meteo",
+                "moon.feedback.enabled=true",
                 "moon.feedback.persistence.enabled=true",
                 "moon.feedback.persistence.jdbc-url="
                         + "jdbc:postgresql://127.0.0.1:1/feedback_unavailable?connectTimeout=1&socketTimeout=1",
@@ -117,7 +118,7 @@ class FeedbackPersistenceConfigurationTest {
     }
 
     @Test
-    void databaseOutageDoesNotAffectExistingTrafficOrExposeFeedbackRoute(CapturedOutput output) {
+    void databaseOutageDoesNotAffectExistingTrafficAndFeedbackStaysUnavailable(CapturedOutput output) {
         assertThat(repository.status())
                 .isInstanceOf(CalibrationFeedbackRepository.RepositoryStatus.Unavailable.class);
         assertThat(applicationContext.getBeansOfType(DataSource.class)).isEmpty();
@@ -142,11 +143,40 @@ class FeedbackPersistenceConfigurationTest {
         webTestClient.get()
                 .uri("/api/calibration-feedback/v1/capability")
                 .exchange()
-                .expectStatus().isNotFound();
+                .expectStatus().isOk()
+                .expectHeader().valueEquals("Cache-Control", "no-store")
+                .expectBody()
+                .jsonPath("$.schemaVersion").isEqualTo(1)
+                .jsonPath("$.featureState").isEqualTo("enabled")
+                .jsonPath("$.submissionAvailability").isEqualTo("unavailable")
+                .jsonPath("$.database").doesNotExist()
+                .jsonPath("$.capacity").doesNotExist();
+        webTestClient.post()
+                .uri("/api/calibration-feedback/v1/submissions")
+                .header("Content-Type", "application/json")
+                .bodyValue("""
+                        {
+                          "schemaVersion": 1,
+                          "clientSubmissionId": "7d444840-9dc0-4f68-b705-06585fa7f974",
+                          "locationId": "private-location-marker",
+                          "opportunityId": "private-opportunity-marker",
+                          "notes": "private-note-marker"
+                        }
+                        """)
+                .exchange()
+                .expectStatus().isEqualTo(503)
+                .expectHeader().valueEquals("Cache-Control", "no-store")
+                .expectBody()
+                .jsonPath("$.error.code").isEqualTo("feedback_unavailable")
+                .jsonPath("$.error.message").isEqualTo("Calibration feedback is unavailable.");
 
         assertThat(output)
                 .doesNotContain("feedback-unavailable-secret")
                 .doesNotContain("feedback-unavailable-user")
-                .doesNotContain("feedback_unavailable?connectTimeout");
+                .doesNotContain("feedback_unavailable?connectTimeout")
+                .doesNotContain("private-location-marker")
+                .doesNotContain("private-opportunity-marker")
+                .doesNotContain("private-note-marker")
+                .doesNotContain("7d444840-9dc0-4f68-b705-06585fa7f974");
     }
 }

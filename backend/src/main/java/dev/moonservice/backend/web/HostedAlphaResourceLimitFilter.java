@@ -18,11 +18,13 @@ import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.concurrent.Semaphore;
+import java.util.function.Supplier;
 
 @Component
 @Order(Ordered.HIGHEST_PRECEDENCE + 5)
-final class HostedAlphaResourceLimitFilter extends OncePerRequestFilter {
+public final class HostedAlphaResourceLimitFilter extends OncePerRequestFilter {
     private static final String OPPORTUNITY_PATH = "/api/opportunities";
     private static final String ADMIN_STATUS_PATH = "/admin/status";
     private static final String READINESS_PATH = "/readyz";
@@ -32,7 +34,7 @@ final class HostedAlphaResourceLimitFilter extends OncePerRequestFilter {
     private final ObjectMapper objectMapper;
     private final TokenBucket wholeSiteBucket;
     private final TokenBucket providerLookupBucket;
-    private final Semaphore opportunityPermits;
+    private final Semaphore providerOperationPermits;
 
     HostedAlphaResourceLimitFilter(
             MoonRuntimeProperties properties,
@@ -62,7 +64,7 @@ final class HostedAlphaResourceLimitFilter extends OncePerRequestFilter {
                 limits.getProviderLookupCapacity(),
                 limits.getProviderLookupRefillInterval(),
                 clock.instant());
-        this.opportunityPermits = new Semaphore(limits.getOpportunityConcurrency(), true);
+        this.providerOperationPermits = new Semaphore(limits.getOpportunityConcurrency(), true);
     }
 
     @Override
@@ -71,7 +73,7 @@ final class HostedAlphaResourceLimitFilter extends OncePerRequestFilter {
             HttpServletResponse response,
             FilterChain filterChain
     ) throws ServletException, IOException {
-        if (!enabled || isDockerReadinessProbe(request)) {
+        if (!enabled || isDockerReadinessProbe(request) || isCalibrationFeedbackRequest(request)) {
             filterChain.doFilter(request, response);
             return;
         }
@@ -88,7 +90,7 @@ final class HostedAlphaResourceLimitFilter extends OncePerRequestFilter {
             return;
         }
 
-        if (!opportunityPermits.tryAcquire()) {
+        if (!providerOperationPermits.tryAcquire()) {
             reject(request, response, path, 1L);
             return;
         }
@@ -100,7 +102,7 @@ final class HostedAlphaResourceLimitFilter extends OncePerRequestFilter {
             }
             filterChain.doFilter(request, response);
         } finally {
-            opportunityPermits.release();
+            providerOperationPermits.release();
         }
     }
 
@@ -130,6 +132,34 @@ final class HostedAlphaResourceLimitFilter extends OncePerRequestFilter {
     private static boolean isProviderBackedOpportunityRequest(HttpServletRequest request, String path) {
         return OPPORTUNITY_PATH.equals(path)
                 && ("GET".equals(request.getMethod()) || "HEAD".equals(request.getMethod()));
+    }
+
+    /**
+     * Applies the same hosted provider token and concurrency guard to feedback location resolution.
+     * The caller invokes this only after cheap replay and persistence decisions, so those paths do
+     * not spend provider capacity. An empty result is exposed as generic feedback unavailability.
+     */
+    public <T> Optional<T> executeWithProviderAdmission(Supplier<T> operation) {
+        Objects.requireNonNull(operation, "operation");
+        if (!enabled) {
+            return Optional.ofNullable(operation.get());
+        }
+        if (!providerOperationPermits.tryAcquire()) {
+            return Optional.empty();
+        }
+        try {
+            Admission providerAdmission = providerLookupBucket.consumeTokenIfAvailable(clock.instant());
+            if (!providerAdmission.accepted()) {
+                return Optional.empty();
+            }
+            return Optional.ofNullable(operation.get());
+        } finally {
+            providerOperationPermits.release();
+        }
+    }
+
+    private static boolean isCalibrationFeedbackRequest(HttpServletRequest request) {
+        return HostedAlphaSurfaceFilter.isFeedbackPath(HostedAlphaSurfaceFilter.applicationPath(request));
     }
 
     private static boolean isDockerReadinessProbe(HttpServletRequest request) {

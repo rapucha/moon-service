@@ -13,6 +13,9 @@ feeds, and calendar exports deliberately out of scope.
 - Browser lookup page at `/search?q=Praha`, backed by the query-shaped API.
 - `POST /api/opportunities/search` using the same JSON request body as the scoring
   prototype fixture.
+- Disabled-by-default calibration feedback capability at
+  `GET /api/calibration-feedback/v1/capability` and bounded report submission at
+  `POST /api/calibration-feedback/v1/submissions`.
 - Runtime city/location resolution is Open-Meteo backed through the
   backend-owned `LocationResolver` seam.
 - Request-level logging, process-local provider counters, quota windows, cache
@@ -40,7 +43,7 @@ feeds, and calendar exports deliberately out of scope.
 - HTTP `400` error mapping for malformed JSON and invalid opportunity search
   requests.
 
-Persistence is limited to the disabled-by-default calibration-feedback
+Durable persistence is limited to the disabled-by-default calibration-feedback
 repository described below. Durable/shared caches, accounts, cookies, feeds,
 calendar generation, and deployment configuration remain out of scope.
 Missing or unknown `moon.location.resolver` or `moon.weather.provider` values
@@ -117,7 +120,7 @@ reason to tune them.
 | `moon.resource-limits.whole-site-refill-interval` | `1s` | Interval that restores one shared whole-site token. |
 | `moon.resource-limits.provider-lookup-capacity` | `10` | Maximum initial or accumulated burst of accepted provider-backed lookups. |
 | `moon.resource-limits.provider-lookup-refill-interval` | `1m` | Interval that restores one provider-backed lookup token. |
-| `moon.resource-limits.opportunity-concurrency` | `2` | Maximum provider-backed opportunity searches executing concurrently. |
+| `moon.resource-limits.opportunity-concurrency` | `2` | Maximum concurrent provider-backed opportunity searches or feedback location resolutions in hosted mode. |
 | `moon.open-meteo.timeout` | `3s` | Open-Meteo connect and read timeout. |
 | `moon.open-meteo.max-transport-retries` | `1` | Maximum retries after the first Open-Meteo attempt. |
 | `moon.open-meteo.max-retry-after` | `1s` | Largest provider `Retry-After` delay accepted for retry. |
@@ -139,6 +142,7 @@ reason to tune them.
 | `moon.provider-quotas.operations.<id>.hourly-limit` | unknown | Optional known hourly call limit. |
 | `moon.provider-quotas.operations.<id>.daily-limit` | unknown | Optional known daily call limit. |
 | `moon.provider-quotas.operations.<id>.monthly-limit` | unknown | Optional known monthly call limit. |
+| `moon.feedback.enabled` | `false` | Enables the public calibration-feedback feature. This is separate from enabling and configuring its private store. |
 | `moon.feedback.persistence.enabled` | `false` | Opts into the private calibration-feedback store only when all connection settings are also present. |
 | `moon.feedback.persistence.jdbc-url` | unset | Private PostgreSQL JDBC URL. Other database schemes keep persistence unavailable. |
 | `moon.feedback.persistence.username` | unset | Private PostgreSQL role used only by feedback persistence. |
@@ -168,14 +172,75 @@ Example placeholder for a later LLM-backed fictional-location fallback:
 --moon.provider-quotas.operations.fictional-location-llm.monthly-limit=1000
 ```
 
-### Calibration-feedback persistence
+### Calibration feedback
 
-The calibration-feedback repository is disabled by default and exposes no
-public route in this implementation slice. Enabling it requires
-`moon.feedback.persistence.enabled=true`, a PostgreSQL JDBC URL, a username,
-and a nonempty password. Missing connection settings leave the repository
-disabled. An invalid capacity, unsupported JDBC scheme, migration failure, or
-database outage makes only feedback persistence unavailable.
+The backend implements these two same-origin alpha routes:
+
+```http
+GET /api/calibration-feedback/v1/capability
+POST /api/calibration-feedback/v1/submissions
+```
+
+The public feature and its private store are disabled independently. The
+service reads the feature flag with the Spring placeholder
+`${moon.feedback.enabled:false}`; set `moon.feedback.enabled=true` to enable
+submission behavior. Separately set
+`moon.feedback.persistence.enabled=true` and provide a PostgreSQL JDBC URL,
+username, and nonempty password to enable storage. Missing connection settings
+leave the repository disabled. An invalid capacity, unsupported JDBC scheme,
+migration failure, or database outage makes only feedback persistence
+unavailable.
+
+The capability route always returns `200` and `Cache-Control: no-store`. It
+publishes only `featureState` and `submissionAvailability`, alongside schema
+version and server time. The public states map as follows:
+
+| Feature and runtime state | Feature state | Submission availability |
+| --- | --- | --- |
+| Feature disabled, regardless of storage | `disabled` | `disabled` |
+| Feature enabled, persistence disabled or settings incomplete | `enabled` | `disabled` |
+| Feature enabled, persistence startup/current status unavailable or storage full | `enabled` | `unavailable` |
+| Feature enabled, a resolver or astronomy dependency known unavailable | `enabled` | `unavailable` |
+| Feature enabled, storage normal or near capacity and dependencies available | `enabled` | `available` |
+
+The response does not reveal the database type, settings, capacity, counts,
+provider details, or failure text. It is a current status, not a reservation;
+temporary write-token exhaustion does not change it. Resolver and astronomy
+failures discovered only while handling a report still return generic
+unavailability for that submission.
+
+Submission accepts only UTF-8 `application/json`, optionally with
+`charset=utf-8`, and no content encoding. The received body limit is 16,384
+bytes. The request is a closed object: unknown or duplicate members, explicit
+`null`, invalid Unicode, malformed JSON, invalid identifiers, and requests with
+no usable evidence are rejected. The exact fields, normalization, bounds, and
+error mappings live in [the API contract](../docs/api-shape.md#calibration-feedback-api).
+
+After receiving the bounded body, the server captures one microsecond-precision
+receipt instant and normalizes the report. It hashes the five fixed semantic
+slots with the versioned framing and SHA-256 defined by the API contract. A
+disabled feature returns before repository access. Otherwise an early lookup
+by `clientSubmissionId` returns an exact replay or changed-payload conflict
+before location resolution or rate limiting. A new report checks storage,
+resolves the canonical location ID, consumes one write token, recomputes the
+four current astronomy facts, and then stores the report transactionally.
+
+The process-wide feedback write bucket starts with 12 tokens and restores one
+whole token per complete hour using a monotonic clock. Exact early replays and
+conflicts do not consume it. Once a new report reaches admission, a later
+astronomy, persistence, capacity-race, replay, or conflict result does not
+restore the token. Exhaustion returns `429` with matching numeric
+`Retry-After` and `error.retryAfterSeconds` values. The bucket resets on process
+restart and is not shared between instances.
+
+All feedback responses use `Cache-Control: no-store`. The submission route
+sends no permissive CORS headers and provides no cross-origin preflight. Logs
+may contain method, route, status, duration, request ID, coarse outcome, and
+aggregate capacity warnings. They do not retain report bodies, location or
+opportunity IDs, evidence, notes, feedback UUIDs, astronomy values, IP
+addresses, forwarded identity, or User-Agent. Feedback database failures map
+to generic feedback unavailability without preventing startup, opportunity
+lookup, liveness, or readiness.
 
 #### Database provisioning and migrations
 
@@ -206,15 +271,16 @@ instead of editing V1.
 Each feedback row stores the loaded opportunity ID, its backend location ID,
 one server receipt instant, optional ambient-light and crescent-visibility
 evidence, optional normalized notes, server-computed Moon altitude and
-illumination, Sun altitude, the light bucket, application revision,
-`serverReportId`, `clientSubmissionId`, and the idempotency hash. At least one
+illumination, Sun altitude, the light bucket, server-retained
+`applicationRevision`, `serverReportId`, `clientSubmissionId`, and the
+idempotency hash. At least one
 evidence field is required; omitted fields stay null instead of becoming an
 `unknown` rating.
 
 Notes may use any language, mixed scripts, and emoji. Stored notes must be NFC,
 have no outer Unicode whitespace or U+0000, and contain 1–4,000 Unicode code
-points. Request normalization and idempotency-hash construction belong to #165;
-this repository enforces the normalized stored shape. The schema creates no
+points. Submission handling constructs the normalized stored shape and exact
+idempotency hash; the repository and schema enforce it. The schema creates no
 account, visitor identity, request-body, IP-address, forwarded-identity, or
 User-Agent field. Reports stay until a later operator tool deletes one by
 `serverReportId`.
@@ -391,14 +457,18 @@ deployment. Because Docker NAT does not reliably distinguish the direct LAN
 listener from Funnel's loopback target, enabling the mode applies the same
 policy to every request reaching that application instance.
 
-The enabled policy allows only `GET` and `HEAD` for `/`, `/search`, `/about`,
-their backing HTML files, the exact static files tracked by the current build,
-`/api/opportunities`, `/readyz`, and exact `/admin/status`. Adding a static file
+The enabled policy allows `GET` and `HEAD` for `/`, `/search`, `/about`, their
+backing HTML files, the exact static files tracked by the current build,
+`/api/opportunities`, `/readyz`, exact `/admin/status`, and the feedback
+capability route. It separately allows only `POST` for the feedback submission
+route so that route can receive its bounded JSON body. Adding a static file
 does not publish it automatically; update the explicit allowlist and test
 inventory. Every other `/admin/**` path, the fixture endpoint, `/healthz`, and
 every unapproved path returns `404`, even with the admin token. An unapproved
-method on an approved path returns `405`; a framed `GET` or `HEAD` body returns
-`400` before authentication.
+method on an approved path returns `405` with the path-specific `Allow` value;
+a framed `GET` or `HEAD` body returns `400` before authentication. The feedback
+routes send no permissive CORS headers, and `OPTIONS` is not an allowed
+cross-origin preflight method.
 
 Hosted startup requires an explicit 64-hex-character `moon.admin.token`
 generated with `openssl rand -hex 32`; this validates format, not randomness.
@@ -419,17 +489,29 @@ SVG silhouette-layer styles. Connector-level rejections such as disabled
 
 Hosted-alpha mode adds one process-local admission boundary before the hosted
 surface and admin authentication. Every request except the exact Docker
-readiness probe shares the whole-site bucket. Exact `/admin/status` attempts
-consume that capacity even when their method, body, or token is rejected; an
-admin `429` remains `no-store` and carries the hosted security headers.
+readiness probe and the two exact feedback paths shares the whole-site bucket.
+Exact `/admin/status` attempts consume that capacity even when their method,
+body, or token is rejected; an admin `429` remains `no-store` and carries the
+hosted security headers.
 
 Exact `GET`/`HEAD /api/opportunities` requests also require one provider token
-and one of two concurrent search permits before controller or provider work.
+and one of two concurrent provider-operation permits before controller or
+provider work.
 The fixture POST, static files, admin status, and readiness do not consume those
 two resources. A rejection returns HTTP `429`, canonical `rate_limited` JSON,
 and a numeric `Retry-After` hint. The Docker carve-out is only bodyless
 `GET /readyz` from loopback with `Host: localhost`; public readiness requests
 remain inside the whole-site bound.
+
+Both feedback paths bypass the hosted whole-site bucket so capability can keep
+its always-`200` contract and submission errors keep their feedback shape.
+Capability is a cheap state read. After the early replay and storage decisions,
+a new submission runs location resolution through the shared hosted provider
+token and concurrency guard. Provider-admission refusal is generic feedback
+unavailability. Successful resolution then reaches the stricter
+feedback-owned, process-wide 12-token write bucket described above; replay,
+conflict, disabled, unavailable, full, and location-resolution failures are
+decided before that write token is consumed.
 
 Hosted startup rejects a weaker resource setting or more than one configured
 Open-Meteo retry. Ten initial tokens plus 1,440 minute refills admit 1,450 lookups in an

@@ -916,8 +916,9 @@ Example:
 Issue [#33](https://github.com/rapucha/moon-service/issues/33) owns the
 calibration-feedback initiative. Issue
 [#165](https://github.com/rapucha/moon-service/issues/165) owns this reduced
-version 1 contract and its later implementation. The routes are not implemented
-yet. Existing opportunity `id` and `moonPass.id` values remain unchanged.
+version 1 contract and its implementation. The backend implements both routes;
+browser controls remain a separate slice. Existing opportunity `id` and
+`moonPass.id` values remain unchanged.
 
 The hand-authored
 [OpenAPI root](openapi/calibration-feedback-v1.yaml) is the canonical wire

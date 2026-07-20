@@ -4,12 +4,12 @@ This is the canonical inventory of HTTP operations explicitly mapped by Moon
 Service controllers. It records who uses each route, why it exists, and how its
 exposure differs between the ordinary application and hosted-alpha mode.
 
-The route universe is the eight mappings declared by `WebPageController`,
-`OpportunitySearchController`, `HealthController`, and
-`AdminStatusController`. Spring's implicit `HEAD` handling, `/error`, exception
-handlers, and static-resource serving are behavior around those mappings, not
-additional inventory entries. Outbound Open-Meteo URLs are provider
-dependencies, not Moon Service routes.
+The route universe is the ten mappings declared by `WebPageController`,
+`OpportunitySearchController`, `CalibrationFeedbackController`,
+`HealthController`, and `AdminStatusController`. Spring's implicit `HEAD`
+handling, `/error`, exception handlers, and static-resource serving are
+behavior around those mappings, not additional inventory entries. Outbound
+Open-Meteo URLs are provider dependencies, not Moon Service routes.
 
 ## Summary
 
@@ -20,6 +20,8 @@ dependencies, not Moon Service routes.
 | `GET /about` | Product/privacy information page | Web browser | Allowlisted; whole-site bound |
 | `GET /api/opportunities` | Location-to-opportunity product API | Browser `app.js` | Allowlisted; site and search bounds |
 | `POST /api/opportunities/search` | Direct fixture/scoring prototype contract | None | Hidden after site admission |
+| `GET /api/calibration-feedback/v1/capability` | Public feedback feature/availability state | None yet | Allowlisted; exempt from hosted resource admission |
+| `POST /api/calibration-feedback/v1/submissions` | Bounded current-observation feedback write | None yet | Allowlisted POST; provider-bound resolution and feedback write bucket |
 | `GET /healthz` | Process liveness probe | None | Hidden after site admission |
 | `GET /readyz` | Deployment readiness probe | Docker and Pi deployment tooling | Allowlisted; narrow Docker bypass |
 | `GET /admin/status` | Operator diagnostics | Human operator | Site-bound and token protected |
@@ -35,31 +37,41 @@ dependencies, not Moon Service routes.
   wherever the configured listener is reachable. Deployment binding determines
   whether that means loopback or an explicitly trusted LAN address.
 - In hosted-alpha mode, resource admission runs before surface policy and admin
-  authentication. Except for the exact Docker readiness probe described below,
-  every request that reaches this filter first consumes from one configured
-  process-wide bucket. Its default and maximum allowed hosted capacity is 40,
-  with a default and fastest allowed refill of one token per second; stricter
-  settings are valid. An empty bucket returns `429` with a numeric `Retry-After`
-  before the route's usual `200`, `400`, `401`, `404`, `405`, or `503` behavior
-  can be selected. `GET` returns canonical `rate_limited` JSON; `HEAD` carries
-  the same status, headers, and would-be content length without a body.
+  authentication. Except for the exact Docker readiness probe and the two exact
+  calibration-feedback paths described below, every request that reaches this
+  filter first consumes from one configured process-wide bucket. Its default
+  and maximum allowed hosted capacity is 40, with a default and fastest allowed
+  refill of one token per second; stricter settings are valid. An empty bucket
+  returns `429` with a numeric `Retry-After` before the route's usual `200`,
+  `400`, `401`, `404`, `405`, or `503` behavior can be selected. `GET` returns
+  canonical `rate_limited` JSON; `HEAD` carries the same status, headers, and
+  would-be content length without a body.
 - Exact `GET`/`HEAD /api/opportunities` requests that pass the whole-site bound
   must also acquire a concurrent-search permit and consume from a provider
   bucket. The defaults and maximum allowed hosted settings are two concurrent
-  searches, ten provider tokens, and a one-token-per-minute refill; stricter
-  settings are valid. Either bound can return `429`; the concurrency permit is
-  released when downstream handling finishes. These two search-specific
-  resources do not apply to pages, static files, admin status, readiness, or the
-  fixture POST route.
-- The only resource-limit bypass is a bodyless `GET /readyz` whose connector
-  reports a loopback remote address and `Host: localhost`, matching the Docker
-  health check. Other readiness requests still consume whole-site capacity.
-- Hosted-alpha mode exposes only exact allowlisted paths and bodyless `GET` or
-  `HEAD`. It adds the hosted security headers, returns empty `404` for hidden or
-  unknown paths, empty `405` with `Allow: GET, HEAD` for disallowed methods that
-  reach the filter on an approved path, and empty `400` for a framed `GET` or
-  `HEAD` body. Tomcat rejects `TRACE` before the application filter, so those
-  application headers and empty-body guarantees do not apply to `TRACE`.
+  provider operations, ten provider tokens, and a one-token-per-minute refill;
+  stricter settings are valid. Either bound can return `429`; the concurrency permit is
+  released when downstream handling finishes. The same two resources wrap
+  feedback location resolution as described below; they do not apply to pages,
+  static files, admin status, readiness, or the fixture POST route.
+- Whole-site bypasses are the bodyless `GET /readyz` whose connector reports a
+  loopback remote address and `Host: localhost`, matching the Docker health
+  check, and both exact feedback paths. Other readiness requests still consume
+  whole-site capacity. Capability performs no provider work. After early
+  disabled, replay, conflict, and storage decisions, feedback location
+  resolution uses the shared provider token and concurrency guard. Successful
+  resolution can then reach the separate process-wide 12-token feedback write
+  bucket, which restores one whole token per complete hour. Resolver failure or
+  provider-admission refusal consumes no feedback write token.
+- Hosted-alpha mode exposes only exact allowlisted paths. It allows bodyless
+  `GET` or `HEAD` on every approved path except feedback submissions, where it
+  allows only `POST` and passes the body to the route's 16,384-byte bound. It
+  adds the hosted security headers, returns empty `404` for hidden or unknown
+  paths, empty `405` with a path-specific `Allow` value for disallowed methods,
+  and empty `400` for a framed `GET` or `HEAD` body. The feedback routes send no
+  permissive CORS headers, and `OPTIONS` does not provide preflight support.
+  Tomcat rejects `TRACE` before the application filter, so those application
+  headers and empty-body guarantees do not apply to `TRACE`.
 - The web lookup is anonymous and creates no durable user profile or preference.
   A `q` value crosses the Open-Meteo geocoding boundary; normalized queries or
   location IDs and their results are held in a bounded, process-local cache.
@@ -193,6 +205,89 @@ and [hosted-alpha functional tests](../backend/src/test/java/dev/moonservice/bac
   [direct engine path](../backend/src/main/java/dev/moonservice/backend/opportunity/scoring/ScoringOpportunitySearchEngine.java),
   [fixture registry](../prototypes/jvm-scoring/src/main/java/dev/moonservice/scoringprototype/fixture/Locations.java),
   [manual requests](../backend/http/README.md).
+
+### `GET /api/calibration-feedback/v1/capability`
+
+- **Handler:** `CalibrationFeedbackController.capability`.
+- **Purpose/lifecycle:** disabled-by-default public state for the bounded alpha
+  feedback feature. A client can decide whether to offer a new submission
+  without learning storage or provider details.
+- **Production invocation:** none yet; browser feedback controls are a separate
+  slice.
+- **Other callers:** functional tests and manual HTTP clients.
+- **Request:** no body or authentication. The route does not reserve storage or
+  consume a feedback write token.
+- **Response:** always `200 application/json` and `Cache-Control: no-store`, with
+  schema version, server time, `featureState`, and `submissionAvailability`.
+  A disabled feature maps to `disabled/disabled`. With the feature enabled,
+  disabled or incompletely configured persistence maps to `enabled/disabled`;
+  unavailable or full persistence, or a known unavailable resolver/astronomy
+  dependency, maps to `enabled/unavailable`; normal or near-capacity storage
+  with available dependencies maps to `enabled/available`. Write-token
+  exhaustion does not change this state.
+- **Authentication/data:** anonymous. The response omits database type,
+  settings, capacity, counts, resolver/provider details, and failure text.
+- **Exposure:** available on the ordinary listener. Hosted alpha allowlists
+  bodyless `GET`/`HEAD` and applies security headers. It exempts the path from
+  the whole-site limiter and performs no provider or concurrency work.
+- **References:** [controller](../backend/src/main/java/dev/moonservice/backend/feedback/CalibrationFeedbackController.java),
+  [service](../backend/src/main/java/dev/moonservice/backend/feedback/CalibrationFeedbackService.java),
+  [wire contract](openapi/calibration-feedback-v1.yaml),
+  [behavior contract](api-shape.md#calibration-feedback-api).
+
+### `POST /api/calibration-feedback/v1/submissions`
+
+- **Handler:** `CalibrationFeedbackController.submit`.
+- **Purpose/lifecycle:** accept one anonymous current-observation calibration
+  report copied from a currently loaded opportunity.
+- **Production invocation:** none yet; browser feedback controls are a separate
+  slice.
+- **Other callers:** functional tests and explicit manual alpha clients.
+- **Request:** UTF-8 `application/json` only, with optional `charset=utf-8`, no
+  content encoding, and at most 16,384 received bytes. The closed object needs
+  schema version 1, a lowercase canonical UUIDv4 `clientSubmissionId`, the
+  loaded `locationId`, the loaded `opportunityId`, and at least one non-null
+  `ambientLight`, `crescentVisibility`, or normalized `notes` value. Unknown or
+  duplicate members, explicit `null`, malformed Unicode, and values outside the
+  contract bounds are rejected.
+- **Processing/idempotency:** after the bounded body arrives, the server captures
+  one microsecond-precision receipt instant, normalizes the request, and hashes
+  the five fixed semantic slots with the versioned framing and SHA-256 in the
+  behavior contract. It checks the feature, then performs an early repository
+  lookup by client UUID. Exact replay and changed-payload conflict finish before
+  location resolution or token admission. A new report checks repository
+  status, resolves the canonical location ID, consumes one feedback write
+  token, recomputes Moon altitude, Moon illumination, Sun altitude, and light
+  bucket, and stores transactionally. The stored `applicationRevision` is
+  supplied by the server and is not accepted from the request.
+- **Admission:** one process-wide bucket starts with 12 tokens and restores one
+  whole token per complete monotonic hour, capped at 12. A token consumed by a
+  new report is not restored after later astronomy, persistence, capacity-race,
+  transactional replay, or conflict outcomes. The bucket resets on process
+  restart and is not shared across instances.
+- **Response:** `201 created` for a new row and `200 replayed` for an exact
+  retry. Stable errors cover invalid JSON/request (`400`), UUID content conflict
+  (`409`), oversized body (`413`), unsupported media (`415`), location/report
+  rejection (`422`), token exhaustion (`429` with matching `Retry-After` and
+  JSON seconds), and generic feedback unavailability (`503`). All responses
+  use `Cache-Control: no-store` and never echo report or dependency details.
+- **Authentication/data:** anonymous and same-origin for browser use. The route
+  requests no GPS permission and sends no permissive CORS headers or preflight
+  support. Controlled logs may keep method, route, status, duration, request
+  ID, coarse outcome, and aggregate capacity warnings, but not request bodies,
+  identifiers, evidence, notes, UUIDs, astronomy, IP/forwarded identity, or
+  User-Agent. Persistence or dependency failure disables only feedback writes;
+  startup, opportunity lookup, liveness, and readiness remain independent.
+- **Exposure:** available on the ordinary listener. Hosted alpha allows only
+  `POST` on this exact path, permits its bounded body, and exempts it from the
+  hosted whole-site limiter. At the resolver step it shares the hosted provider
+  and concurrency guards; after successful resolution it uses the stricter
+  feedback write bucket above. `OPTIONS` receives no preflight support.
+- **References:** [controller](../backend/src/main/java/dev/moonservice/backend/feedback/CalibrationFeedbackController.java),
+  [service](../backend/src/main/java/dev/moonservice/backend/feedback/CalibrationFeedbackService.java),
+  [persistence](../backend/src/main/java/dev/moonservice/backend/feedback/CalibrationFeedbackRepository.java),
+  [wire contract](openapi/calibration-feedback-v1.yaml),
+  [behavior contract](api-shape.md#calibration-feedback-api).
 
 ## Operational routes
 
