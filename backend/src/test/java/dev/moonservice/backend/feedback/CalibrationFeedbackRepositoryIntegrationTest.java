@@ -34,7 +34,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 @Testcontainers(disabledWithoutDocker = true)
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
 @ExtendWith(OutputCaptureExtension.class)
-class JdbcCalibrationFeedbackRepositoryIntegrationTest {
+class CalibrationFeedbackRepositoryIntegrationTest {
     private static final int TEST_CAPACITY = 10;
 
     @Container

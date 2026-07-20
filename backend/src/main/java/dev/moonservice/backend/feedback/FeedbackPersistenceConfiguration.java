@@ -32,8 +32,8 @@ class FeedbackPersistenceConfiguration {
                     .locations("classpath:db/migration")
                     .load()
                     .migrate();
-            JdbcCalibrationFeedbackRepository repository =
-                    new JdbcCalibrationFeedbackRepository(dataSource, capacity);
+            CalibrationFeedbackRepository repository =
+                    new CalibrationFeedbackRepository(dataSource, capacity);
             repository.warnIfNearOrFullAtStartup();
             return repository;
         } catch (RuntimeException exception) {
