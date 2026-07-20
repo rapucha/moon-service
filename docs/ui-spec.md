@@ -152,103 +152,98 @@ separate night.
 Calibration feedback is an optional alpha-testing flow, not a general contact
 form. The browser follows the exact transport and data rules in
 [the calibration API contract](api-shape.md#calibration-feedback-api). It tells
-the tester that notes, city-level location, and timing may identify them and
-asks them not to include names, exact addresses, or unrelated personal details.
-It never requests device-location or GPS permission. Location comes from the
-city the tester chooses through the existing lookup.
-
-### Entry points and modes
-
-When capability allows reporting, every currently loaded real recommendation
-exposes `Review this recommendation`. The form retains that opportunity's
-existing `id`, `moonPass.id`, `location.id`, resolved city display, and compact
-snapshot. It does not change or mint opportunity, pass, or location identifiers.
-Fictional results cannot open the form.
-
-A separate `Report an observation` action may start with the current selected
-real city. It also lets the tester type and select another city, including for
-a historical report, by reusing the existing opportunity query and ambiguous-
-candidate selection. It does not add a feedback-only lookup endpoint, resolver,
-or provider. Preview remains unavailable until that flow selects a real
-location. The report has no recommendation snapshot. Its weather comparison
-is fixed to `not_compared` and is explained rather than shown as an editable
-rating.
-
-The form collects the five ratings and required notes only after location and
-timing are ready. A recommendation review preserves its loaded snapshot even
-when the tester corrects the observation time. Changing the selected
-recommendation starts a different form rather than silently replacing it.
-The browser sends only the selected `locationId`; coordinates, elevation,
-timezone, country, and display name are not request inputs. Preview displays
-the canonical city returned by the server. The UI says that choosing a city
-does not prove the tester was there and that the observation is self-reported.
+the tester that notes, city-level location, and opportunity context may identify
+them and asks them not to include names, exact addresses, or unrelated personal
+details.
 It never requests device-location or GPS permission.
 
-### Timing and reconstruction
+The reduced alpha supports only evidence about the currently loaded real
+opportunity. There is no feedback preview, historical timing, reverse
+observation, feedback-only location lookup, recommendation snapshot, or saved
+review queue.
 
-The tester chooses `Now` or `Past`. `Now` explains that the server receipt time,
-not the browser clock, is authoritative. After preview, show that same instant
-in the reported city's local time and, when useful, browser-local time. Label
-both zones so they cannot be mistaken for different observations.
+### Capability and entry
 
-`Past` collects the original local date and time, a corrected local date and
-time, source, and confidence. It shows the selected city's server-resolved IANA
-timezone but does not let the client submit or edit that zone. The original
-value remains visible and unchanged while the correction is edited. Past
-controls must accept four-digit years `0001-9999`; use a validated text or
-segmented fallback where a native date-time control cannot represent that full
-range.
+The page reads feedback capability before offering the form. New entry is active
+only when `featureState` is `enabled` and `submissionAvailability` is
+`available`. A disabled feature shows a short explanation and no active
+feedback control. When the feature is enabled but submission is `disabled` or
+`unavailable`, the page suppresses new entry and uses generic wording without
+guessing or displaying the cause, database state, capacity, or counts.
+Capability describes a new submission; it does not reserve capacity or a write
+token.
 
-`Preview conditions` is an explicit action and is the default trigger. An
-implementation may also issue one debounced preview after all fields are valid
-and input has settled for at least 500 ms. It must cancel a pending call on a
-new edit and must never call on every keystroke. Preview sends only
-`locationId` and the timing union; ratings, notes,
-recommendation data, and queue metadata never enter that request.
+When capability allows a new submission, a feedback action on the currently
+loaded real opportunity opens the form. The browser copies that result's exact
+`location.id` and opportunity `id` into `locationId` and `opportunityId`. It
+does not change or mint either identifier. Fictional results cannot open the
+form, and changing the loaded opportunity starts a different form.
 
-A successful preview shows the accepted local time and UTC offset, Moon facts,
-Sun facts, light bucket, and whether the pass encloses the accepted time or is
-the nearest pass. It shows pass boundaries and the local-horizon caveat. A
-no-pass result still shows instant facts and says plainly that no visible pass
-was found in the displayed search interval, normally 36 hours on either side.
-It does not imply that weather was checked.
+The form offers three optional evidence fields:
 
-The browser keeps a local freshness key containing mode, `locationId`, timing,
-selected offset, and, for a recommendation review, the compact-snapshot hash.
-It ignores a response unless that key still matches, although mode and snapshot
-are not sent to preview. Ratings and notes do not make a reconstruction stale.
+- ambient light: `Good`, `Too bright`, or `Too dark`;
+- crescent visibility: `Visible` or `Too small to see`; and
+- notes.
 
-Editing the selected city or any timing field, including entered time,
-corrected time, offset, source, or confidence, marks the reconstruction stale.
-Final submission stays unavailable until a new preview succeeds for the current
-values. Repeated correction and preview do not save a report. Preview output is
-display-only; final submission never sends it back as trusted facts.
+At least one field must remain present after server normalization. Notes are
+optional rather than required. The browser may catch obvious empty or oversized
+input, but the server's Unicode normalization and 1-4,000-code-point rule are
+authoritative.
 
-During a spring clock change, some local times never happen. The UI attaches
-that gap error to the corrected local time and asks for a real clock time.
-During an autumn change, one local time can happen twice. The UI shows both
-returned UTC offsets as radio choices, with the resulting UTC instant and
-offset in each label, and requires a choice before preview. A browser-clock
-future check is a warning; only the server's five-minute rule rejects the time.
-For `Now`, the UI also says that preview and final receipt instants can differ
-slightly and that final submission recomputes the facts.
+The browser sends no timing, location detail, coordinates, timezone, weather,
+client astronomy fact, application revision, or opportunity snapshot. The
+server uses its microsecond-normalized receipt instant and computes the four
+stored astronomy facts. The UI says that the city and opportunity identifiers
+are self-reported context rather than proof that the tester was there.
+
+### Submission and exact retry
+
+Immediately before the first submission attempt, the browser creates a
+lowercase-canonical UUIDv4 and freezes the exact normalized semantic payload.
+It sends no request automatically. An edit that changes any normalized evidence
+value starts a new logical submission and requires a new UUID. A different
+loaded opportunity also requires a new UUID.
+
+`201 created` and `200 replayed` are both success states. The confirmation
+distinguishes them and shows the returned server report UUID and submission
+instant. A conflict explains that the client UUID already belongs to different
+content; the browser never works around it automatically.
+
+If a sent request has no definite response, the page shows `Submission outcome
+unknown` and offers an explicit exact retry with the same UUID and frozen
+payload. A definite `429` shows the server retry delay before offering the same
+explicit action. A definite `503` may also offer an unchanged explicit retry.
+No state resubmits in the background or after reload.
+
+An exact retry can replay a committed row with its original IDs and submission
+instant. If no row exists, the retry can create one using its later server
+receipt instant because receipt time is not part of the idempotency digest.
+When the feature remains enabled, an unavailable capability does not by itself
+hide an already frozen exact-retry action because a full store can still replay
+an existing row. A disabled feature or `disabled` submission availability does
+not offer the action.
+
+Validation and transport errors preserve safe input and identify the affected
+field when possible. Changing any normalized digest input after a definite
+validation error starts a new logical submission and requires a new UUID before
+another request. Public error copy never exposes dependency details or echoes
+submitted values.
 
 ### End-to-end sequence
 
-This sequence uses the existing city lookup and the feedback routes from the
-OpenAPI contract. Preview facts are display-only and never become stored
-evidence.
+This sequence shows the reduced current-observation capability and submission
+contract. The browser copies identifiers from the loaded opportunity and sends
+only tester-authored evidence. The server uses its receipt instant and computes
+the four current astronomy facts.
 
-[![Calibration feedback preview and submission sequence](diagrams/calibration-feedback-sequence.svg)](diagrams/calibration-feedback-sequence.svg)
+[![Calibration feedback overview](diagrams/calibration-feedback-sequence.svg)](diagrams/calibration-feedback-sequence.svg)
 
 [PlantUML source](diagrams/calibration-feedback-sequence.puml)
 
 ### Accessible interaction
 
-The reconstruction uses headings and text facts, not chart shape or color
-alone. Its pass relationship, accepted time, UTC offset, and no-pass state have
-text equivalents. Updated preview and submission outcomes are announced in a
-polite live region. Errors also appear in a summary that links to the affected
+Evidence choices use labeled controls, and the at-least-one rule has text that
+does not rely on color. Errors appear in a summary that links to the affected
 field; focus moves to the summary after a rejected explicit action.
 
 Controls keep their labels while busy. A busy state prevents duplicate sends,
@@ -257,88 +252,10 @@ the triggering control unless an error summary or success confirmation needs
 attention. Rate-limit copy includes the server retry delay without starting an
 automatic retry.
 
-### Capability, errors, and submission
-
-The page reads capability before offering the flow. A disabled operation has a
-short explanation and no active submit control. An unavailable operation keeps
-the form and uses the same generic public wording whether location resolution
-or storage is unavailable. The UI never guesses or displays the cause,
-database state, capacity, or counts. New submissions remain unavailable, but a
-frozen attempted payload may still offer an explicit exact retry because a
-known row can replay without fresh resolution or capacity.
-
-Inline invalid states preserve all safe input. Rate-limited and preview-busy
-states preserve input and allow another explicit attempt after `Retry-After`.
-An unavailable preview cannot be bypassed by final submission. No failure
-silently saves or submits a report.
-
-On the first final attempt, the browser creates one UUIDv4 for the exact
-normalized payload before sending it. A definite validation error permits
-editing; the next attempt after any normalized content change gets a new UUID.
-A conflict says that the identifier already belongs to different content and
-requires a new UUID. The browser does not work around a conflict by changing
-content back automatically.
-
-If the request was sent but no definite response arrived, the result is
-`Submission outcome unknown`. The browser retains the exact UUID and normalized
-payload and offers `Retry exact submission`; it neither edits nor resends them
-automatically. Editing from that state creates a new logical submission and a
-new UUID. Immediate unsaved forms retain uncertain state for the current page;
-the later saved-review queue preserves it across reload.
-
-A definite `429` or `503` keeps that attempted UUID and frozen payload for an
-explicit unchanged retry. Editing instead creates a new UUID. A validation
-failure that occurred before any report was accepted follows the same rule:
-unchanged retry may keep the UUID, while changed normalized content may not.
-
-Before retrying a delayed or uncertain `Now` attempt, the browser gets a fresh
-preview and explains the two valid results: an existing report replays with its
-original receipt instant, while an attempt that created no row can be accepted
-at the retry receipt instant. Choosing a remembered clock time changes the form
-to `Past` and creates a new UUID.
-
-Success distinguishes a newly accepted report from an idempotent replay, shows
-the server report UUID, and clears the active form only after the confirmation
-is available to assistive technology.
-
-### Saved-review boundary
-
-The later queue applies only to recommendation reviews and only after an
-explicit `Save for review` action. Viewing a recommendation, opening a form,
-typing, previewing, or receiving an error never saves it. Reverse observations
-remain immediate-only.
-
-Saving lets a tester keep the loaded recommendation before going outside and
-return to that same context afterward. Local browser storage supplies that
-account-free handoff; it is not a server inbox or activity history.
-
-The queue has at most 20 distinct opportunity IDs and keeps insertion order.
-Saving an existing unattempted review updates its one entry in place without a
-duplicate or position change. An attempted frozen payload is never silently
-replaced. Saving a new distinct opportunity appends it; when 20 already exist,
-the first entry is removed, the new one is appended, and the tester is told
-which review was replaced. List order, not a stored timestamp, defines the
-earliest entry.
-
-An unattempted saved entry has no client submission UUID. The queue stores the
-UUID and exact normalized payload immediately before its first final request.
-An uncertain response retains both for exact retry after reload. Editing an
-attempted payload creates a new UUID before another request. Success or explicit
-deletion removes the entry; nothing is submitted in the background.
-
-After reload, a past preview remains current only when its schema version and
-complete mode, `locationId`, timing, selected-offset, and compact-snapshot
-freshness key still match. A restored `now` preview is always stale because the
-next request has a new server receipt instant. Restored preview facts remain
-display-only and never enter final submission as trusted evidence.
-
-Disabled local storage, quota failure, and corrupt entries are nonfatal and
-visibly explained. Valid entries remain usable when one entry is corrupt, and
-the tester can explicitly delete the unreadable entry. The queue states that a
-local draft contains its city and recommendation context and may later contain
-entered timing, ratings, notes, accepted preview display state, UUID, and frozen
-payload. Unreadable data is left untouched until the tester uses the queue
-control to remove it.
+Created, replayed, conflict, unknown-outcome, rate-limited, and unavailable
+states are announced in a polite live region. A success confirmation stays
+available to assistive technology before the form is cleared. Exact retry is a
+labeled tester action, never a timer or background behavior.
 
 ## Moon Path Panel
 

@@ -5,384 +5,61 @@ components:
       const: 1
     UtcInstant:
       type: string
-      pattern: "^(?:[0-9]{4}|[+-][0-9]{5,})-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(?:\\.[0-9]+)?Z$"
-      description: |
-        UTC ISO 8601 instant. Edge calculations may use expanded years outside
-        the ordinary four-digit range, as defined in docs/api-shape.md.
-    LocalDateTime:
-      type: string
-      pattern: "^(?!0000)[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}$"
-      description: Local proleptic-Gregorian date-time with year 0001-9999.
-    UtcOffset:
-      type: string
-      pattern: "^(?:Z|[+-][0-9]{2}:[0-9]{2}(?::[0-9]{2})?)$"
-      description: Canonical zone offset, including historical second precision.
+      format: date-time
+      pattern: "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(?:\\.[0-9]+)?Z$"
+      description: RFC 3339 UTC instant.
     LocationId:
       type: string
       description: |
-        Existing provider-backed canonical ID returned by real city lookup.
-        After outer Unicode whitespace is removed, it must contain 1-100
-        Unicode code points; control and bidirectional-control characters are
-        invalid.
+        Existing provider-backed canonical ID copied from the loaded
+        opportunity response. Feedback normalization and the 1-100 Unicode
+        code-point bound are defined in docs/api-shape.md.
     UuidV4:
       type: string
       format: uuid
       pattern: "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+      description: Lowercase canonical UUID version 4.
     ErrorCode:
       type: string
-      enum: [invalid_json, invalid_request, request_too_large,
-        unsupported_media_type, location_not_found, invalid_report, future_time,
-        nonexistent_local_time, ambiguous_local_time, invalid_utc_offset,
-        client_submission_conflict, rate_limited, preview_busy, feedback_unavailable]
+      enum:
+        - invalid_json
+        - invalid_request
+        - request_too_large
+        - unsupported_media_type
+        - location_not_found
+        - invalid_report
+        - client_submission_conflict
+        - rate_limited
+        - feedback_unavailable
     ApiError:
       type: object
       additionalProperties: false
-      required: [code, message]
+      required:
+        - code
+        - message
       properties:
         code:
           $ref: "#/components/schemas/ErrorCode"
-        message: {type: string, minLength: 1}
-        field: {type: string, minLength: 1}
-        validUtcOffsets:
-          type: array
-          minItems: 2
-          maxItems: 2
-          uniqueItems: true
-          items:
-            $ref: "#/components/schemas/UtcOffset"
-        retryAfterSeconds: {type: integer, minimum: 1}
+        message:
+          type: string
+          minLength: 1
+        field:
+          type: string
+          minLength: 1
+        retryAfterSeconds:
+          type: integer
+          minimum: 1
       allOf:
         - if:
             properties:
-              code: {const: ambiguous_local_time}
-          then: {required: [validUtcOffsets]}
-          else: {not: {required: [validUtcOffsets]}}
-        - if:
-            properties:
-              code: {enum: [rate_limited, preview_busy]}
-          then: {required: [retryAfterSeconds]}
-          else: {not: {required: [retryAfterSeconds]}}
-    PastSource:
-      type: string
-      enum:
-        - camera_metadata
-        - phone_metadata
-        - written_record
-        - memory
-        - other
-    PastConfidence:
-      type: string
-      enum:
-        - exact
-        - within_5_minutes
-        - within_30_minutes
-        - within_2_hours
-        - date_only
-    NowTiming:
-      type: object
-      additionalProperties: false
-      required:
-        - kind
-      properties:
-        kind:
-          type: string
-          const: now
-    PastTiming:
-      type: object
-      additionalProperties: false
-      required:
-        - kind
-        - enteredLocalDateTime
-        - correctedLocalDateTime
-        - source
-        - confidence
-      properties:
-        kind:
-          type: string
-          const: past
-        enteredLocalDateTime:
-          $ref: "#/components/schemas/LocalDateTime"
-        correctedLocalDateTime:
-          $ref: "#/components/schemas/LocalDateTime"
-        utcOffset:
-          $ref: "#/components/schemas/UtcOffset"
-        source:
-          $ref: "#/components/schemas/PastSource"
-        confidence:
-          $ref: "#/components/schemas/PastConfidence"
-    TimingRequest:
-      oneOf:
-        - $ref: "#/components/schemas/NowTiming"
-        - $ref: "#/components/schemas/PastTiming"
-      discriminator:
-        propertyName: kind
-        mapping:
-          now: "#/components/schemas/NowTiming"
-          past: "#/components/schemas/PastTiming"
-    ResolvedLocation:
-      type: object
-      additionalProperties: false
-      required:
-        - kind
-        - id
-        - displayName
-        - latitude
-        - longitude
-        - elevationMeters
-        - timezone
-        - countryCode
-      properties:
-        kind:
-          type: string
-          const: real_location
-        id:
-          $ref: "#/components/schemas/LocationId"
-        displayName:
-          type: string
-          minLength: 1
-        latitude:
-          type: number
-          minimum: -90
-          maximum: 90
-        longitude:
-          type: number
-          minimum: -180
-          maximum: 180
-        elevationMeters:
-          type: integer
-          minimum: -2147483648
-          maximum: 2147483647
-        timezone:
-          type: string
-          minLength: 1
-          description: Server-resolved IANA timezone.
-        countryCode:
-          type: string
-          pattern: "^[A-Z]{2}$"
-    ResolvedNowTiming:
-      type: object
-      additionalProperties: false
-      required:
-        - kind
-        - resolvedLocalDateTime
-        - timezone
-        - utcOffset
-        - source
-        - confidence
-        - resolvedAt
-      properties:
-        kind:
-          type: string
-          const: now
-        resolvedLocalDateTime:
-          $ref: "#/components/schemas/LocalDateTime"
-        timezone:
-          type: string
-          minLength: 1
-        utcOffset:
-          $ref: "#/components/schemas/UtcOffset"
-        source:
-          type: string
-          const: server_receipt
-        confidence:
-          type: string
-          const: exact
-        resolvedAt:
-          $ref: "#/components/schemas/UtcInstant"
-    ResolvedPastTiming:
-      type: object
-      additionalProperties: false
-      required:
-        - kind
-        - enteredLocalDateTime
-        - correctedLocalDateTime
-        - timezone
-        - utcOffset
-        - source
-        - confidence
-        - resolvedAt
-      properties:
-        kind:
-          type: string
-          const: past
-        enteredLocalDateTime:
-          $ref: "#/components/schemas/LocalDateTime"
-        correctedLocalDateTime:
-          $ref: "#/components/schemas/LocalDateTime"
-        timezone:
-          type: string
-          minLength: 1
-        utcOffset:
-          $ref: "#/components/schemas/UtcOffset"
-        source:
-          $ref: "#/components/schemas/PastSource"
-        confidence:
-          $ref: "#/components/schemas/PastConfidence"
-        resolvedAt:
-          $ref: "#/components/schemas/UtcInstant"
-    AcceptedTiming:
-      oneOf:
-        - $ref: "#/components/schemas/ResolvedNowTiming"
-        - $ref: "#/components/schemas/ResolvedPastTiming"
-      discriminator:
-        propertyName: kind
-        mapping:
-          now: "#/components/schemas/ResolvedNowTiming"
-          past: "#/components/schemas/ResolvedPastTiming"
-    PreviewRequest:
-      type: object
-      additionalProperties: false
-      required:
-        - schemaVersion
-        - locationId
-        - timing
-      properties:
-        schemaVersion:
-          $ref: "#/components/schemas/SchemaVersion"
-        locationId:
-          $ref: "#/components/schemas/LocationId"
-        timing:
-          $ref: "#/components/schemas/TimingRequest"
-    LightBucket:
-      type: string
-      enum:
-        - daylight
-        - golden_hour
-        - civil_twilight
-        - nautical_twilight
-        - night
-    AstronomyFacts:
-      type: object
-      additionalProperties: false
-      required:
-        - at
-        - moonAltitudeDegrees
-        - moonAzimuthDegrees
-        - moonIlluminationPercent
-        - moonPhaseAngleDegrees
-        - brightLimbTiltDegrees
-        - northPoleTiltDegrees
-        - sunAltitudeDegrees
-        - sunAzimuthDegrees
-        - lightBucket
-      properties:
-        at:
-          $ref: "#/components/schemas/UtcInstant"
-        moonAltitudeDegrees:
-          type: number
-        moonAzimuthDegrees:
-          type: number
-        moonIlluminationPercent:
-          type: number
-          minimum: 0
-          maximum: 100
-        moonPhaseAngleDegrees:
-          type: number
-        brightLimbTiltDegrees:
-          type:
-            - number
-            - "null"
-        northPoleTiltDegrees:
-          type:
-            - number
-            - "null"
-        sunAltitudeDegrees:
-          type: number
-        sunAzimuthDegrees:
-          type: number
-        lightBucket:
-          $ref: "#/components/schemas/LightBucket"
-    VisiblePass:
-      type: object
-      additionalProperties: false
-      required:
-        - state
-        - startsAt
-        - endsAt
-        - startBoundary
-        - endBoundary
-        - sampleCount
-        - samples
-      properties:
-        state:
-          type: string
-          enum:
-            - enclosing
-            - nearest
-        startsAt:
-          $ref: "#/components/schemas/UtcInstant"
-        endsAt:
-          $ref: "#/components/schemas/UtcInstant"
-        startBoundary:
-          type: string
-          enum:
-            - moonrise
-            - search_start
-        endBoundary:
-          type: string
-          enum:
-            - moonset
-            - search_end
-        sampleCount:
-          type: integer
-          minimum: 0
-          maximum: 147
-        samples:
-          type: array
-          maxItems: 147
-          items:
-            $ref: "#/components/schemas/AstronomyFacts"
-    NoVisiblePass:
-      type: object
-      additionalProperties: false
-      required:
-        - state
-        - reason
-        - sampleCount
-        - samples
-      properties:
-        state:
-          type: string
-          const: none
-        reason:
-          type: string
-          const: no_visible_pass_in_search_range
-        sampleCount:
-          type: integer
-          const: 0
-        samples:
-          type: array
-          maxItems: 0
-    PreviewPass:
-      oneOf:
-        - $ref: "#/components/schemas/VisiblePass"
-        - $ref: "#/components/schemas/NoVisiblePass"
-    PreviewResponse:
-      type: object
-      additionalProperties: false
-      required:
-        - schemaVersion
-        - serverTime
-        - location
-        - acceptedTiming
-        - searchStartsAt
-        - searchEndsAt
-        - facts
-        - pass
-      properties:
-        schemaVersion:
-          $ref: "#/components/schemas/SchemaVersion"
-        serverTime:
-          $ref: "#/components/schemas/UtcInstant"
-        location:
-          $ref: "#/components/schemas/ResolvedLocation"
-        acceptedTiming:
-          $ref: "#/components/schemas/AcceptedTiming"
-        searchStartsAt:
-          $ref: "#/components/schemas/UtcInstant"
-        searchEndsAt:
-          $ref: "#/components/schemas/UtcInstant"
-        facts:
-          $ref: "#/components/schemas/AstronomyFacts"
-        pass:
-          $ref: "#/components/schemas/PreviewPass"
+              code:
+                const: rate_limited
+            required:
+              - code
+          then:
+            required:
+              - retryAfterSeconds
+          else:
+            not:
+              required:
+                - retryAfterSeconds

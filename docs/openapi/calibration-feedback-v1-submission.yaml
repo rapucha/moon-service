@@ -1,321 +1,59 @@
 components:
   schemas:
-    Ratings:
-      type: object
-      additionalProperties: false
-      required:
-        - overall
-        - moon
-        - ambientLight
-        - weather
-        - horizon
-      properties:
-        overall:
-          type: string
-          enum:
-            - positive
-            - marginal
-            - negative
-        moon:
-          type: string
-          enum:
-            - clear
-            - partial
-            - not_visible
-            - unknown
-        ambientLight:
-          type: string
-          enum:
-            - sufficient
-            - marginal
-            - insufficient
-            - unknown
-        weather:
-          type: string
-          enum:
-            - better
-            - matched
-            - worse
-            - not_compared
-        horizon:
-          type: string
-          enum:
-            - none
-            - minor
-            - blocked
-            - unknown
-    MoonPassSnapshot:
-      type: object
-      additionalProperties: false
-      required:
-        - id
-        - startsAt
-        - endsAt
-      properties:
-        id:
-          type: string
-          minLength: 1
-        startsAt:
-          $ref: "./calibration-feedback-v1-common.yaml#/components/schemas/UtcInstant"
-        endsAt:
-          $ref: "./calibration-feedback-v1-common.yaml#/components/schemas/UtcInstant"
-    ComponentScores:
-      type: object
-      additionalProperties: false
-      required:
-        - moonAltitudeFit
-        - sunLightFit
-        - moonIlluminationFit
-        - weatherFit
-        - forecastConfidence
-      properties:
-        moonAltitudeFit:
-          type: integer
-        sunLightFit:
-          type: integer
-        moonIlluminationFit:
-          type: integer
-        weatherFit:
-          type: integer
-        forecastConfidence:
-          type: integer
-    CompactMoon:
-      type: object
-      additionalProperties: false
-      required:
-        - altitudeDegrees
-        - azimuthDegrees
-        - illuminationPercent
-        - phaseAngleDegrees
-        - brightLimbTiltDegrees
-        - northPoleTiltDegrees
-        - phaseName
-      properties:
-        altitudeDegrees:
-          type: number
-        azimuthDegrees:
-          type: number
-        illuminationPercent:
-          type: number
-          minimum: 0
-          maximum: 100
-        phaseAngleDegrees:
-          type: number
-        brightLimbTiltDegrees:
-          type:
-            - number
-            - "null"
-        northPoleTiltDegrees:
-          type:
-            - number
-            - "null"
-        phaseName:
-          type: string
-          minLength: 1
-    CompactSun:
-      type: object
-      additionalProperties: false
-      required:
-        - altitudeDegrees
-        - azimuthDegrees
-        - lightBucket
-      properties:
-        altitudeDegrees:
-          type: number
-        azimuthDegrees:
-          type: number
-        lightBucket:
-          $ref: "./calibration-feedback-v1-common.yaml#/components/schemas/LightBucket"
-    CompactWeather:
-      type: object
-      additionalProperties: false
-      required:
-        - sourceResolution
-        - segmentKind
-        - cloudCoverMeanPercent
-        - cloudCoverMaxPercent
-        - lowCloudCoverMaxPercent
-        - midCloudCoverMaxPercent
-        - highCloudCoverMaxPercent
-        - precipitationProbabilityMaxPercent
-        - precipitationMm
-        - visibilityMinMeters
-        - weatherCode
-        - summary
-      properties:
-        sourceResolution:
-          type: string
-          minLength: 1
-        segmentKind:
-          type: string
-          minLength: 1
-        cloudCoverMeanPercent:
-          type: integer
-          minimum: 0
-          maximum: 100
-        cloudCoverMaxPercent:
-          type: integer
-          minimum: 0
-          maximum: 100
-        lowCloudCoverMaxPercent:
-          type: integer
-          minimum: 0
-          maximum: 100
-        midCloudCoverMaxPercent:
-          type: integer
-          minimum: 0
-          maximum: 100
-        highCloudCoverMaxPercent:
-          type: integer
-          minimum: 0
-          maximum: 100
-        precipitationProbabilityMaxPercent:
-          type: integer
-          minimum: 0
-          maximum: 100
-        precipitationMm:
-          type: number
-          minimum: 0
-        visibilityMinMeters:
-          type: integer
-          minimum: 0
-        weatherCode:
-          type: integer
-        summary:
-          type: string
-          minLength: 1
-    ExposureBalance:
-      type: object
-      additionalProperties: false
-      required:
-        - label
-        - text
-      properties:
-        label:
-          type: string
-          minLength: 1
-        text:
-          type: string
-          minLength: 1
-    CompactOpportunity:
-      type: object
-      additionalProperties: false
-      required:
-        - generatedAt
-        - id
-        - windowKind
-        - moonPass
-        - startsAt
-        - suggestedAt
-        - endsAt
-        - localTimeZone
-        - score
-        - confidence
-        - components
-        - moon
-        - sun
-        - weather
-        - exposureBalance
-        - reason
-      properties:
-        generatedAt:
-          $ref: "./calibration-feedback-v1-common.yaml#/components/schemas/UtcInstant"
-        id:
-          type: string
-          minLength: 1
-        windowKind:
-          type: string
-          minLength: 1
-        moonPass:
-          $ref: "#/components/schemas/MoonPassSnapshot"
-        startsAt:
-          $ref: "./calibration-feedback-v1-common.yaml#/components/schemas/UtcInstant"
-        suggestedAt:
-          oneOf:
-            - $ref: "./calibration-feedback-v1-common.yaml#/components/schemas/UtcInstant"
-            - type: "null"
-        endsAt:
-          $ref: "./calibration-feedback-v1-common.yaml#/components/schemas/UtcInstant"
-        localTimeZone:
-          type: string
-          minLength: 1
-        score:
-          type: integer
-        confidence:
-          type: string
-          enum:
-            - low
-            - medium
-            - high
-        components:
-          $ref: "#/components/schemas/ComponentScores"
-        moon:
-          $ref: "#/components/schemas/CompactMoon"
-        sun:
-          $ref: "#/components/schemas/CompactSun"
-        weather:
-          $ref: "#/components/schemas/CompactWeather"
-        exposureBalance:
-          $ref: "#/components/schemas/ExposureBalance"
-        reason:
-          type: string
-          minLength: 1
+    OpportunityId:
+      type: string
+      minLength: 1
+      description: |
+        Opaque claimed identifier copied from the loaded opportunity. Exact
+        string validation and the trusted-alpha boundary are defined in
+        docs/api-shape.md.
+    AmbientLight:
+      type: string
+      enum:
+        - good
+        - too_bright
+        - too_dark
+    CrescentVisibility:
+      type: string
+      enum:
+        - visible
+        - too_small_to_see
+    Notes:
+      type: string
+      description: |
+        Optional free text. NFC, outer Unicode White_Space removal, U+0000
+        rejection, and the post-normalization 1-4,000 code-point bound are
+        defined in docs/api-shape.md.
     SubmissionRequest:
       type: object
       additionalProperties: false
       required:
         - schemaVersion
         - clientSubmissionId
-        - mode
         - locationId
-        - timing
-        - ratings
-        - notes
+        - opportunityId
       properties:
         schemaVersion:
           $ref: "./calibration-feedback-v1-common.yaml#/components/schemas/SchemaVersion"
         clientSubmissionId:
           $ref: "./calibration-feedback-v1-common.yaml#/components/schemas/UuidV4"
-        mode:
-          type: string
-          enum:
-            - recommendation_review
-            - observation
         locationId:
           $ref: "./calibration-feedback-v1-common.yaml#/components/schemas/LocationId"
-        timing:
-          $ref: "./calibration-feedback-v1-common.yaml#/components/schemas/TimingRequest"
-        ratings:
-          $ref: "#/components/schemas/Ratings"
+        opportunityId:
+          $ref: "#/components/schemas/OpportunityId"
+        ambientLight:
+          $ref: "#/components/schemas/AmbientLight"
+        crescentVisibility:
+          $ref: "#/components/schemas/CrescentVisibility"
         notes:
-          type: string
-          description: Normalized Unicode code-point bounds are defined in docs/api-shape.md.
-        recommendationSnapshot:
-          $ref: "#/components/schemas/CompactOpportunity"
-      allOf:
-        - if:
-            properties:
-              mode:
-                const: recommendation_review
-          then:
-            required:
-              - recommendationSnapshot
-        - if:
-            properties:
-              mode:
-                const: observation
-          then:
-            not:
-              required:
-                - recommendationSnapshot
-            properties:
-              ratings:
-                allOf:
-                  - $ref: "#/components/schemas/Ratings"
-                  - type: object
-                    properties:
-                      weather:
-                        const: not_compared
+          $ref: "#/components/schemas/Notes"
+      anyOf:
+        - required:
+            - ambientLight
+        - required:
+            - crescentVisibility
+        - required:
+            - notes
     SubmissionResponse:
       type: object
       additionalProperties: false

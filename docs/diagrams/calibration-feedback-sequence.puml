@@ -7,60 +7,51 @@ skinparam sequenceMessageAlign left
 skinparam responseMessageBelowArrow true
 hide footbox
 
-title Calibration feedback preview and submission
+title Calibration feedback overview
 autonumber 1 "<b>[00]"
 
-actor Tester
 participant Browser
-participant "Existing city lookup" as Lookup
 participant "Feedback API" as Feedback
-participant "Cached location resolver" as Resolver
+database "Feedback store" as Store
+participant "Cached location\nresolver" as Resolver
+participant "Write limiter" as Limiter
 participant Astronomy
-participant "Feedback store" as Store
 
-alt Recommendation review
-  Browser -> Browser: Reuse loaded location.id and snapshot
-else Reverse observation
-  Tester -> Browser: Type a city
-  Browser -> Lookup: Use existing query and candidate flow
-  Lookup --> Browser: Selected real locationId
+Browser -> Feedback: GET /api/calibration-feedback/v1/capability
+Feedback --> Browser: 200 featureState + submissionAvailability
+Browser -> Browser: Offer new entry only when enabled + available
+
+Browser -> Browser: Copy loaded locationId + opportunityId\nCreate UUID; freeze normalized payload
+Browser -> Feedback: POST /api/calibration-feedback/v1/submissions
+Feedback -> Feedback: Receive bounded body; capture receipt;\nvalidate and normalize; build digest; check feature
+Feedback -> Store: lookup(clientSubmissionId)
+
+alt Existing row with the same digest
+  Store --> Feedback: Original report ID + submission time
+  Feedback --> Browser: 200 replayed
+else Existing row with a different digest
+  Store --> Feedback: UUID conflict
+  Feedback --> Browser: 409 client_submission_conflict
+else New request
+  Store --> Feedback: NotFound
+  Feedback -> Store: Check submission status
+  Store --> Feedback: Ready for a new row
+  Feedback -> Resolver: Resolve normalized locationId
+  Resolver --> Feedback: Canonical ID + calculation input
+  Feedback -> Limiter: Consume one write token
+  Limiter --> Feedback: Admitted
+  Feedback -> Astronomy: Calculate at the receipt instant
+  Astronomy --> Feedback: Four stored astronomy facts
+  Feedback -> Store: Transactionally recheck UUID and capacity; insert
+  Store --> Feedback: Created, replayed, or conflict
+  Feedback --> Browser: 201 created, 200 replayed,\nor 409 client_submission_conflict
 end
 
-loop Correct and preview until accepted
-  Browser -> Feedback: POST preview(locationId, timing)
-  Feedback -> Resolver: resolveLocationId(locationId)
-  Resolver --> Feedback: Canonical city and timezone
-  alt Spring DST gap
-    Feedback --> Browser: 422 nonexistent_local_time
-    Tester -> Browser: Enter a real clock time
-  else Autumn DST overlap
-    Feedback --> Browser: 422 and both valid offsets
-    Tester -> Browser: Select one occurrence
-  else Resolved time
-    Feedback -> Astronomy: Reconstruct bounded facts and pass
-    Astronomy --> Feedback: Moon, Sun, light, and pass state
-    Feedback --> Browser: 200 preview; no feedback record
-  end
-end
-
-Tester -> Browser: Submit ratings and notes
-Browser -> Feedback: POST submissions\n(exact UUID and frozen payload)
-Feedback -> Store: Check client UUID and payload hash
-alt Exact replay
-  Store --> Feedback: Existing server report
-else Changed payload conflict
-  Store --> Feedback: UUID belongs to different content
-else New report
-  Feedback -> Resolver: Resolve locationId again
-  Feedback -> Astronomy: Recompute accepted instant facts
-  Feedback -> Store: Persist canonical city and report
-end
-
-alt Response reaches browser
-  Feedback --> Browser: 200 replayed / 409 conflict / 201 created
-else Network outcome is unknown
-  Tester -> Browser: Retry exact UUID and frozen payload
-  Browser -> Feedback: Repeat the same submission
-end
+note over Browser, Astronomy
+  Overview only. The API contract defines exact validation, check order,
+  public errors, digest bytes, outage behavior, and token handling.
+  A definite eligible retry or an unknown outcome requires tester action
+  with the same UUID and frozen payload. The browser never retries automatically.
+end note
 
 @enduml

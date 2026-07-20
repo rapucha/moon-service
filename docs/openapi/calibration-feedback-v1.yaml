@@ -4,8 +4,9 @@ info:
   title: Moon Service calibration feedback API
   version: 1.0.0
   description: |
-    Hand-authored wire contract for calibration feedback version 1.
-    Behavioral rules that do not fit OpenAPI live in docs/api-shape.md.
+    Hand-authored wire contract for reduced current-observation calibration
+    feedback version 1. Behavioral rules that do not fit OpenAPI live in
+    docs/api-shape.md.
 servers:
   - url: /
 tags:
@@ -17,9 +18,9 @@ paths:
       tags:
         - Calibration feedback
       operationId: getCalibrationFeedbackCapability
-      summary: Read feedback feature availability
+      summary: Read feedback submission availability
       description: |
-        Always returns the public feature and operation states. It does not
+        Always returns the public feature and submission states. It does not
         expose database, resolver, provider, capacity, or failure details.
       responses:
         "200":
@@ -31,57 +32,18 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/CapabilityResponse"
-  /api/calibration-feedback/v1/preview:
-    post:
-      tags:
-        - Calibration feedback
-      operationId: previewCalibrationFeedback
-      summary: Reconstruct astronomy without saving feedback
-      description: |
-        Resolves the selected canonical city and reconstructs Moon, Sun, and
-        light facts. It accepts no ratings, notes, recommendation snapshot, or
-        client preview facts. It calls no weather provider and creates no
-        feedback record.
-      x-body-limit-bytes: 4096
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: "./calibration-feedback-v1-common.yaml#/components/schemas/PreviewRequest"
-      responses:
-        "200":
-          description: Astronomy reconstruction for the accepted city and time.
-          headers:
-            Cache-Control:
-              $ref: "#/components/headers/NoStore"
-          content:
-            application/json:
-              schema:
-                $ref: "./calibration-feedback-v1-common.yaml#/components/schemas/PreviewResponse"
-        "400":
-          $ref: "#/components/responses/BadRequest"
-        "413":
-          $ref: "#/components/responses/RequestTooLarge"
-        "415":
-          $ref: "#/components/responses/UnsupportedMediaType"
-        "422":
-          $ref: "#/components/responses/PreviewUnprocessableRequest"
-        "429":
-          $ref: "#/components/responses/PreviewLimited"
-        "503":
-          $ref: "#/components/responses/FeedbackUnavailable"
   /api/calibration-feedback/v1/submissions:
     post:
       tags:
         - Calibration feedback
       operationId: submitCalibrationFeedback
-      summary: Submit one logical calibration report
+      summary: Submit one current calibration report
       description: |
         Same-origin browser use only. The route sends no permissive CORS
         headers and supports no cross-origin preflight. Exact replay and UUID
-        conflict checks happen before another city resolution. A new report
-        resolves the city and recomputes astronomy before persistence.
+        conflict checks happen before another city resolution or write-token
+        admission. A new report resolves the city and recomputes current
+        astronomy before persistence.
       x-body-limit-bytes: 16384
       requestBody:
         required: true
@@ -131,8 +93,23 @@ components:
         - schemaVersion
         - serverTime
         - featureState
-        - previewAvailability
         - submissionAvailability
+      oneOf:
+        - title: Feature disabled
+          properties:
+            featureState:
+              const: disabled
+            submissionAvailability:
+              const: disabled
+        - title: Feature enabled
+          properties:
+            featureState:
+              const: enabled
+            submissionAvailability:
+              enum:
+                - available
+                - disabled
+                - unavailable
       properties:
         schemaVersion:
           $ref: "./calibration-feedback-v1-common.yaml#/components/schemas/SchemaVersion"
@@ -143,12 +120,6 @@ components:
           enum:
             - enabled
             - disabled
-        previewAvailability:
-          type: string
-          enum:
-            - available
-            - disabled
-            - unavailable
         submissionAvailability:
           type: string
           enum:
@@ -172,8 +143,10 @@ components:
     BadRequestErrorResponse:
       allOf:
         - $ref: "#/components/schemas/ErrorResponse"
-        - properties:
+        - type: object
+          properties:
             error:
+              type: object
               properties:
                 code:
                   enum:
@@ -182,73 +155,62 @@ components:
     RequestTooLargeErrorResponse:
       allOf:
         - $ref: "#/components/schemas/ErrorResponse"
-        - properties:
+        - type: object
+          properties:
             error:
+              type: object
               properties:
                 code:
                   const: request_too_large
     UnsupportedMediaTypeErrorResponse:
       allOf:
         - $ref: "#/components/schemas/ErrorResponse"
-        - properties:
+        - type: object
+          properties:
             error:
+              type: object
               properties:
                 code:
                   const: unsupported_media_type
     SubmissionUnprocessableErrorResponse:
       allOf:
         - $ref: "#/components/schemas/ErrorResponse"
-        - properties:
+        - type: object
+          properties:
             error:
+              type: object
               properties:
                 code:
                   enum:
                     - location_not_found
                     - invalid_report
-                    - future_time
-                    - nonexistent_local_time
-                    - ambiguous_local_time
-                    - invalid_utc_offset
-    PreviewUnprocessableErrorResponse:
-      allOf:
-        - $ref: "#/components/schemas/SubmissionUnprocessableErrorResponse"
-        - properties:
-            error:
-              properties:
-                code:
-                  not:
-                    const: invalid_report
     ConflictErrorResponse:
       allOf:
         - $ref: "#/components/schemas/ErrorResponse"
-        - properties:
+        - type: object
+          properties:
             error:
+              type: object
               properties:
                 code:
                   const: client_submission_conflict
-    PreviewLimitedErrorResponse:
-      allOf:
-        - $ref: "#/components/schemas/ErrorResponse"
-        - properties:
-            error:
-              properties:
-                code:
-                  enum:
-                    - rate_limited
-                    - preview_busy
     SubmissionLimitedErrorResponse:
       allOf:
         - $ref: "#/components/schemas/ErrorResponse"
-        - properties:
+        - type: object
+          properties:
             error:
+              type: object
               properties:
                 code:
                   const: rate_limited
     UnavailableErrorResponse:
       allOf:
         - $ref: "#/components/schemas/ErrorResponse"
-        - properties:
+        - type: object
+          properties:
             error:
+              type: object
               properties:
                 code:
                   const: feedback_unavailable
@@ -268,8 +230,8 @@ components:
   responses:
     BadRequest:
       description: |
-        Malformed JSON or invalid schema version, member, type, UUID, enum,
-        format, numeric range, or location-ID syntax.
+        Malformed JSON or an invalid schema version, member, type, UUID, enum,
+        Unicode string, or identifier syntax.
       headers:
         Cache-Control:
           $ref: "#/components/headers/NoStore"
@@ -278,7 +240,7 @@ components:
           schema:
             $ref: "#/components/schemas/BadRequestErrorResponse"
     RequestTooLarge:
-      description: The route's received-byte limit was exceeded.
+      description: The 16,384-byte received-body limit was exceeded.
       headers:
         Cache-Control:
           $ref: "#/components/headers/NoStore"
@@ -295,21 +257,10 @@ components:
         application/json:
           schema:
             $ref: "#/components/schemas/UnsupportedMediaTypeErrorResponse"
-    PreviewUnprocessableRequest:
-      description: |
-        A selected city no longer resolves, or timing or chronology is
-        semantically invalid.
-      headers:
-        Cache-Control:
-          $ref: "#/components/headers/NoStore"
-      content:
-        application/json:
-          schema:
-            $ref: "#/components/schemas/PreviewUnprocessableErrorResponse"
     SubmissionUnprocessableRequest:
       description: |
-        A selected city no longer resolves, or timing, report content, or
-        chronology is semantically invalid.
+        The selected city no longer resolves, or the normalized feedback
+        report has no valid evidence or otherwise violates a semantic rule.
       headers:
         Cache-Control:
           $ref: "#/components/headers/NoStore"
@@ -326,19 +277,8 @@ components:
         application/json:
           schema:
             $ref: "#/components/schemas/ConflictErrorResponse"
-    PreviewLimited:
-      description: The preview token bucket or single calculation permit rejected the request.
-      headers:
-        Cache-Control:
-          $ref: "#/components/headers/NoStore"
-        Retry-After:
-          $ref: "#/components/headers/RetryAfter"
-      content:
-        application/json:
-          schema:
-            $ref: "#/components/schemas/PreviewLimitedErrorResponse"
     SubmissionLimited:
-      description: The global submission token bucket rejected the request.
+      description: The instance-global submission token bucket rejected the request.
       headers:
         Cache-Control:
           $ref: "#/components/headers/NoStore"
@@ -349,7 +289,9 @@ components:
           schema:
             $ref: "#/components/schemas/SubmissionLimitedErrorResponse"
     FeedbackUnavailable:
-      description: The requested feedback operation is disabled or unavailable.
+      description: |
+        Feedback is disabled or a required resolver, astronomy, or persistence
+        operation is unavailable. The response does not identify the cause.
       headers:
         Cache-Control:
           $ref: "#/components/headers/NoStore"
