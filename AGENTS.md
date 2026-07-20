@@ -72,17 +72,11 @@ The main unresolved choice is now the exact first web/API contract for city look
   unless there is a concrete production caller or established local pattern.
 - State technical judgment directly. Agreement should include reasoning;
   disagreement should be plain and actionable.
-- Use plain language in agent-authored issue and pull-request text, GitHub
-  comments and replies, review summaries, commit messages, code comments, and
-  project or agent-policy documentation. Put one main idea in a sentence. Use
-  common, concrete words and short paragraphs when they stay exact. Keep
-  technical terms when they add needed precision. Avoid chains of nouns,
-  formal filler, abstract lead-ins, and decorative metaphors. When flagging
-  hard-to-read text, suggest simpler wording. Keep required template fields,
-  but write their content like a colleague. This is a review rule, not a word
-  limit, readability score, or style-linter requirement.
-- Code comments should explain why code exists or why a choice was made. Do not
-  restate obvious code. Prefer one or two direct sentences when that is enough.
+- Follow [`docs/ai-agent/plain-technical-writing.md`](docs/ai-agent/plain-technical-writing.md)
+  for agent-authored technical prose. Preserve technical accuracy, contract
+  meaning, exact identifiers, and required template fields. Flag wording only
+  when a simpler version keeps the same meaning. Do not enforce this rule with
+  word limits, readability scores, mechanical counts, or a style linter.
 - Do not introduce mandatory accounts without documenting user value and recovery behavior.
 - Do not permanently store lookup locations server-side. The only current
   exception is the disabled, bounded city-level calibration-feedback store
