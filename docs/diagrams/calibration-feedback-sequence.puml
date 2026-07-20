@@ -7,60 +7,172 @@ skinparam sequenceMessageAlign left
 skinparam responseMessageBelowArrow true
 hide footbox
 
-title Calibration feedback preview and submission
+title Calibration feedback capability and submission
 autonumber 1 "<b>[00]"
 
-actor Tester
 participant Browser
-participant "Existing city lookup" as Lookup
 participant "Feedback API" as Feedback
-participant "Cached location resolver" as Resolver
+database "Feedback store" as Store
+participant "Cached location\nresolver" as Resolver
+participant "Write limiter" as Limiter
 participant Astronomy
-participant "Feedback store" as Store
 
-alt Recommendation review
-  Browser -> Browser: Reuse loaded location.id and snapshot
-else Reverse observation
-  Tester -> Browser: Type a city
-  Browser -> Lookup: Use existing query and candidate flow
-  Lookup --> Browser: Selected real locationId
+group Capability is advisory, not a reservation
+  Browser -> Feedback: GET /api/calibration-feedback/v1/capability
+  Feedback -> Feedback: Map explicit feature setting\nand known dependency state
+  Feedback --> Browser: 200 schemaVersion + serverTime\nfeatureState + submissionAvailability
+  note over Browser, Feedback
+    Always Cache-Control: no-store.
+    The response exposes no cause, capacity, or count.
+    Transient token exhaustion does not change capability.
+  end note
 end
 
-loop Correct and preview until accepted
-  Browser -> Feedback: POST preview(locationId, timing)
-  Feedback -> Resolver: resolveLocationId(locationId)
-  Resolver --> Feedback: Canonical city and timezone
-  alt Spring DST gap
-    Feedback --> Browser: 422 nonexistent_local_time
-    Tester -> Browser: Enter a real clock time
-  else Autumn DST overlap
-    Feedback --> Browser: 422 and both valid offsets
-    Tester -> Browser: Select one occurrence
-  else Resolved time
-    Feedback -> Astronomy: Reconstruct bounded facts and pass
-    Astronomy --> Feedback: Moon, Sun, light, and pass state
-    Feedback --> Browser: 200 preview; no feedback record
-  end
+Browser -> Browser: Tester opens feedback for the loaded real opportunity\nand enters at least one evidence field
+Browser -> Browser: Copy locationId + opportunityId\nCreate lowercase UUIDv4; freeze normalized payload
+Browser -> Feedback: POST /api/calibration-feedback/v1/submissions\nUTF-8 JSON, at most 16,384 received bytes
+Feedback -> Feedback: Enforce media type, content encoding,\nand received-body bound
+
+break Unsupported transport or oversized body
+  Feedback --> Browser: 413 request_too_large\nor 415 unsupported_media_type
+end
+Feedback -> Feedback: Capture one receipt instant;\ntruncate immediately to microseconds
+Feedback -> Feedback: Parse closed schema; validate and normalize;\nrequire ambient light, crescent visibility, or notes
+break Invalid JSON or request
+  Feedback --> Browser: 400 invalid_json or invalid_request
+  Browser -> Browser: Show error summary; preserve safe input
+end
+break Invalid report
+  Feedback --> Browser: 422 invalid_report
+  Browser -> Browser: Show field error; preserve safe input
 end
 
-Tester -> Browser: Submit ratings and notes
-Browser -> Feedback: POST submissions\n(exact UUID and frozen payload)
-Feedback -> Store: Check client UUID and payload hash
-alt Exact replay
-  Store --> Feedback: Existing server report
-else Changed payload conflict
+Feedback -> Feedback: Build exact five-slot frame;\nSHA-256 -> raw 32-byte digest
+note over Browser, Feedback
+  US-ASCII prefix: moon-service/calibration-feedback/idempotency/v1
+  Slots, in order: normalized locationId, opportunityId,
+  ambientLight?, crescentVisibility?, normalized notes?
+  The first two slots are always present.
+  Absent = 0x00
+  Present = 0x01 + unsigned uint32 big-endian UTF-8 length + UTF-8 bytes
+  Values are parsed and normalized, never raw JSON bytes.
+  No prefix terminator, separator, padding, BOM, or trailing byte.
+  No other request or server value is hashed.
+end note
+
+break Feature disabled
+  Feedback --> Browser: 503 feedback_unavailable
+end
+Feedback -> Store: lookup(clientSubmissionId)
+
+break Found, same digest
+  Store --> Feedback: Original serverReportId + submittedAt
+  Feedback --> Browser: 200 replayed with original values
+end
+break Found, different digest
   Store --> Feedback: UUID belongs to different content
-else New report
-  Feedback -> Resolver: Resolve locationId again
-  Feedback -> Astronomy: Recompute accepted instant facts
-  Feedback -> Store: Persist canonical city and report
+  Feedback --> Browser: 409 client_submission_conflict
+end
+break Store lookup disabled
+  Store --> Feedback: Disabled
+  Feedback --> Browser: 503 feedback_unavailable
+end
+break Store lookup unavailable
+  Store --> Feedback: Unavailable
+  Feedback --> Browser: 503 feedback_unavailable
+  Browser -> Browser: Show generic unavailable; keep frozen payload
+  Browser -> Feedback: If capability permits, tester explicitly retries\nthe same UUID and frozen normalized payload
+end
+Store --> Feedback: NotFound; continue
+note over Feedback, Store
+  Disabled feedback and every terminal lookup outcome
+  stop before location resolution or token consumption.
+end note
+
+Feedback -> Store: status()
+break Store disabled
+  Store --> Feedback: Disabled
+  Feedback --> Browser: 503 feedback_unavailable
+end
+break Store unavailable or full
+  Store --> Feedback: Unavailable or full
+  Feedback --> Browser: 503 feedback_unavailable
+  Browser -> Browser: Show generic unavailable; keep frozen payload
+  Browser -> Feedback: If capability permits, tester explicitly retries\nthe same UUID and frozen normalized payload
+end
+Store --> Feedback: Normal or near capacity; continue
+
+Feedback -> Resolver: resolveLocationId(normalized locationId)
+break Location not found
+  Resolver --> Feedback: NotFound
+  Feedback --> Browser: 422 location_not_found
+end
+break Resolver unavailable
+  Resolver --> Feedback: Unavailable
+  Feedback --> Browser: 503 feedback_unavailable
+  Browser -> Browser: Show generic unavailable; keep frozen payload
+  Browser -> Feedback: If capability permits, tester explicitly retries\nthe same UUID and frozen normalized payload
+end
+Resolver --> Feedback: Canonical backend ID + calculation input
+note over Feedback, Resolver
+  The report stores the canonical backend ID,
+  not full city or coordinate data.
+end note
+
+Feedback -> Limiter: consume one instance-global write token
+break Token exhausted
+  Limiter --> Feedback: Retry delay
+  Feedback --> Browser: 429 rate_limited + matching Retry-After
+  Browser -> Browser: Show Retry-After; keep frozen payload
+  Browser -> Feedback: After Retry-After, tester explicitly retries\nthe same UUID and frozen normalized payload
+end
+Limiter --> Feedback: Token admitted; continue
+note over Limiter, Store
+  Once admitted, the token is never restored after astronomy failure,
+  a store failure, a capacity race, or a transactional replay/conflict.
+end note
+
+Feedback -> Astronomy: Compute at the normalized receipt instant
+break Astronomy unavailable
+  Astronomy --> Feedback: Failure
+  Feedback --> Browser: 503 feedback_unavailable
+  Browser -> Browser: Show generic unavailable; keep frozen payload
+  Browser -> Feedback: If capability permits, tester explicitly retries\nthe same UUID and frozen normalized payload
+end
+Astronomy --> Feedback: Moon altitude + Moon illumination\nSun altitude + light bucket
+
+Feedback -> Store: store UUID + raw digest + reduced report\ncanonical backend ID + receipt instant + four facts
+Store -> Store: Transaction: recheck UUID/digest,\nthen capacity, then insert
+break New row created
+  Store --> Feedback: Created with new serverReportId
+  Feedback --> Browser: 201 created + submittedAt
+end
+break Concurrent exact request won
+  Store --> Feedback: Original serverReportId + submittedAt
+  Feedback --> Browser: 200 replayed with original values
+end
+break Concurrent different request won
+  Store --> Feedback: Conflict
+  Feedback --> Browser: 409 client_submission_conflict
+end
+break Transactional store disabled
+  Store --> Feedback: Disabled
+  Feedback --> Browser: 503 feedback_unavailable
+end
+break Capacity race or store unavailable
+  Store --> Feedback: Cannot store
+  Feedback --> Browser: 503 feedback_unavailable
+  Browser -> Browser: Show generic unavailable; keep frozen payload
+  Browser -> Feedback: If capability permits, tester explicitly retries\nthe same UUID and frozen normalized payload
 end
 
-alt Response reaches browser
-  Feedback --> Browser: 200 replayed / 409 conflict / 201 created
-else Network outcome is unknown
-  Tester -> Browser: Retry exact UUID and frozen payload
-  Browser -> Feedback: Repeat the same submission
-end
+legend bottom
+  **Cross-cutting unknown-outcome rule for every sent submission request**
+  If no definite response arrives, show "Submission outcome unknown".
+  The tester may explicitly resend the same UUID and frozen normalized payload.
+  Never retry automatically. A committed row replays its original IDs and time.
+  If no row exists, retry may create one at its later receipt instant.
+  Any changed digest slot requires a new UUID.
+endlegend
 
 @enduml

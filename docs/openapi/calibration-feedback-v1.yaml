@@ -94,6 +94,22 @@ components:
         - serverTime
         - featureState
         - submissionAvailability
+      oneOf:
+        - title: Feature disabled
+          properties:
+            featureState:
+              const: disabled
+            submissionAvailability:
+              const: disabled
+        - title: Feature enabled
+          properties:
+            featureState:
+              const: enabled
+            submissionAvailability:
+              enum:
+                - available
+                - disabled
+                - unavailable
       properties:
         schemaVersion:
           $ref: "./calibration-feedback-v1-common.yaml#/components/schemas/SchemaVersion"
