@@ -22,6 +22,8 @@ CREATE TABLE calibration_feedback_report (
     application_revision TEXT NOT NULL,
     idempotency_hash BYTEA NOT NULL,
     submitted_at TIMESTAMP WITH TIME ZONE NOT NULL,
+    -- This is the initial feedback report format, not Flyway's migration version.
+    -- Applied migrations are immutable; a later format must change this constraint in a new migration.
     CONSTRAINT calibration_feedback_schema_version CHECK (schema_version = 1),
     CONSTRAINT calibration_feedback_server_uuid_v4 CHECK (
         substring(server_report_id::text FROM 15 FOR 1) = '4'

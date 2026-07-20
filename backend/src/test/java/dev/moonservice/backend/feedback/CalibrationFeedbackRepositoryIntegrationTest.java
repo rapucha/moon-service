@@ -90,13 +90,16 @@ class CalibrationFeedbackRepositoryIntegrationTest {
                 assertThat(singleInt(statement, "SELECT count(*) FROM flyway_schema_history")).isEqualTo(1);
                 assertThat(singleInt(statement, "SELECT count(*) FROM calibration_feedback_report")).isEqualTo(3);
                 try (ResultSet row = statement.executeQuery("""
-                        SELECT opportunity_id, location_id, ambient_light, crescent_visibility, notes,
+                        SELECT schema_version, opportunity_id, location_id, ambient_light, crescent_visibility, notes,
                                moon_altitude_degrees, moon_illumination_percent, sun_altitude_degrees, light_bucket,
                                application_revision, idempotency_hash, submitted_at
                         FROM calibration_feedback_report
                         WHERE client_submission_id = '00000000-0000-4000-8000-000000000001'
                         """)) {
                     assertThat(row.next()).isTrue();
+                    assertThat(row.getInt("schema_version"))
+                            .isEqualTo(mixed.schemaVersion())
+                            .isEqualTo(CalibrationFeedbackReport.REPORT_SCHEMA_VERSION);
                     assertThat(row.getString("opportunity_id")).isEqualTo("opportunity-1");
                     assertThat(row.getString("location_id")).isEqualTo("moon-service-3067696");
                     assertThat(row.getString("ambient_light")).isEqualTo("TOO_BRIGHT");
@@ -393,7 +396,7 @@ class CalibrationFeedbackRepositoryIntegrationTest {
         byte[] hash = new byte[32];
         Arrays.fill(hash, hashByte);
         return new CalibrationFeedbackReport(
-                1,
+                CalibrationFeedbackReport.REPORT_SCHEMA_VERSION,
                 clientId,
                 "opportunity-" + index,
                 "moon-service-3067696",

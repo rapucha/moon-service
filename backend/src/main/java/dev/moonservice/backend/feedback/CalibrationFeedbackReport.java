@@ -19,9 +19,17 @@ public record CalibrationFeedbackReport(
         byte[] idempotencyHash,
         Instant submittedAt
 ) {
+    /**
+     * Format version stored with each feedback report. This is independent of Flyway migration
+     * versions. The integration test checks it against the fully migrated database constraint;
+     * advancing it requires a new migration rather than an edit to an applied migration.
+     */
+    static final int REPORT_SCHEMA_VERSION = 1;
+
     public CalibrationFeedbackReport {
-        if (schemaVersion != 1) {
-            throw new IllegalArgumentException("Calibration feedback schema version must be 1.");
+        if (schemaVersion != REPORT_SCHEMA_VERSION) {
+            throw new IllegalArgumentException(
+                    "Calibration feedback schema version must be " + REPORT_SCHEMA_VERSION + ".");
         }
         requireUuidV4(clientSubmissionId, "clientSubmissionId");
         requireOpportunityId(opportunityId);
