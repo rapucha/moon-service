@@ -368,22 +368,24 @@ which is tracked separately by
 Calibration feedback is evidence for later judgment, not an automatic input to
 the live score. Keep raw reports out of fixtures and source control. After a
 period of collection, an owner-selected corpus may publish only authored,
-reviewed cases with new case IDs, coordinates rounded to three decimals,
-paraphrased notes, and preserved timing confidence.
+reviewed cases with new case IDs, no feedback UUIDs, coordinates rounded to
+three decimals when coordinates are needed, paraphrased notes, and only the
+reduced evidence and server-controlled facts needed for review.
 
 The owner decides when the evidence is sufficient for curation. There is no
-numeric report quota. Positive, marginal, and negative examples are useful,
-but a missing outcome class does not block inspection when it is recorded as
-an explicit calibration gap. The corpus must also state selection limits and
+numeric report quota. Coverage across the ambient-light and
+crescent-visibility values and useful notes is valuable, but a missing evidence
+kind or combination does not block inspection when it is recorded as an
+explicit calibration gap. The corpus must also state selection limits and
 remaining uncertainty.
 
-Timing confidence limits what a report can support:
-
-- Precise, consistent timestamps may support a precise suggested-time change.
-- Broad or uncertain timing may support qualitative scoring, wording, or
-  caveat changes.
-- Evidence uncertain by hours, or marked `date_only`, cannot justify moving a
-  recommendation by a precise number of minutes.
+A reduced report describes claimed evidence about the loaded opportunity at the
+server receipt instant. It contains no historical timing input or timing
+confidence, and it does not prove that the tester was present. Ambient-light,
+crescent-visibility, and note evidence may support qualitative scoring, wording,
+or caveat changes. A raw report alone cannot reconstruct an earlier observation
+or justify moving a suggested time by a precise number of minutes; that requires
+consistent, corroborating authored evidence.
 
 Keep two later change types separate:
 

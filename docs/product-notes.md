@@ -123,33 +123,38 @@ Reddit can be used for manual community validation or a project-owned subreddit 
 
 ## Calibration Feedback Boundary
 
-Moon Service may collect optional reports from alpha testers to evaluate loaded
-recommendations and record useful conditions that a tester found independently.
-The purpose is an inspectable calibration set, not user profiling, engagement
-tracking, or a general feedback inbox. Issue
+Moon Service may collect optional reports from alpha testers about the currently
+loaded real opportunity. The selected location and opportunity context are
+tester claims. Canonicalizing the city does not prove that the tester was
+present or that the opportunity occurred as claimed. The purpose is an
+inspectable calibration set, not user profiling, engagement tracking, or a
+general feedback inbox. Issue
 [#33](https://github.com/rapucha/moon-service/issues/33) owns collection,
 curation, and any later evidence-backed scoring work.
 
 Submitting calibration feedback requires no account. That does not make a
-stored report anonymous. Notes, city-level location, and timing may contain or
-reveal identifying information. The form should tell testers to avoid names,
-exact addresses, and other personal details that are not needed to understand
-the observation.
+stored report anonymous. Notes, city-level location, opportunity context, and
+submission time may contain or reveal identifying information. The form should
+tell testers to avoid names, exact addresses, and other personal details that
+are not needed to understand the evidence.
 
 When feedback storage is enabled, a report may retain only:
 
-- Client and server feedback UUIDs.
-- Normalized entered and corrected timing, timezone, source, and confidence.
-- A canonical city-level location.
-- Structured ratings and the required free-text notes.
-- The selected recommendation snapshot when the report reviews one.
-- The server-recomputed astronomy snapshot, application revision, submission
-  time, and idempotency hash.
+- The report schema version and client and server feedback UUIDs.
+- The claimed opportunity ID copied from the loaded result and the canonical
+  backend city-level location ID.
+- Optional normalized ambient-light, crescent-visibility, and notes evidence,
+  with at least one present.
+- One server receipt instant, also used as the submission instant.
+- Exactly Moon altitude, Moon illumination, Sun altitude, and light bucket
+  recomputed for that instant.
+- The server-controlled application revision and raw 32-byte idempotency hash.
 
-Moon Service-controlled feedback records and application or access logs must
-not retain raw request bodies, IP addresses, forwarded identity, or User-Agent
-values for feedback requests. This boundary does not claim that notes,
-location, or timing are non-identifying.
+Moon Service-controlled application and access logs must not retain raw request
+bodies, location or opportunity IDs, evidence values, notes, either feedback
+UUID, astronomy values, IP addresses, forwarded identity, or User-Agent values
+for feedback requests. This boundary does not claim that the retained report is
+non-identifying.
 
 Storage is disabled by default and has a configurable limit. There is no
 unlimited mode or automatic retention period. Reports remain until an operator
