@@ -236,7 +236,7 @@ contract. The browser copies identifiers from the loaded opportunity and sends
 only tester-authored evidence. The server uses its receipt instant and computes
 the four current astronomy facts.
 
-[![Calibration feedback capability and submission sequence](diagrams/calibration-feedback-sequence.svg)](diagrams/calibration-feedback-sequence.svg)
+[![Calibration feedback overview](diagrams/calibration-feedback-sequence.svg)](diagrams/calibration-feedback-sequence.svg)
 
 [PlantUML source](diagrams/calibration-feedback-sequence.puml)
 

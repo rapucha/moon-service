@@ -1183,6 +1183,17 @@ OpenAPI defines the stable HTTP mappings and reduced error codes:
 - `429 rate_limited`; and
 - `503 feedback_unavailable`.
 
+Client completion and retry behavior is exact:
+
+| Outcome | Browser treatment | Retry rule |
+| --- | --- | --- |
+| `201 created` or `200 replayed` | Complete the submission and show its returned status. | Do not retry. |
+| `409 client_submission_conflict` | Stop and explain that the UUID belongs to different content. | Do not retry with that UUID or generate a replacement automatically. |
+| `429 rate_limited` | Keep the UUID and frozen payload and show the server delay. | After `Retry-After`, the tester may explicitly retry while the feature is enabled and submission availability is not `disabled`. |
+| `503 feedback_unavailable` | Keep the UUID and frozen payload and show generic unavailability. | The tester may explicitly retry only while the feature is enabled and submission availability is not `disabled`. An `unavailable` capability does not hide an existing exact-retry action. |
+| No definite response | Show `Submission outcome unknown` and keep the UUID and frozen payload. | Subject to the same capability rule, the tester may explicitly retry. A committed row replays; otherwise the retry may create it at the later receipt instant. |
+| Other definite `4xx` response | Preserve safe input and identify the correction when possible. | Never retry automatically. A change to any normalized digest slot requires a new UUID; a transport-only correction may retain it. |
+
 Errors never echo request values or dependency details. `error.field` appears
 only when useful. `error.retryAfterSeconds` appears only with `rate_limited`.
 Every `429` includes the matching integer `Retry-After` header. Clients retry
