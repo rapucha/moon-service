@@ -168,7 +168,7 @@ Example placeholder for a later LLM-backed fictional-location fallback:
 --moon.provider-quotas.operations.fictional-location-llm.monthly-limit=1000
 ```
 
-### Disabled calibration-feedback persistence
+### Calibration-feedback persistence
 
 The calibration-feedback repository is disabled by default and exposes no
 public route in this implementation slice. Enabling it requires
@@ -177,11 +177,36 @@ and a nonempty password. Missing connection settings leave the repository
 disabled. An invalid capacity, unsupported JDBC scheme, migration failure, or
 database outage makes only feedback persistence unavailable.
 
-With complete settings, a private Hikari pool runs the Flyway migration and
-opens the bounded repository. Each row stores the loaded opportunity ID, its
-backend location ID, one server receipt instant, optional ambient-light and
-crescent-visibility evidence, optional normalized notes, server-computed Moon
-altitude and illumination, Sun altitude, the light bucket, application revision,
+#### Database provisioning and migrations
+
+The deployment must provide a running PostgreSQL server, an existing database,
+and a role with the credentials and permissions needed to create and use the
+feedback tables. Spring, Hikari, and Flyway do not create the PostgreSQL server,
+database, role, or credentials.
+
+`FeedbackPersistenceConfiguration` is an application configuration class that
+Spring discovers during startup. With complete settings, it creates a private
+Hikari connection pool, configures Flyway with that pool, and calls
+`Flyway.migrate()` before opening the bounded repository. The checked-in
+exclusion of Spring Boot's generic `DataSource` and Flyway auto-configuration
+remains in effect. It stops Spring Boot from creating a database dependency for
+the whole application; it does not disable the Flyway library or this explicit
+migration call.
+
+Flyway is the database-schema migration runner. It scans
+`classpath:db/migration` for versioned scripts. On the first successful startup
+against an empty configured database, it creates `flyway_schema_history`, runs
+`V1__create_calibration_feedback.sql`, and records the migration version and
+checksum. The V1 script creates the feedback tables, constraints, and index
+inside the existing database. On later startups, Flyway validates the recorded
+migration and applies only newer pending scripts. Once V1 has been deployed,
+schema changes should be added as a new migration such as `V2__description.sql`
+instead of editing V1.
+
+Each feedback row stores the loaded opportunity ID, its backend location ID,
+one server receipt instant, optional ambient-light and crescent-visibility
+evidence, optional normalized notes, server-computed Moon altitude and
+illumination, Sun altitude, the light bucket, application revision,
 `serverReportId`, `clientSubmissionId`, and the idempotency hash. At least one
 evidence field is required; omitted fields stay null instead of becoming an
 `unknown` rating.
