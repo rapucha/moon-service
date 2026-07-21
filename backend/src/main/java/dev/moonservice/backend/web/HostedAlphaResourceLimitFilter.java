@@ -1,5 +1,6 @@
 package dev.moonservice.backend.web;
 
+import dev.moonservice.backend.admission.HostedAlphaProviderAdmission;
 import dev.moonservice.backend.config.MoonRuntimeProperties;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
@@ -18,13 +19,10 @@ import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Objects;
-import java.util.Optional;
-import java.util.concurrent.Semaphore;
-import java.util.function.Supplier;
 
 @Component
 @Order(Ordered.HIGHEST_PRECEDENCE + 5)
-public final class HostedAlphaResourceLimitFilter extends OncePerRequestFilter {
+final class HostedAlphaResourceLimitFilter extends OncePerRequestFilter {
     private static final String OPPORTUNITY_PATH = "/api/opportunities";
     private static final String ADMIN_STATUS_PATH = "/admin/status";
     private static final String READINESS_PATH = "/readyz";
@@ -33,38 +31,28 @@ public final class HostedAlphaResourceLimitFilter extends OncePerRequestFilter {
     private final Clock clock;
     private final ObjectMapper objectMapper;
     private final TokenBucket wholeSiteBucket;
-    private final TokenBucket providerLookupBucket;
-    private final Semaphore providerOperationPermits;
+    private final HostedAlphaProviderAdmission providerAdmission;
 
     HostedAlphaResourceLimitFilter(
             MoonRuntimeProperties properties,
             Clock clock,
             ObjectMapper objectMapper,
+            HostedAlphaProviderAdmission providerAdmission,
             @Value("${moon.hosted-alpha.enabled:false}") boolean enabled
     ) {
         MoonRuntimeProperties.ResourceLimits limits = properties.getResourceLimits();
         if (enabled && (limits.getWholeSiteCapacity() > 40
-                || limits.getWholeSiteRefillInterval().compareTo(Duration.ofSeconds(1)) < 0
-                || limits.getProviderLookupCapacity() > 10
-                || limits.getProviderLookupRefillInterval().compareTo(Duration.ofMinutes(1)) < 0
-                || limits.getOpportunityConcurrency() > 2)) {
+                || limits.getWholeSiteRefillInterval().compareTo(Duration.ofSeconds(1)) < 0)) {
             throw new IllegalStateException("Hosted-alpha resource settings weaken the accepted safety bounds");
-        }
-        if (enabled && properties.getOpenMeteo().getMaxTransportRetries() > 1) {
-            throw new IllegalStateException("Hosted-alpha mode allows at most one Open-Meteo transport retry");
         }
         this.enabled = enabled;
         this.clock = Objects.requireNonNull(clock, "clock");
         this.objectMapper = Objects.requireNonNull(objectMapper, "objectMapper");
+        this.providerAdmission = Objects.requireNonNull(providerAdmission, "providerAdmission");
         this.wholeSiteBucket = new TokenBucket(
                 limits.getWholeSiteCapacity(),
                 limits.getWholeSiteRefillInterval(),
                 clock.instant());
-        this.providerLookupBucket = new TokenBucket(
-                limits.getProviderLookupCapacity(),
-                limits.getProviderLookupRefillInterval(),
-                clock.instant());
-        this.providerOperationPermits = new Semaphore(limits.getOpportunityConcurrency(), true);
     }
 
     @Override
@@ -90,19 +78,12 @@ public final class HostedAlphaResourceLimitFilter extends OncePerRequestFilter {
             return;
         }
 
-        if (!providerOperationPermits.tryAcquire()) {
-            reject(request, response, path, 1L);
-            return;
-        }
-        try {
-            Admission providerAdmission = providerLookupBucket.consumeTokenIfAvailable(clock.instant());
-            if (!providerAdmission.accepted()) {
-                reject(request, response, path, providerAdmission.retryAfterSeconds());
+        try (HostedAlphaProviderAdmission.Admission admission = providerAdmission.tryAcquire()) {
+            if (!admission.accepted()) {
+                reject(request, response, path, admission.retryAfterSeconds());
                 return;
             }
             filterChain.doFilter(request, response);
-        } finally {
-            providerOperationPermits.release();
         }
     }
 
@@ -132,30 +113,6 @@ public final class HostedAlphaResourceLimitFilter extends OncePerRequestFilter {
     private static boolean isProviderBackedOpportunityRequest(HttpServletRequest request, String path) {
         return OPPORTUNITY_PATH.equals(path)
                 && ("GET".equals(request.getMethod()) || "HEAD".equals(request.getMethod()));
-    }
-
-    /**
-     * Applies the same hosted provider token and concurrency guard to feedback location resolution.
-     * The caller invokes this only after cheap replay and persistence decisions, so those paths do
-     * not spend provider capacity. An empty result is exposed as generic feedback unavailability.
-     */
-    public <T> Optional<T> executeWithProviderAdmission(Supplier<T> operation) {
-        Objects.requireNonNull(operation, "operation");
-        if (!enabled) {
-            return Optional.ofNullable(operation.get());
-        }
-        if (!providerOperationPermits.tryAcquire()) {
-            return Optional.empty();
-        }
-        try {
-            Admission providerAdmission = providerLookupBucket.consumeTokenIfAvailable(clock.instant());
-            if (!providerAdmission.accepted()) {
-                return Optional.empty();
-            }
-            return Optional.ofNullable(operation.get());
-        } finally {
-            providerOperationPermits.release();
-        }
     }
 
     private static boolean isCalibrationFeedbackRequest(HttpServletRequest request) {

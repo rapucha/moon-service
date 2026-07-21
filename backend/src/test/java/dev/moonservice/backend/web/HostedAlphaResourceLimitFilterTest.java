@@ -1,8 +1,8 @@
 package dev.moonservice.backend.web;
 
+import dev.moonservice.backend.admission.HostedAlphaProviderAdmission;
 import dev.moonservice.backend.config.MoonRuntimeProperties;
 import jakarta.servlet.FilterChain;
-import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletResponse;
 import org.junit.jupiter.api.Test;
 import org.springframework.core.annotation.AnnotatedElementUtils;
@@ -16,14 +16,13 @@ import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneId;
 import java.time.ZoneOffset;
-import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.Future;
-import java.util.concurrent.TimeUnit;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 class HostedAlphaResourceLimitFilterTest {
     private static final String ADMIN_TOKEN =
@@ -57,69 +56,28 @@ class HostedAlphaResourceLimitFilterTest {
     }
 
     @Test
-    void provesProviderDayBoundAndConservativeAttemptArithmetic() throws Exception {
+    void appliesWholeSiteAdmissionBeforeProviderAdmissionAndMapsProviderRefusal() throws Exception {
         MutableClock clock = new MutableClock();
+        HostedAlphaProviderAdmission providerAdmission = mock(HostedAlphaProviderAdmission.class);
+        HostedAlphaProviderAdmission.Admission accepted = admission(true, 0L);
+        HostedAlphaProviderAdmission.Admission rejected = admission(false, 37L);
+        when(providerAdmission.tryAcquire()).thenReturn(accepted, rejected);
         HostedAlphaResourceLimitFilter filter = filter(
-                properties(40, Duration.ofSeconds(1), 10, Duration.ofMinutes(1), 2),
+                properties(1, Duration.ofSeconds(1), 10, Duration.ofMinutes(1), 2),
                 clock,
+                providerAdmission,
                 true);
-        int accepted = 0;
 
-        for (int request = 0; request < 10; request++) {
-            assertThat(exchange(filter, opportunityRequest()).getStatus()).isEqualTo(200);
-            accepted++;
-        }
-        assertRateLimited(exchange(filter, opportunityRequest()), 60L);
-        for (int minute = 1; minute <= 1_440; minute++) {
-            clock.advance(Duration.ofMinutes(1));
-            assertThat(exchange(filter, opportunityRequest()).getStatus()).isEqualTo(200);
-            accepted++;
-            assertRateLimited(exchange(filter, opportunityRequest()), 60L);
-        }
+        assertThat(exchange(filter, opportunityRequest()).getStatus()).isEqualTo(200);
+        verify(accepted).close();
 
-        assertThat(accepted).isEqualTo(1_450);
-        int worstCaseAttempts = accepted * 4;
-        assertThat(worstCaseAttempts).isEqualTo(5_800);
-        assertThat(10_000 - worstCaseAttempts).isEqualTo(4_200);
-    }
+        assertRateLimited(exchange(filter, opportunityRequest()), 1L);
+        verify(providerAdmission, times(1)).tryAcquire();
 
-    @Test
-    void rejectsAThirdConcurrentOpportunityAndReleasesPermits() throws Exception {
-        MutableClock clock = new MutableClock();
-        HostedAlphaResourceLimitFilter filter = filter(
-                properties(20, Duration.ofSeconds(1), 10, Duration.ofMinutes(1), 2),
-                clock,
-                true);
-        CountDownLatch entered = new CountDownLatch(2);
-        CountDownLatch release = new CountDownLatch(1);
-        FilterChain blockingChain = (request, response) -> {
-            entered.countDown();
-            try {
-                if (!release.await(5, TimeUnit.SECONDS)) {
-                    throw new ServletException("Timed out waiting to release test request");
-                }
-            } catch (InterruptedException ex) {
-                Thread.currentThread().interrupt();
-                throw new ServletException(ex);
-            }
-        };
-        ExecutorService executor = Executors.newFixedThreadPool(2);
-        try {
-            Future<MockHttpServletResponse> first = executor.submit(() ->
-                    exchange(filter, opportunityRequest(), blockingChain));
-            Future<MockHttpServletResponse> second = executor.submit(() ->
-                    exchange(filter, opportunityRequest(), blockingChain));
-            assertThat(entered.await(5, TimeUnit.SECONDS)).isTrue();
-
-            assertRateLimited(exchange(filter, opportunityRequest()), 1L);
-            release.countDown();
-            assertThat(first.get(5, TimeUnit.SECONDS).getStatus()).isEqualTo(200);
-            assertThat(second.get(5, TimeUnit.SECONDS).getStatus()).isEqualTo(200);
-            assertThat(exchange(filter, opportunityRequest()).getStatus()).isEqualTo(200);
-        } finally {
-            release.countDown();
-            executor.shutdownNow();
-        }
+        clock.advance(Duration.ofSeconds(1));
+        assertRateLimited(exchange(filter, opportunityRequest()), 37L);
+        verify(providerAdmission, times(2)).tryAcquire();
+        verify(rejected).close();
     }
 
     @Test
@@ -161,22 +119,24 @@ class HostedAlphaResourceLimitFilterTest {
 
         clock.advance(Duration.ofSeconds(3));
         assertThat(exchange(filter, opportunityRequest()).getStatus()).isEqualTo(200);
+        assertThat(exchange(filter, opportunityRequest()).getStatus()).isEqualTo(200);
+        assertThat(exchange(filter, opportunityRequest()).getStatus()).isEqualTo(200);
         assertThat(exchange(filter, opportunityRequest()).getStatus()).isEqualTo(429);
     }
 
     @Test
-    void activatesOnlyForHostedModeAndRejectsHostedRetryDrift() throws Exception {
+    void activatesOnlyForHostedModeAndRejectsHostedWholeSiteDrift() throws Exception {
         MoonRuntimeProperties properties = properties(1, Duration.ofSeconds(1), 1, Duration.ofMinutes(1), 1);
-        properties.getOpenMeteo().setMaxTransportRetries(2);
         MutableClock clock = new MutableClock();
         HostedAlphaResourceLimitFilter disabled = filter(properties, clock, false);
         assertThat(exchange(disabled, request("GET", "/")).getStatus()).isEqualTo(200);
         assertThat(exchange(disabled, request("GET", "/")).getStatus()).isEqualTo(200);
+        properties.getResourceLimits().setWholeSiteCapacity(41);
         assertThatThrownBy(() -> filter(properties, clock, true))
                 .isInstanceOf(IllegalStateException.class)
-                .hasMessageContaining("at most one Open-Meteo transport retry");
-        properties.getOpenMeteo().setMaxTransportRetries(1);
-        properties.getResourceLimits().setProviderLookupRefillInterval(Duration.ofSeconds(1));
+                .hasMessageContaining("weaken the accepted safety bounds");
+        properties.getResourceLimits().setWholeSiteCapacity(40);
+        properties.getResourceLimits().setWholeSiteRefillInterval(Duration.ofMillis(500));
         assertThatThrownBy(() -> filter(properties, clock, true))
                 .hasMessageContaining("weaken the accepted safety bounds");
         Order resourceOrder = AnnotatedElementUtils.findMergedAnnotation(HostedAlphaResourceLimitFilter.class, Order.class);
@@ -191,7 +151,30 @@ class HostedAlphaResourceLimitFilterTest {
             Clock clock,
             boolean enabled
     ) {
-        return new HostedAlphaResourceLimitFilter(properties, clock, new ObjectMapper(), enabled);
+        return filter(properties, clock, acceptingProviderAdmission(), enabled);
+    }
+
+    private static HostedAlphaResourceLimitFilter filter(
+            MoonRuntimeProperties properties,
+            Clock clock,
+            HostedAlphaProviderAdmission providerAdmission,
+            boolean enabled
+    ) {
+        return new HostedAlphaResourceLimitFilter(
+                properties, clock, new ObjectMapper(), providerAdmission, enabled);
+    }
+
+    private static HostedAlphaProviderAdmission acceptingProviderAdmission() {
+        HostedAlphaProviderAdmission providerAdmission = mock(HostedAlphaProviderAdmission.class);
+        when(providerAdmission.tryAcquire()).thenAnswer(ignored -> admission(true, 0L));
+        return providerAdmission;
+    }
+
+    private static HostedAlphaProviderAdmission.Admission admission(boolean accepted, long retryAfterSeconds) {
+        HostedAlphaProviderAdmission.Admission admission = mock(HostedAlphaProviderAdmission.Admission.class);
+        when(admission.accepted()).thenReturn(accepted);
+        when(admission.retryAfterSeconds()).thenReturn(retryAfterSeconds);
+        return admission;
     }
 
     private static MoonRuntimeProperties properties(

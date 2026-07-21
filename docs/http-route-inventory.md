@@ -47,22 +47,26 @@ Open-Meteo URLs are provider dependencies, not Moon Service routes.
   canonical `rate_limited` JSON; `HEAD` carries the same status, headers, and
   would-be content length without a body.
 - Exact `GET`/`HEAD /api/opportunities` requests that pass the whole-site bound
-  must also acquire a concurrent-search permit and consume from a provider
-  bucket. The defaults and maximum allowed hosted settings are two concurrent
-  provider operations, ten provider tokens, and a one-token-per-minute refill;
-  stricter settings are valid. Either bound can return `429`; the concurrency permit is
-  released when downstream handling finishes. The same two resources wrap
-  feedback location resolution as described below; they do not apply to pages,
-  static files, admin status, readiness, or the fixture POST route.
+  ask the shared non-web `HostedAlphaProviderAdmission` component to acquire a
+  concurrent provider-operation permit and consume from a provider bucket. The
+  defaults and maximum allowed hosted settings are two concurrent provider
+  operations, ten provider tokens, and a one-token-per-minute refill; stricter
+  settings are valid. A refusal returns to `HostedAlphaResourceLimitFilter`,
+  which maps it to `429`; an accepted permit is released when downstream
+  handling finishes. The same two resources wrap feedback location resolution
+  as described below; they do not apply to pages, static files, admin status,
+  readiness, or the fixture POST route.
 - Whole-site bypasses are the bodyless `GET /readyz` whose connector reports a
   loopback remote address and `Host: localhost`, matching the Docker health
   check, and both exact feedback paths. Other readiness requests still consume
   whole-site capacity. Capability performs no provider work. After early
   disabled, replay, conflict, and storage decisions, feedback location
-  resolution uses the shared provider token and concurrency guard. Successful
-  resolution can then reach the separate process-wide 12-token feedback write
-  bucket, which restores one whole token per complete hour. Resolver failure or
-  provider-admission refusal consumes no feedback write token.
+  resolution asks the same `HostedAlphaProviderAdmission` owner for the shared
+  provider token and concurrency guard. A refusal becomes generic
+  `503 feedback_unavailable`. Successful resolution can then reach the separate
+  process-wide 12-token feedback write bucket, which restores one whole token
+  per complete hour. Resolver failure or provider-admission refusal consumes no
+  feedback write token.
 - Hosted-alpha mode exposes only exact allowlisted paths. It allows bodyless
   `GET` or `HEAD` on every approved path except feedback submissions, where it
   allows only `POST` and passes the body to the route's 16,384-byte bound. It
@@ -79,6 +83,7 @@ Open-Meteo URLs are provider dependencies, not Moon Service routes.
 
 Implementation authority: [request logging](../backend/src/main/java/dev/moonservice/backend/observability/RequestLoggingFilter.java),
 [hosted resource-limit filter](../backend/src/main/java/dev/moonservice/backend/web/HostedAlphaResourceLimitFilter.java),
+[shared provider admission](../backend/src/main/java/dev/moonservice/backend/admission/HostedAlphaProviderAdmission.java),
 [hosted-alpha surface filter](../backend/src/main/java/dev/moonservice/backend/web/HostedAlphaSurfaceFilter.java),
 and [hosted-alpha functional tests](../backend/src/test/java/dev/moonservice/backend/web/HostedAlphaSurfaceFunctionalTest.java).
 

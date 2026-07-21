@@ -13,6 +13,7 @@ autonumber 1 "<b>[00]"
 participant Browser
 participant "Feedback API" as Feedback
 database "Feedback store" as Store
+participant "Shared provider admission\n(no-op outside hosted alpha)" as Admission
 participant "Cached location\nresolver" as Resolver
 participant "Write limiter" as Limiter
 participant Astronomy
@@ -36,20 +37,29 @@ else New request
   Store --> Feedback: NotFound
   Feedback -> Store: Check submission status
   Store --> Feedback: Ready for a new row
-  Feedback -> Resolver: Resolve normalized locationId
-  Resolver --> Feedback: Canonical ID + calculation input
-  Feedback -> Limiter: Consume one write token
-  Limiter --> Feedback: Admitted
-  Feedback -> Astronomy: Calculate at the receipt instant
-  Astronomy --> Feedback: Four stored astronomy facts
-  Feedback -> Store: Transactionally recheck UUID and capacity; insert
-  Store --> Feedback: Created, replayed, or conflict
-  Feedback --> Browser: 201 created, 200 replayed,\nor 409 client_submission_conflict
+  Feedback -> Admission: tryAcquire()
+  alt Provider admission unavailable
+    Admission --> Feedback: Rejected + retryAfterSeconds
+    Feedback --> Browser: 503 feedback_unavailable
+  else Admitted
+    Admission --> Feedback: Admission lease
+    Feedback -> Resolver: Resolve normalized locationId
+    Resolver --> Feedback: Canonical ID + calculation input
+    Feedback -> Admission: Close lease; release permit
+    Feedback -> Limiter: Consume one write token
+    Limiter --> Feedback: Admitted
+    Feedback -> Astronomy: Calculate at the receipt instant
+    Astronomy --> Feedback: Four stored astronomy facts
+    Feedback -> Store: Transactionally recheck UUID and capacity; insert
+    Store --> Feedback: Created, replayed, or conflict
+    Feedback --> Browser: 201 created, 200 replayed,\nor 409 client_submission_conflict
+  end
 end
 
 note over Browser, Astronomy
   Overview only. The API contract defines exact validation, check order,
   public errors, digest bytes, outage behavior, and token handling.
+  A spent provider token is not restored after resolver work or failure.
   A definite eligible retry or an unknown outcome requires tester action
   with the same UUID and frozen payload. The browser never retries automatically.
 end note

@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <svg xmlns="http://www.w3.org/2000/svg" width="297mm" height="210mm" viewBox="0 0 1684 1191" role="img" aria-labelledby="title desc">
   <title id="title">Moon Service hosted-alpha admission by route</title>
-  <desc id="desc">Three-lane overview showing opportunity admission, feedback capability bypass, and feedback submission entering shared provider admission only for new-report location resolution.</desc>
+  <desc id="desc">Three-lane overview showing the HTTP filter owning whole-site admission and HostedAlphaProviderAdmission owning provider admission shared by opportunities and new feedback location resolution.</desc>
   <defs>
     <marker id="arrow" markerWidth="10" markerHeight="10" refX="9" refY="5" orient="auto" markerUnits="strokeWidth">
       <path d="M 0 0 L 10 5 L 0 10 z" fill="#334155"/>
@@ -41,13 +41,13 @@
 
   <g transform="translate(1350 52)">
     <rect x="0" y="0" width="112" height="32" rx="16" fill="#dfeaf8"/>
-    <text x="56" y="21" class="badge" text-anchor="middle" fill="#245a91">ISSUE #165</text>
+    <text x="56" y="21" class="badge" text-anchor="middle" fill="#245a91">ISSUE #185</text>
     <rect x="120" y="0" width="96" height="32" rx="16" fill="#e6f4ef"/>
-    <text x="168" y="21" class="badge" text-anchor="middle" fill="#13705f">PR #178</text>
+    <text x="168" y="21" class="badge" text-anchor="middle" fill="#13705f">PR #186</text>
   </g>
 
   <rect x="40" y="154" width="1604" height="688" rx="22" fill="#ffffff"/>
-  <text x="66" y="189" class="panel-title">Three request paths · one process-wide provider guard</text>
+  <text x="66" y="189" class="panel-title">Three request paths · separate HTTP-filter and provider-admission owners</text>
   <rect x="1262" y="170" width="354" height="29" rx="14.5" fill="#fff7df"/>
   <text x="1439" y="189" class="badge" text-anchor="middle" fill="#8a5a00">SHARED BY ALL VISITORS</text>
 
@@ -60,21 +60,22 @@
 
   <line x1="344" y1="292" x2="402" y2="292" class="arrow"/>
   <rect x="410" y="253" width="264" height="78" rx="13" fill="#dff4ed" stroke="#80cbb7"/>
-  <text x="542" y="280" class="node-title" fill="#0b6757">Whole-site TokenBucket</text>
-  <text x="542" y="303" class="node-copy">40 credits · +1 / full second</text>
-  <text x="542" y="346" class="edge">empty → 429 + Retry-After</text>
+  <text x="542" y="280" class="node-title" fill="#0b6757">HTTP resource-limit filter</text>
+  <text x="542" y="303" class="node-copy">owns whole-site TB: 40 · +1 / second</text>
+  <text x="542" y="346" class="edge">empty → filter returns 429 + Retry-After</text>
 
   <line x1="674" y1="292" x2="744" y2="292" class="arrow"/>
   <rect x="752" y="242" width="362" height="100" rx="14" fill="#f1edfb" stroke="#b7a4e8"/>
-  <text x="933" y="270" class="node-title" fill="#5d3aa2">Shared provider admission</text>
+  <text x="933" y="270" class="node-title" fill="#5d3aa2">HostedAlphaProviderAdmission</text>
   <text x="933" y="293" class="node-copy">fair Semaphore: 2 permits · no queue</text>
   <text x="933" y="314" class="node-copy">then TokenBucket: 10 credits · +1 / minute</text>
-  <text x="933" y="357" class="edge">refusal → 429 · permit held through downstream response</text>
+  <text x="933" y="357" class="edge">refusal result → filter maps 429 + Retry-After</text>
 
   <line x1="1114" y1="292" x2="1198" y2="292" class="arrow"/>
   <rect x="1206" y="253" width="388" height="78" rx="13" fill="#e8f1f8" stroke="#9bbbd3"/>
-  <text x="1400" y="280" class="node-title" fill="#20556f">Surface → controller → caches</text>
-  <text x="1400" y="303" class="node-copy">Open-Meteo only on a miss</text>
+  <text x="1400" y="276" class="node-title" fill="#20556f">Surface → controller → caches</text>
+  <text x="1400" y="298" class="node-copy">Open-Meteo only on a miss</text>
+  <text x="1400" y="318" class="node-copy">filter closes lease after downstream</text>
 
   <!-- Capability lane -->
   <rect x="66" y="378" width="1552" height="116" rx="18" fill="#f0faf7" stroke="#b9dfd3"/>
@@ -112,7 +113,7 @@
   <line x1="752" y1="588" x2="798" y2="588" class="arrow"/>
   <text x="775" y="576" class="edge">new</text>
   <rect x="806" y="538" width="336" height="100" rx="14" fill="#f1edfb" stroke="#b7a4e8"/>
-  <text x="974" y="566" class="node-title" fill="#5d3aa2">Same shared provider admission</text>
+  <text x="974" y="566" class="node-title" fill="#5d3aa2">HostedAlphaProviderAdmission</text>
   <text x="974" y="589" class="node-copy">try permit, then spend provider credit</text>
   <text x="974" y="610" class="node-copy">permit spans location resolution only</text>
   <text x="974" y="630" class="edge" fill="#9e3434">refusal → 503 feedback_unavailable</text>
@@ -164,8 +165,8 @@
     <rect x="0" y="0" width="7" height="260" rx="3.5" fill="#d29a24"/>
     <text x="28" y="38" class="card-title">Refusal contract</text>
     <text x="28" y="72" class="card-copy">• Whole-site exhaustion: 429 + computed Retry-After.</text>
-    <text x="28" y="105" class="card-copy">• Opportunity permit refusal: 429 + Retry-After: 1.</text>
-    <text x="28" y="138" class="card-copy">• Opportunity provider-token refusal: 429 + retry hint.</text>
+    <text x="28" y="105" class="card-copy">• Opportunity permit refusal: filter returns 429 + Retry-After: 1.</text>
+    <text x="28" y="138" class="card-copy">• Opportunity token refusal: filter returns 429 + retry hint.</text>
     <text x="28" y="171" class="card-copy">• Feedback shared-gate refusal: 503 feedback_unavailable.</text>
     <text x="28" y="204" class="card-copy">• Feedback's later write limiter can return its own 429.</text>
     <text x="28" y="232" class="small">Public feedback errors never reveal which shared guard refused work.</text>
@@ -174,7 +175,7 @@
   <g transform="translate(1094 866)">
     <rect x="0" y="0" width="550" height="260" rx="20" fill="#ffffff"/>
     <rect x="0" y="0" width="7" height="260" rx="3.5" fill="#7354b8"/>
-    <text x="28" y="38" class="card-title">Shared provider bound</text>
+    <text x="28" y="38" class="card-title">HostedAlphaProviderAdmission</text>
     <text x="28" y="72" class="card-copy">• One fair two-permit Semaphore is process-wide.</text>
     <text x="28" y="105" class="card-copy">• One 10-credit TokenBucket refills once per minute.</text>
     <text x="28" y="138" class="card-copy">• Opportunity holds a permit through its full filter chain.</text>
@@ -184,6 +185,6 @@
     <text x="44" y="230" class="small">1,450 shared admissions × at most 4 attempts = 5,800 attempts.</text>
   </g>
 
-  <text x="40" y="1166" class="footer">Implementation snapshot · issue #165 / PR #178 · Algorithm and accepted bounds originated in issue #120 / PR #133.</text>
+  <text x="40" y="1166" class="footer">Current implementation · issue #185 / PR #186 · Initial controls: issue #165 / PR #178 · Bounds: issue #120 / PR #133.</text>
   <text x="1644" y="1166" class="footer" text-anchor="end">Moon Service · 2026-07-21</text>
 </svg>
