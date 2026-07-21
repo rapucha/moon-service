@@ -1,48 +1,63 @@
 # Context Pack - Backend Spine
 
 Purpose
-- Guide work in the real backend module while it grows from fixture-backed
-  opportunity search into the MVP service.
+- Guide work in the current Spring Boot backend and apply its approved
+  dependency directions while the MVP grows.
 
 Current Backend Scope
 - Module: `backend/`
 - Framework: Spring Boot.
-- Current endpoints:
+- Primary API endpoints:
   - `GET /api/opportunities?q=Praha`
   - `POST /api/opportunities/search`
-- Current dependency: `jvm-scoring-prototype`
-- Current provider behavior: fixture-backed location resolution and scoring.
-  The location seam can represent resolved, ambiguous, not-found, and
-  temporarily-unavailable lookup results, but it does not call live geocoding
-  providers yet.
+  - `GET /api/calibration-feedback/v1/capability`
+  - `POST /api/calibration-feedback/v1/submissions`
+- The [HTTP route inventory](../../http-route-inventory.md) is the canonical
+  list of controller routes and exposure rules.
+- Anonymous query lookup uses Open-Meteo geocoding and weather adapters behind
+  backend-owned resolver and provider seams. The direct POST endpoint retains
+  its deterministic prototype fixture path. Unit tests use saved responses and
+  fakes rather than live provider calls.
+- Opportunity scoring still depends on the `jvm-scoring-prototype` Maven
+  module and several of its internal types.
+- Optional PostgreSQL, Hikari, and Flyway persistence exists only for bounded
+  calibration feedback. It is disabled by default and isolated from lookup,
+  liveness, and readiness.
 
 Design Intent
 - Keep the backend small and explicit.
-- Preserve the opportunity search contract while replacing fixture dependencies
-  one at a time.
-- Introduce seams before live provider integrations:
-  - Geocoding provider.
-  - Weather provider.
-  - Ephemeris service.
-  - Opportunity scorer.
-  - Feed/calendar renderer.
+- Preserve public opportunity and feedback contracts while replacing internal
+  boundaries deliberately.
+- Keep live provider adapters behind backend-owned ports.
 - Keep each provider testable with fakes and fixtures.
 
+Dependency Directions
+- Treat the [architecture map](../../architecture.md#backend-package-ownership-and-dependency-directions)
+  as the source of truth.
+- `backend.web` is an outer adapter. Application, domain, provider, and
+  persistence responsibilities must not depend on its filters or controllers.
+- Provider adapters depend on backend-owned ports, never the reverse.
+- Spring configuration is the composition root and may wire interfaces to
+  concrete implementations.
+- The Maven direction is `backend` to `jvm-scoring-prototype`; the prototype
+  must not depend on `backend`.
+- Current package cycles and broader prototype imports are transitional, not
+  approved directions. Do not add enforcement tooling without separate issue
+  authority.
+
 Recommended Growth Sequence
-1. Preserve the current fixture-backed opportunity search tests.
-2. Add backend-owned response DTOs when the endpoint stops returning
-   raw prototype JSON.
-3. Add provider interfaces with fixture implementations.
-4. Add cache interfaces before live weather/geocoding calls become normal.
-5. Add an Open-Meteo geocoding adapter behind the existing location seam.
-6. Add Atom/RSS and `.ics` exports after the opportunity contract is stable.
-7. Add persistence only when cache durability, result IDs, saved alerts, or
-   similar product needs require it.
+1. Keep live geocoding and weather behind their current backend-owned seams.
+2. Reduce prototype coupling only through reviewed migration work; do not hide
+   it behind new speculative abstractions.
+3. Keep calibration-feedback persistence optional and privacy-bounded.
+4. Add Atom/RSS and `.ics` exports after the opportunity contract is stable.
 
 Guardrails
-- Do not add database or migrations during endpoint/module cleanup.
+- Do not broaden calibration persistence or make lookup depend on it during
+  endpoint or module cleanup.
 - Do not call live provider APIs from unit tests.
 - Do not introduce accounts or cookies for opportunity search.
+- Do not move shared application or provider behavior into HTTP adapters.
 - Do not silently change public response meanings; update docs and tests.
 - Keep error responses conventional:
   - `400` for invalid request.
@@ -58,9 +73,10 @@ Validation
   - `python3 -B scripts/prototype_contract_parity.py`
 
 Review Questions
-- Is this still fixture-backed, and is that obvious?
+- Does each dependency follow the architecture map, including the outer-web
+  and provider-port directions?
 - Did the change move any privacy boundary?
-- Did it create a provider dependency without a seam?
+- Did it add to a transitional cycle or broaden prototype coupling?
 - Does endpoint behavior match `docs/api-shape.md`, or is the divergence
   intentional and documented?
 - Can the module be tested without network access?

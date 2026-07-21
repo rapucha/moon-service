@@ -164,6 +164,62 @@ Enable collection only after the PRs for those issues merge and the host check
 passes. Change scoring or suggested times later only when collected evidence
 supports the change.
 
+### Backend package ownership and dependency directions
+
+This map records intended dependency direction, not a claim that every current
+package is already isolated. An arrow means the source may depend on the
+target.
+
+```text
+Spring configuration (composition root) -> runtime parts needed for assembly
+
+inbound HTTP adapters -> application workflows -> backend-owned ports/models
+outbound adapters -----------------------------> backend-owned ports/models
+
+backend -> jvm-scoring-prototype (temporary)
+```
+
+The stable rules are:
+
+- `backend.web` is an outer adapter for general HTTP and Servlet concerns such
+  as filters, routes, headers, status codes, and error mapping. It may call
+  application workflows. Application, domain, provider, and persistence
+  responsibilities must not depend on HTTP filters or controllers.
+- A capability shared by HTTP and non-HTTP workflows belongs outside the web
+  adapter. `backend.admission.HostedAlphaProviderAdmission` owns shared provider
+  admission; the opportunity filter and feedback service apply their own public
+  outcome mappings around it.
+- Provider adapters such as `backend.location.openmeteo` and
+  `backend.weather.openmeteo` depend on backend-owned location and weather
+  ports. The port packages do not depend back on provider packages.
+- Spring configuration is the composition root. Configuration types may depend
+  on interfaces and concrete implementations to assemble the runtime graph.
+  That wiring role does not make them owners of application or provider
+  behavior.
+- The Maven module direction is `backend` to `jvm-scoring-prototype`, never the
+  reverse. This is a temporary migration boundary, not the desired final module
+  design.
+
+Some current source structure is transitional:
+
+- Location and weather cache implementations depend on observability-owned
+  cache-metric types, while observability decorators depend back on location
+  and weather types.
+- `backend.opportunity` depends on DTOs and ports in
+  `backend.opportunity.search`, while that package still imports an exception
+  from `backend.opportunity`.
+- The scoring prototype has internal package cycles and a broad public surface.
+- Backend scoring, feedback, and weather code imports several prototype types
+  beyond the public `PreviewEvaluator` facade identified in the MVP roadmap.
+
+These observations document debt; they do not approve new dependencies in the
+same directions. Keep the map conceptual and hand-maintained. Do not add an
+import snapshot or enforcement tool now. Reconsider one narrow executable rule
+only after an independent review finds a repeated violation of an approved
+direction, the scoring prototype boundary is retired or materially
+restructured, or another issue explicitly approves both a stable rule and its
+enforcement cost.
+
 ### Frontend source boundary
 
 Browser source ownership is separate from backend source ownership. Authored
