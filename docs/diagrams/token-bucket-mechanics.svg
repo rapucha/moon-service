@@ -1,0 +1,224 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="297mm" height="210mm" viewBox="0 0 1684 1191" role="img" aria-labelledby="title desc">
+  <title id="title">Inside the Moon Service TokenBucket</title>
+  <desc id="desc">Flowchart and worked timeline explaining the shared TokenBucket algorithm used by hosted-alpha whole-site and provider admission.</desc>
+  <defs>
+    <marker id="arrow" markerWidth="10" markerHeight="10" refX="9" refY="5" orient="auto" markerUnits="strokeWidth">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#34435a"/>
+    </marker>
+    <marker id="arrowGreen" markerWidth="10" markerHeight="10" refX="9" refY="5" orient="auto" markerUnits="strokeWidth">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#16836f"/>
+    </marker>
+    <marker id="arrowRed" markerWidth="10" markerHeight="10" refX="9" refY="5" orient="auto" markerUnits="strokeWidth">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#b44747"/>
+    </marker>
+    <style>
+      @page { size: A4 landscape; margin: 0; }
+      text { font-family: "DejaVu Sans", Arial, sans-serif; fill: #14213d; }
+      .eyebrow { font-size: 14px; font-weight: 800; letter-spacing: 2.1px; fill: #16836f; }
+      .title { font-size: 43px; font-weight: 760; letter-spacing: -1.2px; }
+      .subtitle { font-size: 19px; fill: #516077; }
+      .badge { font-size: 13px; font-weight: 760; letter-spacing: 0.7px; }
+      .panel-title { font-size: 20px; font-weight: 780; }
+      .node-title { font-size: 15px; font-weight: 770; text-anchor: middle; }
+      .node-copy { font-size: 12px; font-weight: 560; text-anchor: middle; fill: #58677e; }
+      .method-node { font-family: "DejaVu Sans Mono", monospace; font-size: 12.5px; font-weight: 750; text-anchor: middle; fill: #ffffff; }
+      .on-dark { fill: #ffffff; }
+      .on-dark-sub { fill: #d7e4f5; }
+      .edge { font-size: 12px; font-weight: 760; }
+      .card-title { font-size: 16px; font-weight: 780; }
+      .copy { font-size: 13px; font-weight: 540; fill: #445269; }
+      .small { font-size: 11.5px; font-weight: 570; fill: #66758b; }
+      .formula { font-family: "DejaVu Sans Mono", monospace; font-size: 13px; font-weight: 650; fill: #243754; }
+      .timeline-time { font-size: 14px; font-weight: 820; text-anchor: middle; }
+      .timeline-copy { font-size: 11.5px; font-weight: 580; text-anchor: middle; fill: #526077; }
+      .footer { font-size: 11px; font-weight: 650; fill: #627086; }
+      .flow { stroke: #34435a; stroke-width: 2; fill: none; marker-end: url(#arrow); }
+      .route { stroke: #34435a; stroke-width: 2; fill: none; }
+      .flow-green { stroke: #16836f; stroke-width: 2.2; fill: none; marker-end: url(#arrowGreen); }
+      .flow-red { stroke: #b44747; stroke-width: 2.2; fill: none; marker-end: url(#arrowRed); }
+    </style>
+  </defs>
+
+  <rect width="1684" height="1191" fill="#f3f6fa"/>
+  <circle cx="1574" cy="-16" r="196" fill="#e6f4ef"/>
+  <circle cx="1640" cy="26" r="74" fill="#bde5d7" opacity="0.65"/>
+
+  <text x="58" y="47" class="eyebrow">MOON SERVICE · TOKEN BUCKET</text>
+  <text x="58" y="96" class="title">Inside one TokenBucket</text>
+  <text x="58" y="128" class="subtitle">A synchronized call refills complete intervals, spends one admission credit, or returns a bounded retry hint.</text>
+
+  <g transform="translate(1360 52)">
+    <rect x="0" y="0" width="118" height="32" rx="16" fill="#e6f4ef"/>
+    <text x="59" y="21" class="badge" text-anchor="middle" fill="#13705f">ALGORITHM</text>
+    <rect x="126" y="0" width="112" height="32" rx="16" fill="#dfeaf8"/>
+    <text x="182" y="21" class="badge" text-anchor="middle" fill="#245a91">ISSUE #120</text>
+  </g>
+
+  <!-- Flowchart panel -->
+  <rect x="40" y="154" width="1000" height="694" rx="22" fill="#ffffff"/>
+  <text x="68" y="191" class="panel-title">What synchronized consumeTokenIfAvailable(now) does</text>
+  <rect x="730" y="169" width="280" height="29" rx="14.5" fill="#e8f7f2"/>
+  <text x="870" y="188" class="badge" text-anchor="middle" fill="#126c5c">LAZY REFILL · NO BACKGROUND TIMER</text>
+
+  <!-- Row 1 -->
+  <rect x="76" y="218" width="230" height="84" rx="42" fill="#183153"/>
+  <text x="191" y="254" class="method-node">consumeTokenIfAvailable(now)</text>
+  <text x="191" y="279" class="node-copy on-dark-sub">enter synchronized section</text>
+  <line x1="306" y1="260" x2="330" y2="260" class="flow"/>
+
+  <rect x="338" y="218" width="204" height="84" rx="14" fill="#e6eef9" stroke="#9cb8dd"/>
+  <text x="440" y="249" class="node-title" fill="#245a91">refill(now)</text>
+  <text x="440" y="271" class="node-copy">updates state before</text>
+  <text x="440" y="287" class="node-copy">checking availability</text>
+  <line x1="542" y1="260" x2="620" y2="260" class="flow"/>
+
+  <path d="M 720 203 L 824 260 L 720 317 L 616 260 z" fill="#fff5df" stroke="#e1b45b" stroke-width="1.5"/>
+  <text x="720" y="254" class="node-title" fill="#835600">now before</text>
+  <text x="720" y="274" class="node-title" fill="#835600">refilledAt?</text>
+
+  <line x1="824" y1="260" x2="870" y2="260" class="flow"/>
+  <text x="836" y="249" class="edge" fill="#9b3e3e">YES</text>
+  <rect x="878" y="222" width="126" height="76" rx="13" fill="#fff0f0" stroke="#e6a0a0"/>
+  <text x="941" y="250" class="node-title" fill="#9b3e3e">No refill</text>
+  <text x="941" y="272" class="node-copy">clock moved back</text>
+  <text x="941" y="288" class="node-copy">add nothing</text>
+
+  <!-- Row 2 refill math -->
+  <path d="M 720 317 L 720 350" class="flow"/>
+  <text x="731" y="340" class="edge" fill="#126c5c">NO</text>
+  <rect x="522" y="356" width="396" height="68" rx="13" fill="#edf4fb" stroke="#aac4df"/>
+  <text x="720" y="382" class="formula" text-anchor="middle">k = floor((now − refilledAt) / Δ)</text>
+  <text x="720" y="406" class="node-copy">count complete refill intervals only</text>
+  <line x1="720" y1="424" x2="720" y2="458" class="flow"/>
+
+  <rect x="456" y="466" width="528" height="94" rx="14" fill="#e8f7f2" stroke="#8acbb9"/>
+  <text x="720" y="491" class="node-title" fill="#126c5c">If k &gt; 0, advance by whole intervals</text>
+  <text x="720" y="516" class="formula" text-anchor="middle">tokens ← min(C, tokens + min(k, C))</text>
+  <text x="720" y="539" class="formula" text-anchor="middle">refilledAt ← refilledAt + k × Δ</text>
+  <text x="720" y="556" class="small" text-anchor="middle">Advance by k × Δ to preserve the partial interval.</text>
+
+  <!-- Both refill outcomes join on a dedicated lane before availability is checked. -->
+  <path d="M 941 298 L 941 326 L 1016 326 L 1016 588 L 724 588" class="route"/>
+  <path d="M 720 560 L 720 584" class="route"/>
+  <circle cx="720" cy="588" r="4.5" fill="#34435a"/>
+  <line x1="720" y1="593" x2="720" y2="610" class="flow"/>
+
+  <!-- Token availability decision -->
+  <path d="M 720 610 L 830 660 L 720 710 L 610 660 z" fill="#eee9fb" stroke="#ad9ade" stroke-width="1.5"/>
+  <text x="720" y="666" class="node-title" fill="#5d3aa2">tokens &gt; 0?</text>
+
+  <!-- Accepted -->
+  <line x1="610" y1="660" x2="338" y2="660" class="flow-green"/>
+  <text x="460" y="648" class="edge" fill="#126c5c">YES</text>
+  <rect x="76" y="611" width="254" height="98" rx="15" fill="#e8f7f2" stroke="#7bc6b2"/>
+  <text x="203" y="638" class="node-title" fill="#126c5c">Spend exactly one</text>
+  <text x="203" y="662" class="formula" text-anchor="middle">tokens ← tokens − 1</text>
+  <text x="203" y="686" class="node-copy">accepted = true · retry = 0</text>
+
+  <!-- Rejected -->
+  <line x1="720" y1="710" x2="720" y2="752" class="flow-red"/>
+  <text x="735" y="738" class="edge" fill="#9b3e3e">NO</text>
+  <rect x="420" y="760" width="600" height="76" rx="15" fill="#fff0f0" stroke="#e39b9b"/>
+  <text x="720" y="784" class="node-title" fill="#9b3e3e">Reject without changing tokens</text>
+  <text x="720" y="806" class="formula" text-anchor="middle">remainingMs ← (Δ − elapsed).toMillis()</text>
+  <text x="720" y="827" class="formula" text-anchor="middle">retrySeconds ← max(1, floor((remainingMs + 999) / 1000))</text>
+
+  <!-- Right state panel -->
+  <rect x="1062" y="154" width="582" height="694" rx="22" fill="#ffffff"/>
+  <text x="1090" y="191" class="panel-title">State carried between calls</text>
+
+  <g transform="translate(1100 222)">
+    <path d="M 88 20 L 362 20 L 328 184 Q 323 210 296 210 L 154 210 Q 127 210 122 184 z" fill="#edf4fb" stroke="#86add2" stroke-width="3"/>
+    <line x1="88" y1="20" x2="362" y2="20" stroke="#245a91" stroke-width="8" stroke-linecap="round"/>
+    <circle cx="163" cy="166" r="24" fill="#16836f"/>
+    <circle cx="225" cy="166" r="24" fill="#16836f"/>
+    <circle cx="287" cy="166" r="24" fill="#d9e2ed" stroke="#a7b4c4" stroke-width="2" stroke-dasharray="5 4"/>
+    <circle cx="194" cy="106" r="24" fill="#16836f"/>
+    <circle cx="256" cy="106" r="24" fill="#d9e2ed" stroke="#a7b4c4" stroke-width="2" stroke-dasharray="5 4"/>
+    <path d="M 225 -46 L 225 -4" class="flow-green"/>
+    <text x="225" y="-58" class="node-title" fill="#126c5c">+1 after each complete Δ</text>
+    <text x="225" y="248" class="node-title">0 ≤ tokens ≤ capacity C</text>
+    <text x="225" y="271" class="node-copy">illustrative slots; capacity is configurable</text>
+  </g>
+
+  <rect x="1090" y="510" width="526" height="123" rx="14" fill="#f6f8fb" stroke="#d6dee9"/>
+  <text x="1114" y="536" class="card-title">Four fields</text>
+  <text x="1114" y="558" class="formula">capacity C</text>
+  <text x="1282" y="558" class="copy">maximum stored credits</text>
+  <text x="1114" y="580" class="formula">refill interval Δ</text>
+  <text x="1282" y="580" class="copy">time required for one credit</text>
+  <text x="1114" y="602" class="formula">tokens</text>
+  <text x="1282" y="602" class="copy">current stored admission credits</text>
+  <text x="1114" y="624" class="formula">refilledAt</text>
+  <text x="1282" y="624" class="copy">anchor; advances even when capacity-capped</text>
+
+  <rect x="1090" y="651" width="252" height="112" rx="14" fill="#e8f7f2"/>
+  <text x="1114" y="677" class="card-title" fill="#126c5c">Whole-site instance</text>
+  <text x="1114" y="704" class="formula">C = 40 · Δ = 1s</text>
+  <text x="1114" y="729" class="small">Shared except exact Docker</text>
+  <text x="1114" y="746" class="small">and feedback API paths.</text>
+
+  <rect x="1364" y="651" width="252" height="112" rx="14" fill="#f1edfb"/>
+  <text x="1388" y="677" class="card-title" fill="#5d3aa2">Provider instance</text>
+  <text x="1388" y="704" class="formula">C = 10 · Δ = 60s</text>
+  <text x="1388" y="729" class="small">Shared by opportunities and</text>
+  <text x="1388" y="746" class="small">feedback location resolution.</text>
+
+  <rect x="1090" y="781" width="526" height="45" rx="12" fill="#fff8e8" stroke="#ead19a"/>
+  <text x="1353" y="809" class="copy" text-anchor="middle">The feedback write limiter is separate; it is not this TokenBucket.</text>
+
+  <!-- Worked timeline -->
+  <rect x="40" y="872" width="1604" height="254" rx="22" fill="#ffffff"/>
+  <text x="68" y="906" class="panel-title">Worked timeline · illustrative C = 4, Δ = 10 seconds</text>
+  <text x="1614" y="906" class="small" text-anchor="end">A filled dot is one stored admission credit.</text>
+  <line x1="112" y1="968" x2="1572" y2="968" stroke="#9eacbd" stroke-width="4" stroke-linecap="round"/>
+
+  <!-- t=0 -->
+  <line x1="150" y1="956" x2="150" y2="980" stroke="#183153" stroke-width="4"/>
+  <circle cx="150" cy="968" r="10" fill="#183153"/>
+  <text x="150" y="930" class="timeline-time">t = 0</text>
+  <text x="150" y="949" class="timeline-copy">start ●●●●</text>
+  <text x="150" y="997" class="timeline-copy">4 immediate calls accepted</text>
+  <text x="150" y="1015" class="timeline-copy">state ○○○○ · refilledAt = 0</text>
+
+  <!-- t=7 -->
+  <line x1="470" y1="956" x2="470" y2="980" stroke="#b44747" stroke-width="4"/>
+  <circle cx="470" cy="968" r="10" fill="#b44747"/>
+  <text x="470" y="930" class="timeline-time" fill="#9b3e3e">t = 7</text>
+  <text x="470" y="949" class="timeline-copy">k = floor(7/10) = 0</text>
+  <text x="470" y="997" class="timeline-copy">empty → rejected</text>
+  <text x="470" y="1015" class="timeline-copy">Retry-After = ceil(3s) = 3</text>
+
+  <!-- t=12 -->
+  <line x1="790" y1="956" x2="790" y2="980" stroke="#16836f" stroke-width="4"/>
+  <circle cx="790" cy="968" r="10" fill="#16836f"/>
+  <text x="790" y="930" class="timeline-time" fill="#126c5c">t = 12</text>
+  <text x="790" y="949" class="timeline-copy">k = 1 → add ● · refilledAt = 10</text>
+  <text x="790" y="997" class="timeline-copy">consume ● → accepted, ○○○○</text>
+  <text x="790" y="1015" class="timeline-copy">2 seconds remain toward the next refill</text>
+
+  <!-- t=19 -->
+  <line x1="1110" y1="956" x2="1110" y2="980" stroke="#b44747" stroke-width="4"/>
+  <circle cx="1110" cy="968" r="10" fill="#b44747"/>
+  <text x="1110" y="930" class="timeline-time" fill="#9b3e3e">t = 19</text>
+  <text x="1110" y="949" class="timeline-copy">only 9s since refilledAt = 10</text>
+  <text x="1110" y="997" class="timeline-copy">empty → rejected</text>
+  <text x="1110" y="1015" class="timeline-copy">Retry-After = 1</text>
+
+  <!-- t=65 -->
+  <line x1="1430" y1="956" x2="1430" y2="980" stroke="#7354b8" stroke-width="4"/>
+  <circle cx="1430" cy="968" r="10" fill="#7354b8"/>
+  <text x="1430" y="930" class="timeline-time" fill="#5d3aa2">t = 65</text>
+  <text x="1430" y="949" class="timeline-copy">k = floor((65−10)/10) = 5</text>
+  <text x="1430" y="997" class="timeline-copy">cap at ●●●● · refilledAt = 60</text>
+  <text x="1430" y="1015" class="timeline-copy">consume one → ●●●○ · keep 5s partial</text>
+
+  <rect x="92" y="1034" width="1500" height="72" rx="12" fill="#f5f7fa"/>
+  <text x="112" y="1058" class="card-title">Clock and concurrency safeguards</text>
+  <text x="112" y="1080" class="copy">A backward clock never mints credits; an empty bucket then uses zero elapsed time. Synchronization prevents simultaneous callers from spending the same credit.</text>
+  <text x="112" y="1099" class="copy">Downstream failure does not return a spent token; only timed refill or a process restart restores it.</text>
+
+  <text x="40" y="1166" class="footer">Current implementation snapshot · issue #165 / PR #178 · TokenBucket algorithm and bounds originated in issue #120 / PR #133.</text>
+  <text x="1644" y="1166" class="footer" text-anchor="end">Moon Service · 2026-07-21</text>
+</svg>

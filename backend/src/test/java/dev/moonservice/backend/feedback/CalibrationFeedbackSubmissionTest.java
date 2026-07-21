@@ -312,12 +312,15 @@ class CalibrationFeedbackSubmissionTest {
         CalibrationFeedbackSubmission changedSlot = parse(validJson(
                 "\"ambientLight\":\"good\",\"crescentVisibility\":\"visible\"," +
                         "\"notes\":\"Café crescent\""));
+        CalibrationFeedbackSubmission changedContent = parse(validJson(
+                "\"ambientLight\":\"good\",\"notes\":\"Different note\""));
 
         assertThat(decomposed.locationId()).isEqualTo("moon-service-3067696");
         assertThat(decomposed.opportunityId()).isEqualTo("opportunity-1");
         assertThat(decomposed.notes()).isEqualTo("Café crescent");
         assertArrayEquals(composed.idempotencyHash(), decomposed.idempotencyHash());
         assertThat(changedSlot.idempotencyHash()).isNotEqualTo(composed.idempotencyHash());
+        assertThat(changedContent.idempotencyHash()).isNotEqualTo(composed.idempotencyHash());
 
         byte[] exposed = composed.idempotencyHash();
         exposed[0] ^= 0xff;
