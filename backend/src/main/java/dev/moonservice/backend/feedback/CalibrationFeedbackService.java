@@ -1,9 +1,9 @@
 package dev.moonservice.backend.feedback;
 
+import dev.moonservice.backend.admission.HostedAlphaProviderAdmission;
 import dev.moonservice.backend.location.LocationResolution;
 import dev.moonservice.backend.location.LocationResolver;
 import dev.moonservice.backend.location.ResolvedLocation;
-import dev.moonservice.backend.web.HostedAlphaResourceLimitFilter;
 import dev.moonservice.scoringprototype.scoring.ScoringModel;
 import io.github.cosinekitty.astronomy.Aberration;
 import io.github.cosinekitty.astronomy.Astronomy;
@@ -54,12 +54,12 @@ final class CalibrationFeedbackService {
     CalibrationFeedbackService(
             CalibrationFeedbackRepository repository,
             LocationResolver locationResolver,
-            HostedAlphaResourceLimitFilter hostedResourceLimits,
+            HostedAlphaProviderAdmission providerAdmission,
             @Value("${moon.feedback.enabled:false}") boolean featureEnabled
     ) {
         this(repository, locationResolver, featureEnabled,
                 CalibrationFeedbackService::computeAstronomy, System::nanoTime,
-                hostedResourceLimits::executeWithProviderAdmission);
+                locationAdmission(providerAdmission));
     }
 
     CalibrationFeedbackService(
@@ -76,6 +76,17 @@ final class CalibrationFeedbackService {
         this.astronomy = Objects.requireNonNull(astronomy, "astronomy");
         this.writeLimiter = new WriteLimiter(Objects.requireNonNull(monotonicNanos, "monotonicNanos"));
         this.locationAdmission = Objects.requireNonNull(locationAdmission, "locationAdmission");
+    }
+
+    private static Function<Supplier<LocationResolution>, Optional<LocationResolution>> locationAdmission(
+            HostedAlphaProviderAdmission providerAdmission
+    ) {
+        Objects.requireNonNull(providerAdmission, "providerAdmission");
+        return operation -> {
+            try (HostedAlphaProviderAdmission.Admission admission = providerAdmission.tryAcquire()) {
+                return admission.accepted() ? Optional.ofNullable(operation.get()) : Optional.empty();
+            }
+        };
     }
 
     Capability capability() {

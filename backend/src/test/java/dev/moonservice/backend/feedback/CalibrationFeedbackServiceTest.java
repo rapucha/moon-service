@@ -1,25 +1,18 @@
 package dev.moonservice.backend.feedback;
 
-import dev.moonservice.backend.config.MoonRuntimeProperties;
+import dev.moonservice.backend.admission.HostedAlphaProviderAdmission;
 import dev.moonservice.backend.location.LocationProvider;
 import dev.moonservice.backend.location.LocationResolution;
 import dev.moonservice.backend.location.LocationResolver;
 import dev.moonservice.backend.location.ProviderLocationId;
 import dev.moonservice.backend.location.ResolvedLocation;
-import dev.moonservice.backend.web.HostedAlphaResourceLimitFilter;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
-import org.springframework.boot.test.context.runner.ApplicationContextRunner;
-import org.springframework.mock.web.MockHttpServletRequest;
-import org.springframework.mock.web.MockHttpServletResponse;
-import tools.jackson.databind.ObjectMapper;
 
-import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneId;
-import java.time.ZoneOffset;
 import java.time.temporal.ChronoUnit;
 import java.util.Optional;
 import java.util.UUID;
@@ -189,44 +182,6 @@ class CalibrationFeedbackServiceTest {
     }
 
     @Test
-    void hostedServiceSharesProviderAdmissionWhileFeedbackBypassesWholeSiteAdmission() {
-        MoonRuntimeProperties properties = new MoonRuntimeProperties();
-        properties.getResourceLimits().setWholeSiteCapacity(2);
-        properties.getResourceLimits().setWholeSiteRefillInterval(Duration.ofHours(1));
-        properties.getResourceLimits().setProviderLookupCapacity(1);
-        properties.getResourceLimits().setProviderLookupRefillInterval(Duration.ofMinutes(1));
-        properties.getResourceLimits().setOpportunityConcurrency(2);
-
-        new ApplicationContextRunner()
-                .withBean(MoonRuntimeProperties.class, () -> properties)
-                .withBean(Clock.class, () -> Clock.fixed(RECEIVED_AT, ZoneOffset.UTC))
-                .withBean(ObjectMapper.class, ObjectMapper::new)
-                .withBean(HostedAlphaResourceLimitFilter.class)
-                .withPropertyValues("moon.hosted-alpha.enabled=true")
-                .run(context -> {
-                    HostedAlphaResourceLimitFilter filter = context.getBean(HostedAlphaResourceLimitFilter.class);
-                    CalibrationFeedbackService service =
-                            new CalibrationFeedbackService(repository, resolver, filter, true);
-
-                    assertThat(service.submit(submission((byte) 42), RECEIVED_AT, "test-revision"))
-                            .isInstanceOf(CalibrationFeedbackService.Created.class);
-                    MockHttpServletResponse providerLimited = exchange(filter, "GET", "/api/opportunities");
-                    assertThat(providerLimited.getStatus()).isEqualTo(429);
-                    assertThat(providerLimited.getHeader("Retry-After")).isEqualTo("60");
-
-                    assertThat(exchange(filter, "GET", "/api/calibration-feedback/v1/capability").getStatus())
-                            .isEqualTo(200);
-                    assertThat(exchange(filter, "POST", "/api/calibration-feedback/v1/submissions").getStatus())
-                            .isEqualTo(200);
-                    assertThat(exchange(filter, "GET", "/about").getStatus()).isEqualTo(200);
-
-                    MockHttpServletResponse wholeSiteLimited = exchange(filter, "GET", "/app.js");
-                    assertThat(wholeSiteLimited.getStatus()).isEqualTo(429);
-                    assertThat(wholeSiteLimited.getHeader("Retry-After")).isEqualTo("3600");
-                });
-    }
-
-    @Test
     void storesCanonicalLocationFourFactsRevisionAndOneMicrosecondInstant() {
         AtomicInteger astronomyCalls = new AtomicInteger();
         astronomy = (location, instant) -> {
@@ -256,13 +211,12 @@ class CalibrationFeedbackServiceTest {
 
     @Test
     void productionAstronomyPreservesSubMillisecondReceiptPrecision() {
-        HostedAlphaResourceLimitFilter hostedResourceLimits = mock(HostedAlphaResourceLimitFilter.class);
-        org.mockito.Mockito.doAnswer(invocation -> {
-            Supplier<?> operation = invocation.getArgument(0);
-            return Optional.ofNullable(operation.get());
-        }).when(hostedResourceLimits).executeWithProviderAdmission(any());
+        HostedAlphaProviderAdmission providerAdmission = mock(HostedAlphaProviderAdmission.class);
+        HostedAlphaProviderAdmission.Admission admission = mock(HostedAlphaProviderAdmission.Admission.class);
+        when(providerAdmission.tryAcquire()).thenReturn(admission);
+        when(admission.accepted()).thenReturn(true);
         CalibrationFeedbackService service =
-                new CalibrationFeedbackService(repository, resolver, hostedResourceLimits, true);
+                new CalibrationFeedbackService(repository, resolver, providerAdmission, true);
         Instant laterInSameMillisecond = RECEIVED_AT.plusNanos(543_000);
 
         assertThat(service.submit(submission((byte) 8), RECEIVED_AT, "test-revision"))
@@ -280,6 +234,7 @@ class CalibrationFeedbackServiceTest {
         assertThat(first.submittedAt()).isEqualTo(RECEIVED_AT.truncatedTo(ChronoUnit.MICROS));
         assertThat(second.submittedAt()).isEqualTo(laterInSameMillisecond.truncatedTo(ChronoUnit.MICROS));
         assertThat(second.astronomyFacts()).isNotEqualTo(first.astronomyFacts());
+        verify(admission, times(2)).close();
     }
 
     @Test
@@ -349,20 +304,6 @@ class CalibrationFeedbackServiceTest {
     private CalibrationFeedbackService service(boolean enabled) {
         return new CalibrationFeedbackService(
                 repository, resolver, enabled, astronomy, monotonicNanos::get, locationAdmission);
-    }
-
-    private static MockHttpServletResponse exchange(
-            HostedAlphaResourceLimitFilter filter,
-            String method,
-            String path
-    ) throws Exception {
-        MockHttpServletRequest request = new MockHttpServletRequest(method, path);
-        request.setRemoteAddr("198.51.100.10");
-        request.setServerName("moon.example");
-        MockHttpServletResponse response = new MockHttpServletResponse();
-        filter.doFilter(request, response,
-                (ignoredRequest, finalResponse) -> ((MockHttpServletResponse) finalResponse).setStatus(200));
-        return response;
     }
 
     private static CalibrationFeedbackSubmission submission(byte marker) {
