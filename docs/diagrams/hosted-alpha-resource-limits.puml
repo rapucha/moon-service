@@ -1,0 +1,69 @@
+@startuml
+skinparam defaultFontName "DejaVu Sans"
+skinparam defaultFontSize 15
+skinparam shadowing false
+skinparam roundcorner 8
+skinparam sequenceMessageAlign left
+skinparam responseMessageBelowArrow true
+skinparam BoxPadding 10
+hide footbox
+
+title Hosted-alpha admission by route
+
+actor Caller
+participant "Resource-limit filter\nWhole-site TB: 40 · +1/s" as Whole
+participant "Hosted surface\nand feedback application" as App
+participant "Shared provider admission\nSemaphore: 2 · provider TB: 10 · +1/min" as Gate
+participant "Location resolver\ncache / provider" as Location
+
+== Opportunity ==
+
+Caller -> Whole: GET / HEAD /api/opportunities\nSpend whole-site token
+alt Whole-site token unavailable
+  Whole --> Caller: 429 + Retry-After
+else Whole-site token spent
+  Whole -> Gate: Try permit, then spend provider token
+  alt Provider admission unavailable
+    Gate --> Caller: 429 + Retry-After\n(1 second when no permit)
+  else Admitted
+    Gate -> App: Continue; permit spans downstream
+    App -> App: Surface policy, controller, caches,\nand provider work
+    App --> Gate: Downstream result; release permit
+    Gate --> Caller: Response
+  end
+end
+
+== Feedback ==
+
+Caller -> Whole: Exact capability or submission path
+Whole -> App: Bypass whole-site TokenBucket
+alt GET capability
+  App -> App: Read feature and repository state
+  App --> Caller: 200 capability
+else POST submission
+  App -> App: Bound transport; parse and normalize\nCheck feature, UUID, and repository capacity
+  alt Request ends before new provider work
+    App --> Caller: Validation, replay, conflict,\nor availability response
+  else New report can be stored
+    App -> Gate: Resolve location under shared admission
+    alt Permit or provider token unavailable
+      Gate --> App: Not admitted
+      App --> Caller: 503 feedback_unavailable
+    else Admitted
+      Gate -> Location: resolveLocationId(locationId)
+      Location --> Gate: Location result
+      Gate --> App: Location result; release permit
+      App -> App: Interpret location; then write limiter,\nastronomy, and store
+      App --> Caller: Feedback response
+    end
+  end
+end
+
+note over Whole, Gate
+  The exact Docker readiness probe bypasses admission.
+  Other non-feedback, non-opportunity routes use whole-site admission only.
+  Provider credits stay spent after a cache hit or failure.
+  The feedback write limiter is separate from these TokenBuckets.
+end note
+
+@enduml
