@@ -113,13 +113,15 @@ Check scope before implementation quality:
 6. Then prioritize concrete bugs, behavior regressions, public contract drift,
    missing or weak tests, privacy/security/provider risks, UI/layout risks,
    documentation mismatches, and validation gaps.
-7. Review changed agent-authored prose for plain language. Flag wording only
-   when a simpler version keeps the same meaning, and suggest that version.
-   Keep exact contract language and needed technical terms. Code comments
+7. Review changed agent-authored prose against the target project's canonical
+   writing guide. For Moon Service, read
+   `docs/ai-agent/plain-technical-writing.md`. Flag wording only when a simpler
+   version keeps the same meaning, and suggest that version. Preserve exact
+   contract language, modal meaning, and needed technical terms. Code comments
    should explain why rather than restate obvious code.
 
-Do not turn the plain-language rule into personal style preferences, a word
-limit, or a readability score.
+Do not turn the plain-language rule into personal style preferences, mechanical
+counts, a word limit, a readability score, or a style-linter requirement.
 
 For each finding, include severity, file and line reference when possible,
 why it matters, and the smallest practical fix. If there are no findings,
