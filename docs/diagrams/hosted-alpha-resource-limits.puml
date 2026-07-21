@@ -11,9 +11,9 @@ hide footbox
 title Hosted-alpha admission by route
 
 actor Caller
-participant "Resource-limit filter\nWhole-site TB: 40 · +1/s" as Whole
+participant "HostedAlphaResourceLimitFilter\nWhole-site TB: 40 · +1/s" as Whole
+participant "HostedAlphaProviderAdmission\nSemaphore: 2 · provider TB: 10 · +1/min" as Gate
 participant "Hosted surface\nand feedback application" as App
-participant "Shared provider admission\nSemaphore: 2 · provider TB: 10 · +1/min" as Gate
 participant "Location resolver\ncache / provider" as Location
 
 == Opportunity ==
@@ -22,14 +22,17 @@ Caller -> Whole: GET / HEAD /api/opportunities\nSpend whole-site token
 alt Whole-site token unavailable
   Whole --> Caller: 429 + Retry-After
 else Whole-site token spent
-  Whole -> Gate: Try permit, then spend provider token
+  Whole -> Gate: tryAcquire()
   alt Provider admission unavailable
-    Gate --> Caller: 429 + Retry-After\n(1 second when no permit)
+    Gate --> Whole: Rejected + retryAfterSeconds
+    Whole --> Caller: 429 + Retry-After\n(1 second when no permit)
   else Admitted
-    Gate -> App: Continue; permit spans downstream
+    Gate --> Whole: Admission lease
+    Whole -> App: Continue filter chain; permit spans downstream
     App -> App: Surface policy, controller, caches,\nand provider work
-    App --> Gate: Downstream result; release permit
-    Gate --> Caller: Response
+    App --> Whole: Downstream response
+    Whole -> Gate: Close lease; release permit
+    Whole --> Caller: Response
   end
 end
 
@@ -45,14 +48,15 @@ else POST submission
   alt Request ends before new provider work
     App --> Caller: Validation, replay, conflict,\nor availability response
   else New report can be stored
-    App -> Gate: Resolve location under shared admission
+    App -> Gate: tryAcquire()
     alt Permit or provider token unavailable
-      Gate --> App: Not admitted
+      Gate --> App: Rejected + retryAfterSeconds
       App --> Caller: 503 feedback_unavailable
     else Admitted
-      Gate -> Location: resolveLocationId(locationId)
-      Location --> Gate: Location result
-      Gate --> App: Location result; release permit
+      Gate --> App: Admission lease
+      App -> Location: resolveLocationId(locationId)
+      Location --> App: Location result
+      App -> Gate: Close lease; release permit
       App -> App: Interpret location; then write limiter,\nastronomy, and store
       App --> Caller: Feedback response
     end

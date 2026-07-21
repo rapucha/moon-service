@@ -162,8 +162,8 @@
   <rect x="1364" y="651" width="252" height="112" rx="14" fill="#f1edfb"/>
   <text x="1388" y="677" class="card-title" fill="#5d3aa2">Provider instance</text>
   <text x="1388" y="704" class="formula">C = 10 · Δ = 60s</text>
-  <text x="1388" y="729" class="small">Shared by opportunities and</text>
-  <text x="1388" y="746" class="small">feedback location resolution.</text>
+  <text x="1388" y="729" class="small">HostedAlphaProviderAdmission</text>
+  <text x="1388" y="746" class="small">serves opportunities + feedback.</text>
 
   <rect x="1090" y="781" width="526" height="45" rx="12" fill="#fff8e8" stroke="#ead19a"/>
   <text x="1353" y="809" class="copy" text-anchor="middle">The feedback write limiter is separate; it is not this TokenBucket.</text>
@@ -219,6 +219,6 @@
   <text x="112" y="1080" class="copy">A backward clock never mints credits; an empty bucket then uses zero elapsed time. Synchronization prevents simultaneous callers from spending the same credit.</text>
   <text x="112" y="1099" class="copy">Downstream failure does not return a spent token; only timed refill or a process restart restores it.</text>
 
-  <text x="40" y="1166" class="footer">Current implementation snapshot · issue #165 / PR #178 · TokenBucket algorithm and bounds originated in issue #120 / PR #133.</text>
+  <text x="40" y="1166" class="footer">Current implementation · issue #185 / PR #186 · Initial controls: issue #165 / PR #178 · Algorithm/bounds: issue #120 / PR #133.</text>
   <text x="1644" y="1166" class="footer" text-anchor="end">Moon Service · 2026-07-21</text>
 </svg>
