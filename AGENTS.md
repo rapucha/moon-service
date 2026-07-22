@@ -1,349 +1,440 @@
 # Moon Service Agent Notes
 
-## Project Purpose
+## What Moon Service Does
 
-Moon Service is a lightweight discovery and alert tool for photographers. It should identify upcoming Moon photography opportunities near user-selected locations, with emphasis on low Moon altitude, useful ambient light, and promising weather.
+Moon Service is a small discovery and alert tool for photographers. It should
+find upcoming Moon photography opportunities near places that users choose. It
+should focus on a low Moon, useful ambient light, and promising weather.
 
-The near-term product is a web-first discovery MVP that helps users decide when to go outside with a camera, with recurring alerts added only after the basic value is proven.
+The near-term MVP is a website that helps a user decide when to go outside with
+a camera. Add recurring alerts only after this basic service proves useful.
 
 ## Current Phase
 
-This repo is moving from planning/prototype mode into a thin real backend
-spine. Narrow prototypes remain under `prototypes/`, and the first real Spring
-Boot backend module lives under `backend/`.
+This repository is moving from plans and prototypes to a small real backend.
+Focused prototypes remain under `prototypes/`. The first Spring Boot backend
+module lives under `backend/`.
 
-Do not scaffold an installed client, database, accounts, or new live provider
-integration code until the relevant MVP boundaries are documented. The backend
-should remain small and web-first: replace fixture-backed seams with geocoding,
-weather, caching, feeds, and `.ics` behavior deliberately.
+Do not scaffold an installed client, database, account system, or new live
+provider integration until its MVP boundaries are documented. The backend
+should remain small and web-first. Replace fixture-backed code one part at a
+time with geocoding, weather, caching, feeds, and `.ics` support.
 
 ## Product Direction
 
-- Prefer no mandatory account for the MVP.
-- Start with a zero-install web flow: enter a city/location and see the next good Moon opportunity.
-- Keep the first public product anonymous: web lookup, shareable result page, RSS/Atom, and `.ics` export.
-- Treat email alerts as later because they require storing personal data and handling consent, unsubscribe, deletion, retention, and provider processing.
-- Treat Reddit as a community experiment only; do not depend on automated posting.
+- Prefer not to require an account for the MVP.
+- Start with a website that needs no installation: enter a city or location and
+  see the next good Moon opportunity.
+- Keep the first public product anonymous. It includes web lookup, a shareable
+  result page, RSS/Atom feeds, and `.ics` export.
+- Add email alerts later. They require personal-data storage, consent,
+  unsubscribe and deletion flows, retention rules, and an email provider.
+- Use Reddit only for community experiments. Do not depend on automated posts.
 - Do not plan Mastodon or Bluesky integration for now.
-- Keep privacy boundaries explicit if a backend receives locations or preferences.
-- Favor a small backend because geocoding, weather lookup, caching, scoring, and provider migration are server-side concerns.
+- State the privacy rules clearly when the backend receives a location or user
+  preference.
+- Favor a small backend because it handles geocoding, weather lookup, caching,
+  scoring, and changes between providers.
 
-## Architecture Bias
+## Expected Architecture
 
-The current likely direction is:
+The likely architecture is:
 
-- Web MVP: city/location entry, next opportunity display, shareable result page, RSS/Atom feeds, and `.ics` export.
-- Small backend: geocoding, weather integration, scoring rules, weather cache, candidate Moon opportunity generation, and provider abstraction.
-- Installed client later: keep the web app first-class. After the web, feed,
-  and calendar flow is complete and testers show recurring demand, use Expo
-  for a focused iOS/Android companion. Share contracts, validation, formatting,
-  domain logic, design rules, assets, and suitable simple components. Keep
-  complex views, web semantics and URLs, storage, notifications, permissions,
-  and distribution platform-specific. Saved places stay on device; notifications
-  are local-first; results may be cached; bounded offline Moon calculations are
-  allowed. Weather-backed scoring remains authoritative in the backend.
+- Website: city or location entry, the next opportunity, a shareable result
+  page, RSS/Atom feeds, and `.ics` export.
+- Small backend: geocoding, weather integration and caching, scoring, candidate
+  Moon-opportunity generation, and a provider abstraction.
+- Installed app later: keep the website as a complete product. After the web,
+  feed, and calendar flows are complete and testers show recurring demand,
+  build a focused iOS/Android companion with Expo.
+- Share contracts, validation, formatting, domain rules, design rules, assets,
+  and simple components where practical. Keep complex views, web URLs and
+  behavior, storage, notifications, permissions, and app distribution specific
+  to each platform.
+- In an installed app, saved places stay on the device and notifications are
+  local-first. Results may be cached. Limited offline Moon calculations are
+  allowed. Backend scoring remains authoritative when it uses weather data.
 
-The main unresolved choice is now the exact first web/API contract for city lookup, opportunity results, RSS/Atom feeds, and `.ics` export.
+The main open architecture decision is the first web/API contract for city
+lookup, opportunity results, RSS/Atom feeds, and `.ics` export.
 
 ## Documentation Map
 
-- `docs/README.md`: human-facing documentation hub.
-- `docs/ai-agent/README.md`: active AI-agent operating guide, context packs, and checklists.
-- `docs/product-notes.md`: product stance, users, MVP scope, privacy posture.
-- `docs/architecture.md`: architecture options, recommended hybrid shape, unresolved decisions.
-- `docs/api-shape.md`: first web/API contract, statuses, result kinds, localStorage, RSS/Atom, and `.ics` rules.
+- `docs/README.md`: documentation index for people working on the project.
+- `docs/ai-agent/README.md`: current agent guide, context packs, and checklists.
+- `docs/product-notes.md`: product decisions, users, MVP scope, and privacy
+  rules.
+- `docs/architecture.md`: architecture choices, current recommendation, and
+  open decisions.
+- `docs/api-shape.md`: first web/API contract, statuses, result kinds,
+  localStorage, RSS/Atom, and `.ics` rules.
 - `docs/scoring-model.md`: first scoring model for Moon opportunities.
-- `docs/ephemeris-research.md`: ephemeris library recommendation and validation plan.
-- `docs/weather-provider-research.md`: weather provider recommendation, caching, and privacy notes.
-- `docs/geocoding-research.md`: geocoding provider recommendation and city/location lookup privacy notes.
+- `docs/ephemeris-research.md`: recommended ephemeris library and validation
+  plan.
+- `docs/weather-provider-research.md`: recommended weather provider, caching,
+  and privacy notes.
+- `docs/geocoding-research.md`: recommended geocoding provider and privacy rules
+  for city and location lookup.
 - `docs/mvp-roadmap.md`: milestone plan and implementation order.
 - `.agents/review-policy.md`: canonical review gates, triggers, measures, and
   planning-estimate rules.
-- `prototypes/jvm-scoring/`: minimal Maven JVM scoring/ephemeris prototype with fixture tests.
-- `backend/`: first Spring Boot backend module, currently fixture-backed through the scoring prototype.
+- `prototypes/jvm-scoring/`: small Maven scoring and ephemeris prototype with
+  fixture tests.
+- `backend/`: first Spring Boot backend module, which currently gets fixture
+  data through the scoring prototype.
 
-## Engineering Guidelines
+## How Agents Should Work
 
-- Keep early changes narrow and documentation-led.
-- Prefer explicit tradeoffs over premature abstractions.
-- Avoid adding public production constructors, factories, or methods only to
-  make tests shorter. Keep production API surface aligned with real runtime
-  use. Put test-only construction convenience in test helpers or builders
-  unless there is a concrete production caller or established local pattern.
-- State technical judgment directly. Agreement should include reasoning;
-  disagreement should be plain and actionable.
+### Do only the work the user approved
+
+- Treat the user's wording as intentional.
+- If the user asks a question or checks feasibility, answer first and do not
+  change code, documentation, GitHub, or other external state. Examples include
+  requests that start with "can you", "could you", "is it possible", or "should
+  we", and requests that end with a question mark.
+- Start changing things only after a clear instruction such as "do it", "go
+  ahead", "implement", "update", or "create".
+- If the requested outcome is unclear, ask before changing files or external
+  state.
+- Use an open GitHub issue to define implementation, technical debt, follow-up,
+  and decision work. Product and architecture documents should record strategy
+  and decisions, but the next implementation step should come from an open
+  issue. The user may explicitly ask for exploratory work without an issue.
+- Use `enhancement` and `documentation` for feature and documentation work.
+  Add `mvp`, `tech-debt`, `decision`, `blocked`, or `follow-up` when it
+  improves triage.
+
+### Keep changes narrow
+
+- Keep early changes small and led by documented decisions.
+- Prefer direct tradeoffs to abstractions that have no current need.
+- Avoid adding a public production constructor, factory, or method only to make
+  a test shorter. Keep the production API aligned with real runtime use. Put
+  test-only convenience in test helpers or builders unless a production caller
+  or established project pattern needs the API.
+- State technical judgment directly. Agreement should include the reason.
+  Disagreement should be plain and actionable.
 - Follow [`docs/ai-agent/plain-technical-writing.md`](docs/ai-agent/plain-technical-writing.md)
-  for agent-authored technical prose. Preserve technical accuracy, contract
-  meaning, exact identifiers, and required template fields. Flag wording only
-  when a simpler version keeps the same meaning. Do not enforce this rule with
-  word limits, readability scores, mechanical counts, or a style linter.
-- Do not introduce mandatory accounts without documenting user value and recovery behavior.
-- Do not permanently store lookup locations server-side. The only current
-  exception is the disabled, bounded city-level calibration-feedback store
-  approved under issue #33 and documented in `docs/product-notes.md` and
-  `docs/architecture.md`. Saved alerts still require their own updated privacy
-  model.
-- Design device identity recovery before relying on anonymous device-bound accounts.
-- Treat platform backup, background scheduling, and push services as
-  conveniences with iOS/Android assumptions, not universal guarantees.
-- If subagents, delegation, or parallel agent work may help a session, ask the
-  user near the beginning of that session for explicit permission to use
-  subagents. Treat this as a request for active-session authorization, not as
-  an override of any runtime, tool, sandbox, or external-model approval rules.
-- When parallel branches or worktrees are active and a branch needs manual
-  verification without being checked out in the primary workspace, run that
-  branch from its isolated worktree on an available loopback port. Verify
-  readiness and a representative user path, then report the branch, port, and
-  a direct clickable URL instead of asking the user to switch branches. Keep
-  the preview running until verification is complete and stop it afterward.
-  Bind to `127.0.0.1` by default; use broader network exposure only when the
-  user explicitly needs it. Report startup blockers rather than silently
-  omitting the verification link.
-- Treat user wording as intentional. If the user phrases a request as a
-  question or feasibility check, such as starting with "can you", "could you",
-  "is it possible", "should we", or ending with a question mark, answer the
-  question first and do not make code, documentation, GitHub, or other mutating
-  changes yet. Begin implementation only after the user gives a clear
-  imperative instruction, such as "do it", "go ahead", "implement", "update",
-  or "create". If the wording is ambiguous, ask what outcome is required before
-  changing files or external state.
-- For visual or document-format work where readability, layout, rendering, or
-  format remains unresolved, distinguish a temporary local preview from durable
-  PR-ready delivery. Within an already-authorized task, an affirmative format
-  selection authorizes only the smallest useful preview; questions and
-  feasibility checks remain non-mutating. Keep previews untracked, normally
-  under `/tmp`, use only already-available tooling without installs, downloads,
-  manifests, or dependencies, avoid external mutations, and validate only
-  enough to make the preview trustworthy. Preview acceptance approves the
-  visual, not durable repository mutation or publication; that outcome must
-  already be authorized or explicitly confirmed, after which every normal
-  issue, branch, review, generated-output, push, and pull-request gate applies.
-  Do not add a redundant preview pause when durable delivery was explicit and
-  the visual choice was already settled.
-- Use GitHub issues as the source of truth for actionable implementation work, technical debt, follow-ups, and decision tasks. Product and architecture docs should capture strategy and decisions, but the next implementation step should come from an open issue unless the user explicitly asks for exploratory work first.
-- Use the existing `enhancement` and `documentation` labels for feature and docs work. Use `mvp`, `tech-debt`, `decision`, `blocked`, and `follow-up` labels when they clarify issue triage.
-- For issue-backed implementation work, use a branch name that mentions the issue number, preferably `issue-<number>-short-topic`, and update the issue to link to the branch where the work is being done.
-- Merge issue-backed implementation work through a pull request; do not merge implementation branches directly.
-- Pull requests must mention the issue or issues they address. Completed implementation issues should be closed through, or at least explicitly link to, the pull request that delivered the work.
-- Agent-authored pull requests should assign `rapucha` and request review from
-  `rapucha` when created. Use `gh pr create --assignee rapucha --reviewer
-  rapucha ...`; the repository workflow also applies this to non-draft PRs
-  opened by `moon-service-agent`.
-- Session handover files are transient working notes for context resets, laptop
-  shutdowns, or other session-boundary handoffs. When creating or updating one,
-  preserve context from the current conversation and existing tool results; do
-  not perform a fresh GitHub audit, rerun tests, or investigate already-known
-  state unless explicitly requested. Label uncertain details instead. Keep the
-  handover concise: capture the current objective, decisions and rationale,
-  pending feedback, active work, blockers, next actions, and files that must not
-  be disturbed. Do not commit handovers by default; commit one only when
-  explicitly useful as durable project state. Prefer replacing or removing old
-  handovers instead of accumulating them.
-- At the end of implementation tasks, stage all intended source, test, and documentation changes with `git add` so they are ready for commit. Leave unrelated, generated, IDE-only, or otherwise intentionally excluded files unstaged, and call them out in the final response.
-- In this environment, `git push` requires network access and sandboxed DNS has repeatedly failed. When the user asks to push any branch or remote, run the push with escalated permissions immediately instead of first attempting a sandboxed push.
-- Do not repeat a failing command, API request, or tool call unchanged unless the failure is plausibly transient, such as a timeout, network interruption, rate-limit retry hint, lock contention, or service restart. For deterministic errors, change the request based on a concrete hypothesis, reduce it to a minimal reproduction, inspect docs/help/output, or stop and explain the blocker. For plausibly transient errors, retry with exponential backoff and a small retry budget; once the next backoff delay would reach roughly 30 to 60 seconds, stop retrying and report the failure.
+  for all agent-authored prose. Keep contracts, identifiers, modal verbs, and
+  required template fields exact. Suggest simpler wording only when it keeps the
+  same meaning. Do not use word limits, readability scores, mechanical counts,
+  a style linter, or another automatic gate to enforce the guide.
 
-## Agent Review Workflows
+### Protect the product and its users
 
-The canonical definitions of project-specific review skills live under
-`.agents/skills/`. Change them through the repository's normal issue and pull
-request workflow. Treat copies outside the repository as temporary installed
-artifacts, not as an independently editable source of truth.
+- Do not require an account until the project documents the user benefit and
+  account-recovery behavior.
+- Do not permanently store lookup locations on the server. The only current
+  exception is the disabled, bounded, city-level calibration-feedback store
+  approved by issue #33 and documented in `docs/product-notes.md` and
+  `docs/architecture.md`. Saved alerts need their own updated privacy model.
+- Design identity recovery before depending on anonymous device-bound
+  accounts.
+- Treat platform backup, background scheduling, and push delivery as
+  iOS/Android conveniences, not universal guarantees.
 
-The review numbers, their effects, and the rules for planning estimates live in
-[`.agents/review-policy.md`](.agents/review-policy.md). Any review skill that
-applies those rules must read that file. Do not repeat its numbers in
-`AGENTS.md` or a skill.
+### Use subagents and worktrees carefully
 
-A skill migration is not complete while a same-named legacy copy remains
-discoverable outside the repository. After the repository-local version reaches
-the default branch, remove or disable the legacy copy and verify in a fresh
-Codex session that only the canonical path is offered. Until then, do not edit
-the legacy copy independently or claim migration cleanup is complete.
+- If subagents, delegation, or parallel work may help, use them. If a sandbox,
+  active instruction, tool, or other rule requires the user's permission, ask
+  first.
+- To verify a branch that is checked out in another worktree, run it from that
+  worktree on an available loopback port. Check readiness and one representative
+  user path. Report the branch, port, and direct clickable URL; do not ask the
+  user to switch branches.
+- Keep the preview running until verification finishes, then stop it. Bind to
+  `127.0.0.1` unless the user explicitly needs broader access. Report startup
+  blockers instead of omitting the preview link.
 
-### Review-Agent Callsigns
+### Separate previews from durable work
 
-When reporting delegated project reviews to the user, use these role callsigns:
+- When a visual or document format is not settled, distinguish a temporary
+  preview from durable work.
+- Within a task the user already approved, the user's affirmative format choice
+  allows only the smallest useful temporary preview.
+- A question or feasibility check does not authorize a preview.
+- Keep previews untracked, normally under `/tmp`. Use only installed tools. Do
+  not install or download anything, add a manifest or dependency, or mutate
+  external state for a preview.
+- Validate only enough to make the preview trustworthy.
+- Accepting a preview approves the visual choice. It does not authorize a
+  repository change or publication. The user must already have requested that
+  durable result, or must explicitly request it after accepting the preview.
+- Once durable work is authorized, apply every normal issue, branch, review,
+  generated-output, push, and pull-request rule.
+- Do not add another preview pause when the user already requested durable work
+  and the visual choice is settled.
+
+### Use Git and GitHub consistently
+
+- For issue-backed work, name the branch with the issue number. Prefer
+  `issue-<number>-short-topic`. Link the branch from the issue.
+- Deliver issue-backed implementation through a pull request. Do not merge the
+  implementation branch directly.
+- Every pull request must mention the issues it addresses. A completed
+  implementation issue should be closed through the pull request, or the issue
+  should at least link to the pull request.
+- An agent-authored pull request should assign `rapucha` and request review
+  from `rapucha`. Use `gh pr create --assignee rapucha --reviewer rapucha
+  ...`. The repository workflow applies the same rule to non-draft pull
+  requests opened by `moon-service-agent`.
+- At the end of implementation, stage every intended source, test, and
+  documentation change with `git add`. Leave unrelated, generated, IDE-only,
+  and intentionally excluded files unstaged. List those files in the final
+  response.
+- In this environment, run an explicitly requested `git push` with escalated
+  permissions immediately. Sandboxed DNS has repeatedly failed.
+
+### Write useful handovers
+
+- Use a session handover only for a context reset, shutdown, or similar session
+  boundary.
+- Preserve the current conversation and known tool results. Do not perform a
+  new GitHub audit, rerun tests, or investigate known state unless the user asks.
+- Mark uncertain details as uncertain.
+- Record the current goal, decisions and reasons, pending feedback, active work,
+  blockers, next actions, and files that must not be disturbed.
+- Do not commit a handover by default. Commit it only when it is useful as
+  durable project state.
+- Prefer replacing or removing old handovers instead of accumulating them.
+
+### Respond to failures deliberately
+
+- Do not repeat a deterministic failure without changing the request or the
+  hypothesis. Inspect help or documentation, reduce the problem, or stop and
+  explain the blocker.
+- Retry only failures that may be temporary, such as timeouts, network
+  interruptions, rate limits with retry guidance, lock contention, or service
+  restarts.
+- Use exponential backoff and a small retry budget. Stop when the next delay
+  would be about 30–60 seconds, then report the failure.
+
+## Review Workflow
+
+### Use the repository review files
+
+- The canonical project review skills live in `.agents/skills/`. Change them
+  through the normal issue and pull-request workflow. A copy installed outside
+  the repository is temporary and is not an independent source of truth.
+- [`.agents/review-policy.md`](.agents/review-policy.md) defines change
+  categories, review measures, gates, documentation triggers, output budgets,
+  counting rules, planning estimates, required evidence, and their effects. A
+  skill must read that file before using those rules. Do not copy the numbers
+  into this file or another skill.
+- A skill migration remains incomplete while a same-named legacy copy can still
+  be discovered outside the repository. After the repository version reaches
+  the default branch, remove or disable the legacy copy. Start a fresh Codex
+  session and confirm that only the canonical skill appears. Until then, do not
+  edit the legacy copy separately or claim the migration is complete.
+
+### Use these review callsigns
 
 - **Grady Booch** — `issue-design-review`
 - **Martin Fowler** — `implementation-scope-review`
 - **Dennis Ritchie** — `second-agent-review`
 - **Bruce Schneier** — `sensitive-information-review`
 
-Each review must still use the fresh AI subagent required by its skill. These
-callsigns do not imply that the named people participate in, endorse, or supply
-views to the project.
+Each review still requires the fresh AI subagent named by its skill. The real
+people named above do not participate in, endorse, or provide the review.
 
-Before an agent creates a nontrivial actionable issue or treats its own draft
-as implementation authority, use `$issue-design-review` with a fresh read-only
-agent after the user has authorized subagents for the active session. This
-includes implementation, technical-debt, follow-up, decision, dependency,
-privacy, and operational issues. The review must return `ready`, `revise`, or
-`split_required`; record the verdict or a concise review summary in the issue
-when it is created. Do not publish or act on a `revise` draft, and split a
-`split_required` draft according to the repository workflow. Tiny bookkeeping
-issues that directly transcribe an explicit user instruction may skip this
-review only when the issue records why it was unnecessary.
+### Review an issue before publishing or using it
 
-An issue is not `ready` while it silently introduces or leaves unresolved a
-material runtime component, edge proxy, provider, external account, stored-data
-or privacy obligation, network exposure, deployment burden, recurring cost, or
-operational dependency. Document the need and alternatives and obtain the
-required owner decision before implementation planning.
+- Before an agent creates a nontrivial issue that asks for work or uses its own
+  draft as permission to implement, ask a fresh read-only agent to run
+  `$issue-design-review`. The user must first authorize subagents for the
+  active session.
+- This rule covers implementation, technical-debt, follow-up, decision,
+  dependency, privacy, and operational issues.
+- The reviewer must return `ready`, `revise`, or `split_required`. Record the
+  verdict or a short summary in the issue.
+- Do not publish or use a `revise` draft. Follow the repository split workflow
+  for `split_required`.
+- A tiny bookkeeping issue may skip this review only when it directly records
+  an explicit user instruction and the issue explains why review was
+  unnecessary.
+- Do not mark an issue `ready` while it hides or leaves unresolved a material
+  runtime component, edge proxy, provider, external account, stored-data or
+  privacy duty, network exposure, deployment work, recurring cost, or
+  operational dependency. Document the need and alternatives, then obtain the
+  owner's decision before implementation planning.
+- If implementation needs to add or materially change one of those dependencies
+  and the issue does not approve it, stop before editing. Ask the user to
+  approve an issue update. After that approval, update the issue and run
+  `$issue-design-review` again. Also run `$implementation-scope-review` again
+  when the approved scope or pull-request plan may change.
 
-If implementation would add or materially change one of these dependencies and
-the source issue does not already document and approve it, stop before editing.
-Update the issue through the authorized workflow, rerun `$issue-design-review`,
-and rerun `$implementation-scope-review` when the accepted scope or PR packaging
-may change.
+### Record the implementation plan
 
-## Change Categories and Gates
+- Use [`.agents/review-policy.md`](.agents/review-policy.md) to choose the
+  change category and apply concern, file, code-size, documentation, generated,
+  vendored, and lock-file rules.
+- Before issue-backed implementation, record:
+  - the result that the issue or user approved;
+  - each independently reviewable concern or subsystem;
+  - likely paths and other paths that may be needed, with reasons;
+  - the expected ordinary-file range and informational ordinary-churn range;
+  - expected resulting code-file sizes;
+  - documentation measures and required reviews;
+  - output classes, including generated, vendored, and lock-file output; and
+  - which pull request owns each acceptance criterion.
+- Choose the change category from the work that the issue or user approved. Do
+  this before editing. Do not relabel the work later to gain a larger limit.
+  Use the stricter rule or split when the category is mixed or unclear.
+- Path and count estimates forecast the work. They are not a fixed list and do
+  not authorize extra behavior. A different path or count does not by itself
+  require permission or another scope review. The work must still deliver the
+  approved result and stay within the approved concerns, dependencies, output
+  classes, and hard gates.
+- After staging, record the actual paths and file count. Explain a meaningful
+  difference from the forecast.
+- Ordinary churn is information, not permission or a gate.
+- Room under a limit does not allow work that the issue or user did not approve.
+- Documentation size thresholds require focused review. They do not by
+  themselves force a split or another scope review. Apply the rules in
+  `.agents/review-policy.md` about approval for documentation changes and
+  staged reviews.
 
-Use [`.agents/review-policy.md`](.agents/review-policy.md) for change
-categories, concern and file gates, code-file limits, documentation triggers,
-output budgets, counting rules, and required evidence.
+### Review large plans before editing
 
-Before issue-backed implementation, record the accepted outcome, independently
-reviewable concerns or subsystems, expected paths, other paths that may be
-needed and why, an expected ordinary-file count range, informational
-ordinary-churn estimate, expected code-file results, documentation measures,
-output classes, and acceptance-criterion ownership.
+- Before editing a plan that may cross a scope gate, ask a fresh read-only agent
+  to run `$implementation-scope-review`. The user must first authorize
+  subagents for the active session.
+- The reviewer must return `single_pr` or `split_required`, map every acceptance
+  criterion to a proposed pull request, identify dependencies, and recommend
+  merge order.
+- If the user has not allowed a planning agent, or none is available, stop
+  oversized work and report the blocker. Do not waive the review.
 
-Likely paths and count ranges forecast the implementation. They are not a fixed
-list and do not authorize more work. A different path or count does not need
-reauthorization or another scope review by itself. It must still serve the
-accepted outcome and stay within the accepted concerns, dependencies, output
-classes, and hard gates. Record the actual paths and count after staging.
-Explain any meaningful difference from the plan.
+### Do not add work that was not approved
 
-Select the change category from accepted authority before editing. Do not
-relabel work later to obtain a larger allowance. Ambiguous or mixed work uses
-the stricter applicable gate or splits. Room under a limit never authorizes an
-unaccepted concern.
+A limit is a ceiling, not permission to add work. Stop before editing and ask
+the user or owner to approve a new plan when the approved result cannot be
+delivered safely without an unrequested refactor, incidental fix, new concern,
+or new dependency.
 
-Ordinary churn is information. Documentation size conditions are review
-triggers, not scope gates. Apply the documentation authority rules and staged
-review requirements in the policy.
-
-## Scope Growth and Mutation Authority
-
-Do not use room under a limit to enlarge accepted work. Stop before editing and
-obtain new scope authority when accepted behavior cannot be delivered safely
-without an unrequested refactor, incidental fix, new concern, or new dependency.
-In particular:
-
-- Omit an unrequested refactor when the accepted behavior can be delivered
-  safely without it. If it is genuinely required, explain why and re-estimate.
-- Report an incidental finding without fixing or filing it when it does not
-  block correctness, safety, or validation. A blocking finding requires
-  stop-and-replan authority.
+- Omit an unrequested refactor when the approved behavior can be delivered
+  safely without it. If the refactor is required, explain why and update the
+  estimate before editing.
+- Report an incidental finding without fixing it or filing an issue when it
+  does not block correctness, safety, or validation. If it blocks the work,
+  stop and ask the user or owner to approve a new plan.
 - Add an abstraction, production API, configuration option, provider slot,
-  toggle, or extension point only for a current accepted production use or an
-  established local boundary. Tests alone and speculative future use are not
-  sufficient.
-- Exclude opportunistic formatting, renames, dead-code removal, dependency
-  upgrades, cleanup, and unrelated hardening tests or documentation.
-- Stop before adding or changing a manifest, lock file, workflow, provider,
-  account, network service, runtime component, build tool, or test dependency
-  unless the accepted issue explicitly approves that dependency and its
-  consequences.
+  toggle, or extension point only for a current approved production use or an
+  established project boundary. Tests and possible future uses are not enough.
+- Do not include unrelated formatting, renames, dead-code removal, dependency
+  upgrades, cleanup, hardening tests, or documentation.
+- Do not add or change a manifest, lock file, workflow, provider, account,
+  network service, runtime component, build tool, or test dependency unless the
+  approved issue includes the dependency and its consequences.
 
-A `split_required` verdict does not itself authorize GitHub mutations. After the
-owner explicitly accepts an enumerated split plan, an agent may create only the
-child issues that directly map the parent acceptance criteria named in that
-plan. Incidental findings, cleanup, speculative work, and new dependencies still
-require separate explicit user/owner instruction or explicit source-issue
-authority. Without that authority, report the observation without mutating
-GitHub.
+### Split work when a hard gate requires it
 
-Before editing a plan that may cross a scope gate, use
-`$implementation-scope-review` with a fresh read-only agent after the user has
-authorized subagents for the active session. The reviewer must return
-`single_pr` or `split_required`, map acceptance criteria to proposed PRs,
-identify dependencies, and recommend merge order. If a planning agent is
-unavailable or not authorized, pause oversized work and report the blocker; do
-not silently waive the review.
+- Default to `split_required` when a plan crosses a hard gate for concerns,
+  ordinary files, resulting code size, generated output, vendored output, or
+  lock files.
+- General approval of an issue or pull request is not an exception.
+- To keep oversized work in one pull request, record the exact gate, measured
+  values, and the reason a split is unsafe or inseparable on the issue. Obtain
+  explicit owner approval.
+- A `split_required` verdict does not authorize a GitHub change. Present the
+  numbered split to the owner first.
+- Until the owner explicitly accepts that numbered split, report the finding
+  and do not change GitHub.
+- After the owner accepts the split, create and link only the child issues that
+  map to the named parent acceptance criteria. Do this before implementation.
+  Incidental findings, cleanup, speculative work, and new dependencies still
+  need separate explicit user or owner instruction, or approval in the source
+  issue.
+- Keep the parent issue open. Give every pull request one coherent result and
+  keep each slice independently safe and mergeable. Leave unfinished behavior
+  disabled by default.
+- During implementation, stop and rerun `$implementation-scope-review` if the
+  diff crosses a hard gate or adds a concern, output class, or dependency.
+- Split the work unless the issue records the required exception and the owner
+  approves it.
+- Do not silently expand or recategorize a pull request.
+- If only a documentation threshold is crossed, record the measures and arrange
+  focused staged review. Do not rerun the scope review for documentation size
+  alone.
 
-Documentation review thresholds are not scope gates. Crossing one does not by
-itself require another scope review or a split.
+### Review the complete implementation
 
-Default to `split_required` whenever a hard gate is crossed. Hard gates cover
-concerns, ordinary files, resulting code-file size, and the separate generated,
-vendored, and lock-file budgets. Keeping oversized work in one PR requires the
-exact exceeded gate and measured values, an inseparability or safety rationale
-recorded on the issue, and explicit approval from the user or repository owner.
-General approval of an issue or PR is not a blanket exception. For an
-owner-accepted split plan, create and link only its authorized child issues
-before implementation, keep the parent issue open, give each PR one coherent
-outcome, and make every slice independently safe and mergeable. Leave unfinished
-capabilities disabled by default.
+- Before opening or finalizing a nontrivial implementation pull request, stage
+  the complete intended diff and ask a fresh read-only agent to run
+  `$second-agent-review`.
+- Decide each finding. Fix accepted findings narrowly. Record why any finding
+  is rejected or deferred.
+- Rerun the relevant checks and summarize the review in the pull request.
+- Treat work as nontrivial when it changes runtime behavior, a public contract,
+  scoring or data transformation, provider, privacy or security boundaries,
+  deployment or CI behavior, migrations, or two or more files with coupled
+  behavior.
+- A tiny mechanical edit or wording-only documentation change may skip staged
+  review only when the documentation authority and size rules do not require
+  it.
+  The pull request must say why no review was required.
 
-Re-evaluate hard gates during implementation. If the actual diff crosses one or
-a new independently reviewable concern, output category, or dependency appears,
-stop and rerun `$implementation-scope-review`. Split the work unless keeping one
-PR satisfies the recorded exception requirements above; never silently expand
-or recategorize the current PR. If a documentation threshold is crossed, record
-the measures and arrange the focused staged review without rerunning scope
-review for size alone.
+### Review sensitive information before publication
 
-Before opening or finalizing a nontrivial implementation PR, stage the complete
-intended diff and use `$second-agent-review` with a fresh read-only agent. Triage
-every finding, fix accepted findings narrowly, record reasons for rejected or
-deferred findings, rerun relevant checks, and summarize the review outcome in
-the PR.
+Before an agent-authored push:
 
-Before any agent-authored push, use `$sensitive-information-review` with a fresh
-read-only agent on the exact source ref, actual remote destination, complete
-refspecs, and push options. Inspect all commit messages and every introduced or
-modified blob version in the outgoing range, including intermediate versions
-absent from the final diff. Git LFS pointer blobs require inspection of their
-referenced payloads. Do not substitute a net diff or broaden the review into
-unrelated local secrets and uncommitted work.
+- Ask a fresh read-only agent to run `$sensitive-information-review`.
+- Give it the exact source ref, remote destination, complete refspecs, and push
+  options.
+- Review every commit message and every introduced or changed blob version in
+  the outgoing range. Include intermediate versions that are absent from the
+  final diff.
+- Inspect the payload referenced by every Git LFS pointer.
+- Do not substitute a net diff. Do not expand the review to unrelated local
+  secrets or uncommitted work.
 
-Before an agent creates a nontrivial PR or publishes a relevant agent-authored
-mutation to its surface, use the same skill on the exact unpublished title,
-body, relevant comment or reply, and
-attachment bytes plus their intended repository and PR destination. Settled
-Git and PR-surface inputs may be reviewed together before their corresponding
-publication steps. Before PR creation, prove complete merge-base-to-head
-coverage from recorded full object IDs and reachability; inspect any commits or
-blobs not covered by matching `clear` pre-push reviews. For an existing PR,
-treat its live text and discussion only as read-only context and review only the
-new outgoing material. Review attachments, including PDFs and other documents,
-before upload; review a later outgoing reference to a service-generated URL as
-part of that later text.
+Before creating a nontrivial pull request or publishing a relevant
+agent-authored change to an existing pull request:
 
-Immediately before each publication step, re-resolve the applicable refs,
-refspecs, push options, destination, and exact unpublished bytes. A change to an
-unpublished reviewed input invalidates the verdict and requires a fresh review;
-publishing those exact inputs does not. A later PR mutation gets its own
-pre-publication review of only its new outgoing content. Do not run a mandatory
-sensitive-information review after publication or merely for final handoff. At
-handoff, verify refs, checks, and PR state read-only and report the recorded
-pre-publication verdicts without another PR mutation.
+- Ask a fresh read-only agent to run `$sensitive-information-review` on the
+  exact unpublished title, body, comment or reply, and attachment bytes.
+  Include the destination repository and pull request.
+- Settled Git and pull-request text may be reviewed together before their
+  publication steps.
+- Before creating the pull request, prove complete merge-base-to-head coverage
+  with recorded full object IDs and reachability. Inspect any commit or blob
+  that is not covered by a matching `clear` pre-push review.
+- For an existing pull request, read live text and discussion only as context.
+  Review only the new outgoing material.
+- Review every attachment, including a PDF or other document, before upload.
+  If later text refers to a URL created by the hosting service, review that
+  outgoing reference with the later text.
 
-The sensitive-information reviewer returns `clear`, `review_required`, or
-`block`. A `block` verdict stops the applicable push or PR publication step. Treat
-`review_required` as unresolved until the owner decides or full coverage is
-restored; never present it as a passed gate. Report candidates only through
-opaque review-local IDs and sanitized locations, never by reproducing or
-fingerprinting the value. Missing document tooling, encryption, malformed or
-unsupported content, unsafe extraction, or exceeded inspection bounds prevents
-a `clear` result. The reviewer never executes active content or performs
-remediation. Pre-commit use is optional and occurs only when explicitly
-requested; it does not replace mandatory pre-push or outgoing-PR review. If a
-credible sensitive value is discovered after publication, stop further
-publication and report the existing owner-directed incident actions rather than
-describing the retrospective audit as a gate.
+Immediately before each publication step:
 
-Treat implementation work as nontrivial when it changes runtime behavior,
-public contracts, scoring or data transformation, provider/privacy/security
-boundaries, deployment or CI behavior, migrations, or multiple files with
-coupled behavior. Tiny mechanical edits and wording-only documentation changes
-may skip the staged-diff review only when the documentation authority and size
-rules do not require it. The PR must record why review was not required.
+- Resolve the refs, refspecs, push options, destination, and exact unpublished
+  bytes again.
+- If an unpublished reviewed input changed, run a new review. Publishing the
+  exact reviewed input does not invalidate its verdict.
+- Review each later pull-request change separately and only for its new
+  outgoing content.
+- Do not run this mandatory review after publication or only for final handoff.
+  At handoff, verify refs, checks, and pull-request state without changing them,
+  and report the recorded pre-publication verdicts.
 
-## Suggested Tooling Direction
+Sensitive-review verdicts:
+
+- `clear` allows the reviewed publication step.
+- `review_required` remains unresolved until the owner decides or complete
+  review coverage is restored. Do not report it as passed.
+- `block` stops the push or pull-request publication.
+- Report a candidate only by an opaque review-local ID and sanitized location.
+  Do not reproduce or fingerprint the value.
+- Missing document tools, encryption, malformed or unsupported content, unsafe
+  extraction, or exceeded inspection limits prevent a `clear` verdict.
+- The reviewer does not execute active content or fix findings.
+- A pre-commit review is optional and happens only when the user asks. It does
+  not replace the required pre-push or pull-request review.
+- If a credible sensitive value is found after publication, stop publishing
+  further material and report the incident steps that the owner already
+  specified. Do not describe that retrospective check as a passed gate.
+
+## Expected Tools
 
 As implementation continues, the expected stack remains:
 
@@ -353,7 +444,7 @@ As implementation continues, the expected stack remains:
   flow is complete and testers show recurring demand.
 - Local infrastructure: Docker Compose for Postgres and integration dependencies.
 
-Do not add Postgres, migrations, an installed client, or local infrastructure
+Do not add an installed client or local infrastructure
 until the next implementation step explicitly calls for them.
 
 ## Verification
