@@ -11,6 +11,9 @@ INVENTORY = DEPLOYMENT / "inventory.example.yml"
 ROLE = DEPLOYMENT / "roles" / "moon_service_preview_storage"
 DEFAULTS = ROLE / "defaults" / "main.yml"
 TASKS = ROLE / "tasks" / "main.yml"
+INVENTORY_VALIDATION = ROLE / "tasks" / "validate-inventory.yml"
+MOUNT_VALIDATION = ROLE / "tasks" / "validate-current-mount.yml"
+RUNTIME_VALIDATION = DEPLOYMENT / "tests" / "preview-storage-validation.runtime.yml"
 
 TARGET = "/mnt/moon-service-preview"
 OPTIONS = (
@@ -41,7 +44,19 @@ class PreviewStorageContractTest(unittest.TestCase):
         cls.production_playbook = PRODUCTION_PLAYBOOK.read_text(encoding="utf-8")
         cls.inventory = INVENTORY.read_text(encoding="utf-8")
         cls.defaults = DEFAULTS.read_text(encoding="utf-8")
-        cls.tasks = TASKS.read_text(encoding="utf-8")
+        cls.main_tasks = TASKS.read_text(encoding="utf-8")
+        cls.inventory_validation = INVENTORY_VALIDATION.read_text(encoding="utf-8")
+        cls.mount_validation = MOUNT_VALIDATION.read_text(encoding="utf-8")
+        cls.runtime_validation = RUNTIME_VALIDATION.read_text(encoding="utf-8")
+        cls.tasks = cls.main_tasks.replace(
+            "- name: Validate preview-storage inventory before host mutation\n"
+            "  ansible.builtin.include_tasks: validate-inventory.yml\n",
+            cls.inventory_validation,
+        ).replace(
+            "- name: Validate the current preview-storage mount state\n"
+            "  ansible.builtin.include_tasks: validate-current-mount.yml\n",
+            cls.mount_validation,
+        )
 
     def assert_before(self, earlier: str, later: str) -> None:
         self.assertIn(earlier, self.tasks)
@@ -124,8 +139,22 @@ class PreviewStorageContractTest(unittest.TestCase):
 
     def test_rpcbind_is_rejected_before_apt_and_remains_unavailable(self):
         install = "Install only the NFS client package without service auto-start"
-        self.assert_before("Check for an active rpcbind service before mutation", install)
-        self.assert_before("Refuse an existing rpcbind use", install)
+        self.assert_before("Inspect rpcbind unit state before mutation", install)
+        self.assert_before("Refuse an existing rpcbind unit use", install)
+        unit_check = self.task("Inspect rpcbind unit state before mutation")
+        self.assertIn("--property=LoadState", unit_check)
+        self.assertIn("--property=ActiveState", unit_check)
+        unit_refusal = self.task("Refuse an existing rpcbind unit use")
+        for state in (
+            "ActiveState=inactive",
+            "ActiveState=failed",
+            "LoadState=loaded",
+            "LoadState=masked",
+            "LoadState=not-found",
+        ):
+            self.assertIn(state, unit_refusal)
+        for unsafe_state in ("active", "activating", "deactivating", "maintenance"):
+            self.assertNotIn(f"ActiveState={unsafe_state}' in", unit_refusal)
         apt = self.task(install)
         self.assertIn("name: nfs-common", apt)
         self.assertIn("policy_rc_d: 101", apt)
@@ -228,6 +257,42 @@ class PreviewStorageContractTest(unittest.TestCase):
         ):
             self.assertIn(value, validation)
         self.assertIn("automount_after.rc == 0", validation)
+
+    def test_generated_systemd_policy_is_verified_without_source_output(self):
+        mount_policy = self.task("Inspect the generated preview mount policy")
+        self.assertIn("--property=ReadWriteOnly", mount_policy)
+        self.assertIn("--property=TimeoutUSec", mount_policy)
+        self.assertNotIn("--property=What", mount_policy)
+        automount_policy = self.task("Inspect the generated preview automount policy")
+        self.assertIn("--property=TimeoutIdleUSec", automount_policy)
+        self.assertNotIn("--property=What", automount_policy)
+        validation = self.task("Require the exact live preview-storage contract")
+        for value in (
+            "ReadWriteOnly=yes",
+            "TimeoutUSec=30s",
+            "TimeoutIdleUSec=10min",
+        ):
+            self.assertIn(value, validation)
+
+    def test_runtime_validation_exercises_inputs_and_mount_classification(self):
+        for tasks_from in ("validate-inventory", "validate-current-mount"):
+            self.assertIn(f"tasks_from: {tasks_from}", self.runtime_validation)
+        for evidence in (
+            "documentation_endpoint_rejected",
+            "malformed_export_rejected",
+            "missing_confirmation_rejected",
+            "foreign_mount_rejected",
+            "unowned_autofs_rejected",
+        ):
+            self.assertIn(evidence, self.runtime_validation)
+        for mutating_module in (
+            "ansible.builtin.apt:",
+            "ansible.builtin.file:",
+            "ansible.builtin.lineinfile:",
+            "ansible.builtin.systemd_service:",
+            "ansible.builtin.command:",
+        ):
+            self.assertNotIn(mutating_module, self.runtime_validation)
 
     def test_mutation_uses_convergent_builtin_modules(self):
         for module in (

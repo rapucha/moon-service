@@ -199,6 +199,8 @@ From `deployment/raspberry-pi`, check and apply only the focused playbook:
 
 ```bash
 ansible-playbook preview-storage.yml --syntax-check
+ansible-playbook --inventory localhost, --connection local \
+  tests/preview-storage-validation.runtime.yml
 ansible-playbook preview-storage.yml --diff
 ```
 
@@ -218,6 +220,10 @@ sudo findmnt --target /mnt/moon-service-preview \
   --output TARGET,SOURCE,FSTYPE,OPTIONS
 systemctl status 'mnt-moon\x2dservice\x2dpreview.automount'
 systemctl status 'mnt-moon\x2dservice\x2dpreview.mount'
+systemctl show 'mnt-moon\x2dservice\x2dpreview.automount' \
+  --property=TimeoutIdleUSec
+systemctl show 'mnt-moon\x2dservice\x2dpreview.mount' \
+  --property=ReadWriteOnly --property=TimeoutUSec
 systemctl is-enabled rpcbind.service rpcbind.socket
 systemctl is-active rpcbind.service rpcbind.socket
 sudo ss -H -lntup '( sport = :111 )'
@@ -228,6 +234,8 @@ sudo ss -H -lntup '( sport = :111 )'
 `ro` or `soft`. The root-owned fstab entry also holds `_netdev`, `nofail`,
 `x-systemd.rw-only`, `x-systemd.automount`, the 600-second idle timeout, and the
 30-second mount timeout; these systemd properties are not kernel mount flags.
+The generated units must report `TimeoutIdleUSec=10min`,
+`ReadWriteOnly=yes`, and `TimeoutUSec=30s`.
 Both `rpcbind` units must be masked and inactive, and the `ss` command must
 print no TCP or UDP port 111 listener on IPv4 or IPv6. After ten minutes without
 access, the mount unit may be inactive while the automount unit stays active.
