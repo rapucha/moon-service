@@ -1,18 +1,21 @@
 # First Backend/Web API Shape
 
-This document owns product API design and intended future shapes. For the
-currently implemented controller mappings, concrete consumers, and exposure,
-see the [HTTP route inventory](http-route-inventory.md).
+This document defines the product API and its planned additions. For the routes
+that the controllers currently implement, who calls them, and how they are
+exposed, see the [HTTP route inventory](http-route-inventory.md).
 
 ## Goal
 
-The first API should support a single-page web experience:
+The first API should support this single-page web flow:
 
 ```text
 /search?q=Praha
 ```
 
-The page should accept a city/location query, resolve it, return Moon opportunities when possible, and support playful fictional Easter eggs without requiring accounts, cookies, email, or saved server-side preferences.
+The page should accept and resolve a city or location query. It should return
+Moon opportunities when possible and support playful fictional Easter eggs. It
+should not require accounts, cookies, email, or preferences saved on the
+server.
 
 ## Public UX
 
@@ -32,44 +35,49 @@ shareable result flow, and
 [#16](https://github.com/rapucha/moon-service/issues/16) for feeds and
 calendar exports.
 
-The web page can call a single opportunity search endpoint:
+The web page can use one endpoint to search for opportunities:
 
 ```http
 GET /api/opportunities?q=Praha&lang=cs
 ```
 
-`lang` is optional. If absent, use `Accept-Language` as a display/ranking hint only.
+`lang` is optional. When it is absent, use `Accept-Language` only as a hint for
+display and ranking.
 
 ## Request Parameters
 
 `q`:
 
-- Required for query-based lookup.
-- Raw Unicode city/location query.
-- Do not ASCII-normalize before geocoding.
+- Query-based lookup requires this parameter.
+- It contains the raw Unicode city or location query.
+- Do not convert the query to ASCII before geocoding.
 - Reject empty or unreasonably long queries with `invalid_request`.
-- One visible-character queries are allowed because real one-symbol place names exist, such as `Å` and `Y`, but they should use stricter handling because they are highly ambiguous.
+- Allow one-visible-character queries because real one-symbol place names exist,
+  such as `Å` and `Y`. These queries should receive stricter handling because
+  they are highly ambiguous.
 
 `lang`:
 
 - Optional BCP 47 language tag.
-- Used only for display/ranking preferences.
-- Must not prevent local-language queries from resolving.
+- Use it only for display and ranking preferences.
+- It must not prevent local-language queries from resolving.
 
 `country`:
 
 - Optional ISO country code.
-- Used as a disambiguation hint, not as a hard filter unless the UI explicitly says so.
+- Use it as a disambiguation hint. Do not use it as a hard filter unless the UI
+  explicitly says so.
 
 `locationId`:
 
-- Optional alternative to `q` for a selected canonical real location.
+- Optional alternative to `q` when the user has selected a canonical real
+  location.
 - The current backend accepts provider-backed IDs returned after
   `ambiguous_location`; curated fictional IDs remain a future contract.
 
 ## Response Statuses
 
-Use `status` for the overall request state:
+Use `status` to report the result of the whole request:
 
 ```text
 ok
@@ -82,24 +90,27 @@ rate_limited
 
 Meanings:
 
-- `ok`: resolved one location and completed the lookup. For real locations, `opportunities` may contain results or be empty.
-- `ambiguous_location`: multiple plausible candidates; the current backend
-  returns real geocoding candidates only, while fictional candidates remain a
-  future contract.
-- `location_not_found`: no real geocoding result. The current backend has no
-  fictional fallback.
-- `invalid_request`: missing, empty after trimming, too long, malformed, or unsupported input.
-- `temporarily_unavailable`: the current backend could not complete geocoding
-  or weather lookup. The target contract may apply the same state to other
-  required dependencies.
-- `rate_limited`: request was valid, but the client or service exceeded an application-level rate limit.
+- `ok`: the backend resolved one location and completed the lookup. For a real
+  location, `opportunities` may contain results or be empty.
+- `ambiguous_location`: multiple plausible candidates matched. The current
+  backend returns only real geocoding candidates. Fictional candidates remain
+  part of a future contract.
+- `location_not_found`: geocoding found no real location. The current backend
+  has no fictional fallback.
+- `invalid_request`: the input is missing, empty after trimming, too long,
+  malformed, or unsupported.
+- `temporarily_unavailable`: the current backend could not complete the
+  geocoding or weather lookup. The target contract may use the same state when
+  another required dependency fails.
+- `rate_limited`: the request was valid, but the client or service exceeded an
+  application-level rate limit.
 
-For a resolved real location, `status: "ok"` with `opportunities: []` means
-evaluation completed successfully but produced no scored result. Today that can
-mean no natural windows were generated, no live portion remained, or every
-retained window was rejected by the thin-crescent visibility rule. There is no
-minimum total-score threshold. Dependency failures should not be represented as
-an empty list.
+For a resolved real location, `status: "ok"` with `opportunities: []` means the
+backend completed evaluation but produced no scored result. Today, this can
+mean that the backend generated no natural windows, found no remaining live
+portion, or rejected every retained window under the thin-crescent visibility
+rule. There is no minimum total-score threshold. A dependency failure should
+not appear as an empty list.
 
 HTTP status codes can stay conventional:
 
@@ -110,7 +121,7 @@ HTTP status codes can stay conventional:
 
 ## Message Codes
 
-Responses may include `messages` for non-fatal context:
+Responses may include `messages` with non-fatal information:
 
 ```text
 local_horizon_not_modelled
@@ -122,36 +133,45 @@ one_character_query
 
 Meanings:
 
-- `local_horizon_not_modelled`: terrain, buildings, trees, and exact local horizon are not included.
-- `fictional_result`: the response is an Easter egg and not real-world guidance.
-- `query_alias_used`: raw geocoding returned no candidates, so a curated alias, transliteration, or exact curated one-character place record was used.
-- `input_normalized`: lookup/cache input was normalized, such as whitespace collapsing, while preserving the original query in the response.
-- `one_character_query`: the query is a single visible character and was handled with stricter lookup rules.
+- `local_horizon_not_modelled`: the calculation does not include terrain,
+  buildings, trees, or the exact local horizon.
+- `fictional_result`: the response is an Easter egg, not real-world guidance.
+- `query_alias_used`: raw geocoding returned no candidates, so the lookup used a
+  curated alias, transliteration, or exact curated one-character place record.
+- `input_normalized`: the backend normalized input for lookup and cache use,
+  such as by collapsing whitespace, but preserved the original query in the
+  response.
+- `one_character_query`: the query contains one visible character, so the
+  backend used stricter lookup rules.
 
 ## Rate Limits And Upstream Quotas
 
-The backend must protect both Moon Service and upstream providers.
+The backend must protect Moon Service and its upstream providers.
 
 Application-level limits:
 
-- Rate limit `/api/opportunities` by IP or coarse anonymous client fingerprint
-  before public alpha. For home-hosted alpha, start with an edge or ingress
-  limit around 30 requests per minute per client, with stricter handling for
-  one-character or otherwise high-ambiguity lookups.
+- Before public alpha, rate limit `/api/opportunities` by IP or coarse anonymous
+  client fingerprint. For home-hosted alpha, start with an edge or ingress
+  limit around 30 requests per minute per client. Apply stricter handling to
+  one-character and other highly ambiguous lookups.
 - Edge or ingress limits are acceptable as an early safety control, but the
   documented `rate_limited` JSON response requires application-level handling.
-- Keep limits generous enough for manual use and testing.
+- Keep the limits generous enough for manual use and testing.
 - Return `status: "rate_limited"` with HTTP `429` when a client is limited.
 - Include a retry hint when possible.
 
 Upstream provider limits:
 
-- Open-Meteo free weather API is documented as non-commercial and rate-limited.
+- The Open-Meteo free weather API is documented as non-commercial and
+  rate-limited.
 - Open-Meteo geocoding should be cached and should not be called on every keystroke.
 - Avoid typeahead/autocomplete in v0 to reduce geocoding request volume.
-- Cache geocoding, weather, and scoring outputs enough to avoid repeated provider calls for the same city/time window.
-- If an upstream provider quota is exhausted, return `temporarily_unavailable`, not `opportunities: []`.
-- Record outbound provider calls in local counters so `/admin/status` can show hourly, daily, and monthly usage.
+- Cache geocoding, weather, and scoring output enough to avoid repeated provider
+  calls for the same city and time window.
+- If an upstream provider quota is exhausted, return `temporarily_unavailable`,
+  not `opportunities: []`.
+- Record outbound provider calls in local counters so `/admin/status` can show
+  hourly, daily, and monthly usage.
 
 Example rate-limited response:
 
@@ -165,43 +185,53 @@ Example rate-limited response:
 
 ## Input Validation And Abuse Protection
 
-Treat lookup input as hostile even when it looks like a city name.
+Treat every lookup value as hostile input, even when it looks like a city name.
 
 Validation rules:
 
 - Require `q` after Unicode trim.
 - Reject empty input.
-- Use a maximum length for city/location search, initially around 100 visible characters.
+- Limit city and location searches to an initial maximum of around 100 visible
+  characters.
 - Allow one visible Unicode letter or number because real one-symbol place names exist.
-- Reject or strip ASCII control characters and Unicode bidirectional control characters.
-- Normalize whitespace runs to a single space for lookup/cache keys while preserving the original query for display/debug context.
-- Do not call aliases, secondary geocoders, or future LLM fallback for invalid input.
+- Reject or remove ASCII control characters and Unicode bidirectional control
+  characters.
+- Collapse whitespace runs to one space in lookup and cache keys. Preserve the
+  original query for display and debugging.
+- For invalid input, do not call aliases, secondary geocoders, or a future LLM
+  fallback.
 
 One-character query rules:
 
 - Permit one visible-character queries such as `Å` or `Y`.
 - Require exact geocoding or exact curated alias match.
-- Do not invoke broad fuzzy fallback, dynamic translation/transliteration, secondary geocoding, or LLM fallback by default.
+- Do not invoke broad fuzzy fallback, dynamic translation/transliteration,
+  secondary geocoding, or LLM fallback by default.
 - Return `ambiguous_location` if multiple plausible places match.
-- Rate-limit one-character lookups conservatively because they are cheap to abuse and likely to be ambiguous.
+- Rate-limit one-character lookups conservatively. They are cheap to abuse and
+  likely to be ambiguous.
 
 Safety rules:
 
-- Escape `q`, provider display names, and aliases before rendering them in HTML.
+- Escape `q`, provider display names, and aliases before rendering them as
+  HTML.
 - Do not put raw `q` in structured application logs by default.
 - Do not build provider URLs by string concatenation; use encoded query parameters.
-- Cache negative lookups briefly, but cap negative-cache size and TTL to avoid cache pollution.
+- Cache negative lookups briefly. Cap the negative-cache size and TTL to avoid
+  cache pollution.
 - Keep provider call counters and rate limits visible in `/admin/status`.
 
 ## Admin Status Endpoint
 
-The first backend should expose a private operator endpoint:
+The first backend should provide this private operator endpoint:
 
 ```http
 GET /admin/status
 ```
 
-This endpoint is for the Moon Service operator, not public users. It should be protected and may render simple server-side HTML before any richer admin UI exists.
+This endpoint is for the Moon Service operator, not public users. It should be
+protected. It may render simple server-side HTML before a richer admin UI
+exists.
 
 Minimum response/page fields:
 
@@ -263,16 +293,16 @@ public_api:
   opportunity_search_rate_limit
 ```
 
-The status page should make quota risk visible before exhaustion. If known
+The status page should show quota risk before a quota is exhausted. When known
 limits are configured, show warning states at roughly 50 percent, 80 percent,
-and 95 percent usage. Unknown limits must stay explicit instead of returning a
-fake percent. Provider operations should stay generic enough for later
+and 95 percent usage. Unknown limits must remain explicit; do not return a fake
+percentage. Provider operations should remain generic enough to support later
 geocoding, weather, email, calendar, ephemeris, map, or LLM-backed fictional
 location providers.
 
 ## Candidate Kinds
 
-Use `kind` on candidates/results, not in `status`:
+Put `kind` on candidates and results, not in `status`:
 
 ```text
 real_location
@@ -282,112 +312,116 @@ fictional_location
 `real_location`:
 
 - Comes from geocoding provider data.
-- Can have latitude, longitude, elevation, timezone, country, admin areas.
+- Can include latitude, longitude, elevation, timezone, country, and admin
+  areas.
 - Can produce real opportunities, RSS/Atom feeds, and `.ics` exports.
 
 `fictional_location`:
 
-- Comes from curated fictional data or later LLM-assisted lore classification.
+- Comes from curated fictional data or a later LLM-assisted lore
+  classification.
 - Must not include real coordinates.
 - Must not produce RSS/Atom feed entries, `.ics` exports, real weather, or real ephemeris results.
 - Can produce a clearly labeled fictional report.
 
 ## Opportunity Window Contract
 
-Real opportunities should represent natural visible-Moon windows, not artificial
-slices produced by ephemeris sampling. Low Moon remains the strongest default
-use case, but context Moon opportunities should not be excluded when light and
-weather are favorable.
+Real opportunities should represent natural windows when the Moon is visible,
+not artificial slices created by ephemeris sampling. A low Moon remains the
+strongest default use case. The backend should not exclude context Moon
+opportunities when light and weather are favorable.
 
-The backend should first find physical Moon passes: continuous intervals where
-the apparent refracted Moon altitude stays above the local horizon. A pass is
-bounded by Moonrise, Moonset, or the search horizon edges. Local midnight is not
-a pass boundary.
+The backend should first find physical Moon passes. A pass is a continuous
+interval when the apparent refracted Moon altitude stays above the local
+horizon. Moonrise, Moonset, or an edge of the search horizon bounds the pass.
+Local midnight does not.
 
-Useful recommendation windows live inside a Moon pass. A single pass may
-produce more than one opportunity, for example one while the Moon is ascending
-and another while it is descending. Recommendation windows may be bounded by
-Moonrise, Moonset, optional crossings through the configured altitude ceiling,
-the pass peak, or the search horizon edges.
+The backend finds useful recommendation windows inside each Moon pass. One pass
+may produce more than one opportunity, such as one while the Moon ascends and
+another while it descends. Moonrise, Moonset, optional crossings through the
+configured altitude ceiling, the pass peak, or search-horizon edges may bound
+a recommendation window.
 
 Response rules:
 
 - The current response remains a flat `opportunities` array. Follow-up #53
   tracks whether the API should later become pass-centric, with Moon passes as
   the primary ranked objects and recommendation windows nested inside them.
-- The anonymous `GET /api/opportunities` lookup requests up to ten raw
-  recommendation windows by default, ordered by the existing score and
-  tie-break rules. Ten is a provisional discovery safeguard while the scoring
-  model is being evaluated under #33, not a claim that every returned candidate
-  will produce an objectively good photograph.
+- By default, the anonymous `GET /api/opportunities` lookup requests up to ten
+  raw recommendation windows. It orders them by the existing score and
+  tie-break rules. Ten is a provisional discovery safeguard while #33 evaluates
+  the scoring model. It does not mean that every returned candidate will
+  produce an objectively good photograph.
 - The direct `POST /api/opportunities/search` scoring contract keeps its
   caller-supplied `limit`; increasing the anonymous lookup default does not
   change that explicit request control.
 - `startsAt` and `endsAt` define the useful opportunity window.
-- `moonPass` identifies the containing physical Moon pass. Clients may use
-  `moonPass.id` to group ascending and descending recommendations from the
-  same pass, so ten raw candidates may render as fewer than ten pass cards.
-  `moonPass.startsAt` and `moonPass.endsAt` describe the whole pass, which may
-  cross local midnight.
+- `moonPass` identifies the physical Moon pass that contains the opportunity.
+  Clients may use `moonPass.id` to group ascending and descending
+  recommendations from the same pass. Therefore, ten raw candidates may render
+  as fewer than ten pass cards. `moonPass.startsAt` and `moonPass.endsAt`
+  describe the whole pass, which may cross local midnight.
 - `moonPass.path` describes Moon movement across the whole physical pass. The
-  current flat response repeats this bounded pass path on each opportunity so a
-  grouped client can draw one continuous pass chart; follow-up #53 can remove
-  that duplication if the API becomes pass-centric.
-- `suggestedAt` is optional and only identifies a representative time inside
+  current flat response repeats this bounded pass path on each opportunity. A
+  grouped client can then draw one continuous pass chart. Follow-up #53 can
+  remove that duplication if the API becomes pass-centric.
+- `suggestedAt` is optional. It only identifies a representative time inside
   the window for sorting, links, or display.
 - `moon` describes the Moon at `suggestedAt`; keep this field as the compact
   suggested-time summary for compatibility.
 - `moon.phaseAngleDegrees` uses the astronomical lunar phase angle: `0` is new
   Moon, `90` is first quarter, `180` is full Moon, and `270` is last quarter.
 - `moon.brightLimbTiltDegrees` is an optional observer-oriented value at
-  `suggestedAt`. It gives the direction from the Moon center toward the Sun in
-  the local sky tangent plane: `0` points toward local zenith at the top of a
-  horizon-aligned image, `90` points right toward increasing azimuth, and angles
-  increase clockwise in the range `[0, 360)`. A missing or `null` value means
-  clients must retain their location-independent phase fallback. This is not a
-  celestial-north position angle, lunar-axis rotation, or parallactic angle.
+  `suggestedAt`. It points from the Moon center toward the Sun in the local sky
+  tangent plane. In a horizon-aligned image, `0` points toward the local zenith
+  at the top, `90` points right toward increasing azimuth, and angles increase
+  clockwise in the range `[0, 360)`. When the value is missing or `null`,
+  clients must retain their location-independent phase fallback. This value is
+  not a celestial-north position angle, lunar-axis rotation, or parallactic
+  angle.
 - `moon.northPoleTiltDegrees` is an optional observer-oriented value at
-  `suggestedAt`. It gives the direction from the Moon center toward the lunar
-  north rotational pole in the same local tangent-plane convention: `0` points
-  toward local zenith, `90` points right toward increasing azimuth, and angles
-  increase clockwise in `[0, 360)`. A missing or `null` value means clients
-  retain the canonical north-up surface texture. This field rotates surface
-  sampling only; it does not change the phase silhouette or bright-limb
-  direction and does not model libration.
-- `moonPath` describes Moon movement across the window. It must include direct
-  `start`, `suggested`, and `end` points plus a bounded `samples` array
-  suitable for compact UI charts. V0 samples the path at regular 30-minute
-  intervals, with additional samples at suggested time, window boundaries, and
-  light-bucket crossings.
+  `suggestedAt`. It points from the Moon center toward the lunar north
+  rotational pole and uses the same local tangent-plane convention. `0` points
+  toward the local zenith, `90` points right toward increasing azimuth, and
+  angles increase clockwise in `[0, 360)`. When the value is missing or `null`,
+  clients retain the canonical north-up surface texture. This field rotates
+  only surface sampling. It does not change the phase silhouette or
+  bright-limb direction, and it does not model libration.
+- `moonPath` describes Moon movement across the window. It must directly
+  include `start`, `suggested`, and `end` points. It must also include a bounded
+  `samples` array suitable for compact UI charts. V0 samples the path at regular
+  30-minute intervals and adds samples at the suggested time, window
+  boundaries, and light-bucket crossings.
 - `moonPath` points include `lightBucket` derived from Sun altitude so clients
   can show daylight, golden hour, twilight, and night changes across the same
   Moon path without treating weather precision as minute-level.
 - `moonPath` points include `sunAzimuthDegrees` alongside
   `sunAltitudeDegrees` so clients can annotate secondary Sun positions without
   doing their own ephemeris calculation.
-- Every `moonPass.path` and `moonPath` point includes Moon-disc orientation for
-  its own `at` instant. `moonPhaseAngleDegrees` uses the same convention as
-  `moon.phaseAngleDegrees`; nullable `brightLimbTiltDegrees` and
+- Every `moonPass.path` and `moonPath` point includes the Moon-disc orientation
+  at its own `at` instant. `moonPhaseAngleDegrees` uses the same convention as
+  `moon.phaseAngleDegrees`. Nullable `brightLimbTiltDegrees` and
   `northPoleTiltDegrees` use the same observer-oriented conventions as the
-  compact `moon` summary. The two tilt fields retain their independent null
-  fallbacks. Clients rendering older responses without a per-point phase may
-  fall back to the containing opportunity's `moon` summary.
+  compact `moon` summary. The two tilt fields keep separate null fallbacks.
+  Clients that render older responses without a per-point phase may fall back
+  to the containing opportunity's `moon` summary.
 - Do not expose ephemeris sampling cadence such as `stepMinutes` in the public
   API.
 
-The current engine selects the hourly forecast record covering `suggestedAt`;
-the response's weather summary and aggregate-shaped fields currently describe
-that one record. The target V0 weather-window contract is broader:
+The current engine selects the hourly forecast record that covers
+`suggestedAt`. The response's weather summary and aggregate-shaped fields
+currently describe that one record. The target V0 weather-window contract
+instead describes weather across the opportunity window:
 
 - Weather fields on an opportunity should aggregate the merged weather
   interval. V0 uses hourly weather fields because cloud cover is the primary
   scoring input and Open-Meteo exposes cloud-cover layers hourly.
-- Natural visible-Moon windows should split at provider forecast change
-  boundaries when those changes affect the recommendation.
+- Natural visible-Moon windows should split at provider forecast boundaries
+  when a forecast change affects the recommendation.
 - Adjacent intervals should merge when the derived weather class and
   decision-relevant facts are equivalent.
-- A single opportunity may then cover a broad interval when the Moon remains
-  visible and the forecast state is stable.
+- One opportunity may then cover a broad interval while the Moon remains
+  visible and the forecast state remains stable.
 - Avoid wording that implies minute-level weather certainty.
 
 ## Preview Response Examples
@@ -881,22 +915,28 @@ that one record. The target V0 weather-window contract is broader:
 - Store times as UTC instants.
 - Return the resolved location timezone.
 - Display event times in the location timezone.
-- Keep first MVP UI copy English-only unless translation work is explicitly added.
-- Provider validation found that Open-Meteo Geocoding resolves many raw Unicode city queries, but misses some native-script cases such as Japanese `東京`, `京都`, and `大阪`, and Korean `서울`. Keeping a broad raw Unicode promise requires a curated alias/transliteration fallback before considering a secondary geocoder or narrower v0 search promise.
+- Keep the first MVP UI copy in English only unless translation work is
+  explicitly added.
+- Provider validation found that Open-Meteo Geocoding resolves many raw Unicode
+  city queries. It misses some native-script cases, including Japanese `東京`,
+  `京都`, and `大阪`, and Korean `서울`. A broad raw Unicode promise requires a
+  curated alias or transliteration fallback before considering a secondary
+  geocoder or a narrower v0 search promise.
 
 ## Local Recent Searches
 
-The first web MVP may use browser `localStorage` for recent searches.
+The first web MVP may store recent searches in browser `localStorage`.
 
 Rules:
 
-- Store only an ordered list of recent location display names and slugs/canonical IDs.
+- Store only an ordered list of recent location display names and slugs or
+  canonical IDs.
 - Do not store timestamps in v0.
 - Do not store exact addresses.
 - Avoid storing latitude/longitude if a slug/canonical ID is enough.
 - Keep a small maximum, such as 5 or 10 entries.
 - Provide `Clear recent searches`.
-- The app must work when localStorage is disabled or cleared.
+- The app must work when `localStorage` is disabled or cleared.
 - Do not use localStorage for auth, consent, private tokens, or server tracking.
 
 Example:
@@ -913,25 +953,25 @@ Example:
 
 ## Calibration Feedback API
 
-Issue [#33](https://github.com/rapucha/moon-service/issues/33) owns the
-calibration-feedback initiative. Issue
-[#165](https://github.com/rapucha/moon-service/issues/165) owns this reduced
-version 1 contract and its implementation. The backend implements both routes;
-browser controls remain a separate slice. Existing opportunity `id` and
-`moonPass.id` values remain unchanged.
+Issue [#33](https://github.com/rapucha/moon-service/issues/33) tracks the full
+calibration-feedback work. Issue
+[#165](https://github.com/rapucha/moon-service/issues/165) defines and
+implements this smaller version 1 contract. The backend implements both routes.
+Browser controls remain separate work. Existing opportunity `id` and
+`moonPass.id` values do not change.
 
 The hand-authored
 [OpenAPI root](openapi/calibration-feedback-v1.yaml) is the canonical wire
-contract. Its local
+contract. The local
 [shared](openapi/calibration-feedback-v1-common.yaml) and
 [submission](openapi/calibration-feedback-v1-submission.yaml) component files
-define the referenced schemas. This Markdown section owns behavior that
-OpenAPI cannot express clearly: normalization, location resolution, processing
-order, idempotency bytes, admission, privacy, logging, and failure semantics.
-There is no Swagger UI, generated client, runtime validation, or build
-dependency.
+define its referenced schemas. This Markdown section defines rules that OpenAPI
+cannot state clearly: normalization, location resolution, processing order,
+idempotency bytes, admission, privacy, logging, and error handling. The
+implementation has no Swagger UI, generated client, runtime validation, or
+build dependency for this contract.
 
-The alpha has two routes only:
+The alpha exposes only these two routes:
 
 - `GET /api/calibration-feedback/v1/capability`
 - `POST /api/calibration-feedback/v1/submissions`
@@ -941,44 +981,49 @@ saved-review queue, or feedback-only location lookup.
 
 ### Shared transport and identifiers
 
-Both routes return JSON with integer `schemaVersion: 1`, an RFC 3339 UTC
-`serverTime`, and `Cache-Control: no-store`. Submission accepts UTF-8
-`application/json`; an optional `charset=utf-8` parameter is allowed. Other
-media types, content encodings, duplicate or unknown members, explicit `null`
-values, malformed Unicode, and unpaired surrogates are rejected. The
-submission body limit is 16,384 received bytes before JSON parsing. A declared
-or streamed body over the limit is rejected without parsing the excess.
+Both routes return JSON. Each response contains integer `schemaVersion: 1` and
+an RFC 3339 UTC `serverTime`, and it uses `Cache-Control: no-store`. Submission
+accepts UTF-8 `application/json`; an optional `charset=utf-8` parameter is
+allowed. The server rejects other media types, content encodings, duplicate or
+unknown members, explicit `null` values, malformed Unicode, and unpaired
+surrogates. It limits the received submission body to 16,384 bytes before JSON
+parsing. When a declared or streamed body exceeds the limit, the server rejects
+it without parsing the excess.
 
 The browser copies `locationId` and `opportunityId` from the currently loaded
-opportunity response. It requests no device-location or GPS permission.
+opportunity response. It does not request device-location or GPS permission.
 
-For feedback, the server removes the maximal leading and trailing sequence of
-these Unicode White_Space code points from `locationId`: U+0009-U+000D,
-U+0020, U+0085, U+00A0, U+1680, U+2000-U+200A, U+2028, U+2029, U+202F,
-U+205F, and U+3000. The result must contain 1-100 Unicode code points. Control
-characters and these bidirectional controls are invalid: U+061C,
-U+200E-U+200F, U+202A-U+202E, and U+2066-U+2069. The server does not apply
-case folding or NFC to the ID. This feedback rule does not change opportunity
-lookup validation.
+For feedback, the server first removes the maximal leading and trailing
+sequence of these Unicode White_Space code points from `locationId`:
+U+0009-U+000D, U+0020, U+0085, U+00A0, U+1680, U+2000-U+200A, U+2028, U+2029,
+U+202F, U+205F, and U+3000. The result must contain 1-100 Unicode code points.
+Control characters and these bidirectional controls are invalid: U+061C,
+U+200E-U+200F, U+202A-U+202E, and U+2066-U+2069. The server does not apply case
+folding or NFC to the ID. This feedback rule does not change validation for
+opportunity lookup.
 
-`opportunityId` is opaque claimed context copied from the loaded result. It is
-accepted exactly as parsed, with no trimming, case folding, or NFC change. It
-must be nonblank and cannot have outer Unicode White_Space, control characters,
-or the bidirectional controls listed above. The server validates and stores the
-claim but does not verify its provenance or its association with `locationId`.
-The alpha trusts this tester-supplied linkage. It does not add an opportunity
-provider or rebuild the recommendation merely to prove the association.
+`opportunityId` is an opaque value copied from the loaded result. It identifies
+the opportunity that the tester claims to have used. The server accepts it
+exactly as parsed, without trimming, case folding, or NFC changes. It must be
+nonblank. It cannot contain outer Unicode White_Space, control characters, or
+the bidirectional controls listed above. The server validates and stores the
+claim, but it does not verify where the value came from or whether it belongs
+to `locationId`. The alpha trusts this link supplied by the tester. It does not
+add an opportunity provider or rebuild the recommendation only to prove the
+link.
 
-For a new report, the server resolves the normalized `locationId` through the
-established cached `resolveLocationId` path. On a cache miss, the configured
+For a new report, the server uses the established cached `resolveLocationId`
+path to resolve the normalized `locationId`. On a cache miss, the configured
 geocoding provider receives only the provider-backed part derived from that
-selected ID. It never receives the opportunity ID or feedback content. Invalid
-location-ID syntax is `400 invalid_request`. A syntactically valid ID that no
-longer resolves is `422 location_not_found`. Resolver unavailability or an
-unexpected ambiguous result for a canonical ID is `503 feedback_unavailable`.
+selected ID. The provider never receives the opportunity ID or feedback
+content. Invalid location-ID syntax returns `400 invalid_request`. A
+syntactically valid ID that no longer resolves returns
+`422 location_not_found`. Resolver unavailability or an unexpected ambiguous
+result for a canonical ID returns `503 feedback_unavailable`.
 
-The resolved city is a calculation input, not proof that the tester was there.
-Fabricated observations remain an accepted alpha risk.
+The server uses the resolved city as a calculation input. The city does not
+prove that the tester was there. The alpha accepts the risk of fabricated
+observations.
 
 ### Capability
 
@@ -986,15 +1031,15 @@ Fabricated observations remain an accepted alpha risk.
 GET /api/calibration-feedback/v1/capability
 ```
 
-The route always returns `200` and does not require feedback persistence to be
-operational. OpenAPI defines its exact response fields:
+The route always returns `200`. It does not require working feedback
+persistence. OpenAPI defines these exact response fields:
 
 - `schemaVersion`
 - `serverTime`
 - `featureState`: `enabled | disabled`
 - `submissionAvailability`: `available | disabled | unavailable`
 
-`featureState` comes from explicit feature configuration, not database health.
+Explicit feature configuration sets `featureState`; database health does not.
 The reduced state mapping is exact:
 
 | Feature setting | Persistence and dependency state | `featureState` | `submissionAvailability` |
@@ -1006,13 +1051,14 @@ The reduced state mapping is exact:
 | Enabled | Persistence is below capacity but the resolver or astronomy engine is known unavailable | `enabled` | `unavailable` |
 | Enabled | Persistence is normal or near capacity and no dependency is known unavailable | `enabled` | `available` |
 
-Transient write-token exhaustion does not change capability.
+Running out of write tokens temporarily does not change capability.
 
-The response never exposes database type, configuration, capacity, counts,
-resolver or provider details, or failure text. Availability describes a new
-submission, not a reservation. An exact replay may still return `200` while a
-full store reports `unavailable` because replay creates no row. A database
-outage cannot replay until persistence is reachable.
+The response never exposes the database type, configuration, capacity, counts,
+resolver or provider details, or failure text. Availability reports whether a
+new submission can be made; it does not reserve capacity. When a full store
+reports `unavailable`, an exact replay may still return `200` because it creates
+no row. During a database outage, the server cannot replay a submission until
+persistence is reachable.
 
 ### Submission wire shape
 
@@ -1020,9 +1066,9 @@ outage cannot replay until persistence is reachable.
 POST /api/calibration-feedback/v1/submissions
 ```
 
-Browser use is same-origin. The route sends no permissive CORS headers and
-provides no cross-origin preflight support. Non-browser clients remain subject
-to the same public contract.
+Browsers use this route from the same origin. The route sends no permissive CORS
+headers and provides no cross-origin preflight support. The same public
+contract applies to non-browser clients.
 
 The closed request object requires:
 
@@ -1031,44 +1077,45 @@ The closed request object requires:
 - `locationId` from the loaded result; and
 - `opportunityId` from the loaded opportunity.
 
-It accepts three optional, non-null evidence members:
+The request accepts three optional, non-null evidence members:
 
 - `ambientLight`: `good | too_bright | too_dark`;
 - `crescentVisibility`: `visible | too_small_to_see`; and
 - `notes`: normalized free text.
 
-At least one evidence member must remain present after note normalization.
-Omission means missing evidence, not an `unknown` answer. A present note that
-normalizes to an empty string is invalid; the server does not silently turn it
-into an omission.
+After note normalization, at least one evidence member must remain present. An
+omitted member means missing evidence, not an `unknown` answer. A present note
+that normalizes to an empty string is invalid. The server does not silently
+turn it into an omitted member.
 
 For notes, the server rejects U+0000, malformed Unicode, and unpaired
-surrogates. It applies Unicode NFC, then removes the maximal outer sequence of
-the Unicode White_Space set listed above. The result must contain 1-4,000
+surrogates. It then applies Unicode NFC and removes the maximal outer sequence
+of the Unicode White_Space set listed above. The result must contain 1-4,000
 Unicode code points inclusive. A code point is not a UTF-16 code unit, byte, or
 grapheme cluster. Mixed scripts and emoji are allowed. The server does not
 normalize CRLF or CR line endings, detect language, or translate text. It
 stores the normalized note.
 
-After the bounded body has arrived, the server captures one receipt instant and
-immediately truncates it to microsecond precision. For a new report, that exact
-normalized instant is the observation instant, astronomy calculation instant,
-response `submittedAt`, and stored `submittedAt`. The server stores it once.
+After the bounded body arrives, the server captures one receipt instant. It
+immediately truncates that instant to microsecond precision. For a new report,
+that exact normalized instant becomes the observation instant, astronomy
+calculation instant, response `submittedAt`, and stored `submittedAt`. The
+server stores it once.
 
 The request cannot contain timing, mode, old rating, recommendation snapshot,
 location detail, client astronomy, weather, application revision,
 `serverReportId`, `submittedAt`, or an idempotency digest. The server resolves
-and stores only the canonical backend location ID. It recomputes and stores
-exactly Moon altitude, Moon illumination, Sun altitude, and light bucket at the
-receipt instant. It stores no coordinates, elevation, timezone, country,
+and stores only the canonical backend location ID. At the receipt instant, it
+recomputes and stores exactly Moon altitude, Moon illumination, Sun altitude,
+and light bucket. It stores no coordinates, elevation, timezone, country,
 display name, weather, azimuth, phase or tilt value, open-ended astronomy JSON,
 or client preview fact.
 
 ### Exact idempotency digest
 
-`clientSubmissionId` is the repository lookup key. The digest compares the
-semantic client-authored report. It is not an authentication, signature, or
-request-integrity mechanism.
+The repository uses `clientSubmissionId` as its lookup key. The digest compares
+the five semantic client-authored slots listed below. It does not authenticate
+or sign the request, and it does not prove request integrity.
 
 The five fixed semantic slots, in order, are:
 
@@ -1078,11 +1125,11 @@ The five fixed semantic slots, in order, are:
 4. `crescentVisibility`, using its lowercase API spelling, if present; and
 5. normalized `notes`, if present.
 
-`schemaVersion`, `clientSubmissionId`, `serverReportId`, receipt or submission
-time, resolved location data, astronomy facts, application revision, and all
-other server-supplied values are excluded. The `v1` suffix in the constant
-prefix versions this digest representation; it is not a serialized request
-field.
+Exclude `schemaVersion`, `clientSubmissionId`, `serverReportId`, receipt or
+submission time, resolved location data, astronomy facts, application
+revision, and every other server-supplied value. The `v1` suffix in the
+constant prefix versions this digest representation. It is not a serialized
+request field.
 
 Build the digest input exactly as follows:
 
@@ -1104,17 +1151,17 @@ One golden vector uses `locationId: "moon-service-3067696"`,
 bytes. The raw digest, rendered as hexadecimal only for this test vector, is
 `cae49e707f8369f022638bcb97c365b6531e9c609bd312b920addc8cfeebd6d5`.
 
-The values are parsed and normalized values, never raw JSON spellings or bytes.
-Therefore JSON member order, insignificant JSON whitespace, equivalent JSON
-string escapes, and canonically equivalent note spellings do not change the
-digest. Adding, removing, or changing an optional slot does change it. Fixed
-slots and presence markers distinguish field identity and omission without
-depending on a JSON serializer.
+Use parsed and normalized values, never raw JSON spellings or bytes. Therefore,
+JSON member order, insignificant JSON whitespace, equivalent JSON string
+escapes, and canonically equivalent note spellings do not change the digest.
+Adding, removing, or changing an optional slot does change it. Fixed slots and
+presence markers distinguish each field and an omitted field without depending
+on a JSON serializer.
 
-Changing this representation later needs a new prefix/version and explicit
-migration authority. Implementations require golden vectors for the framing
-and SHA-256 result, plus equivalence tests for JSON spelling and Unicode
-normalization.
+A later change to this representation needs a new prefix/version and explicit
+migration authority. Implementations require golden vectors for the framing and
+SHA-256 result. They also require equivalence tests for JSON spelling and
+Unicode normalization.
 
 ### Processing and admission order
 
@@ -1123,54 +1170,59 @@ For each bounded submission:
 1. Capture the prospective receipt instant once the body has fully arrived.
    Truncate it to microsecond precision before using it for any calculation or
    response.
-2. Parse the closed schema, validate and normalize values, enforce the evidence
-   rule, and build the exact digest.
+2. Parse the closed request object. Validate and normalize its values, enforce
+   the evidence rule, and build the exact digest.
 3. If the feedback feature is disabled, return `503 feedback_unavailable`
    without querying persistence, resolving the location, or consuming a token.
 4. Query persistence by `clientSubmissionId`.
-5. A `Found` result with a matching digest returns `200` with
-   `status: replayed` and the original `serverReportId` and `submittedAt`. A
-   different digest returns `409 client_submission_conflict`. A `Disabled` or
-   `Unavailable` result returns `503 feedback_unavailable`. None of these paths
-   resolves the location or consumes a write token. Only `NotFound` continues.
+5. Handle the persistence result. `Found` with a matching digest returns `200`
+   with `status: replayed` and the original `serverReportId` and `submittedAt`.
+   `Found` with a different digest returns `409 client_submission_conflict`.
+   `Disabled` or `Unavailable` returns `503 feedback_unavailable`. None of these
+   paths resolves the location or consumes a write token. Only `NotFound`
+   continues.
 6. Read repository status. `Disabled`, `Unavailable`, or an available-but-full
    status returns `503` without a token. Normal and near-capacity status
    continue.
 7. Resolve the normalized `locationId`. Resolver failure consumes no write
    token.
-8. Consume one instance-global write token immediately before current astronomy
-   recomputation and the atomic store. The request is considered new for
-   admission because its early lookup returned `NotFound`.
+8. Consume one instance-global write token immediately before the server
+   recomputes the current astronomy facts and performs the atomic store.
+   Admission treats the request as new because the early lookup returned
+   `NotFound`.
 9. Recompute the four astronomy facts at the normalized receipt instant and
    call the repository. The repository repeats the UUID and capacity checks
    inside its transaction to close concurrent races.
 
-A failed attempt that creates no row may be retried with the same UUID and
-normalized payload. That later attempt can create the row with its later
-receipt instant because receipt time is not a digest slot. Editing any digest
-slot requires a new client UUID. An uncertain response retains the exact UUID
-and normalized payload only for this immediate retry behavior.
+When a failed attempt creates no row, the client may retry it with the same UUID
+and normalized payload. That later attempt can create the row with its later
+receipt instant because receipt time is not a digest slot. Changing any digest
+slot requires a new client UUID. After an uncertain response, the client
+retains the exact UUID and normalized payload only for this immediate retry
+behavior.
 
-The write bucket is shared by every visitor to one application instance. It
-starts full, has capacity 12, and restores one whole token per complete hour
-measured by a monotonic clock, capped at 12. Refill advances by complete
-intervals and retains a partial interval. Process restart creates a new full
-in-memory bucket; buckets are not shared between instances. No account, IP
-address, forwarded identity, User-Agent, or other visitor identity
-participates.
+Every visitor to one application instance shares the same write bucket. The
+bucket starts full, has capacity 12, and restores one whole token for each
+complete hour measured by a monotonic clock, up to 12. Refill advances by
+complete intervals and retains a partial interval. A process restart creates a
+new, full in-memory bucket. Instances do not share buckets. Accounts, IP
+addresses, forwarded identity, User-Agent, and other visitor identities do not
+affect the bucket.
 
-A request that reached admission as `NotFound` consumes a token. A downstream
-astronomy, capacity-race, database failure, or transactional replay or conflict
-after a concurrent same-UUID request wins does not restore it. Early `Found`
-replay and conflict paths consume no token. Exhaustion returns `429` with
-`Retry-After` equal to the ceiling of seconds until the next token and the same
-integer in `error.retryAfterSeconds`.
+A request that reaches admission as `NotFound` consumes a token. The server
+does not restore that token after a downstream astronomy, capacity-race, or
+database failure. It also does not restore the token after a transactional
+replay or conflict caused by a concurrent same-UUID request winning. Early
+`Found` replay and conflict paths consume no token. When the bucket is empty,
+the server returns `429`. `Retry-After` equals the ceiling of the seconds until
+the next token, and `error.retryAfterSeconds` contains the same integer.
 
-A new stored report returns `201` with `status: created` and a server-generated
-UUIDv4 `serverReportId`. Exact replay returns `200` with `status: replayed` and
-the original IDs and submission instant. Resolver, astronomy, or persistence
-unavailability, disabled persistence, and configured-capacity refusal use
-`503 feedback_unavailable` without revealing the cause.
+After storing a new report, the server returns `201` with `status: created` and
+a server-generated UUIDv4 `serverReportId`. For an exact replay, it returns
+`200` with `status: replayed` and the original IDs and submission instant.
+Resolver, astronomy, or persistence unavailability, disabled persistence, and
+configured-capacity refusal use `503 feedback_unavailable` without revealing
+the cause.
 
 ### Error, availability, and privacy boundary
 
@@ -1184,7 +1236,8 @@ OpenAPI defines the stable HTTP mappings and reduced error codes:
 - `429 rate_limited`; and
 - `503 feedback_unavailable`.
 
-Client completion and retry behavior is exact:
+The following table defines exactly how clients complete and retry
+submissions:
 
 | Outcome | Browser treatment | Retry rule |
 | --- | --- | --- |
@@ -1195,31 +1248,31 @@ Client completion and retry behavior is exact:
 | No definite response | Show `Submission outcome unknown` and keep the UUID and frozen payload. | Subject to the same capability rule, the tester may explicitly retry. A committed row replays; otherwise the retry may create it at the later receipt instant. |
 | Other definite `4xx` response | Preserve safe input and identify the correction when possible. | Never retry automatically. A change to any normalized digest slot requires a new UUID; a transport-only correction may retain it. |
 
-Errors never echo request values or dependency details. `error.field` appears
-only when useful. `error.retryAfterSeconds` appears only with `rate_limited`.
+Errors never echo request values or dependency details. Include `error.field`
+only when useful. Include `error.retryAfterSeconds` only with `rate_limited`.
 Every `429` includes the matching integer `Retry-After` header. Clients retry
-only after explicit tester action.
+only when the tester explicitly starts the retry.
 
-Moon Service-controlled logs may keep method, route, status, duration, request
-ID, coarse outcome, and aggregate storage warnings. They do not retain raw
-request bodies, location ID, opportunity ID, evidence values, notes, either
+Logs controlled by Moon Service may keep the method, route, status, duration,
+request ID, coarse outcome, and aggregate storage warnings. They do not retain
+raw request bodies, location ID, opportunity ID, evidence values, notes, either
 feedback UUID, astronomy values, IP addresses, forwarded identity, or
-User-Agent. Aggregate capacity warnings contain state and counts only.
+User-Agent. Aggregate capacity warnings contain only state and counts.
 
-Feedback and persistence remain disabled by default. PostgreSQL retains
-accepted reports until manual deletion by server report UUID. Feedback
+Feedback and its persistence remain disabled by default. PostgreSQL retains an
+accepted report until it is manually deleted by server report UUID. A feedback
 database failure may disable submission, but it does not prevent application
 startup, opportunity lookup, liveness, `/healthz`, or `/readyz`.
 
 ## Future Event-Aware Search
 
-The first `/api/opportunities?q=...` contract is location-focused. Recurring
-event-aware search should be added later only after the base location, Moon,
-weather, feed, and calendar behavior works.
+The first `/api/opportunities?q=...` contract searches by location. Recurring
+event-aware search should be added only after the base location lookup, Moon
+calculation, weather lookup, feed, and calendar features work.
 
-A later event-aware request can either extend the lookup with an optional event
-context or use a separate endpoint. The event context should describe an
-approximate recurring pattern, not a guaranteed occurrence:
+A later event-aware request can add optional event details to the lookup or use
+a separate endpoint. Those details should describe an approximate recurring
+pattern, not promise that an event will occur:
 
 ```text
 event_kind
@@ -1232,8 +1285,8 @@ optional route/direction/azimuth fields
 source and confidence fields
 ```
 
-Event-aware responses should keep the base opportunity facts and add event
-match facts, for example:
+Event-aware responses should keep the base opportunity facts and add facts
+about the event match, for example:
 
 ```text
 eventMatch:
@@ -1245,15 +1298,15 @@ eventMatch:
   caveat
 ```
 
-Do not expose event-aware matches as exact minute-level predictions. Flights,
-transport schedules, and other recurring events can be delayed, early, rerouted,
-or cancelled. If the system does not use a live event provider, response copy
-must say that the event timing is approximate.
+Do not present event-aware matches as exact minute-level predictions. Flights,
+transport schedules, and other recurring events can be delayed, early,
+rerouted, or cancelled. If the system does not use a live event provider, the
+response text must say that the event timing is approximate.
 
-Public RSS/Atom or `.ics` links may be acceptable for canonical, nonpersonal
-event patterns encoded in a URL. Personal saved event subscriptions require the
-privacy and storage model to cover stored preferences, notification delivery,
-retention, and deletion before implementation.
+Public RSS/Atom or `.ics` links may be acceptable when a URL encodes a
+canonical, nonpersonal event pattern. Personal saved event subscriptions
+require the privacy and storage model to cover stored preferences, notification
+delivery, retention, and deletion before implementation.
 
 ## Feed And Calendar Rules
 
@@ -1263,16 +1316,22 @@ Implementation tracking:
 RSS/Atom:
 
 - Only for real public opportunities.
-- Suitable for city/region feeds and best-upcoming feeds.
+- Suitable for city or region feeds and best-upcoming feeds.
 - Do not include fictional reports.
 - Do not include private user preferences.
 
 `.ics`:
 
-- Dynamic public calendar feeds may be generated on demand for canonical real locations, such as `/calendars/prague-cz.ics`.
-- Calendar feeds should contain a rolling window of upcoming public opportunities for that location and use caching rather than manual feed creation per requested city.
+- Dynamic public calendar feeds may be generated on demand for canonical real
+  locations, such as `/calendars/prague-cz.ics`.
+- Calendar feeds should contain a rolling window of upcoming public
+  opportunities for that location. They should use caching instead of creating
+  a feed manually for each requested city.
 - Only for real individual opportunities.
-- Individual event exports, such as `/o/prague-cz-2026-06-29T1920Z.ics`, should include title, time window, location display name, summary, and caveat about local horizon obstruction.
+- Individual event exports, such as
+  `/o/prague-cz-2026-06-29T1920Z.ics`, should include the title, time window,
+  location display name, summary, and a note about local horizon
+  obstruction.
 - Do not generate `.ics` for fictional reports.
 
 ## Privacy And Storage Rules
@@ -1281,17 +1340,19 @@ RSS/Atom:
 - No server-side user profile in v0.
 - No email alerts in v0.
 - No cookies for remembering users.
-- Server may cache geocoding/weather/scoring data by provider, canonical location, rounded coordinate, and forecast time.
-- Browser may keep recent searches locally with `localStorage`.
-- Backend logs should avoid raw query strings and exact coordinates where possible.
+- The server may cache geocoding, weather, and scoring data by provider,
+  canonical location, rounded coordinate, and forecast time.
+- The browser may keep recent searches locally with `localStorage`.
+- Backend logs should avoid raw query strings and exact coordinates where
+  possible.
 
 ## Implemented Opportunity-Search Sequence
 
-The browser uses only `GET /api/opportunities`; the direct POST contract shown
-at the bottom is for ordinary-mode prototype and test callers. In hosted-alpha
-mode, resource admission can return `429` before this application sequence
-begins; the separate [resource-admission diagrams](diagrams/hosted-alpha-resource-limits.pdf)
-cover that filter, its token buckets, and its concurrency permit.
+The browser uses only `GET /api/opportunities`. The direct POST contract at the
+bottom is for ordinary-mode prototype and test callers. In hosted-alpha mode,
+resource admission can return `429` before this application sequence begins.
+The separate [resource-admission diagrams](diagrams/hosted-alpha-resource-limits.pdf)
+show that filter, its token buckets, and its concurrency permit.
 
 ### Browser GET
 
@@ -1305,13 +1366,14 @@ cover that filter, its token buckets, and its concurrency permit.
 
 [PlantUML source](diagrams/opportunity-search-post.puml)
 
-In prose: GET validates one lookup input, resolves it through a status-aware
-cache, stops on an ambiguous, missing, or unavailable location, then obtains a
-cached hourly forecast before running the opportunity pipeline. A successful
-pipeline may return an empty list. POST bypasses both live provider paths and
-uses the scoring prototype's sole `prague-cz` fixture and fixed fixture weather.
+GET first validates one lookup input and resolves it through a status-aware
+cache. It stops when the location is ambiguous, missing, or unavailable.
+Otherwise, it gets a cached hourly forecast and runs the opportunity pipeline.
+A successful pipeline may return an empty list. POST bypasses both live
+provider paths. It uses the scoring prototype's only `prague-cz` fixture and
+fixed fixture weather.
 
-The implementation authority is the
+These files define the current implementation:
 [controller](../backend/src/main/java/dev/moonservice/backend/web/OpportunitySearchController.java),
 [search service](../backend/src/main/java/dev/moonservice/backend/opportunity/OpportunitySearchService.java),
 [location cache](../backend/src/main/java/dev/moonservice/backend/location/CachingLocationResolver.java),
@@ -1320,9 +1382,10 @@ and [weather cache](../backend/src/main/java/dev/moonservice/backend/weather/Cac
 
 ## Target Internal Service Boundary
 
-Even with a single opportunity search endpoint, keep target responsibilities
-separate. Fictional lookup, feed/calendar assembly, and recurring-event search
-below are not implemented by the current opportunity path.
+Keep the target components separate even though the public API has one
+opportunity search endpoint. The current opportunity path does not implement
+the fictional lookup, feed and calendar assembly, or recurring-event search
+shown below.
 
 ```text
 opportunity_search
@@ -1339,7 +1402,7 @@ The coordinate-backed opportunity engine was delivered through
 weather integration is tracked by
 [#14](https://github.com/rapucha/moon-service/issues/14).
 
-This keeps the public API simple without making the backend design hard to change.
+This keeps the public API simple and the backend easy to change.
 
 Recurring event-aware search can later add:
 

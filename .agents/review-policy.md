@@ -1,50 +1,49 @@
 # Review Policy
 
-This file is the single source for review measures, numeric gates, and review
-triggers. `AGENTS.md` owns the workflow and mutation rules. Review skills own
-their review methods. Skills that assess scope size, documentation size, or
-output budgets must read this file before returning a verdict.
+This file defines the review measures, numeric limits, and review triggers for
+Moon Service. `AGENTS.md` defines the workflow and mutation rules. Each review
+skill defines how to run its review. A review skill that measures scope,
+documentation, or output must read this file before it returns a verdict.
 
-Do not copy the numbers into another policy or skill. Link here instead. If a
-number elsewhere conflicts with this file, use this file and fix the duplicate.
+Do not copy these numbers into another policy or skill. Link to this file. If
+another file gives a different number, use this file and correct the duplicate.
 
-## Effects
+## What Each Rule Does
 
-- A **hard gate** limits one pull request. Stop and rerun the implementation
-  scope review when the plan or actual diff crosses it. Split the work unless
-  the repository owner approves the recorded exception.
-- A **review trigger** requires focused staged-diff review and evidence. It does
-  not by itself force a split or another scope review.
+- A **hard gate** limits one pull request. If a plan or diff crosses a hard
+  gate, stop and repeat the implementation scope review. Split the work unless
+  the repository owner approves a recorded exception.
+- A **review trigger** requires a focused review of the staged diff and review
+  evidence. A trigger alone does not require a split or another scope review.
 - An **informational measure** must be recorded when the workflow asks for it.
-  It does not block a pull request or grant scope.
+  It does not block a pull request or authorize more work.
 - An **authority rule** can require review regardless of size.
 
-All maxima and trigger thresholds are inclusive.
+Every maximum and trigger threshold is inclusive.
 
-## Planning Estimates
+## Plan Before Editing
 
-Before editing, record:
+Record these estimates before editing:
 
-- paths expected to change;
-- other paths that may be needed and why;
-- an expected range for the ordinary-file count; and
-- an estimated ordinary-churn range when useful.
+- paths that will probably change;
+- other paths that may be needed, and why;
+- the expected range of ordinary files; and
+- the estimated ordinary churn when that estimate is useful.
 
-These are estimates, not a fixed path list, unless accepted issue text makes a
-path part of the outcome. A path or count difference alone
-does not require new scope authority or another scope review when the actual
-work still has the accepted outcome, concerns, dependencies, output classes,
-and hard gates.
+These values are forecasts. They are not a fixed path list unless the accepted
+issue makes a path part of the result. A different path or file count alone
+does not require new authority or another scope review when the work keeps the
+accepted outcome, concerns, dependencies, output classes, and hard gates.
 
-A range describes uncertainty. The gap between the actual count and the top of
-the range is not a budget for more behavior, cleanup, or unrelated files.
-Record the actual paths and count in the pull request. Explain any meaningful
-difference. Stop and replan for a new behavior, concern, dependency, output
-class, or hard-gate crossing.
+A range describes uncertainty. Unused room below its upper bound does not
+authorize more behavior, cleanup, or files. Record the actual paths and file
+count in the pull request, and explain a meaningful difference from the plan.
+Stop and make a new plan if the work adds behavior, a concern, a dependency, an
+output class, or a hard-gate crossing.
 
 ## Ordinary Work
 
-These concern and file maxima are hard gates:
+The concern and ordinary-file limits below are hard gates:
 
 | Change category | Maximum concerns or subsystems | Maximum ordinary files |
 | --- | ---: | ---: |
@@ -52,62 +51,63 @@ These concern and file maxima are hard gates:
 | New feature or default | 2 supporting one accepted outcome | 10 |
 | Documentation-only | 1 | 6 |
 
-Documentation-only work changes no runtime, policy, workflow, configuration,
-CI, or tooling behavior. A policy or workflow change uses the new-feature or
-default category. An authorized refactor uses that category's file maximum but
+Documentation-only work does not change runtime behavior, policy, workflow,
+configuration, CI, or tooling. A policy or workflow change uses the new-feature
+or-default category. An authorized refactor uses that category's file limit but
 may contain only one concern. Operations and dependency work use the
-new-feature or default maxima plus explicit authority for their consequences.
+new-feature-or-default limits and require explicit authority for their effects.
 
-Examples of separate concerns include backend behavior, frontend UX,
-deployment or operations, CI or automation, and provider or privacy policy.
-Code, tests, and documentation that directly support one accepted behavior are
-one concern. Room under a maximum never authorizes another concern.
+Backend behavior, frontend UX, deployment or operations, CI or automation, and
+provider or privacy policy are examples of separate concerns. Code, tests, and
+documentation that directly support one accepted behavior form one concern.
+Space below a maximum never authorizes another concern.
 
-An ordinary file is every changed file that is not generated, vendored, or a
-lock file. Agent- or LLM-authored files are ordinary. Mixed authored and
-generated files are ordinary. A manifest that causes a lock-file change is
+An ordinary file is any changed file that is not generated, vendored, or a lock
+file. Agent- or LLM-authored files are ordinary. A file that mixes authored and
+generated content is ordinary. A manifest that causes a lock-file change is
 ordinary.
 
-Record total added plus deleted ordinary lines as an informational measure.
-Ordinary churn has no numeric hard gate. It does not block a pull request,
-force a split, or trigger another scope review.
+Record the total added plus deleted lines in ordinary files. This churn is
+informational. It has no numeric limit and does not block a pull request, force
+a split, or trigger another scope review.
 
 ## Code-File Size
 
-The resulting code-line maximum is a hard gate for each changed code file:
+Each changed code file has this resulting code-line hard limit:
 
 | File type | Maximum code lines |
 | --- | ---: |
 | Production or runtime code, including scripts, configuration, and workflows | 400 |
 | Test and prototype code | 600 |
 
-A code line is a physical nonblank line that contains code or configuration
-after comment-only content is ignored.
+A code line is a physical, nonblank line that contains code or configuration
+after comment-only content is removed.
 
 - Blank and comment-only lines do not count.
-- A line that mixes code and a comment counts as code.
+- A line that contains both code and a comment counts.
 - Block comments and documentation-only docstrings do not count. A docstring or
   string used as runtime data counts.
-- Each nonblank source line in a multiline runtime string counts.
+- Every nonblank source line in a multiline runtime string counts.
 - Shebangs, YAML configuration, and commands in workflow `run:` blocks count.
 - Executed embedded code counts. An ordinary string literal counts once as its
   host-language line.
-- When classification is unclear, count the line as code.
-- A mixed file uses the stricter maximum. A test or prototype file that also
-  contains production or runtime behavior uses the production maximum.
+- If classification is unclear, count the line as code.
+- A mixed file uses the stricter limit. A test or prototype file that also
+  contains production or runtime behavior uses the production limit.
 - Do not pack statements or expressions onto fewer lines to pass the gate.
 
-New files and files below their maximum must finish within it. An existing
-oversized file may change when its code-line count does not grow. Do not remove
-unrelated code to offset growth.
+A new file, or an existing file below its limit, must finish within the limit.
+An existing oversized file may change only when its code-line count does not
+grow. Do not remove unrelated code to offset growth.
 
 If accepted work must grow an oversized file, stop before editing. Record its
-exact base count, expected maximum, reason, and explicit owner approval. Record
-the actual result after staging. Stop again if it exceeds the approved maximum.
+exact starting count, expected maximum, reason, and the owner's explicit
+approval. Record the actual result after staging. Stop again if it exceeds the
+approved maximum.
 
 ## Authored Documentation
 
-Classify authored documents by what they can change:
+Classify an authored document by what it can change:
 
 - **Control documents:** `AGENTS.md`, `SKILL.md`, pull-request templates,
   workflow rules, and API or operations rules.
@@ -116,8 +116,7 @@ Classify authored documents by what they can change:
   or decision.
 
 For every changed authored document, record its resulting nonblank lines and
-its added plus deleted nonblank lines. These size conditions are review
-triggers:
+its added plus deleted nonblank lines. These size conditions trigger review:
 
 | Condition | Trigger |
 | --- | ---: |
@@ -125,34 +124,34 @@ triggers:
 | A new or changed document crosses from below this size to at least this size | 600 resulting nonblank lines |
 | A document already at or above this size grows | 600 resulting nonblank lines |
 
-A small correction to a document already at or above the size trigger does not
-trigger size review when the file does not grow and the update stays below the
-changed-line trigger.
+A small correction to a document already at or above the size threshold does
+not trigger size review when the file does not grow and the update remains
+below the changed-line threshold.
 
-Authority rules can require review sooner:
+Authority rules can require earlier review:
 
 - Every substantive control-document change requires an independent staged
   review.
 - Every change that adds, removes, or changes a decision in a decision document
   requires that review.
-- Pure spelling, formatting, or wording changes may skip it when meaning does
+- A spelling, formatting, or wording-only change may skip it when meaning does
   not change.
 
 One independent review can satisfy both authority and size triggers. A focused
 documentation review checks for removed constraints, contradictions, new
 authority, repeated rules, mismatch with code, and unclear structure.
 
-Code fences count toward document size. Check executable embedded blocks under
-the code-size gate too. When comment-only lines or documentation-only
-docstrings change, measure those prose lines separately and apply the
-documentation triggers. Check a mixed prose and code file under both rules.
+Code fences count toward document size. Apply the code-size gate to executable
+embedded blocks as well. Measure changed comment-only lines and
+documentation-only docstrings as prose and apply the documentation triggers.
+Check a file that mixes prose and code under both sets of rules.
 
 Truly generated reference documentation uses the generated-output budget and
-regeneration evidence. Its tracked inputs remain ordinary.
+includes regeneration evidence. Its tracked inputs remain ordinary files.
 
 ## Generated, Vendored, and Lock Files
 
-These independent budgets are hard gates:
+Each output class has its own hard limits:
 
 | Output class | Maximum files | Maximum textual churn | Maximum aggregate resulting size |
 | --- | ---: | ---: | ---: |
@@ -160,14 +159,14 @@ These independent budgets are hard gates:
 | Vendored, when explicitly authorized | 2 | Not capped separately | 1 MiB |
 | Lock files | 1 | 2,000 lines | 256 KiB |
 
-Vendored output is not allowed without explicit issue authority. The authorized
-budget above applies only after that decision.
+Vendored output is forbidden without explicit issue authority. The limits above
+apply only after that decision.
 
-Generated output must be emitted byte-for-byte by a tracked deterministic
-command from tracked inputs. Plans and pull requests record its paths,
+A tracked deterministic command must reproduce generated output byte for byte
+from tracked inputs. Plans and pull requests record the output paths,
 generator and version, inputs, exact command, file count, textual churn,
 resulting bytes, clean regeneration, and semantic validation. Visual snapshots
-also need a pinned reproducible environment.
+also require a pinned, reproducible environment.
 
 Authorized vendoring records provenance, an immutable version or hash, the
 license, and why repository storage is required. Lock-file evidence records the
