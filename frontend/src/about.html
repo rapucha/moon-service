@@ -50,6 +50,30 @@
         </ul>
       </section>
 
+      <section id="privacy-and-providers" class="about-section">
+        <h2>Privacy and Provider Processing</h2>
+        <ul class="about-list">
+          <li>Moon Service does not require an account, email, cookies, or a saved server-side user profile. Recent searches stay in this browser. Moon Service does not permanently store a location just because you search for it.</li>
+          <li>If calibration feedback is enabled and you submit a report, Moon Service retains its city-level location and opportunity context until an operator deletes the report.</li>
+          <li>Moon Service sends city queries and forecast coordinates from its backend to Open-Meteo. Open-Meteo receives the backend address and request data rather than a direct browser request. Its free API may keep backend request logs containing coordinates for up to 90 days. Moon Service adds no visitor tracking.</li>
+          <li>Open-Meteo uses GeoNames data for city lookup. GeoNames supplies the location dataset; the browser does not send the search directly to GeoNames.</li>
+        </ul>
+      </section>
+
+      <section id="data-sources" class="about-section">
+        <h2>Data Sources and Service Limits</h2>
+        <ul class="about-list">
+          <li>
+            <a href="https://open-meteo.com/" rel="noreferrer">Weather data by Open-Meteo</a>
+            (<a href="https://open-meteo.com/en/licence" rel="noreferrer">licence</a> and
+            <a href="https://open-meteo.com/en/terms" rel="noreferrer">terms</a>).
+            Location data is based on
+            <a href="https://www.geonames.org/export/" rel="noreferrer">GeoNames</a>.
+          </li>
+          <li>The free Open-Meteo API is rate-limited and has no uptime guarantee. Forecasts can change. Moon Service scores are decision support, not a promise of clear weather or an unobstructed view.</li>
+        </ul>
+      </section>
+
       <section class="about-section">
         <h2>Data and Imagery</h2>
         <p>The Moon surface texture is derived from the <a href="https://svs.gsfc.nasa.gov/4720/">NASA SVS CGI Moon Kit</a>. Credit: NASA's Scientific Visualization Studio.</p>

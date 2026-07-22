@@ -246,6 +246,10 @@ main {
   padding: 16px;
 }
 
+.recent-panel > summary {
+  display: none;
+}
+
 .panel-heading {
   display: flex;
   align-items: center;
@@ -255,7 +259,6 @@ main {
 }
 
 .panel-heading h2,
-.compact-note h2,
 .workspace-heading h2 {
   margin: 0;
   font-size: 1rem;
@@ -306,15 +309,6 @@ main {
 
 .panel-note {
   margin-top: 12px;
-}
-
-.compact-note ul {
-  display: grid;
-  gap: 8px;
-  margin: 10px 0 0;
-  padding-left: 18px;
-  color: var(--muted);
-  font-size: 0.88rem;
 }
 
 .workspace {
@@ -1570,7 +1564,6 @@ summary {
 
   .side-column {
     position: static;
-    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   }
 
   .summary-grid {
@@ -1600,8 +1593,15 @@ summary {
     font-size: 1.7rem;
   }
 
+  .recent-panel > summary {
+    display: list-item;
+  }
+
+  .recent-panel .panel-heading h2 {
+    display: none;
+  }
+
   .search-row,
-  .side-column,
   .pass-choices,
   .moon-path-summary,
   .moon-path-charts,

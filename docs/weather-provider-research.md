@@ -32,7 +32,9 @@ Re-verified against the primary provider sources on 2026-07-17:
 - Open-Meteo's [licence](https://open-meteo.com/en/licence) places API data under CC BY 4.0 and requires a visible Open-Meteo link next to displayed data.
 - The [free API terms](https://open-meteo.com/en/terms) allow noncommercial use within the published limits. Open-Meteo's [pricing](https://open-meteo.com/en/pricing) says commercial use requires a subscription and customer API key.
 - Moon Service calls Open-Meteo from its backend. The provider receives the backend address and forecast coordinates rather than a direct browser request. Open-Meteo says troubleshooting logs may contain IP addresses and request data, including coordinates, and are deleted after 90 days.
-- The public lookup page credits Open-Meteo, links to the licence, identifies the noncommercial tester alpha, and states that commercial launch requires a separately approved provider plan. These are static links and copy; they add no analytics or visitor tracking.
+- Search keeps a short linked Open-Meteo credit beside provider-derived data.
+  About contains the full licence, terms, service-limit, and provider-processing
+  explanation. These static links and copy add no analytics or visitor tracking.
 
 ## Recommended MVP Boundary
 

@@ -9,9 +9,13 @@ var form = /** @type {HTMLFormElement} */ (document.getElementById("search-form"
 var input = /** @type {HTMLInputElement} */ (document.getElementById("location-input"));
 var formFeedback = /** @type {HTMLElement} */ (document.getElementById("form-feedback"));
 var results = /** @type {HTMLElement} */ (document.getElementById("results"));
+var recentSearches = /** @type {HTMLDetailsElement} */ (document.getElementById("recent-searches"));
 var recentList = /** @type {HTMLElement} */ (document.getElementById("recent-list"));
 var clearRecent = /** @type {HTMLButtonElement} */ (document.getElementById("clear-recent"));
+var resultProviderCredit = /** @type {HTMLElement} */ (document.getElementById("result-provider-credit"));
+var resultObstructionNote = /** @type {HTMLElement} */ (document.getElementById("result-obstruction-note"));
 var submitButton = /** @type {HTMLButtonElement} */ (form.querySelector("button[type='submit']"));
+var narrowSearchLayout = window.matchMedia("(max-width: 680px)");
 var activeRequest = null;
 
 var responseView = createResponseView(results, {
@@ -35,6 +39,8 @@ clearRecent.addEventListener("click", function () {
   renderRecent();
 });
 
+narrowSearchLayout.addEventListener("change", syncRecentDisclosure);
+
 window.addEventListener("popstate", function () {
   runLookup(lookupFromUrl(), { updateUrl: false });
 });
@@ -56,6 +62,7 @@ document.addEventListener("click", function (event) {
   });
 });
 
+syncRecentDisclosure(narrowSearchLayout);
 renderRecent();
 runLookup(lookupFromUrl(), { updateUrl: false });
 
@@ -75,6 +82,7 @@ function lookupFromUrl() {
 function runLookup(request, options) {
   if (!request) {
     input.value = "";
+    updateResultNotes("");
     responseView.renderIntro();
     return;
   }
@@ -97,6 +105,7 @@ function search(rawQuery, options) {
   formFeedback.textContent = validationMessage || "";
 
   if (validationMessage) {
+    updateResultNotes("");
     responseView.renderInvalid(validationMessage);
     return;
   }
@@ -117,6 +126,7 @@ function searchLocationId(rawLocationId, displayName, options) {
   formFeedback.textContent = validationMessage || "";
 
   if (validationMessage) {
+    updateResultNotes("");
     responseView.renderInvalid(validationMessage);
     return;
   }
@@ -166,6 +176,7 @@ function fetchOpportunities(request) {
   var requestController = activeRequest;
   setSearchBusy(true);
   results.setAttribute("aria-busy", "true");
+  updateResultNotes("");
   responseView.renderLoading(request.label);
 
   fetch(apiPathFor(request), {
@@ -180,11 +191,13 @@ function fetchOpportunities(request) {
           return fallbackPayload(response.status);
         })
         .then(function (payload) {
+          updateResultNotes(payload && payload.status);
           responseView.renderResponse(payload || fallbackPayload(response.status), request, response.status);
         });
     })
     .catch(function (error) {
       if (error.name !== "AbortError") {
+        updateResultNotes("");
         responseView.renderResponse({
           status: "temporarily_unavailable",
           message: "The lookup could not be reached. Try again shortly."
@@ -198,6 +211,15 @@ function fetchOpportunities(request) {
         activeRequest = null;
       }
     });
+}
+
+function syncRecentDisclosure(mediaQuery) {
+  recentSearches.open = !mediaQuery.matches;
+}
+
+function updateResultNotes(status) {
+  resultProviderCredit.hidden = status !== "ok" && status !== "ambiguous_location";
+  resultObstructionNote.hidden = status !== "ok";
 }
 
 function renderRecent() {
