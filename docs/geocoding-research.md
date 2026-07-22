@@ -29,7 +29,11 @@ Re-verified against the primary provider sources on 2026-07-17:
 - The Open-Meteo [Geocoding API documentation](https://open-meteo.com/en/docs/geocoding-api) identifies GeoNames as the location-data source.
 - Open-Meteo's [licence](https://open-meteo.com/en/licence) lists the GeoNames database under CC BY and requires attribution. [GeoNames' own terms](https://www.geonames.org/export/) require credit with a link or other reference and allow commercial data use.
 - The current Open-Meteo free API remains limited to noncommercial use. A commercial Moon Service launch still requires a separately approved provider plan even though GeoNames itself permits commercial use.
-- The browser sends a city search to Moon Service. The backend then sends the query to Open-Meteo Geocoding, so Open-Meteo receives the backend address and query rather than a direct browser request. The lookup-page disclosure explains this provider processing without adding analytics or visitor tracking.
+- The browser sends a city search to Moon Service. The backend then sends the
+  query to Open-Meteo Geocoding, so Open-Meteo receives the backend address and
+  query rather than a direct browser request. Search keeps short linked
+  Open-Meteo and GeoNames credit beside provider-derived locations. About
+  explains the provider processing without adding analytics or visitor tracking.
 
 ## Internationalization
 

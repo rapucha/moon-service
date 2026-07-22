@@ -1,6 +1,7 @@
 package dev.moonservice.backend;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import dev.moonservice.backend.location.LocationResolver;
@@ -95,7 +96,10 @@ class OpportunitySearchFunctionalTest {
                     assertTrue(body.contains("href=\"/favicon.svg\""));
                     assertTrue(body.contains("Moon windows near a city"));
                     assertTrue(body.contains("href=\"/about\""));
-                    assertTrue(body.contains("Privacy and caveats"));
+                    assertTrue(body.contains("id=\"recent-searches\""));
+                    assertFalse(body.contains("Privacy and caveats"));
+                    assertFalse(body.contains("Data sources and alpha use"));
+                    assertFalse(body.contains("This is a noncommercial tester alpha."));
                     assertTrue(body.contains("type=\"module\" src=\"/app.js\""));
                 });
     }
@@ -112,6 +116,12 @@ class OpportunitySearchFunctionalTest {
                     assertTrue(body.contains("About Moon Service"));
                     assertTrue(body.contains("Why It Exists"));
                     assertTrue(body.contains("Search opportunities"));
+                    assertTrue(body.contains("Privacy and Provider Processing"));
+                    assertTrue(body.contains("Data Sources and Service Limits"));
+                    assertTrue(body.contains("https://www.geonames.org/export/"));
+                    assertTrue(body.contains("backend request logs containing coordinates for up to 90 days"));
+                    assertTrue(body.contains("Moon Service adds no visitor tracking."));
+                    assertFalse(body.contains("This is a noncommercial tester alpha."));
                     assertTrue(body.contains("NASA's Scientific Visualization Studio"));
                 });
     }

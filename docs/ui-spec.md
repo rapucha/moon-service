@@ -45,6 +45,12 @@ terrain horizon, obstruction, and shooting-position limitations.
 - Recent searches may be stored only in browser `localStorage`, with display
   names and canonical IDs rather than timestamps, exact addresses, cookies, or
   server-side user identifiers.
+- Search keeps provider credit beside provider-derived recent searches,
+  ambiguous choices, resolved locations, and opportunity results. About holds
+  the full privacy, service-limit, and provider-processing explanations.
+- Search keeps short warnings beside the action or result they explain. The
+  form says that an exact home address is unnecessary. Results warn that local
+  hills, buildings, and trees may block the view.
 - The page should expose shareable lookup results.
 - The UI should present ranked opportunities, not only chronological events.
 - Opportunity cards are currently ranked by backend score.
@@ -507,6 +513,14 @@ Open questions:
 Agreed behavior:
 
 - The same page should work in desktop, tablet, and mobile browser viewports.
+- At widths up to 680px, Recent searches is one native disclosure that starts
+  closed whenever `/search` loads. Its summary must work with a keyboard and a
+  screen reader. Opening it shows the current browser-local list, storage note,
+  provider credit, location selection, and clear action.
+- Above 680px, Recent searches stays open and visible in the sidebar. The page
+  does not show the mobile disclosure control.
+- The long privacy, service-limit, and data-source explanations do not appear
+  between city search and results. They remain available on About.
 - Mobile should not require horizontal scrolling to understand a single
   opportunity card.
 - Text must fit inside controls and cards without overlap.

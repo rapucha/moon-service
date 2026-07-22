@@ -48,43 +48,20 @@
 
     <div class="content-grid">
       <aside class="side-column" aria-label="Lookup context">
-        <section class="side-panel" aria-labelledby="recent-title">
+        <details id="recent-searches" class="side-panel recent-panel">
+          <summary id="recent-title">Recent searches</summary>
           <div class="panel-heading">
-            <h2 id="recent-title">Recent searches</h2>
+            <h2>Recent searches</h2>
             <button id="clear-recent" type="button" class="text-button">Clear</button>
           </div>
           <div id="recent-list" class="recent-list"></div>
           <p class="panel-note">Stored only in this browser.</p>
-        </section>
-
-        <section class="side-panel compact-note" aria-labelledby="privacy-title">
-          <h2 id="privacy-title">Privacy and caveats</h2>
-          <ul>
-            <li>No account, cookies, email, or server-side user profile is required.</li>
-            <li>Searches are sent to the backend for geocoding, weather, Moon geometry, and scoring.</li>
-            <li>Local hills, buildings, trees, and exact horizon obstructions are not modelled.</li>
-          </ul>
-        </section>
-
-        <section class="side-panel" aria-labelledby="data-sources-title">
-          <h2 id="data-sources-title">Data sources and alpha use</h2>
-          <p class="panel-note">
-            <a href="https://open-meteo.com/" rel="noreferrer">Weather data by Open-Meteo</a>
-            (<a href="https://open-meteo.com/en/licence" rel="noreferrer">licence</a>).
-            Location data is based on
+          <p class="panel-note provider-credit">
+            Data providers:
+            <a href="https://open-meteo.com/" rel="noreferrer">Open-Meteo</a> and
             <a href="https://www.geonames.org/export/" rel="noreferrer">GeoNames</a>.
           </p>
-          <p class="panel-note">
-            Moon Service sends city searches and forecast coordinates from its backend to Open-Meteo.
-            Open-Meteo says its free API may log the backend address and request data, including coordinates,
-            for troubleshooting and deletes those logs after 90 days. Moon Service adds no visitor tracking.
-            See the <a href="https://open-meteo.com/en/terms" rel="noreferrer">provider terms</a>.
-          </p>
-          <p class="panel-note">
-            This is a noncommercial tester alpha. A commercial launch requires a separately approved
-            <a href="https://open-meteo.com/en/pricing" rel="noreferrer">provider plan</a>.
-          </p>
-        </section>
+        </details>
       </aside>
 
       <section class="workspace" aria-labelledby="workspace-title">
@@ -100,6 +77,14 @@
           </div>
         </div>
         <div id="results" class="results-region" aria-live="polite" aria-busy="false"></div>
+        <p id="result-provider-credit" class="panel-note provider-credit" hidden>
+          Data providers:
+          <a href="https://open-meteo.com/" rel="noreferrer">Open-Meteo</a> and
+          <a href="https://www.geonames.org/export/" rel="noreferrer">GeoNames</a>.
+        </p>
+        <p id="result-obstruction-note" class="panel-note" hidden>
+          Local hills, buildings, and trees may block the view.
+        </p>
       </section>
     </div>
   </main>
