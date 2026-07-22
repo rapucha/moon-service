@@ -40,6 +40,9 @@ answer:
 
 - The proposed issue title and complete draft body.
 - The user's request, evidence, failure, or feedback that motivated the draft.
+- The user's exact statements about the current threat model, risk tolerance,
+  acceptable failure, and maintenance tradeoffs. Do not substitute an
+  agent-authored parent issue or draft for those statements.
 - The trace from each material acceptance criterion to that request, evidence,
   an established contract, or an explicit owner decision.
 - Project authority such as `AGENTS.md`, contribution rules, and relevant issue
@@ -61,16 +64,20 @@ answer:
    that it exists.
 2. Check whether an existing issue, pull request, or documented decision already
    owns the work.
-3. Challenge the proposed solution and identify materially simpler alternatives
-   or cases where no action is warranted. Reject speculative abstractions,
-   extension points, cleanup, or refactors that the stated outcome does not
-   require.
+3. Start with the smallest standard implementation that matches the current
+   accepted threat model. Challenge the proposed solution and present that
+   approach beside any materially stricter alternative, including the current
+   need, tradeoffs, and ongoing maintenance cost. Reject speculative
+   abstractions, extension points, cleanup, or refactors that the stated
+   outcome does not require.
 4. Classify proposed behavior as the minimum end-to-end capability, behavior
    required for current correctness or safety, or optional hardening. Require a
    concrete authority or evidence trace for each material criterion; the draft's
    own wording is not authority. Treat deduplication, pagination, recovery,
    reconciliation, supersession, generalized extensibility, and hypothetical
-   scale handling as optional unless the inputs demonstrate otherwise.
+   scale or threat handling as optional unless the inputs demonstrate otherwise.
+   Do not require a custom protocol client without explicit owner approval after
+   the standard and stricter alternatives have been presented.
 5. Prefer an issue whose first deliverable is the smallest observable
    user-visible or operational outcome. Defer optional hardening rather than
    embedding it in the core issue. Do not create or presume a follow-up issue
@@ -102,12 +109,14 @@ answer:
 
 ## Verdict Rules
 
-- `ready`: the problem is supported, the scope is coherent, material decisions
-  and criteria are explicit and authorized, optional hardening is justified or
-  excluded, and acceptance criteria are testable.
+- `ready`: the problem is supported, the smallest standard implementation was
+  considered, the scope is coherent, material decisions and criteria are
+  explicit and authorized, optional hardening is justified or excluded, and
+  acceptance criteria are testable.
 - `revise`: one coherent issue remains appropriate, but its premise, choices,
   dependencies, boundaries, scope authority, or acceptance criteria need
-  correction before it is created or acted upon.
+  correction before it is created or acted upon. Use this verdict when a draft
+  selects an unapproved stricter design or custom protocol client.
 - `split_required`: the draft combines independently reviewable outcomes,
   crosses a hard project scope gate, or mixes a prerequisite decision with
   implementation that should not begin before that decision. A documentation
@@ -182,14 +191,18 @@ project authority before it is created or treated as implementation authority.
 Read `.agents/review-policy.md` before applying its gates or triggers. Do not
 edit files or external state. Challenge the premise, alternatives, hidden
 dependencies, owner decisions, scope authority, YAGNI, and acceptance criteria.
-Trace every material criterion to user intent, evidence, a current
-correctness/safety need, or an explicit decision. Identify the minimum
-end-to-end capability and separate unsupported optional hardening. Apply the
-repository change category, hard scope gates, documentation review rules, and
-output budgets. Treat ordinary churn as information. Return exactly ready,
-revise, or split_required. Do not assume the drafting agent's proposed solution
-or its own acceptance criteria are authoritative. Use plain, direct language
-and suggest simpler wording when it preserves the meaning.
+Start with the smallest standard implementation that matches the user's current
+threat model. Present any materially stricter alternative with its current need,
+tradeoffs, and ongoing maintenance cost. Trace every material criterion to user
+intent, evidence, a current correctness/safety need, or an explicit decision.
+Identify the minimum end-to-end capability and separate unsupported optional
+hardening. Return revise when an unapproved stricter design or custom protocol
+client is required. Apply the repository change category, hard scope gates,
+documentation review rules, and output budgets. Treat ordinary churn as
+information. Return exactly ready, revise, or split_required. Do not assume the
+drafting agent's proposed solution, its own acceptance criteria, or an
+agent-authored parent issue are authoritative. Use plain, direct language and
+suggest simpler wording when it preserves the meaning.
 ```
 
 ## Primary-Agent Follow-Up
