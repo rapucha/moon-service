@@ -108,6 +108,16 @@ lookup, opportunity results, RSS/Atom feeds, and `.ics` export.
 
 - Keep early changes small and led by documented decisions.
 - Prefer direct tradeoffs to abstractions that have no current need.
+- Optimize for the smallest standard implementation that matches the current
+  accepted threat model. Do not add defenses for hypothetical future threats
+  without explicit owner approval.
+- Before creating an implementation issue, present the smallest standard
+  approach and any materially stricter alternative. State the current need,
+  tradeoffs, and ongoing maintenance cost of the stricter choice.
+- Stop and replan if implementation requires a custom protocol client or
+  substantially exceeds the forecast because of an added mechanism, concern,
+  dependency, output class, or hardening. Informational churn alone remains
+  nonblocking. Obtain owner approval for the revised scope before continuing.
 - Avoid adding a public production constructor, factory, or method only to make
   a test shorter. Keep the production API aligned with real runtime use. Put
   test-only convenience in test helpers or builders unless a production caller
@@ -299,9 +309,12 @@ people named above do not participate in, endorse, or provide the review.
 - Before editing a plan that may cross a scope gate, ask a fresh read-only agent
   to run `$implementation-scope-review`. The user must first authorize
   subagents for the active session.
-- The reviewer must return `single_pr` or `split_required`, map every acceptance
-  criterion to a proposed pull request, identify dependencies, and recommend
-  merge order.
+- The reviewer must return `single_pr`, `split_required`, or `revise`. For
+  `single_pr` and `split_required`, map every acceptance criterion to a proposed
+  pull request, identify dependencies, and recommend merge order.
+- A `revise` verdict stops implementation. Correct the proposed design or
+  return the source issue to `$issue-design-review`; do not split an
+  unnecessary design merely to fit the gates.
 - If the user has not allowed a planning agent, or none is available, stop
   oversized work and report the blocker. Do not waive the review.
 
@@ -349,7 +362,9 @@ or new dependency.
   keep each slice independently safe and mergeable. Leave unfinished behavior
   disabled by default.
 - During implementation, stop and rerun `$implementation-scope-review` if the
-  diff crosses a hard gate or adds a concern, output class, or dependency.
+  diff crosses a hard gate; adds a concern, output class, or dependency;
+  requires a custom protocol client; or materially exceeds the forecast because
+  of an added mechanism or hardening.
 - Split the work unless the issue records the required exception and the owner
   approves it.
 - Do not silently expand or recategorize a pull request.
