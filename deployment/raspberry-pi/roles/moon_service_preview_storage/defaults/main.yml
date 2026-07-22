@@ -1,0 +1,8 @@
+---
+moon_service_preview_storage_enabled: false
+moon_service_preview_storage_server: ""
+moon_service_preview_storage_export: ""
+moon_service_preview_storage_confirm_client_allowlist: false
+moon_service_preview_storage_confirm_root_squash: false
+moon_service_preview_storage_confirm_sync: false
+moon_service_preview_storage_confirm_trusted_lan: false
