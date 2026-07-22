@@ -1,0 +1,8 @@
+---
+- name: Provision Moon Service pull-request preview storage
+  hosts: all
+  become: true
+  gather_facts: true
+  roles:
+    - role: moon_service_preview_storage
+      when: moon_service_preview_storage_enabled | bool

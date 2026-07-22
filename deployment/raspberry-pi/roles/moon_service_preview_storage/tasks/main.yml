@@ -1,0 +1,352 @@
+---
+- name: Validate preview-storage inventory before host mutation
+  ansible.builtin.include_tasks: validate-inventory.yml
+
+- name: Record the fixed preview-storage contract
+  ansible.builtin.set_fact:
+    _moon_service_preview_storage_mount_point: /mnt/moon-service-preview
+    _moon_service_preview_storage_source: >-
+      {{ moon_service_preview_storage_server }}:{{ moon_service_preview_storage_export }}
+    _moon_service_preview_storage_options: >-
+      vers=4.1,proto=tcp,rw,hard,_netdev,nofail,nosuid,nodev,noexec,x-systemd.rw-only,x-systemd.automount,x-systemd.idle-timeout=600,x-systemd.mount-timeout=30s
+    _moon_service_preview_storage_mount_unit: 'mnt-moon\x2dservice\x2dpreview.mount'
+    _moon_service_preview_storage_automount_unit: 'mnt-moon\x2dservice\x2dpreview.automount'
+  no_log: true
+  diff: false
+
+- name: Record the exact preview-storage fstab line
+  ansible.builtin.set_fact:
+    _moon_service_preview_storage_fstab_line: >-
+      {{ _moon_service_preview_storage_source }}
+      {{ _moon_service_preview_storage_mount_point }}
+      nfs {{ _moon_service_preview_storage_options }} 0 0
+  no_log: true
+  diff: false
+
+- name: Inspect rpcbind unit state before mutation
+  ansible.builtin.command:
+    cmd: >-
+      /usr/bin/systemctl show {{ item }} --property=LoadState
+      --property=ActiveState --no-pager
+  loop:
+    - rpcbind.service
+    - rpcbind.socket
+  register: _moon_service_preview_storage_rpcbind_before
+  changed_when: false
+  failed_when: >-
+    _moon_service_preview_storage_rpcbind_before.rc != 0
+    or (_moon_service_preview_storage_rpcbind_before.stderr | trim | length) > 0
+
+- name: Check for a port 111 listener before mutation
+  ansible.builtin.command:
+    cmd: /usr/bin/ss -H -lntu sport = :111
+  register: _moon_service_preview_storage_port_111_before
+  changed_when: false
+  failed_when: >-
+    _moon_service_preview_storage_port_111_before.rc != 0
+    or (_moon_service_preview_storage_port_111_before.stderr | trim | length) > 0
+
+- name: Refuse an existing rpcbind unit use
+  ansible.builtin.assert:
+    that:
+      - >-
+        'ActiveState=inactive' in item.stdout_lines
+        or 'ActiveState=failed' in item.stdout_lines
+      - >-
+        'LoadState=loaded' in item.stdout_lines
+        or 'LoadState=masked' in item.stdout_lines
+        or 'LoadState=not-found' in item.stdout_lines
+    fail_msg: >-
+      Preview storage will not change a host with an active, transitional, or
+      indeterminate rpcbind unit.
+  loop: "{{ _moon_service_preview_storage_rpcbind_before.results }}"
+  loop_control:
+    label: "{{ item.item }}"
+
+- name: Refuse an existing port 111 listener
+  ansible.builtin.assert:
+    that:
+      - (_moon_service_preview_storage_port_111_before.stdout | trim | length) == 0
+    fail_msg: >-
+      Preview storage will not change a host with a TCP or UDP port 111
+      listener.
+
+- name: Read fstab before mutation
+  ansible.builtin.slurp:
+    src: /etc/fstab
+  register: _moon_service_preview_storage_fstab_before
+  no_log: true
+  diff: false
+
+- name: Record existing preview-storage fstab entries
+  ansible.builtin.set_fact:
+    _moon_service_preview_storage_fstab_target_lines: >-
+      {{ (_moon_service_preview_storage_fstab_before.content | b64decode).splitlines()
+         | reject('match', '^\s*(?:#|$)')
+         | select('search', '\s+/mnt/moon-service-preview\s+') | list }}
+    _moon_service_preview_storage_exact_fstab_present: >-
+      {{ _moon_service_preview_storage_fstab_line in
+         (_moon_service_preview_storage_fstab_before.content | b64decode).splitlines() }}
+  no_log: true
+  diff: false
+
+- name: Refuse an unexpected preview-storage fstab entry
+  ansible.builtin.assert:
+    that:
+      - >-
+        _moon_service_preview_storage_fstab_target_lines | length == 0
+        or (
+          _moon_service_preview_storage_fstab_target_lines | length == 1
+          and _moon_service_preview_storage_exact_fstab_present
+        )
+    fail_msg: >-
+      Preview storage found an unexpected fstab entry for its fixed target.
+      Resolve it locally before provisioning.
+
+- name: Inspect the current exact mount point
+  ansible.builtin.command:
+    cmd: >-
+      /usr/bin/findmnt --json --all --mountpoint /mnt/moon-service-preview
+      --output SOURCE,TARGET,FSTYPE,OPTIONS
+  register: _moon_service_preview_storage_mount_before
+  changed_when: false
+  failed_when: _moon_service_preview_storage_mount_before.rc not in [0, 1]
+  no_log: true
+  diff: false
+
+- name: Check the existing preview automount unit
+  ansible.builtin.command:
+    cmd: >-
+      /usr/bin/systemctl is-active --quiet
+      {{ _moon_service_preview_storage_automount_unit }}
+  register: _moon_service_preview_storage_automount_before
+  changed_when: false
+  failed_when: false
+
+- name: Validate the current preview-storage mount state
+  ansible.builtin.include_tasks: validate-current-mount.yml
+
+- name: Inspect an unmounted preview-storage target
+  ansible.builtin.stat:
+    path: "{{ _moon_service_preview_storage_mount_point }}"
+    follow: false
+  register: _moon_service_preview_storage_target_before
+  when: _moon_service_preview_storage_mount_records | length == 0
+
+- name: Check for local data at an unmounted preview-storage target
+  ansible.builtin.command:
+    cmd: >-
+      /usr/bin/find /mnt/moon-service-preview -mindepth 1 -maxdepth 1
+      -print -quit
+  register: _moon_service_preview_storage_local_data
+  changed_when: false
+  when:
+    - _moon_service_preview_storage_mount_records | length == 0
+    - _moon_service_preview_storage_target_before.stat.exists
+    - _moon_service_preview_storage_target_before.stat.isdir
+    - not _moon_service_preview_storage_target_before.stat.islnk
+  no_log: true
+  diff: false
+
+- name: Refuse a nonempty or unsafe unmounted target
+  ansible.builtin.assert:
+    that:
+      - >-
+        not _moon_service_preview_storage_target_before.stat.exists
+        or (
+          _moon_service_preview_storage_target_before.stat.isdir
+          and not _moon_service_preview_storage_target_before.stat.islnk
+          and (_moon_service_preview_storage_local_data.stdout | default('') | trim | length) == 0
+        )
+    fail_msg: >-
+      The unmounted preview-storage target must be absent or an empty real
+      directory. No local data were changed.
+  when: _moon_service_preview_storage_mount_records | length == 0
+
+- name: Mask rpcbind before installing the NFS client
+  ansible.builtin.systemd_service:
+    name: "{{ item }}"
+    masked: true
+  loop:
+    - rpcbind.service
+    - rpcbind.socket
+
+- name: Install only the NFS client package without service auto-start
+  ansible.builtin.apt:
+    name: nfs-common
+    state: present
+    update_cache: true
+    cache_valid_time: 3600
+    policy_rc_d: 101
+
+- name: Keep rpcbind stopped, disabled, and masked
+  ansible.builtin.systemd_service:
+    name: "{{ item }}"
+    state: stopped
+    enabled: false
+    masked: true
+  loop:
+    - rpcbind.service
+    - rpcbind.socket
+
+- name: Create the local preview-storage mount point
+  ansible.builtin.file:
+    path: "{{ _moon_service_preview_storage_mount_point }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0750"
+  when: _moon_service_preview_storage_mount_records | length == 0
+
+- name: Configure the exact preview-storage fstab entry
+  ansible.builtin.lineinfile:
+    path: /etc/fstab
+    regexp: '^\s*[^#\s]\S*\s+/mnt/moon-service-preview\s+\S+\s+\S+(?:\s+\d+\s+\d+)?\s*$'
+    line: "{{ _moon_service_preview_storage_fstab_line }}"
+    insertafter: EOF
+    state: present
+  no_log: true
+  diff: false
+
+- name: Reload systemd after validating preview-storage fstab
+  ansible.builtin.systemd_service:
+    daemon_reload: true
+
+- name: Start the preview-storage automount
+  ansible.builtin.systemd_service:
+    name: "{{ _moon_service_preview_storage_automount_unit }}"
+    state: started
+  no_log: true
+  diff: false
+
+- name: Trigger the preview-storage automount
+  ansible.builtin.command:
+    cmd: /usr/bin/stat --format=%d /mnt/moon-service-preview/.
+  changed_when: false
+  no_log: true
+  diff: false
+
+- name: Inspect the active preview-storage NFS mount
+  ansible.builtin.command:
+    cmd: >-
+      /usr/bin/findmnt --json --all --mountpoint /mnt/moon-service-preview
+      --types nfs,nfs4 --output SOURCE,TARGET,FSTYPE,OPTIONS
+  register: _moon_service_preview_storage_mount_after
+  changed_when: false
+  no_log: true
+  diff: false
+
+- name: Read fstab after provisioning
+  ansible.builtin.slurp:
+    src: /etc/fstab
+  register: _moon_service_preview_storage_fstab_after
+  no_log: true
+  diff: false
+
+- name: Inspect final rpcbind masks
+  ansible.builtin.command:
+    cmd: "/usr/bin/systemctl is-enabled {{ item }}"
+  loop:
+    - rpcbind.service
+    - rpcbind.socket
+  register: _moon_service_preview_storage_rpcbind_after
+  changed_when: false
+  failed_when: false
+
+- name: Check for a final port 111 listener
+  ansible.builtin.command:
+    cmd: /usr/bin/ss -H -lntu sport = :111
+  register: _moon_service_preview_storage_port_111_after
+  changed_when: false
+  failed_when: >-
+    _moon_service_preview_storage_port_111_after.rc != 0
+    or (_moon_service_preview_storage_port_111_after.stderr | trim | length) > 0
+
+- name: Check the final preview automount unit
+  ansible.builtin.command:
+    cmd: >-
+      /usr/bin/systemctl is-active --quiet
+      {{ _moon_service_preview_storage_automount_unit }}
+  register: _moon_service_preview_storage_automount_after
+  changed_when: false
+
+- name: Inspect the generated preview mount policy
+  ansible.builtin.command:
+    cmd: >-
+      /usr/bin/systemctl show {{ _moon_service_preview_storage_mount_unit }}
+      --property=ReadWriteOnly --property=TimeoutUSec --no-pager
+  register: _moon_service_preview_storage_mount_policy_after
+  changed_when: false
+  failed_when: >-
+    _moon_service_preview_storage_mount_policy_after.rc != 0
+    or (_moon_service_preview_storage_mount_policy_after.stderr | trim | length) > 0
+
+- name: Inspect the generated preview automount policy
+  ansible.builtin.command:
+    cmd: >-
+      /usr/bin/systemctl show {{ _moon_service_preview_storage_automount_unit }}
+      --property=TimeoutIdleUSec --no-pager
+  register: _moon_service_preview_storage_automount_policy_after
+  changed_when: false
+  failed_when: >-
+    _moon_service_preview_storage_automount_policy_after.rc != 0
+    or (_moon_service_preview_storage_automount_policy_after.stderr | trim | length) > 0
+
+- name: Record final private preview-storage evidence
+  ansible.builtin.set_fact:
+    _moon_service_preview_storage_final_records: >-
+      {{ (_moon_service_preview_storage_mount_after.stdout | from_json).filesystems
+         | default([]) }}
+    _moon_service_preview_storage_final_fstab_lines: >-
+      {{ (_moon_service_preview_storage_fstab_after.content | b64decode).splitlines()
+         | reject('match', '^\s*(?:#|$)')
+         | select('search', '\s+/mnt/moon-service-preview\s+') | list }}
+  no_log: true
+  diff: false
+
+- name: Record final NFS identity and semantics
+  ansible.builtin.set_fact:
+    _moon_service_preview_storage_final_options: >-
+      {{ (_moon_service_preview_storage_final_records[0].options.split(','))
+         if _moon_service_preview_storage_final_records | length == 1 else [] }}
+    _moon_service_preview_storage_final_source_matches: >-
+      {{ _moon_service_preview_storage_final_records | length == 1
+         and _moon_service_preview_storage_final_records[0].source
+             == _moon_service_preview_storage_source }}
+    _moon_service_preview_storage_final_target_matches: >-
+      {{ _moon_service_preview_storage_final_records | length == 1
+         and _moon_service_preview_storage_final_records[0].target
+             == _moon_service_preview_storage_mount_point }}
+    _moon_service_preview_storage_final_fstab_matches: >-
+      {{ _moon_service_preview_storage_final_fstab_lines | length == 1
+         and _moon_service_preview_storage_final_fstab_lines[0]
+             == _moon_service_preview_storage_fstab_line }}
+  no_log: true
+  diff: false
+
+- name: Require the exact live preview-storage contract
+  ansible.builtin.assert:
+    that:
+      - _moon_service_preview_storage_final_source_matches | bool
+      - _moon_service_preview_storage_final_target_matches | bool
+      - _moon_service_preview_storage_final_fstab_matches | bool
+      - _moon_service_preview_storage_final_records[0].fstype in ['nfs', 'nfs4']
+      - "['vers=4.1', 'proto=tcp', 'rw', 'hard', 'nosuid', 'nodev', 'noexec'] | difference(_moon_service_preview_storage_final_options) | length == 0"
+      - "['ro', 'soft'] | intersect(_moon_service_preview_storage_final_options) | length == 0"
+      - _moon_service_preview_storage_automount_after.rc == 0
+      - >-
+        'ReadWriteOnly=yes'
+        in _moon_service_preview_storage_mount_policy_after.stdout_lines
+      - >-
+        'TimeoutUSec=30s'
+        in _moon_service_preview_storage_mount_policy_after.stdout_lines
+      - >-
+        'TimeoutIdleUSec=10min'
+        in _moon_service_preview_storage_automount_policy_after.stdout_lines
+      - >-
+        _moon_service_preview_storage_rpcbind_after.results
+        | rejectattr('stdout', 'equalto', 'masked') | list | length == 0
+      - (_moon_service_preview_storage_port_111_after.stdout | trim | length) == 0
+    fail_msg: >-
+      Preview storage did not reach its exact NFS 4.1 hard automount contract.
+      Inspect root-local fstab, mount, and systemd state without publishing it.

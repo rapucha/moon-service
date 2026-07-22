@@ -161,9 +161,106 @@ ansible all -m setup -a 'filter=ansible_architecture'
 The expected values are Debian, major version `13`, release `trixie`, and
 architecture `aarch64`.
 
+### Optional pull-request preview NFS storage
+
+Issue [#198](https://github.com/rapucha/moon-service/issues/198) provides a
+separate, disabled playbook for the preview database's NFS mount. It is not
+included by `site.yml` and does not change the production Compose service,
+listeners, timers, application data, or deployment state. The fixed mount point
+is `/mnt/moon-service-preview`.
+
+Configure the real NFS server address and export only through the ignored
+`inventory.yml`, which must have mode `0600`. The role necessarily writes that
+source to root-owned `/etc/fstab` and exposes it in the Pi's kernel mount table
+and root-local systemd diagnostics. Keep those values and outputs off GitHub.
+The tracked example uses an IPv4 documentation address and a placeholder
+export. Enable the role only after the NAS is configured and all four
+statements below are true:
+
+- the NAS client allowlist includes the Pi's intended private IPv4;
+- root squashing is enabled for the export;
+- the export uses synchronous writes;
+- the Pi-to-NAS path stays on the trusted LAN and is not routed publicly.
+
+Record those checks in the private inventory without copying the endpoint into
+an issue, pull request, CI output, or shared verification log:
+
+```yaml
+moon_service_preview_storage_enabled: true
+moon_service_preview_storage_server: REPLACE_WITH_PRIVATE_NAS_IPV4
+moon_service_preview_storage_export: REPLACE_WITH_NFS_EXPORT_PATH
+moon_service_preview_storage_confirm_client_allowlist: true
+moon_service_preview_storage_confirm_root_squash: true
+moon_service_preview_storage_confirm_sync: true
+moon_service_preview_storage_confirm_trusted_lan: true
+```
+
+From `deployment/raspberry-pi`, check and apply only the focused playbook:
+
+```bash
+ansible-playbook preview-storage.yml --syntax-check
+ansible-playbook --inventory localhost, --connection local \
+  tests/preview-storage-validation.runtime.yml
+ansible-playbook preview-storage.yml --diff
+```
+
+Add `--ask-become-pass` to the apply command when the bootstrap account needs
+it. The role installs the NFS client without allowing package installation
+to start services, rejects a pre-existing active `rpcbind`, and masks both the
+service and socket. It manages an NFS 4.1 TCP hard mount through a systemd
+automount. Access mounts it on demand; ten idle minutes unmount it while the
+automount remains ready.
+
+Run the following only on the Pi. Treat the whole diagnostic block as private
+local output because mount and systemd status can reveal the NFS source. Do not
+paste its output into public evidence:
+
+```bash
+sudo findmnt --target /mnt/moon-service-preview \
+  --output TARGET,SOURCE,FSTYPE,OPTIONS
+systemctl status 'mnt-moon\x2dservice\x2dpreview.automount'
+systemctl status 'mnt-moon\x2dservice\x2dpreview.mount'
+systemctl show 'mnt-moon\x2dservice\x2dpreview.automount' \
+  --property=TimeoutIdleUSec
+systemctl show 'mnt-moon\x2dservice\x2dpreview.mount' \
+  --property=ReadWriteOnly --property=TimeoutUSec
+systemctl is-enabled rpcbind.service rpcbind.socket
+systemctl is-active rpcbind.service rpcbind.socket
+sudo ss -H -lntup '( sport = :111 )'
+```
+
+`findmnt` must report the exact configured source and target, NFS or NFS4,
+`vers=4.1`, `proto=tcp`, `rw`, `hard`, `nosuid`, `nodev`, and `noexec`, with no
+`ro` or `soft`. The root-owned fstab entry also holds `_netdev`, `nofail`,
+`x-systemd.rw-only`, `x-systemd.automount`, the 600-second idle timeout, and the
+30-second mount timeout; these systemd properties are not kernel mount flags.
+The generated units must report `TimeoutIdleUSec=10min`,
+`ReadWriteOnly=yes`, and `TimeoutUSec=30s`.
+Both `rpcbind` units must be masked and inactive, and the `ss` command must
+print no TCP or UDP port 111 listener on IPv4 or IPv6. After ten minutes without
+access, the mount unit may be inactive while the automount unit stays active.
+Run the apply command again; an unchanged host must finish with `changed=0` as
+the idempotence check.
+
+The role fails closed on an unconfirmed prerequisite, invalid endpoint, wrong
+existing mount, nonempty local mount-point directory, or active portmapper.
+Correct the inventory or NAS policy and rerun the focused playbook. Before
+moving unexpected local data or changing a mount used by another service,
+inspect it and preserve it for recovery; do not force the role past the check.
+If `rpcbind` is already active, identify its owner and dependencies before
+stopping it. Leave preview storage disabled when another required service needs
+the portmapper.
+
+This step proves only the live host mount and records the operator's four NAS
+and trusted-LAN confirmations. It cannot prove NAS ACLs, routing,
+`root_squash`, or synchronous server writes. It also does not prove that the
+preview PostgreSQL UID can write its required database subtree; the preview
+runtime issue owns that separate preparation and writeability test.
+
 ## Provision the Pi
 
-The first actual host mutation is intentionally a coordinated operator step:
+The first production-provisioning mutation is intentionally a coordinated
+operator step:
 
 ```bash
 ansible-playbook site.yml --diff

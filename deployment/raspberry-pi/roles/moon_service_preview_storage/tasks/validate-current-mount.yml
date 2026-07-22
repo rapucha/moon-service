@@ -1,0 +1,76 @@
+---
+- name: Parse the current exact mount point
+  ansible.builtin.set_fact:
+    _moon_service_preview_storage_mount_records: >-
+      {{ ((_moon_service_preview_storage_mount_before.stdout | from_json).filesystems
+          | default([]))
+         if _moon_service_preview_storage_mount_before.rc == 0 else [] }}
+  no_log: true
+  diff: false
+
+- name: Classify the current exact mount point
+  ansible.builtin.set_fact:
+    _moon_service_preview_storage_nfs_records: >-
+      {{ _moon_service_preview_storage_mount_records
+         | selectattr('fstype', 'in', ['nfs', 'nfs4']) | list }}
+    _moon_service_preview_storage_autofs_records: >-
+      {{ _moon_service_preview_storage_mount_records
+         | selectattr('fstype', 'equalto', 'autofs') | list }}
+    _moon_service_preview_storage_other_records: >-
+      {{ _moon_service_preview_storage_mount_records
+         | rejectattr('fstype', 'in', ['nfs', 'nfs4', 'autofs']) | list }}
+  no_log: true
+  diff: false
+
+- name: Record current NFS identity and semantics
+  ansible.builtin.set_fact:
+    _moon_service_preview_storage_current_nfs_options: >-
+      {{ (_moon_service_preview_storage_nfs_records[0].options.split(','))
+         if _moon_service_preview_storage_nfs_records | length == 1 else [] }}
+    _moon_service_preview_storage_current_nfs_source_matches: >-
+      {{ _moon_service_preview_storage_nfs_records | length == 1
+         and _moon_service_preview_storage_nfs_records[0].source
+             == _moon_service_preview_storage_source }}
+  no_log: true
+  diff: false
+
+- name: Record whether the current mount is safe
+  ansible.builtin.set_fact:
+    _moon_service_preview_storage_current_mount_safe: >-
+      {{ (_moon_service_preview_storage_mount_records | length == 0)
+         or (
+           _moon_service_preview_storage_other_records | length == 0
+           and _moon_service_preview_storage_autofs_records | length <= 1
+           and (
+             (
+               _moon_service_preview_storage_current_nfs_source_matches
+               and _moon_service_preview_storage_exact_fstab_present
+               and _moon_service_preview_storage_automount_before.rc == 0
+               and 'vers=4.1' in _moon_service_preview_storage_current_nfs_options
+               and 'proto=tcp' in _moon_service_preview_storage_current_nfs_options
+               and 'rw' in _moon_service_preview_storage_current_nfs_options
+               and 'ro' not in _moon_service_preview_storage_current_nfs_options
+               and 'hard' in _moon_service_preview_storage_current_nfs_options
+               and 'soft' not in _moon_service_preview_storage_current_nfs_options
+               and 'nosuid' in _moon_service_preview_storage_current_nfs_options
+               and 'nodev' in _moon_service_preview_storage_current_nfs_options
+               and 'noexec' in _moon_service_preview_storage_current_nfs_options
+             )
+             or (
+               _moon_service_preview_storage_nfs_records | length == 0
+               and _moon_service_preview_storage_autofs_records | length == 1
+               and _moon_service_preview_storage_exact_fstab_present
+               and _moon_service_preview_storage_automount_before.rc == 0
+             )
+           )
+         ) }}
+  no_log: true
+  diff: false
+
+- name: Refuse an unsafe current mount
+  ansible.builtin.assert:
+    that:
+      - _moon_service_preview_storage_current_mount_safe | bool
+    fail_msg: >-
+      The fixed preview-storage target has an unexpected mount identity or
+      unsafe NFS semantics. Resolve it locally before provisioning.

@@ -1,0 +1,48 @@
+---
+- name: Validate the supported preview-storage host boundary
+  ansible.builtin.assert:
+    that:
+      - ansible_facts.distribution == "Debian"
+      - ansible_facts.distribution_major_version == "13"
+      - ansible_facts.distribution_release == "trixie"
+      - ansible_facts.architecture == "aarch64"
+    fail_msg: >-
+      Preview storage supports Raspberry Pi OS Lite 64-bit based on Debian 13
+      (Trixie) on ARM64 only.
+
+- name: Validate private preview-storage inventory
+  ansible.builtin.set_fact:
+    _moon_service_preview_storage_inventory_valid: >-
+      {{ moon_service_preview_storage_server is string
+         and moon_service_preview_storage_server is match(
+           '^(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])'
+           ~ '(?:\.(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])){3}\Z'
+         )
+         and moon_service_preview_storage_server is match(
+           '^(?:10\.|192\.168\.|172\.(?:1[6-9]|2[0-9]|3[01])\.)'
+         )
+         and moon_service_preview_storage_export is string
+         and moon_service_preview_storage_export
+             is match('^/[A-Za-z0-9_./-]+\Z')
+         and not moon_service_preview_storage_export.endswith('/')
+         and '//' not in moon_service_preview_storage_export
+         and '.' not in moon_service_preview_storage_export.split('/')
+         and '..' not in moon_service_preview_storage_export.split('/')
+         and moon_service_preview_storage_export != '/example/moon-service-preview'
+         and 'REPLACE' not in moon_service_preview_storage_export }}
+    _moon_service_preview_storage_confirmations_valid: >-
+      {{ moon_service_preview_storage_confirm_client_allowlist is sameas true
+         and moon_service_preview_storage_confirm_root_squash is sameas true
+         and moon_service_preview_storage_confirm_sync is sameas true
+         and moon_service_preview_storage_confirm_trusted_lan is sameas true }}
+  no_log: true
+  diff: false
+
+- name: Require valid private preview-storage inventory
+  ansible.builtin.assert:
+    that:
+      - _moon_service_preview_storage_inventory_valid | bool
+      - _moon_service_preview_storage_confirmations_valid | bool
+    fail_msg: >-
+      Set a private RFC 1918 NFS IPv4 address, one safe absolute export path,
+      and all four NAS and trusted-LAN confirmations in ignored inventory.
