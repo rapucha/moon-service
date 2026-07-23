@@ -1,0 +1,275 @@
+name: Publish pull-request preview
+
+on:
+  workflow_dispatch:
+    inputs:
+      pull_request:
+        description: Same-repository pull-request number
+        required: true
+        type: number
+
+permissions: {}
+
+concurrency:
+  group: moon-service-pr-preview
+  queue: max
+  cancel-in-progress: false
+
+env:
+  IMAGE_REPOSITORY: ghcr.io/rapucha/moon-service
+  IMAGE_SOURCE: https://github.com/rapucha/moon-service
+
+jobs:
+  build-preview:
+    name: Build and smoke ARM64 preview
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    permissions:
+      checks: read
+      contents: read
+      pull-requests: read
+    outputs:
+      artifact_name: ${{ steps.archive.outputs.artifact_name }}
+      head_sha: ${{ steps.candidate.outputs.head_sha }}
+      pull_request_number: ${{ steps.candidate.outputs.pull_request_number }}
+    steps:
+      - name: Validate dispatch
+        env:
+          ACTOR: ${{ github.actor }}
+          EVENT_NAME: ${{ github.event_name }}
+          PULL_REQUEST: ${{ inputs.pull_request }}
+          REF: ${{ github.ref }}
+          TRIGGERING_ACTOR: ${{ github.triggering_actor }}
+          WORKFLOW_REF: ${{ github.workflow_ref }}
+        run: |
+          set -euo pipefail
+          [[ "$EVENT_NAME" == "workflow_dispatch" ]]
+          [[ "$REF" == "refs/heads/main" ]]
+          [[ "$WORKFLOW_REF" == "rapucha/moon-service/.github/workflows/publish-pr-preview.yml@refs/heads/main" ]]
+          [[ "$ACTOR" == "rapucha" ]]
+          [[ "$TRIGGERING_ACTOR" == "rapucha" ]]
+          [[ "$PULL_REQUEST" =~ ^[1-9][0-9]*$ ]]
+
+      - name: Validate pull request and required checks
+        id: candidate
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PULL_REQUEST: ${{ inputs.pull_request }}
+        run: |
+          set -euo pipefail
+          pull_json="$(gh pr view "$PULL_REQUEST" --repo "$GITHUB_REPOSITORY" \
+            --json number,state,baseRefName,headRefOid,isCrossRepository,statusCheckRollup)"
+          jq -e --arg number "$PULL_REQUEST" '
+            .number == ($number | tonumber)
+            and .state == "OPEN"
+            and .baseRefName == "main"
+            and .isCrossRepository == false
+            and (.headRefOid | test("^[0-9a-f]{40}$"))
+          ' <<<"$pull_json" >/dev/null
+          jq -e '
+            [
+              .statusCheckRollup[]
+              | select(.workflowName == "Test and publish container")
+              | select(
+                  .name == "Backend tests"
+                  or .name == "Frontend tests"
+                  or .name == "Deployment tests"
+                )
+            ] as $required
+            | ($required | length) == 3
+              and ([$required[].name] | unique | length) == 3
+              and all($required[];
+                .status == "COMPLETED" and .conclusion == "SUCCESS")
+          ' <<<"$pull_json" >/dev/null
+          head_sha="$(jq -er '.headRefOid' <<<"$pull_json")"
+          {
+            echo "head_sha=$head_sha"
+            echo "pull_request_number=$PULL_REQUEST"
+          } >>"$GITHUB_OUTPUT"
+
+      - name: Check out trusted smoke test
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          ref: ${{ github.workflow_sha }}
+          path: trusted
+          persist-credentials: false
+
+      - name: Check out exact pull-request source
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          ref: ${{ steps.candidate.outputs.head_sha }}
+          path: source
+          persist-credentials: false
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@96fe6ef7f33517b61c61be40b68a1882f3264fb8 # v4.2.0
+        with:
+          platforms: arm64
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@bb05f3f5519dd87d3ba754cc423b652a5edd6d2c # v4.2.0
+
+      - name: Build exact ARM64 image
+        env:
+          LOCAL_IMAGE: moon-service-preview:${{ steps.candidate.outputs.head_sha }}
+          REVISION: ${{ steps.candidate.outputs.head_sha }}
+        run: |
+          docker buildx build \
+            --file source/backend/Dockerfile \
+            --platform linux/arm64 \
+            --load \
+            --provenance=false \
+            --sbom=false \
+            --build-arg "MOON_BUILD_REVISION=$REVISION" \
+            --build-arg "MOON_IMAGE_SOURCE=$IMAGE_SOURCE" \
+            --tag "$LOCAL_IMAGE" \
+            source
+
+      - name: Smoke-test exact ARM64 image
+        env:
+          LOCAL_IMAGE: moon-service-preview:${{ steps.candidate.outputs.head_sha }}
+          MOON_SERVICE_CONTAINER_PLATFORM: linux/arm64
+          MOON_SERVICE_CONTAINER_START_TIMEOUT_SECONDS: '180'
+          REVISION: ${{ steps.candidate.outputs.head_sha }}
+        run: trusted/scripts/smoke_container_image.sh "$LOCAL_IMAGE" "$REVISION"
+
+      - name: Save tested Docker image
+        id: archive
+        env:
+          ARCHIVE_DIR: ${{ runner.temp }}/moon-preview-archive
+          ARTIFACT_NAME: preview-pr-${{ steps.candidate.outputs.pull_request_number }}-${{ steps.candidate.outputs.head_sha }}-${{ github.run_id }}-${{ github.run_attempt }}
+          LOCAL_IMAGE: moon-service-preview:${{ steps.candidate.outputs.head_sha }}
+        run: |
+          set -euo pipefail
+          mkdir "$ARCHIVE_DIR"
+          docker image inspect "$LOCAL_IMAGE" >/dev/null
+          docker save --output "$ARCHIVE_DIR/preview-image.tar" "$LOCAL_IMAGE"
+          test -s "$ARCHIVE_DIR/preview-image.tar"
+          echo "artifact_name=$ARTIFACT_NAME" >>"$GITHUB_OUTPUT"
+
+      - name: Upload one-day image archive
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: ${{ steps.archive.outputs.artifact_name }}
+          path: ${{ runner.temp }}/moon-preview-archive/preview-image.tar
+          if-no-files-found: error
+          retention-days: 1
+          compression-level: 0
+          overwrite: false
+
+  publish-preview:
+    name: Publish ARM64 preview
+    needs: build-preview
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    permissions:
+      checks: read
+      contents: read
+      packages: write
+      pull-requests: read
+    steps:
+      - name: Download exact image archive
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: ${{ needs.build-preview.outputs.artifact_name }}
+          path: ${{ runner.temp }}/moon-preview-archive
+
+      - name: Revalidate pull request and required checks
+        env:
+          EXPECTED_HEAD_SHA: ${{ needs.build-preview.outputs.head_sha }}
+          GH_TOKEN: ${{ github.token }}
+          PULL_REQUEST: ${{ needs.build-preview.outputs.pull_request_number }}
+        run: |
+          set -euo pipefail
+          pull_json="$(gh pr view "$PULL_REQUEST" --repo "$GITHUB_REPOSITORY" \
+            --json number,state,baseRefName,headRefOid,isCrossRepository,statusCheckRollup)"
+          jq -e --arg number "$PULL_REQUEST" --arg head "$EXPECTED_HEAD_SHA" '
+            .number == ($number | tonumber)
+            and .state == "OPEN"
+            and .baseRefName == "main"
+            and .isCrossRepository == false
+            and .headRefOid == $head
+          ' <<<"$pull_json" >/dev/null
+          jq -e '
+            [
+              .statusCheckRollup[]
+              | select(.workflowName == "Test and publish container")
+              | select(
+                  .name == "Backend tests"
+                  or .name == "Frontend tests"
+                  or .name == "Deployment tests"
+                )
+            ] as $required
+            | ($required | length) == 3
+              and ([$required[].name] | unique | length) == 3
+              and all($required[];
+                .status == "COMPLETED" and .conclusion == "SUCCESS")
+          ' <<<"$pull_json" >/dev/null
+
+      - name: Load and inspect tested image
+        env:
+          LOCAL_IMAGE: moon-service-preview:${{ needs.build-preview.outputs.head_sha }}
+          REVISION: ${{ needs.build-preview.outputs.head_sha }}
+        run: |
+          set -euo pipefail
+          docker load --input "$RUNNER_TEMP/moon-preview-archive/preview-image.tar"
+          image_json="$(docker image inspect "$LOCAL_IMAGE")"
+          jq -e --arg revision "$REVISION" --arg source "$IMAGE_SOURCE" '
+            length == 1
+            and .[0].Os == "linux"
+            and .[0].Architecture == "arm64"
+            and .[0].Config.Labels["org.opencontainers.image.revision"] == $revision
+            and .[0].Config.Labels["org.opencontainers.image.source"] == $source
+            and (.[0].Config.Env | index("MOON_BUILD_REVISION=" + $revision) != null)
+          ' <<<"$image_json" >/dev/null
+
+      - name: Log in to GHCR
+        uses: docker/login-action@af1e73f918a031802d376d3c8bbc3fe56130a9b0 # v4.4.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ github.token }}
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@bb05f3f5519dd87d3ba754cc423b652a5edd6d2c # v4.2.0
+
+      - name: Push revision and preview tags
+        env:
+          LOCAL_IMAGE: moon-service-preview:${{ needs.build-preview.outputs.head_sha }}
+          PREVIEW_REF: ${{ env.IMAGE_REPOSITORY }}:preview
+          REVISION_REF: ${{ env.IMAGE_REPOSITORY }}:preview-pr-${{ needs.build-preview.outputs.pull_request_number }}-${{ needs.build-preview.outputs.head_sha }}
+        run: |
+          set -euo pipefail
+          docker tag "$LOCAL_IMAGE" "$REVISION_REF"
+          docker push "$REVISION_REF"
+          docker tag "$LOCAL_IMAGE" "$PREVIEW_REF"
+          docker push "$PREVIEW_REF"
+
+      - name: Verify and report published digest
+        env:
+          PREVIEW_REF: ${{ env.IMAGE_REPOSITORY }}:preview
+          PULL_REQUEST: ${{ needs.build-preview.outputs.pull_request_number }}
+          REVISION: ${{ needs.build-preview.outputs.head_sha }}
+          REVISION_REF: ${{ env.IMAGE_REPOSITORY }}:preview-pr-${{ needs.build-preview.outputs.pull_request_number }}-${{ needs.build-preview.outputs.head_sha }}
+        run: |
+          set -euo pipefail
+          revision_manifest="$(docker buildx imagetools inspect \
+            "$REVISION_REF" --format '{{json .Manifest}}')"
+          preview_manifest="$(docker buildx imagetools inspect \
+            "$PREVIEW_REF" --format '{{json .Manifest}}')"
+          revision_digest="$(jq -er \
+            '.digest | select(test("^sha256:[0-9a-f]{64}$"))' \
+            <<<"$revision_manifest")"
+          preview_digest="$(jq -er \
+            '.digest | select(test("^sha256:[0-9a-f]{64}$"))' \
+            <<<"$preview_manifest")"
+          [[ "$preview_digest" == "$revision_digest" ]]
+          {
+            echo "## Published pull-request preview"
+            echo
+            echo "- Pull request: #$PULL_REQUEST"
+            echo "- Revision: \`$REVISION\`"
+            echo "- Revision tag: \`$REVISION_REF\`"
+            echo "- Digest: \`$revision_digest\`"
+          } >>"$GITHUB_STEP_SUMMARY"
+          echo "Published $REVISION_REF@$revision_digest"

@@ -51,6 +51,68 @@ the exact result, while the separate confirmation waiter receives Deployments
 read access only. Each uses the repository-scoped `GITHUB_TOKEN`. All external
 Actions are pinned to full commit SHAs.
 
+## Pull-Request Preview Publication
+
+`.github/workflows/publish-pr-preview.yml` publishes one approved pull-request
+preview without changing the production publication flow. The repository owner
+starts it from `main` and supplies only a pull-request number. The workflow
+continues only when both the original actor and the triggering actor are
+`rapucha` and the workflow itself comes from `main`. It does not run
+automatically for pull requests.
+
+The workflow requires an open, same-repository pull request whose base is
+`main`. It resolves the full head revision and requires exactly one successful
+`Backend tests`, `Frontend tests`, and `Deployment tests` check from the
+existing test workflow. It checks the live head and checks again before
+publication.
+
+The complete workflow is serialized through GitHub's concurrency queue. A
+read-only job checks out the exact head, uses QEMU and Buildx to build and load
+`linux/arm64`, and runs the trusted default-branch smoke test. It saves that
+tested image as an ordinary Docker archive in a one-day Actions artifact.
+
+The second job downloads the exact artifact, loads it, and verifies its
+platform, source, and revision with standard Docker inspection. Only this job
+receives the repository-scoped `GITHUB_TOKEN` with `packages: write`. It does
+not run the image. It uses standard Docker tag and push commands for these
+reserved references in the existing public package:
+
+```text
+ghcr.io/rapucha/moon-service:preview-pr-<number>-<full-sha>
+ghcr.io/rapucha/moon-service:preview
+```
+
+Both tags must resolve to the same remote manifest digest after publication.
+The job summary records the pull-request number, full revision, revision-scoped
+reference, and digest for manual deployment.
+
+GHCR tags are mutable. A deliberate rerun may replace the revision-scoped tag,
+and the last successful serialized publication sets `preview`. The reported
+digest, not either tag, is the immutable deployment identity. This manual
+workflow is intended for deliberate, low-volume use.
+
+The actor, triggering-actor, dispatch-ref, and workflow-ref checks protect
+normal use of the canonical workflow. They do not enforce an owner-only
+boundary against repository writers. A writer can dispatch a modified branch
+copy that removes those checks and requests `packages: write`, and GHCR cannot
+restrict that token to preview tags. For the current project, every human or
+automation principal with repository write access is trusted as an Actions and
+GHCR administrator. Revisit this design before granting write access to a
+less-trusted principal or giving preview images access to sensitive data or
+credentials. [Issue #203](https://github.com/rapucha/moon-service/issues/203)
+owns the decision about stronger enforcement.
+
+The ordinary archive is trusted under that same repository-writer model. The
+workflow has no custom OCI parser, registry client, immutable-tag protocol, or
+producer-ordering protocol. It does not create a GitHub Deployment, contact the
+Raspberry Pi, or delete GHCR package versions. Issues
+[#200](https://github.com/rapucha/moon-service/issues/200) and
+[#201](https://github.com/rapucha/moon-service/issues/201) must be revised and
+freshly reviewed against this contract before they consume this digest or add
+preview replacement, expiry, or package retention. They must accept that a
+standard single-platform push can produce an image-manifest digest rather than
+an OCI index digest.
+
 ## Image Identity
 
 Every successful `main` revision publishes one manifest with these platforms:
