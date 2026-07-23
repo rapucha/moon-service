@@ -23,7 +23,7 @@
              }
            ]
          } | to_json }}
-    _preview_storage_idle_autofs: >-
+    _preview_storage_inactive_autofs: >-
       {{ {
            'filesystems': [
              {
@@ -139,7 +139,7 @@
         that:
           - _preview_storage_missing_confirmation_rejected | bool
 
-    - name: Accept a safe active NFS mount classification
+    - name: Accept a safe active NFS mount from the previous managed contract
       ansible.builtin.include_role:
         name: moon_service_preview_storage
         tasks_from: validate-current-mount
@@ -148,18 +148,19 @@
           rc: 0
           stdout: "{{ _preview_storage_safe_nfs }}"
         _moon_service_preview_storage_source: "{{ _preview_storage_test_source }}"
-        _moon_service_preview_storage_exact_fstab_present: true
+        _moon_service_preview_storage_exact_fstab_present: false
+        _moon_service_preview_storage_previous_fstab_present: true
         _moon_service_preview_storage_automount_before:
           rc: 0
 
-    - name: Accept the expected idle autofs classification
+    - name: Accept the expected inactive autofs classification
       ansible.builtin.include_role:
         name: moon_service_preview_storage
         tasks_from: validate-current-mount
       vars:
         _moon_service_preview_storage_mount_before:
           rc: 0
-          stdout: "{{ _preview_storage_idle_autofs }}"
+          stdout: "{{ _preview_storage_inactive_autofs }}"
         _moon_service_preview_storage_source: "{{ _preview_storage_test_source }}"
         _moon_service_preview_storage_exact_fstab_present: true
         _moon_service_preview_storage_automount_before:
@@ -206,7 +207,7 @@
           vars:
             _moon_service_preview_storage_mount_before:
               rc: 0
-              stdout: "{{ _preview_storage_idle_autofs }}"
+              stdout: "{{ _preview_storage_inactive_autofs }}"
             _moon_service_preview_storage_source: "{{ _preview_storage_test_source }}"
             _moon_service_preview_storage_exact_fstab_present: false
             _moon_service_preview_storage_automount_before:
