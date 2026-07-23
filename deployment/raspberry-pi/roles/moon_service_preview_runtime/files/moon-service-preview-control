@@ -106,6 +106,10 @@ option_present() {
     [[ ",$1," == *",$2,"* ]]
 }
 
+as_database_user() {
+    /usr/bin/timeout --signal=TERM --kill-after=5s "$1" /usr/bin/setpriv --reuid=999 --regid=999 --clear-groups "${@:2}"
+}
+
 nfs_preflight() {
     local fstab_records expected_source target fstype options dump pass
     local mount_json resolved probe probe_identity
@@ -124,7 +128,7 @@ nfs_preflight() {
     ! option_present "$options" ro || return 1
     ! option_present "$options" soft || return 1
 
-    /usr/bin/timeout 35s /usr/bin/stat --format=%d "$MOUNT_POINT/." >/dev/null 2>&1 || return 1
+    /usr/bin/timeout --signal=TERM --kill-after=5s 35s /usr/bin/stat --format=%d "$MOUNT_POINT/." >/dev/null 2>&1 || return 1
     mount_json="$(
         /usr/bin/findmnt --json --all --mountpoint "$MOUNT_POINT" \
             --types nfs,nfs4 --output SOURCE,TARGET,FSTYPE,OPTIONS 2>/dev/null
@@ -143,27 +147,24 @@ nfs_preflight() {
         and ($records[0].options | split(",") | index("soft") == null)
     ' <<<"$mount_json" >/dev/null || return 1
 
-    /usr/bin/timeout 10s /usr/bin/test -d "$DATA_DIR" -a ! -L "$DATA_DIR" || return 1
-    resolved="$(/usr/bin/timeout 10s /usr/bin/realpath -e -- "$DATA_DIR")" || return 1
+    /usr/bin/timeout --signal=TERM --kill-after=5s 10s /usr/bin/test -d "$DATA_DIR" -a ! -L "$DATA_DIR" || return 1
+    resolved="$(/usr/bin/timeout --signal=TERM --kill-after=5s 10s /usr/bin/realpath -e -- "$DATA_DIR")" || return 1
     [[ "$resolved" == "$DATA_DIR" ]] || return 1
-    [[ "$(/usr/bin/timeout 10s /usr/bin/stat -c '%u:%g' "$DATA_DIR")" == 999:999 ]] || return 1
-    probe="$(
-        /usr/bin/timeout 10s /usr/bin/setpriv --reuid=999 --regid=999 \
-            --clear-groups /usr/bin/mktemp "$DATA_DIR/.moon-preview-probe.XXXXXXXX"
-    )" || return 1
-    probe_identity="$(/usr/bin/timeout 10s /usr/bin/stat -c '%u:%g:%s' "$probe" 2>/dev/null || true)"
+    [[ "$(/usr/bin/timeout --signal=TERM --kill-after=5s 10s /usr/bin/stat -c '%u:%g' "$DATA_DIR")" == 999:999 ]] || return 1
+    probe="$(as_database_user 10s /usr/bin/mktemp \
+        "$DATA_DIR/.moon-preview-probe.XXXXXXXX")" || return 1
+    probe_identity="$(as_database_user 10s /usr/bin/stat -c '%u:%g:%s' "$probe" 2>/dev/null || true)"
     if [[ "$probe_identity" != 999:999:0 ]]; then
-        /usr/bin/timeout 10s /usr/bin/setpriv --reuid=999 --regid=999 --clear-groups \
-            /usr/bin/rm -f -- "$probe" 2>/dev/null || true
+        as_database_user 10s /usr/bin/rm -f -- "$probe" 2>/dev/null || true
         return 1
     fi
-    /usr/bin/timeout 10s /usr/bin/setpriv --reuid=999 --regid=999 \
-        --clear-groups /usr/bin/rm -- "$probe"
+    as_database_user 10s /usr/bin/rm -- "$probe"
 }
 
 data_has_entries() {
     local entry
-    entry="$(/usr/bin/timeout 10s /usr/bin/find "$DATA_DIR" -mindepth 1 -maxdepth 1 -print -quit)" || return 0
+    entry="$(as_database_user 10s /usr/bin/find \
+        "$DATA_DIR" -mindepth 1 -maxdepth 1 -print -quit)" || return 0
     [[ -n "$entry" ]]
 }
 
@@ -396,8 +397,7 @@ stop_action() {
 purge_action() {
     containers_exist && die 65 "stop the preview before confirmed purge"
     nfs_preflight || die 69 "NFS preflight failed; preview data were not changed"
-    /usr/bin/timeout 60s /usr/bin/setpriv --reuid=999 --regid=999 --clear-groups \
-        /usr/bin/find "$DATA_DIR" -mindepth 1 -maxdepth 1 \
+    as_database_user 60s /usr/bin/find "$DATA_DIR" -mindepth 1 -maxdepth 1 \
         -exec /usr/bin/rm -rf -- '{}' + \
         || die 69 "preview data could not be emptied"
     data_has_entries && die 69 "preview data directory is not empty"
@@ -407,6 +407,7 @@ purge_action() {
 }
 
 [[ "$EUID" -eq 0 ]] || die 77 "root privileges are required"
+cd /
 /usr/bin/mkdir -p "$STATE_DIR"
 /usr/bin/chown root:root "$STATE_DIR"
 /usr/bin/chmod 0700 "$STATE_DIR"

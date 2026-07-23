@@ -278,8 +278,16 @@ class PreviewRuntimeContractTest(unittest.TestCase):
 
     def test_nfs_preflight_is_exact_and_has_no_local_fallback(self):
         preflight = self.function("nfs_preflight")
+        database_user = self.function("as_database_user")
+        self.assertIn(
+            '/usr/bin/timeout --signal=TERM --kill-after=5s "$1"',
+            database_user,
+        )
+        self.assertIn("--reuid=999 --regid=999 --clear-groups", database_user)
         for value in (
             "/etc/fstab",
+            "timeout --signal=TERM --kill-after=5s 35s",
+            "timeout --signal=TERM --kill-after=5s 10s",
             '/usr/bin/stat --format=%d "$MOUNT_POINT/."',
             '--mountpoint "$MOUNT_POINT"',
             "--types nfs,nfs4",
@@ -293,14 +301,18 @@ class PreviewRuntimeContractTest(unittest.TestCase):
             '/usr/bin/test -d "$DATA_DIR" -a ! -L "$DATA_DIR"',
             '/usr/bin/realpath -e -- "$DATA_DIR"',
             "/usr/bin/stat -c '%u:%g' \"$DATA_DIR\"",
-            "--reuid=999 --regid=999",
-            "--clear-groups",
-            'mktemp "$DATA_DIR/.moon-preview-probe.',
-            '/usr/bin/rm -- "$probe"',
+            "as_database_user 10s /usr/bin/mktemp",
+            "as_database_user 10s /usr/bin/stat",
+            '"$DATA_DIR/.moon-preview-probe.',
+            'as_database_user 10s /usr/bin/rm -- "$probe"',
         ):
             self.assertIn(value, preflight)
         self.assertNotIn("mkdir", preflight)
         self.assertNotIn("mount ", preflight)
+        self.assertIn(
+            "entry=\"$(as_database_user 10s /usr/bin/find",
+            self.function("data_has_entries"),
+        )
         self.assert_ordered(
             preflight,
             '/usr/bin/stat --format=%d "$MOUNT_POINT/."',
@@ -443,11 +455,12 @@ class PreviewRuntimeContractTest(unittest.TestCase):
             '/usr/bin/rm -f "$ADMIN_TOKEN_FILE"',
         )
         for value in (
-            "--reuid=999 --regid=999 --clear-groups",
+            "as_database_user 60s /usr/bin/find",
             '"$DATA_DIR" -mindepth 1 -maxdepth 1',
             "-exec /usr/bin/rm -rf -- '{}' +",
             '"$CURRENT_STATE" "$DEGRADED_STATE" "$PURGE_REQUIRED"',
             '/usr/bin/flock -w 30',
+            "cd /",
             '[[ $# -eq 2 && "$2" == --confirm ]]',
         ):
             self.assertIn(value, purge + self.control)
@@ -461,8 +474,7 @@ class PreviewRuntimeContractTest(unittest.TestCase):
             "wait_healthy moon-service-preview-postgres 90",
             "/usr/bin/timeout 20s /usr/bin/docker info",
             "/usr/bin/timeout 20s /usr/bin/docker inspect",
-            "/usr/bin/timeout 10s",
-            "/usr/bin/timeout 60s",
+            "as_database_user 60s",
             "--max-time 3",
             "/usr/bin/flock -w 30",
         ):
