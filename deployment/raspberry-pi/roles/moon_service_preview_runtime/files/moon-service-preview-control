@@ -13,6 +13,9 @@ readonly DEGRADED_STATE="$STATE_DIR/degraded.env"
 readonly PURGE_REQUIRED="$STATE_DIR/purge-required"
 readonly ADMIN_TOKEN_FILE=/etc/moon-service-preview/admin-token
 readonly DATABASE_PASSWORD_FILE=/etc/moon-service-preview/database-password
+readonly APP_ADMIN_TOKEN_FILE=/etc/moon-service-preview/app-admin-token
+readonly APP_DATABASE_PASSWORD_FILE=/etc/moon-service-preview/app-database-password
+readonly POSTGRES_DATABASE_PASSWORD_FILE=/etc/moon-service-preview/postgres-database-password
 
 log() {
     printf '%s moon-service-preview: %s\n' "$(/usr/bin/date -u +%Y-%m-%dT%H:%M:%SZ)" "$*"
@@ -75,31 +78,26 @@ write_secret() {
     /usr/bin/mv -f "$temporary" "$target"
 }
 
+install_secret_copy() {
+    local source="$1" target="$2" owner="$3"
+    [[ "$(<"$source")" =~ ^[0-9a-f]{64}$ ]] \
+        && /usr/bin/install -o "$owner" -g "$owner" -m 0400 -T "$source" "$target"
+}
+
 ensure_secrets() {
     [[ -f "$ADMIN_TOKEN_FILE" ]] || write_secret "$ADMIN_TOKEN_FILE"
     [[ -f "$DATABASE_PASSWORD_FILE" ]] || write_secret "$DATABASE_PASSWORD_FILE"
+    install_secret_copy "$ADMIN_TOKEN_FILE" "$APP_ADMIN_TOKEN_FILE" 10001 \
+        && install_secret_copy "$DATABASE_PASSWORD_FILE" "$APP_DATABASE_PASSWORD_FILE" 10001 \
+        && install_secret_copy "$DATABASE_PASSWORD_FILE" "$POSTGRES_DATABASE_PASSWORD_FILE" 999
 }
 
 compose() {
-    local state_file="$1"
-    shift
-    local admin_token database_password
-    if [[ -r "$ADMIN_TOKEN_FILE" && -r "$DATABASE_PASSWORD_FILE" ]]; then
-        admin_token="$(<"$ADMIN_TOKEN_FILE")"
-        database_password="$(<"$DATABASE_PASSWORD_FILE")"
-        [[ "$admin_token" =~ ^[0-9a-f]{64}$ ]] || return 1
-        [[ "$database_password" =~ ^[0-9a-f]{64}$ ]] || return 1
-    else
-        admin_token="$(printf '0%.0s' {1..64})"
-        database_password="$(printf '0%.0s' {1..64})"
-    fi
-    MOON_PREVIEW_ADMIN_TOKEN="$admin_token" \
-    MOON_PREVIEW_DATABASE_PASSWORD="$database_password" \
-        /usr/bin/timeout --signal=TERM --kill-after=5s 180s \
+    /usr/bin/timeout --signal=TERM --kill-after=5s 180s \
         /usr/bin/docker compose \
         --project-name moon-service-preview \
         --file /opt/moon-service-preview/compose.yml \
-        --env-file "$state_file" "$@"
+        --env-file "$1" "${@:2}"
 }
 
 option_present() {
@@ -294,7 +292,9 @@ start_action() {
     image_is_valid "$revision" "$digest" \
         || die 69 "candidate image did not satisfy the preview contract"
     if [[ -z "$existing_state" ]] && { [[ -e "$ADMIN_TOKEN_FILE" \
-        || -e "$DATABASE_PASSWORD_FILE" ]] || containers_exist; }; then
+        || -e "$DATABASE_PASSWORD_FILE" || -e "$APP_ADMIN_TOKEN_FILE" \
+        || -e "$APP_DATABASE_PASSWORD_FILE" \
+        || -e "$POSTGRES_DATABASE_PASSWORD_FILE" ]] || containers_exist; }; then
         mark_purge_required
         die 65 "unowned preview state requires local inspection and confirmed purge"
     fi
@@ -401,7 +401,7 @@ purge_action() {
         -exec /usr/bin/rm -rf -- '{}' + \
         || die 69 "preview data could not be emptied"
     data_has_entries && die 69 "preview data directory is not empty"
-    /usr/bin/rm -f "$ADMIN_TOKEN_FILE" "$DATABASE_PASSWORD_FILE"
+    /usr/bin/rm -f "$ADMIN_TOKEN_FILE" "$DATABASE_PASSWORD_FILE" "$APP_ADMIN_TOKEN_FILE" "$APP_DATABASE_PASSWORD_FILE" "$POSTGRES_DATABASE_PASSWORD_FILE"
     /usr/bin/rm -f "$CURRENT_STATE" "$DEGRADED_STATE" "$PURGE_REQUIRED"
     log "preview data, secrets, and identity were purged"
 }

@@ -196,19 +196,32 @@ class PreviewRuntimeContractTest(unittest.TestCase):
 
     def test_credentials_are_runtime_secrets_not_rendered_values(self):
         for value in (
-            "environment: MOON_PREVIEW_ADMIN_TOKEN",
-            "environment: MOON_PREVIEW_DATABASE_PASSWORD",
+            "file: /etc/moon-service-preview/app-admin-token",
+            "file: /etc/moon-service-preview/app-database-password",
+            "file: /etc/moon-service-preview/postgres-database-password",
             "target: moon.admin.token",
             "target: moon.feedback.persistence.password",
             "target: postgres.password",
         ):
             self.assertIn(value, self.compose)
-        self.assertNotIn("${MOON_PREVIEW_ADMIN_TOKEN}", self.compose)
-        self.assertNotIn("${MOON_PREVIEW_DATABASE_PASSWORD}", self.compose)
+        self.assertNotIn("environment: MOON_PREVIEW", self.compose)
         self.assertNotIn("POSTGRES_PASSWORD:", self.compose)
         secret_writer = self.function("write_secret")
         self.assertIn('mktemp "${target%/*}/.secret.', secret_writer)
         self.assertNotIn("CONFIG_DIR", secret_writer)
+        secret_copy = self.function("install_secret_copy")
+        self.assertIn(
+            '[[ "$(<"$source")" =~ ^[0-9a-f]{64}$ ]]',
+            secret_copy,
+        )
+        self.assertIn(
+            'install -o "$owner" -g "$owner" -m 0400 -T "$source" "$target"',
+            secret_copy,
+        )
+        ensure_secrets = self.function("ensure_secrets")
+        self.assertIn('"$APP_ADMIN_TOKEN_FILE" 10001', ensure_secrets)
+        self.assertIn('"$APP_DATABASE_PASSWORD_FILE" 10001', ensure_secrets)
+        self.assertIn('"$POSTGRES_DATABASE_PASSWORD_FILE" 999', ensure_secrets)
 
     def test_application_environment_matches_preview_contract(self):
         expected = {
@@ -519,13 +532,22 @@ class PreviewRuntimeContractTest(unittest.TestCase):
                 "/etc/moon-service-preview/application.env",
                 str(application_env),
             )
+            for secret_name in (
+                "app-admin-token",
+                "app-database-password",
+                "postgres-database-password",
+            ):
+                secret_file = root / secret_name
+                secret_file.write_text("a" * 64 + "\n", encoding="utf-8")
+                rendered = rendered.replace(
+                    f"/etc/moon-service-preview/{secret_name}",
+                    str(secret_file),
+                )
             compose_file = root / "compose.yml"
             compose_file.write_text(rendered, encoding="utf-8")
             environment = os.environ.copy()
             environment.update(
                 {
-                    "MOON_PREVIEW_ADMIN_TOKEN": "a" * 64,
-                    "MOON_PREVIEW_DATABASE_PASSWORD": "b" * 64,
                     "MOON_PREVIEW_IMAGE_DIGEST": "sha256:" + "c" * 64,
                     "MOON_PREVIEW_IMAGE_REVISION": "d" * 40,
                     "MOON_PREVIEW_PULL_REQUEST": "200",

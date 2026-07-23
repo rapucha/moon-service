@@ -33,14 +33,8 @@ services:
     secrets:
       - source: moon_preview_admin_token
         target: moon.admin.token
-        uid: "10001"
-        gid: "10001"
-        mode: 0400
       - source: moon_preview_database_password
         target: moon.feedback.persistence.password
-        uid: "10001"
-        gid: "10001"
-        mode: 0400
     networks:
       - outbound
       - database
@@ -87,9 +81,6 @@ services:
     secrets:
       - source: moon_preview_postgres_password
         target: postgres.password
-        uid: "999"
-        gid: "999"
-        mode: 0400
     networks:
       - database
 
@@ -100,8 +91,8 @@ networks:
 
 secrets:
   moon_preview_admin_token:
-    environment: MOON_PREVIEW_ADMIN_TOKEN
+    file: /etc/moon-service-preview/app-admin-token
   moon_preview_database_password:
-    environment: MOON_PREVIEW_DATABASE_PASSWORD
+    file: /etc/moon-service-preview/app-database-password
   moon_preview_postgres_password:
-    environment: MOON_PREVIEW_DATABASE_PASSWORD
+    file: /etc/moon-service-preview/postgres-database-password
