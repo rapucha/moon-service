@@ -278,7 +278,9 @@ ansible-playbook preview-runtime.yml --diff
 
 This renders no credential or candidate and starts nothing. For a CI-green
 same-repository PR, the owner manually dispatches `publish-pr-preview` and uses
-its PR number, full revision, and digest. Require four CPUs and 4 GiB memory:
+its PR number, full revision, and digest. Require four CPUs and at least
+3,750,000 KiB Linux `MemTotal`, representing a nominal 4 GB-or-larger Pi after
+firmware and reserved-memory deductions:
 
 ```bash
 nproc
