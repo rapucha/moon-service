@@ -8,6 +8,8 @@
     _moon_service_preview_storage_source: >-
       {{ moon_service_preview_storage_server }}:{{ moon_service_preview_storage_export }}
     _moon_service_preview_storage_options: >-
+      vers=4.1,proto=tcp,rw,hard,_netdev,nofail,nosuid,nodev,noexec,x-systemd.rw-only,x-systemd.automount,x-systemd.mount-timeout=30s
+    _moon_service_preview_storage_previous_options: >-
       vers=4.1,proto=tcp,rw,hard,_netdev,nofail,nosuid,nodev,noexec,x-systemd.rw-only,x-systemd.automount,x-systemd.idle-timeout=600,x-systemd.mount-timeout=30s
     _moon_service_preview_storage_mount_unit: 'mnt-moon\x2dservice\x2dpreview.mount'
     _moon_service_preview_storage_automount_unit: 'mnt-moon\x2dservice\x2dpreview.automount'
@@ -20,6 +22,10 @@
       {{ _moon_service_preview_storage_source }}
       {{ _moon_service_preview_storage_mount_point }}
       nfs {{ _moon_service_preview_storage_options }} 0 0
+    _moon_service_preview_storage_previous_fstab_line: >-
+      {{ _moon_service_preview_storage_source }}
+      {{ _moon_service_preview_storage_mount_point }}
+      nfs {{ _moon_service_preview_storage_previous_options }} 0 0
   no_log: true
   diff: false
 
@@ -87,6 +93,9 @@
     _moon_service_preview_storage_exact_fstab_present: >-
       {{ _moon_service_preview_storage_fstab_line in
          (_moon_service_preview_storage_fstab_before.content | b64decode).splitlines() }}
+    _moon_service_preview_storage_previous_fstab_present: >-
+      {{ _moon_service_preview_storage_previous_fstab_line in
+         (_moon_service_preview_storage_fstab_before.content | b64decode).splitlines() }}
   no_log: true
   diff: false
 
@@ -97,7 +106,10 @@
         _moon_service_preview_storage_fstab_target_lines | length == 0
         or (
           _moon_service_preview_storage_fstab_target_lines | length == 1
-          and _moon_service_preview_storage_exact_fstab_present
+          and (
+            _moon_service_preview_storage_exact_fstab_present
+            or _moon_service_preview_storage_previous_fstab_present
+          )
         )
     fail_msg: >-
       Preview storage found an unexpected fstab entry for its fixed target.
@@ -116,9 +128,11 @@
 
 - name: Check the existing preview automount unit
   ansible.builtin.command:
-    cmd: >-
-      /usr/bin/systemctl is-active --quiet
-      {{ _moon_service_preview_storage_automount_unit }}
+    argv:
+      - /usr/bin/systemctl
+      - is-active
+      - --quiet
+      - "{{ _moon_service_preview_storage_automount_unit }}"
   register: _moon_service_preview_storage_automount_before
   changed_when: false
   failed_when: false
@@ -264,33 +278,28 @@
 
 - name: Check the final preview automount unit
   ansible.builtin.command:
-    cmd: >-
-      /usr/bin/systemctl is-active --quiet
-      {{ _moon_service_preview_storage_automount_unit }}
+    argv:
+      - /usr/bin/systemctl
+      - is-active
+      - --quiet
+      - "{{ _moon_service_preview_storage_automount_unit }}"
   register: _moon_service_preview_storage_automount_after
   changed_when: false
 
 - name: Inspect the generated preview mount policy
   ansible.builtin.command:
-    cmd: >-
-      /usr/bin/systemctl show {{ _moon_service_preview_storage_mount_unit }}
-      --property=ReadWriteOnly --property=TimeoutUSec --no-pager
+    argv:
+      - /usr/bin/systemctl
+      - show
+      - "{{ _moon_service_preview_storage_mount_unit }}"
+      - --property=ReadWriteOnly
+      - --property=TimeoutUSec
+      - --no-pager
   register: _moon_service_preview_storage_mount_policy_after
   changed_when: false
   failed_when: >-
     _moon_service_preview_storage_mount_policy_after.rc != 0
     or (_moon_service_preview_storage_mount_policy_after.stderr | trim | length) > 0
-
-- name: Inspect the generated preview automount policy
-  ansible.builtin.command:
-    cmd: >-
-      /usr/bin/systemctl show {{ _moon_service_preview_storage_automount_unit }}
-      --property=TimeoutIdleUSec --no-pager
-  register: _moon_service_preview_storage_automount_policy_after
-  changed_when: false
-  failed_when: >-
-    _moon_service_preview_storage_automount_policy_after.rc != 0
-    or (_moon_service_preview_storage_automount_policy_after.stderr | trim | length) > 0
 
 - name: Record final private preview-storage evidence
   ansible.builtin.set_fact:
@@ -340,9 +349,6 @@
       - >-
         'TimeoutUSec=30s'
         in _moon_service_preview_storage_mount_policy_after.stdout_lines
-      - >-
-        'TimeoutIdleUSec=10min'
-        in _moon_service_preview_storage_automount_policy_after.stdout_lines
       - >-
         _moon_service_preview_storage_rpcbind_after.results
         | rejectattr('stdout', 'equalto', 'masked') | list | length == 0

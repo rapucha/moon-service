@@ -18,6 +18,10 @@ RUNTIME_VALIDATION = DEPLOYMENT / "tests" / "preview-storage-validation.runtime.
 TARGET = "/mnt/moon-service-preview"
 OPTIONS = (
     "vers=4.1,proto=tcp,rw,hard,_netdev,nofail,nosuid,nodev,noexec,"
+    "x-systemd.rw-only,x-systemd.automount,x-systemd.mount-timeout=30s"
+)
+PREVIOUS_OPTIONS = (
+    "vers=4.1,proto=tcp,rw,hard,_netdev,nofail,nosuid,nodev,noexec,"
     "x-systemd.rw-only,x-systemd.automount,x-systemd.idle-timeout=600,"
     "x-systemd.mount-timeout=30s"
 )
@@ -198,12 +202,19 @@ class PreviewStorageContractTest(unittest.TestCase):
         self.assertIn("fstab_target_lines | length == 0", fstab_check)
         self.assertIn("fstab_target_lines | length == 1", fstab_check)
         self.assertIn("exact_fstab_present", fstab_check)
+        self.assertIn("previous_fstab_present", fstab_check)
+        fstab_state = self.task("Record existing preview-storage fstab entries")
+        self.assertIn("_previous_fstab_line in", fstab_state)
+        current_mount = self.task("Record whether the current mount is safe")
+        self.assertIn("previous_fstab_present", current_mount)
 
     def test_mount_target_and_options_are_fixed(self):
         self.assertIn(TARGET, self.tasks)
         self.assertIn(OPTIONS, self.tasks)
+        self.assertIn(PREVIOUS_OPTIONS, self.tasks)
         self.assertNotRegex(self.defaults, r"(?m)^moon_service_preview_storage_(?:target|options):")
         self.assertNotRegex(OPTIONS, r"(?:^|,)(?:ro|soft)(?:,|$)")
+        self.assertNotIn("x-systemd.idle-timeout", OPTIONS)
 
     def test_source_bearing_tasks_suppress_logs_and_diffs(self):
         names = (
@@ -223,7 +234,7 @@ class PreviewStorageContractTest(unittest.TestCase):
             self.assertIn("no_log: true", block, name)
             self.assertIn("diff: false", block, name)
 
-    def test_automount_can_be_retriggered_after_an_idle_unmount(self):
+    def test_automount_can_be_triggered_from_an_inactive_mount(self):
         self.assertIn("mnt-moon\\x2dservice\\x2dpreview.automount", self.tasks)
         self.assertIn("selectattr('fstype', 'equalto', 'autofs')", self.tasks)
         self.assertIn("_moon_service_preview_storage_automount_before.rc == 0", self.tasks)
@@ -233,6 +244,24 @@ class PreviewStorageContractTest(unittest.TestCase):
         self.assertIn(TARGET, trigger)
         self.assertIn("changed_when: false", trigger)
         self.assertNotIn("findmnt --target", self.tasks)
+
+    def test_escaped_systemd_units_are_passed_as_exact_argv_elements(self):
+        checks = {
+            "Check the existing preview automount unit": (
+                "_moon_service_preview_storage_automount_unit"
+            ),
+            "Check the final preview automount unit": (
+                "_moon_service_preview_storage_automount_unit"
+            ),
+            "Inspect the generated preview mount policy": (
+                "_moon_service_preview_storage_mount_unit"
+            ),
+        }
+        for name, variable in checks.items():
+            block = self.task(name)
+            self.assertIn("argv:", block, name)
+            self.assertIn(f'- "{{{{ {variable} }}}}"', block, name)
+            self.assertNotIn("cmd:", block, name)
 
     def test_live_mount_validation_is_exact_and_fail_closed(self):
         inspection = self.task("Inspect the active preview-storage NFS mount")
@@ -258,19 +287,16 @@ class PreviewStorageContractTest(unittest.TestCase):
             self.assertIn(value, validation)
         self.assertIn("automount_after.rc == 0", validation)
 
-    def test_generated_systemd_policy_is_verified_without_source_output(self):
+    def test_generated_mount_policy_is_verified_without_source_output(self):
         mount_policy = self.task("Inspect the generated preview mount policy")
         self.assertIn("--property=ReadWriteOnly", mount_policy)
         self.assertIn("--property=TimeoutUSec", mount_policy)
         self.assertNotIn("--property=What", mount_policy)
-        automount_policy = self.task("Inspect the generated preview automount policy")
-        self.assertIn("--property=TimeoutIdleUSec", automount_policy)
-        self.assertNotIn("--property=What", automount_policy)
+        self.assertNotIn("TimeoutIdleUSec", self.tasks)
         validation = self.task("Require the exact live preview-storage contract")
         for value in (
             "ReadWriteOnly=yes",
             "TimeoutUSec=30s",
-            "TimeoutIdleUSec=10min",
         ):
             self.assertIn(value, validation)
 

@@ -44,7 +44,13 @@
            and (
              (
                _moon_service_preview_storage_current_nfs_source_matches
-               and _moon_service_preview_storage_exact_fstab_present
+               and (
+                 _moon_service_preview_storage_exact_fstab_present
+                 or (
+                   _moon_service_preview_storage_previous_fstab_present
+                   | default(false)
+                 )
+               )
                and _moon_service_preview_storage_automount_before.rc == 0
                and 'vers=4.1' in _moon_service_preview_storage_current_nfs_options
                and 'proto=tcp' in _moon_service_preview_storage_current_nfs_options
@@ -59,7 +65,13 @@
              or (
                _moon_service_preview_storage_nfs_records | length == 0
                and _moon_service_preview_storage_autofs_records | length == 1
-               and _moon_service_preview_storage_exact_fstab_present
+               and (
+                 _moon_service_preview_storage_exact_fstab_present
+                 or (
+                   _moon_service_preview_storage_previous_fstab_present
+                   | default(false)
+                 )
+               )
                and _moon_service_preview_storage_automount_before.rc == 0
              )
            )

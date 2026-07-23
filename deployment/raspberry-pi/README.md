@@ -208,8 +208,9 @@ Add `--ask-become-pass` to the apply command when the bootstrap account needs
 it. The role installs the NFS client without allowing package installation
 to start services, rejects a pre-existing active `rpcbind`, and masks both the
 service and socket. It manages an NFS 4.1 TCP hard mount through a systemd
-automount. Access mounts it on demand; ten idle minutes unmount it while the
-automount remains ready.
+automount. Access mounts it on demand. After first access, the NFS layer may
+stay mounted until an explicit unmount or shutdown; the persistent automount
+keeps boot independent of NAS availability and remains ready across reboot.
 
 Run the following only on the Pi. Treat the whole diagnostic block as private
 local output because mount and systemd status can reveal the NFS source. Do not
@@ -220,8 +221,6 @@ sudo findmnt --target /mnt/moon-service-preview \
   --output TARGET,SOURCE,FSTYPE,OPTIONS
 systemctl status 'mnt-moon\x2dservice\x2dpreview.automount'
 systemctl status 'mnt-moon\x2dservice\x2dpreview.mount'
-systemctl show 'mnt-moon\x2dservice\x2dpreview.automount' \
-  --property=TimeoutIdleUSec
 systemctl show 'mnt-moon\x2dservice\x2dpreview.mount' \
   --property=ReadWriteOnly --property=TimeoutUSec
 systemctl is-enabled rpcbind.service rpcbind.socket
@@ -232,15 +231,14 @@ sudo ss -H -lntup '( sport = :111 )'
 `findmnt` must report the exact configured source and target, NFS or NFS4,
 `vers=4.1`, `proto=tcp`, `rw`, `hard`, `nosuid`, `nodev`, and `noexec`, with no
 `ro` or `soft`. The root-owned fstab entry also holds `_netdev`, `nofail`,
-`x-systemd.rw-only`, `x-systemd.automount`, the 600-second idle timeout, and the
-30-second mount timeout; these systemd properties are not kernel mount flags.
-The generated units must report `TimeoutIdleUSec=10min`,
-`ReadWriteOnly=yes`, and `TimeoutUSec=30s`.
+`x-systemd.rw-only`, `x-systemd.automount`, and the 30-second mount timeout;
+these systemd properties are not kernel mount flags. The generated mount unit
+must report `ReadWriteOnly=yes` and `TimeoutUSec=30s`.
 Both `rpcbind` units must be masked and inactive, and the `ss` command must
-print no TCP or UDP port 111 listener on IPv4 or IPv6. After ten minutes without
-access, the mount unit may be inactive while the automount unit stays active.
-Run the apply command again; an unchanged host must finish with `changed=0` as
-the idempotence check.
+print no TCP or UDP port 111 listener on IPv4 or IPv6. Continued NFS attachment
+after first access is expected and does not fail validation. Run the apply
+command again; an unchanged host must finish with `changed=0` as the
+idempotence check.
 
 The role fails closed on an unconfirmed prerequisite, invalid endpoint, wrong
 existing mount, nonempty local mount-point directory, or active portmapper.
