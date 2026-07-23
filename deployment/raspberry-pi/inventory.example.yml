@@ -22,3 +22,7 @@ all:
       moon_service_preview_storage_confirm_root_squash: false
       moon_service_preview_storage_confirm_sync: false
       moon_service_preview_storage_confirm_trusted_lan: false
+      # Optional pull-request preview runtime assets. This only renders the
+      # disabled local Compose project and installs its root-only control
+      # helper. It does not select a candidate or start containers.
+      moon_service_preview_runtime_enabled: false

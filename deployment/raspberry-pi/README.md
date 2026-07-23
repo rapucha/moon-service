@@ -255,6 +255,97 @@ and trusted-LAN confirmations. It cannot prove NAS ACLs, routing,
 preview PostgreSQL UID can write its required database subtree; the preview
 runtime issue owns that separate preparation and writeability test.
 
+### Optional pull-request preview runtime
+
+Issue [#200](https://github.com/rapucha/moon-service/issues/200) adds a second
+disabled playbook for one manual pull-request preview. `site.yml` does not
+include it, and it starts no boot service or timer. The preview listens only on
+the primary LAN address at port `8081`; PostgreSQL has no host port.
+
+First have the NAS operator create `/mnt/moon-service-preview/postgres` as
+numeric owner `999:999` under the existing `root_squash` export. Preview data
+is disposable and may include tester notes, city-level locations, opportunity
+context, and timestamps. There is no backup or recovery promise. Keep the NFS
+endpoint, credentials, feedback, locations, and host diagnostics off GitHub.
+
+After storage is active, set `moon_service_preview_runtime_enabled: true` only
+in ignored inventory, then install the source-free assets and control helper:
+
+```bash
+ansible-playbook preview-runtime.yml --syntax-check
+ansible-playbook preview-runtime.yml --diff
+```
+
+This renders no credential or candidate and starts nothing. For a CI-green
+same-repository PR, the owner manually dispatches `publish-pr-preview` and uses
+its PR number, full revision, and digest. Require four CPUs and 4 GiB memory:
+
+```bash
+nproc
+grep -E '^(MemTotal|MemAvailable|SwapTotal|SwapFree):' /proc/meminfo
+sudo moon-service-control revision
+sudo moon-service-preview-control start \
+  REPLACE_WITH_PR_NUMBER REPLACE_WITH_40_CHARACTER_REVISION \
+  sha256:REPLACE_WITH_64_HEXADECIMAL_CHARACTERS
+sudo moon-service-preview-control status
+```
+
+`start` pulls only the fixed Moon Service repository at that digest, validates
+ARM64 and revision identity, checks the exact NFS mount and a bounded
+UID/GID-`999:999` create/remove probe, and then starts both containers. It makes
+root-only credentials once. A same-PR update retains credentials and data; a
+different PR is refused while identity or data remains.
+
+Verify the exact revision, representative lookup, and hosted-alpha surface
+from the trusted LAN:
+
+```bash
+curl --fail 'http://REPLACE_WITH_PI_LAN_ADDRESS:8081/readyz'
+curl --fail \
+  'http://REPLACE_WITH_PI_LAN_ADDRESS:8081/api/opportunities?q=REPLACE_WITH_TEST_CITY'
+curl --fail \
+  'http://REPLACE_WITH_PI_LAN_ADDRESS:8081/api/calibration-feedback/v1/capability'
+curl --silent --output /dev/null --write-out '%{http_code}\n' \
+  'http://REPLACE_WITH_PI_LAN_ADDRESS:8081/healthz'
+```
+
+Require the requested revision, a successful lookup, enabled/available
+feedback, and a `404` from `/healthz`. As the bootstrap administrator, use
+`docker inspect` to confirm the Compose users, limits, read-only filesystems,
+capabilities, privilege setting, tmpfs, logs, networks, exact application
+binding, and absent PostgreSQL host binding.
+
+For the database-loss check, stop only PostgreSQL. The application must stay
+running and usable, feedback must become unavailable, and `/healthz` stay `404`:
+
+```bash
+sudo docker stop moon-service-preview-postgres
+```
+
+Restart with the same control-helper `start` command. Before a same-PR update,
+record a disposable database marker and feedback row; verify both remain
+afterward. A failed candidate leaves the preview stopped with data and secrets.
+
+`stop` removes preview containers and networks but retains identity, secrets,
+and data. Replacing it with another pull request requires three explicit
+commands. `purge` is destructive and cannot be undone:
+
+```bash
+sudo moon-service-preview-control stop
+sudo moon-service-preview-control purge --confirm
+```
+
+Then use `start` with the other PR. Purge rechecks the mount and path, empties
+but never removes the prepared subtree, and removes only preview credentials
+and state. If NFS or initial PostgreSQL startup fails, the application starts
+without persistence, status reports `degraded`, and `start` returns nonzero.
+Partial first initialization records `purge-required`; stop, repair, and purge.
+
+During the controlled simultaneous production/preview run, repeat production
+readiness and representative requests. Require 512 MiB `MemAvailable`, no swap
+increase or OOM kill, and the configured quotas. Stop the preview afterward;
+issue #201 owns later polling, boot restore, expiry, replacement, and cleanup.
+
 ## Provision the Pi
 
 The first production-provisioning mutation is intentionally a coordinated
