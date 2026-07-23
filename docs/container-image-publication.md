@@ -60,63 +60,36 @@ continues only when both the original actor and the triggering actor are
 `rapucha` and the workflow itself comes from `main`. It does not run
 automatically for pull requests.
 
-Trusted default-branch code first requires an open, same-repository pull
-request whose base is `main`. It resolves the exact full head revision and
-requires the newest matching attempt of the existing pull-request test workflow
-to be complete. Exactly one `Backend tests`, `Frontend tests`, and `Deployment
-tests` job must have succeeded. A newer pending or failed attempt cannot be
-hidden by an older success.
+The workflow requires an open, same-repository pull request whose base is
+`main`. It resolves the full head revision and requires exactly one successful
+`Backend tests`, `Frontend tests`, and `Deployment tests` check from the
+existing test workflow. It checks the live head and checks again before
+publication.
 
-The workflow keeps pull-request execution separate from registry authority:
+The complete workflow is serialized through GitHub's concurrency queue. A
+read-only job checks out the exact head, uses QEMU and Buildx to build and load
+`linux/arm64`, and runs the trusted default-branch smoke test. It saves that
+tested image as an ordinary Docker archive in a one-day Actions artifact.
 
-- The build job has read-only repository access. It checks out only the
-  validated head, keeps no checkout credential, receives no production or host
-  secret, and uses no shared writable Actions build cache.
-- That job builds only `linux/arm64` and runs the trusted default-branch copy of
-  `scripts/smoke_container_image.sh` against the result.
-- When a build is needed, only the OCI image archive and a machine-readable
-  expected identity cross the one-day Actions artifact boundary. The artifact
-  name identifies its workflow run and attempt.
-- A separate read-only job revalidates the open pull request and exact head
-  after the build. The package-write job cannot start unless this check passes.
-- After the package-write job acquires the shared queue, trusted code validates
-  the pull request, head, and required CI again before it accesses GHCR.
-- The package-write job trusts the validation outputs, not identity claims in
-  the archive. It strictly inspects the archive and does not run the image,
-  pull-request source, or another pull-request-controlled command.
-
-Preview publication uses only the existing public package and these reserved
-tags:
+The second job downloads the exact artifact, loads it, and verifies its
+platform, source, and revision with standard Docker inspection. Only this job
+receives the repository-scoped `GITHUB_TOKEN` with `packages: write`. It does
+not run the image. It uses standard Docker tag and push commands for these
+reserved references in the existing public package:
 
 ```text
 ghcr.io/rapucha/moon-service:preview-pr-<number>-<full-sha>
 ghcr.io/rapucha/moon-service:preview
 ```
 
-The immutable tag points to a one-platform OCI index for `linux/arm64`. Its
-source and revision identify the validated pull-request head. Trusted index
-annotations also record the workflow run and attempt that first published it.
-The moving `preview` tag points to the same verified index digest.
+Both tags must resolve to the same remote manifest digest after publication.
+The job summary records the pull-request number, full revision, revision-scoped
+reference, and digest for manual deployment.
 
-If the immutable tag already exists, the workflow validates its platform,
-source, revision, child digest, and first-producer metadata. An exact match is
-reused without rebuilding or overwriting it. A mismatch fails closed. Reuse
-keeps the original producer run and attempt; a later rerun does not make an old
-immutable image a newer channel candidate.
-
-Channel updates use GitHub's maximum concurrency queue. One package-write job
-runs at a time, and up to 100 jobs can wait without replacing another pending
-job. GitHub may cancel arrivals beyond that service limit. Because build
-completion order can differ from dispatch order, the workflow compares the
-producer workflow run number and attempt before it moves `preview`. It refuses
-to replace a newer channel, including when a later rerun tries to reuse an
-older immutable image.
-
-Only the publication job receives the repository-scoped, short-lived
-`GITHUB_TOKEN` with `packages: write`. GitHub cannot limit this token to a tag
-prefix, so trusted workflow code constructs and enforces both preview tags. The
-workflow must not change `main`, a production full-revision tag, or another
-package tag.
+GHCR tags are mutable. A deliberate rerun may replace the revision-scoped tag,
+and the last successful serialized publication sets `preview`. The reported
+digest, not either tag, is the immutable deployment identity. This manual
+workflow is intended for deliberate, low-volume use.
 
 The actor, triggering-actor, dispatch-ref, and workflow-ref checks protect
 normal use of the canonical workflow. They do not enforce an owner-only
@@ -129,14 +102,16 @@ less-trusted principal or giving preview images access to sensitive data or
 credentials. [Issue #203](https://github.com/rapucha/moon-service/issues/203)
 owns the decision about stronger enforcement.
 
-The successful job summary records the pull-request number, full revision,
-immutable reference, and digest for manual deployment. This workflow does not
-create a GitHub Deployment or contact the Raspberry Pi.
-
-The one-day Actions artifact expires automatically. This workflow does not
-delete GHCR package versions. Dispatch should remain deliberate and low-volume
-until [#201](https://github.com/rapucha/moon-service/issues/201) adds routine
-preview replacement, expiry, and package retention.
+The ordinary archive is trusted under that same repository-writer model. The
+workflow has no custom OCI parser, registry client, immutable-tag protocol, or
+producer-ordering protocol. It does not create a GitHub Deployment, contact the
+Raspberry Pi, or delete GHCR package versions. Issues
+[#200](https://github.com/rapucha/moon-service/issues/200) and
+[#201](https://github.com/rapucha/moon-service/issues/201) must be revised and
+freshly reviewed against this contract before they consume this digest or add
+preview replacement, expiry, or package retention. They must accept that a
+standard single-platform push can produce an image-manifest digest rather than
+an OCI index digest.
 
 ## Image Identity
 
