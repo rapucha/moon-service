@@ -134,10 +134,18 @@ class FeedbackPersistenceConfigurationTest {
 
         assertThat(migration).isNotNull();
         assertThat(migration.getPoolName()).isEqualTo("moon-feedback-migration");
-        assertThat(migration.getConnectionTimeout()).isEqualTo(15_000);
+        assertThat(migration.getConnectionTimeout()).isEqualTo(30_000);
+        assertThat(migration.getValidationTimeout()).isEqualTo(2_000);
+        assertThat(migration.getDataSourceProperties())
+                .containsEntry("connectTimeout", "5")
+                .containsEntry("socketTimeout", "10");
         assertThat(active).isNotNull();
         assertThat(active.getPoolName()).isEqualTo("moon-feedback");
-        assertThat(active.getConnectionTimeout()).isEqualTo(1_000);
+        assertThat(active.getConnectionTimeout()).isEqualTo(10_000);
+        assertThat(active.getValidationTimeout()).isEqualTo(2_000);
+        assertThat(active.getDataSourceProperties())
+                .containsEntry("connectTimeout", "5")
+                .containsEntry("socketTimeout", "10");
     }
 
     @Test

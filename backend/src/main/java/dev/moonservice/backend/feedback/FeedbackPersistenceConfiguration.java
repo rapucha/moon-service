@@ -13,8 +13,11 @@ import org.springframework.context.annotation.Configuration;
 class FeedbackPersistenceConfiguration {
     private static final int DEFAULT_CAPACITY = 2_000;
     private static final int MAXIMUM_CAPACITY = 2_000;
-    private static final long MIGRATION_CONNECTION_TIMEOUT_MILLIS = 15_000;
-    private static final long RUNTIME_CONNECTION_TIMEOUT_MILLIS = 1_000;
+    private static final long MIGRATION_CONNECTION_TIMEOUT_MILLIS = 30_000;
+    private static final long RUNTIME_CONNECTION_TIMEOUT_MILLIS = 10_000;
+    private static final long CONNECTION_VALIDATION_TIMEOUT_MILLIS = 2_000;
+    private static final String DRIVER_CONNECT_TIMEOUT_SECONDS = "5";
+    private static final String DRIVER_SOCKET_TIMEOUT_SECONDS = "10";
 
     @Bean(destroyMethod = "close")
     CalibrationFeedbackRepository calibrationFeedbackRepository(PersistenceProperties properties) {
@@ -75,10 +78,10 @@ class FeedbackPersistenceConfiguration {
         config.setMaximumPoolSize(2);
         config.setMinimumIdle(0);
         config.setConnectionTimeout(connectionTimeoutMillis);
-        config.setValidationTimeout(750);
+        config.setValidationTimeout(CONNECTION_VALIDATION_TIMEOUT_MILLIS);
         config.setInitializationFailTimeout(-1);
-        config.addDataSourceProperty("connectTimeout", "3");
-        config.addDataSourceProperty("socketTimeout", "5");
+        config.addDataSourceProperty("connectTimeout", DRIVER_CONNECT_TIMEOUT_SECONDS);
+        config.addDataSourceProperty("socketTimeout", DRIVER_SOCKET_TIMEOUT_SECONDS);
         return config;
     }
 
