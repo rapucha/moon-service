@@ -1,0 +1,79 @@
+---
+- name: Validate the supported preview-runtime host boundary
+  ansible.builtin.assert:
+    that:
+      - ansible_facts.distribution == "Debian"
+      - ansible_facts.distribution_major_version == "13"
+      - ansible_facts.distribution_release == "trixie"
+      - ansible_facts.architecture == "aarch64"
+    fail_msg: >-
+      The preview runtime supports Raspberry Pi OS Lite 64-bit based on
+      Debian 13 (Trixie) on ARM64 only.
+
+- name: Record the host primary IPv4 address
+  ansible.builtin.set_fact:
+    _moon_service_preview_primary_ipv4_address: >-
+      {{ (ansible_facts.default_ipv4 | default({})).address | default('') }}
+
+- name: Require the exact primary IPv4 preview listener
+  ansible.builtin.assert:
+    that:
+      - moon_service_bind_address is defined
+      - moon_service_bind_address is string
+      - >-
+        moon_service_bind_address
+        is match('^(?:[0-9]{1,3}\.){3}[0-9]{1,3}$')
+      - moon_service_bind_address != '127.0.0.1'
+      - moon_service_bind_address != '0.0.0.0'
+      - >-
+        moon_service_bind_address
+        == _moon_service_preview_primary_ipv4_address
+    fail_msg: >-
+      moon_service_bind_address must equal this host's active primary IPv4
+      address. Wildcard, loopback, and secondary-interface listeners are not
+      accepted.
+
+- name: Create fixed local preview-runtime directories
+  ansible.builtin.file:
+    path: "{{ item.path }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "{{ item.mode }}"
+  loop:
+    - path: /etc/moon-service-preview
+      mode: "0700"
+    - path: /opt/moon-service-preview
+      mode: "0755"
+    - path: /var/lib/moon-service-preview
+      mode: "0700"
+
+- name: Render the source-free preview application environment
+  ansible.builtin.template:
+    src: application.env.j2
+    dest: /etc/moon-service-preview/application.env
+    owner: root
+    group: root
+    mode: "0600"
+  no_log: true
+  diff: false
+
+- name: Render the fixed preview Compose project
+  ansible.builtin.template:
+    src: compose.yml.j2
+    dest: /opt/moon-service-preview/compose.yml
+    owner: root
+    group: root
+    mode: "0600"
+  no_log: true
+  diff: false
+
+- name: Install the root-only preview control helper
+  ansible.builtin.copy:
+    src: moon-service-preview-control
+    dest: /usr/local/sbin/moon-service-preview-control
+    owner: root
+    group: root
+    mode: "0700"
+  no_log: true
+  diff: false

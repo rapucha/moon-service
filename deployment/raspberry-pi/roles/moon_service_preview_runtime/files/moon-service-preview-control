@@ -1,0 +1,438 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+
+umask 077
+export PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+
+readonly STATE_DIR=/var/lib/moon-service-preview
+readonly MOUNT_POINT=/mnt/moon-service-preview
+readonly DATA_DIR=/mnt/moon-service-preview/postgres
+readonly APP_CONTAINER=moon-service-preview-app
+readonly CURRENT_STATE="$STATE_DIR/current.env"
+readonly DEGRADED_STATE="$STATE_DIR/degraded.env"
+readonly PURGE_REQUIRED="$STATE_DIR/purge-required"
+readonly ADMIN_TOKEN_FILE=/etc/moon-service-preview/admin-token
+readonly DATABASE_PASSWORD_FILE=/etc/moon-service-preview/database-password
+readonly APP_ADMIN_TOKEN_FILE=/etc/moon-service-preview/app-admin-token
+readonly APP_DATABASE_PASSWORD_FILE=/etc/moon-service-preview/app-database-password
+readonly POSTGRES_DATABASE_PASSWORD_FILE=/etc/moon-service-preview/postgres-database-password
+
+log() {
+    printf '%s moon-service-preview: %s\n' "$(/usr/bin/date -u +%Y-%m-%dT%H:%M:%SZ)" "$*"
+}
+
+usage() {
+    printf 'Usage: %s start <pull-request> <revision> <digest>\n' "$0" >&2
+    printf '       %s {status|stop}\n' "$0" >&2
+    printf '       %s purge --confirm\n' "$0" >&2
+    exit 64
+}
+
+die() {
+    local status="$1"
+    shift
+    log "$*"
+    exit "$status"
+}
+
+state_value() {
+    local file="$1" key="$2"
+    /usr/bin/awk -F= -v wanted="$key" \
+        '$1 == wanted { sub(/^[^=]*=/, ""); print; exit }' "$file"
+}
+
+valid_state() {
+    local file="$1" pull_request revision digest
+    [[ -f "$file" ]] || return 1
+    pull_request="$(state_value "$file" MOON_PREVIEW_PULL_REQUEST)"
+    revision="$(state_value "$file" MOON_PREVIEW_IMAGE_REVISION)"
+    digest="$(state_value "$file" MOON_PREVIEW_IMAGE_DIGEST)"
+    [[ "$pull_request" =~ ^[1-9][0-9]*$ ]] || return 1
+    [[ "$revision" =~ ^[0-9a-f]{40}$ ]] || return 1
+    [[ "$digest" =~ ^sha256:[0-9a-f]{64}$ ]] || return 1
+}
+
+write_state() {
+    local target="$1" pull_request="$2" revision="$3" digest="$4" temporary
+    temporary="$(/usr/bin/mktemp "$STATE_DIR/.identity.XXXXXXXX")"
+    {
+        printf 'MOON_PREVIEW_IMAGE_DIGEST=%s\n' "$digest"
+        printf 'MOON_PREVIEW_IMAGE_REVISION=%s\n' "$revision"
+        printf 'MOON_PREVIEW_PULL_REQUEST=%s\n' "$pull_request"
+    } >"$temporary"
+    /usr/bin/chmod 0600 "$temporary"
+    /usr/bin/mv -f "$temporary" "$target"
+}
+
+mark_purge_required() {
+    /usr/bin/install -o root -g root -m 0600 /dev/null "$PURGE_REQUIRED"
+}
+
+write_secret() {
+    local target="$1" temporary value
+    value="$(/usr/bin/openssl rand -hex 32)"
+    [[ "$value" =~ ^[0-9a-f]{64}$ ]] || return 1
+    temporary="$(/usr/bin/mktemp "${target%/*}/.secret.XXXXXXXX")"
+    printf '%s\n' "$value" >"$temporary"
+    /usr/bin/chmod 0600 "$temporary"
+    /usr/bin/mv -f "$temporary" "$target"
+}
+
+install_secret_copy() {
+    local source="$1" target="$2" owner="$3"
+    [[ "$(<"$source")" =~ ^[0-9a-f]{64}$ ]] \
+        && /usr/bin/install -o "$owner" -g "$owner" -m 0400 -T "$source" "$target"
+}
+
+ensure_secrets() {
+    [[ -f "$ADMIN_TOKEN_FILE" ]] || write_secret "$ADMIN_TOKEN_FILE"
+    [[ -f "$DATABASE_PASSWORD_FILE" ]] || write_secret "$DATABASE_PASSWORD_FILE"
+    install_secret_copy "$ADMIN_TOKEN_FILE" "$APP_ADMIN_TOKEN_FILE" 10001 \
+        && install_secret_copy "$DATABASE_PASSWORD_FILE" "$APP_DATABASE_PASSWORD_FILE" 10001 \
+        && install_secret_copy "$DATABASE_PASSWORD_FILE" "$POSTGRES_DATABASE_PASSWORD_FILE" 999
+}
+
+compose() {
+    /usr/bin/timeout --signal=TERM --kill-after=5s 180s \
+        /usr/bin/docker compose \
+        --project-name moon-service-preview \
+        --file /opt/moon-service-preview/compose.yml \
+        --env-file "$1" "${@:2}"
+}
+
+option_present() {
+    [[ ",$1," == *",$2,"* ]]
+}
+
+as_database_user() {
+    /usr/bin/timeout --signal=TERM --kill-after=5s "$1" /usr/bin/setpriv --reuid=999 --regid=999 --clear-groups "${@:2}"
+}
+
+nfs_preflight() {
+    local fstab_records expected_source target fstype options dump pass
+    local mount_json resolved probe probe_identity
+    fstab_records="$(
+        /usr/bin/awk -v target="$MOUNT_POINT" '
+            $0 !~ /^[[:space:]]*(#|$)/ && $2 == target { print }
+        ' /etc/fstab
+    )"
+    [[ -n "$fstab_records" && "$fstab_records" != *$'\n'* ]] || return 1
+    read -r expected_source target fstype options dump pass <<<"$fstab_records"
+    [[ -n "$expected_source" && "$target" == "$MOUNT_POINT" && "$fstype" == nfs ]] || return 1
+    option_present "$options" vers=4.1 || return 1
+    option_present "$options" proto=tcp || return 1
+    option_present "$options" rw || return 1
+    option_present "$options" hard || return 1
+    ! option_present "$options" ro || return 1
+    ! option_present "$options" soft || return 1
+
+    /usr/bin/timeout --signal=TERM --kill-after=5s 35s /usr/bin/stat --format=%d "$MOUNT_POINT/." >/dev/null 2>&1 || return 1
+    mount_json="$(
+        /usr/bin/findmnt --json --all --mountpoint "$MOUNT_POINT" \
+            --types nfs,nfs4 --output SOURCE,TARGET,FSTYPE,OPTIONS 2>/dev/null
+    )" || return 1
+    /usr/bin/jq -e --arg source "$expected_source" --arg target "$MOUNT_POINT" '
+        (.filesystems // []) as $records
+        | ($records | length) == 1
+        and $records[0].source == $source
+        and $records[0].target == $target
+        and ($records[0].fstype == "nfs" or $records[0].fstype == "nfs4")
+        and ($records[0].options | split(",") | index("vers=4.1") != null)
+        and ($records[0].options | split(",") | index("proto=tcp") != null)
+        and ($records[0].options | split(",") | index("rw") != null)
+        and ($records[0].options | split(",") | index("hard") != null)
+        and ($records[0].options | split(",") | index("ro") == null)
+        and ($records[0].options | split(",") | index("soft") == null)
+    ' <<<"$mount_json" >/dev/null || return 1
+
+    /usr/bin/timeout --signal=TERM --kill-after=5s 10s /usr/bin/test -d "$DATA_DIR" -a ! -L "$DATA_DIR" || return 1
+    resolved="$(/usr/bin/timeout --signal=TERM --kill-after=5s 10s /usr/bin/realpath -e -- "$DATA_DIR")" || return 1
+    [[ "$resolved" == "$DATA_DIR" ]] || return 1
+    [[ "$(/usr/bin/timeout --signal=TERM --kill-after=5s 10s /usr/bin/stat -c '%u:%g' "$DATA_DIR")" == 999:999 ]] || return 1
+    probe="$(as_database_user 10s /usr/bin/mktemp \
+        "$DATA_DIR/.moon-preview-probe.XXXXXXXX")" || return 1
+    probe_identity="$(as_database_user 10s /usr/bin/stat -c '%u:%g:%s' "$probe" 2>/dev/null || true)"
+    if [[ "$probe_identity" != 999:999:0 ]]; then
+        as_database_user 10s /usr/bin/rm -f -- "$probe" 2>/dev/null || true
+        return 1
+    fi
+    as_database_user 10s /usr/bin/rm -- "$probe"
+}
+
+data_has_entries() {
+    local entry
+    entry="$(as_database_user 10s /usr/bin/find \
+        "$DATA_DIR" -mindepth 1 -maxdepth 1 -print -quit)" || return 0
+    [[ -n "$entry" ]]
+}
+
+image_is_valid() {
+    local revision="$1" digest="$2" reference inspect_json
+    reference="ghcr.io/rapucha/moon-service@$digest"
+    /usr/bin/timeout --signal=TERM --kill-after=5s 180s \
+        /usr/bin/docker pull "$reference" >/dev/null || return 1
+    inspect_json="$(/usr/bin/timeout 20s /usr/bin/docker image inspect "$reference" 2>/dev/null)" || return 1
+    /usr/bin/jq -e --arg revision "$revision" --arg source "https://github.com/rapucha/moon-service" '
+        length == 1
+        and .[0].Os == "linux"
+        and .[0].Architecture == "arm64"
+        and .[0].Config.Labels["org.opencontainers.image.source"] == $source
+        and .[0].Config.Labels["org.opencontainers.image.revision"] == $revision
+        and (.[0].Config.Env | index("MOON_BUILD_REVISION=" + $revision) != null)
+    ' <<<"$inspect_json" >/dev/null
+}
+
+wait_healthy() {
+    local container="$1" timeout_seconds="$2" deadline status health
+    deadline=$((SECONDS + timeout_seconds))
+    while true; do
+        status="$(
+            /usr/bin/timeout 20s /usr/bin/docker inspect \
+                --format '{{.State.Status}}' "$container" 2>/dev/null || true
+        )"
+        health="$(
+            /usr/bin/timeout 20s /usr/bin/docker inspect \
+                --format '{{if .State.Health}}{{.State.Health.Status}}{{end}}' \
+                "$container" 2>/dev/null || true
+        )"
+        [[ "$status" == running && "$health" == healthy ]] && return 0
+        (( SECONDS >= deadline )) && return 1
+        /usr/bin/sleep 2
+    done
+}
+
+app_ready() {
+    local revision="$1" inspect_json host_ip host_port primary_ip response
+    wait_healthy "$APP_CONTAINER" 180 || return 1
+    inspect_json="$(/usr/bin/timeout 20s /usr/bin/docker inspect "$APP_CONTAINER" 2>/dev/null)" || return 1
+    host_ip="$(/usr/bin/jq -er '.[0].HostConfig.PortBindings["8080/tcp"][0].HostIp' \
+        <<<"$inspect_json")" || return 1
+    host_port="$(/usr/bin/jq -er '.[0].HostConfig.PortBindings["8080/tcp"][0].HostPort' \
+        <<<"$inspect_json")" || return 1
+    primary_ip="$(
+        /usr/sbin/ip -4 route get 1.1.1.1 2>/dev/null \
+            | /usr/bin/awk '{ for (i=1; i<=NF; i++) if ($i == "src") { print $(i+1); exit } }'
+    )"
+    [[ "$host_ip" == "$primary_ip" && "$host_port" == 8081 ]] || return 1
+    response="$(
+        /usr/bin/curl --fail --silent --show-error --noproxy '*' --max-time 3 \
+            "http://$host_ip:$host_port/readyz" 2>/dev/null
+    )" || return 1
+    /usr/bin/jq -e --arg revision "$revision" \
+        '.status == "ok" and .revision == $revision' <<<"$response" >/dev/null
+}
+
+feedback_has_availability() {
+    local expected="$1" inspect_json host_ip response
+    inspect_json="$(/usr/bin/timeout 20s /usr/bin/docker inspect "$APP_CONTAINER" 2>/dev/null)" || return 1
+    host_ip="$(/usr/bin/jq -er '.[0].HostConfig.PortBindings["8080/tcp"][0].HostIp' \
+        <<<"$inspect_json")" || return 1
+    response="$(
+        /usr/bin/curl --fail --silent --show-error --noproxy '*' --max-time 3 \
+            "http://$host_ip:8081/api/calibration-feedback/v1/capability" 2>/dev/null
+    )" || return 1
+    /usr/bin/jq -e --arg expected "$expected" '
+        .featureState == "enabled" and .submissionAvailability == $expected
+    ' <<<"$response" >/dev/null
+}
+
+containers_exist() {
+    /usr/bin/timeout 20s /usr/bin/docker inspect "$APP_CONTAINER" >/dev/null 2>&1 \
+        || /usr/bin/timeout 20s /usr/bin/docker inspect moon-service-preview-postgres >/dev/null 2>&1
+}
+
+remove_preview() {
+    compose "$1" down --remove-orphans >/dev/null || die 69 "preview cleanup failed"
+    ! containers_exist || die 69 "preview containers remain after cleanup"
+}
+
+select_state() {
+    if valid_state "$CURRENT_STATE"; then
+        printf '%s\n' "$CURRENT_STATE"
+    elif valid_state "$DEGRADED_STATE"; then
+        printf '%s\n' "$DEGRADED_STATE"
+    else
+        return 1
+    fi
+}
+
+start_degraded_app() {
+    local state_file="$1" revision="$2"
+    compose "$state_file" up --detach --no-deps --pull never app >/dev/null || return 1
+    app_ready "$revision" && feedback_has_availability unavailable
+}
+
+start_action() {
+    local pull_request="$1" revision="$2" digest="$3"
+    local existing_state="" existing_pull="" running_database="" had_current=false
+    [[ "$pull_request" =~ ^[1-9][0-9]*$ ]] || die 65 "refusing invalid pull-request number"
+    [[ "$revision" =~ ^[0-9a-f]{40}$ ]] || die 65 "refusing invalid revision"
+    [[ "$digest" =~ ^sha256:[0-9a-f]{64}$ ]] || die 65 "refusing invalid digest"
+    [[ ! -e "$PURGE_REQUIRED" ]] || die 65 "preview requires confirmed purge before start"
+
+    if [[ -e "$CURRENT_STATE" && ! -f "$CURRENT_STATE" ]] \
+        || [[ -e "$DEGRADED_STATE" && ! -f "$DEGRADED_STATE" ]]; then
+        mark_purge_required
+        die 65 "preview identity state is invalid; confirmed purge is required"
+    fi
+    if valid_state "$CURRENT_STATE"; then
+        existing_state="$CURRENT_STATE"
+        had_current=true
+    elif valid_state "$DEGRADED_STATE"; then
+        existing_state="$DEGRADED_STATE"
+    elif [[ -e "$CURRENT_STATE" || -e "$DEGRADED_STATE" ]]; then
+        mark_purge_required
+        die 65 "preview identity state is invalid; confirmed purge is required"
+    fi
+    if [[ -n "$existing_state" ]]; then
+        existing_pull="$(state_value "$existing_state" MOON_PREVIEW_PULL_REQUEST)"
+        [[ "$existing_pull" == "$pull_request" ]] \
+            || die 65 "another pull request owns the slot; stop and purge it first"
+    fi
+    image_is_valid "$revision" "$digest" \
+        || die 69 "candidate image did not satisfy the preview contract"
+    if [[ -z "$existing_state" ]] && { [[ -e "$ADMIN_TOKEN_FILE" \
+        || -e "$DATABASE_PASSWORD_FILE" || -e "$APP_ADMIN_TOKEN_FILE" \
+        || -e "$APP_DATABASE_PASSWORD_FILE" \
+        || -e "$POSTGRES_DATABASE_PASSWORD_FILE" ]] || containers_exist; }; then
+        mark_purge_required
+        die 65 "unowned preview state requires local inspection and confirmed purge"
+    fi
+
+    if ! nfs_preflight; then
+        [[ "$had_current" == false ]] \
+            || die 69 "NFS preflight failed; the current preview was left unchanged"
+        ensure_secrets || die 70 "preview secrets could not be prepared"
+        write_state "$DEGRADED_STATE" "$pull_request" "$revision" "$digest"
+        if start_degraded_app "$DEGRADED_STATE" "$revision"; then
+            log "application is ready without database persistence; repair NFS and restart"
+        else
+            remove_preview "$DEGRADED_STATE"
+            die 69 "degraded application did not become ready"
+        fi
+        return 1
+    fi
+
+    if [[ -z "$existing_state" ]] && data_has_entries; then
+        mark_purge_required
+        die 65 "unowned preview data require confirmed purge"
+    fi
+    ensure_secrets || die 70 "preview secrets could not be prepared"
+    if [[ -n "$existing_state" ]] && containers_exist; then
+        compose "$existing_state" down --remove-orphans >/dev/null \
+            || die 69 "current preview could not be stopped"
+    fi
+    write_state "$DEGRADED_STATE" "$pull_request" "$revision" "$digest"
+    /usr/bin/rm -f "$CURRENT_STATE"
+
+    if ! compose "$DEGRADED_STATE" up --detach --no-deps postgres >/dev/null \
+        || ! wait_healthy moon-service-preview-postgres 90; then
+        [[ "$had_current" == true ]] || mark_purge_required
+        compose "$DEGRADED_STATE" stop postgres >/dev/null || die 69 "database cleanup failed"
+        running_database="$(/usr/bin/timeout 20s /usr/bin/docker ps --quiet --filter 'name=^/moon-service-preview-postgres$')" || die 69 "database cleanup could not be verified"
+        [[ -z "$running_database" ]] || die 69 "database remains running after cleanup"
+        [[ "$had_current" == true ]] || data_has_entries || /usr/bin/rm -f "$PURGE_REQUIRED"
+        if start_degraded_app "$DEGRADED_STATE" "$revision"; then
+            log "application is ready but database startup failed"
+        else
+            remove_preview "$DEGRADED_STATE"
+            die 69 "database and degraded application startup failed"
+        fi
+        return 1
+    fi
+
+    if ! compose "$DEGRADED_STATE" up --detach --no-deps --pull never app >/dev/null \
+        || ! app_ready "$revision" \
+        || ! feedback_has_availability available; then
+        remove_preview "$DEGRADED_STATE"
+        [[ "$had_current" == true ]] || mark_purge_required
+        die 69 "candidate application did not become ready; preview remains stopped"
+    fi
+    write_state "$CURRENT_STATE" "$pull_request" "$revision" "$digest"
+    /usr/bin/rm -f "$DEGRADED_STATE" "$PURGE_REQUIRED"
+    log "preview pull request $pull_request is ready at revision $revision"
+}
+
+status_action() {
+    local state_file status=empty pull_request=none revision=none digest=none
+    if [[ -e "$PURGE_REQUIRED" ]]; then
+        status=purge-required
+    elif valid_state "$CURRENT_STATE"; then
+        state_file="$CURRENT_STATE"
+        status=stopped
+        if wait_healthy "$APP_CONTAINER" 0; then
+            status=running
+        fi
+    elif valid_state "$DEGRADED_STATE"; then
+        state_file="$DEGRADED_STATE"
+        status=stopped
+        if wait_healthy "$APP_CONTAINER" 0; then
+            status=degraded
+        fi
+    elif [[ -e "$CURRENT_STATE" || -e "$DEGRADED_STATE" ]] || containers_exist; then
+        status=invalid
+    fi
+    if [[ -n "${state_file:-}" ]]; then
+        pull_request="$(state_value "$state_file" MOON_PREVIEW_PULL_REQUEST)"
+        revision="$(state_value "$state_file" MOON_PREVIEW_IMAGE_REVISION)"
+        digest="$(state_value "$state_file" MOON_PREVIEW_IMAGE_DIGEST)"
+    fi
+    printf 'status=%s\npull_request=%s\nrevision=%s\ndigest=%s\n' "$status" "$pull_request" "$revision" "$digest"
+    [[ "$status" != invalid ]]
+}
+
+stop_action() {
+    local state_file
+    if ! containers_exist; then
+        log "preview is already stopped"
+        return 0
+    fi
+    state_file="$(select_state)" \
+        || die 65 "running preview has no valid identity; inspect it locally"
+    compose "$state_file" down --remove-orphans >/dev/null \
+        || die 69 "preview containers could not be stopped"
+    log "preview is stopped; data and secrets are retained"
+}
+
+purge_action() {
+    containers_exist && die 65 "stop the preview before confirmed purge"
+    nfs_preflight || die 69 "NFS preflight failed; preview data were not changed"
+    as_database_user 60s /usr/bin/find "$DATA_DIR" -mindepth 1 -maxdepth 1 \
+        -exec /usr/bin/rm -rf -- '{}' + \
+        || die 69 "preview data could not be emptied"
+    data_has_entries && die 69 "preview data directory is not empty"
+    /usr/bin/rm -f "$ADMIN_TOKEN_FILE" "$DATABASE_PASSWORD_FILE" "$APP_ADMIN_TOKEN_FILE" "$APP_DATABASE_PASSWORD_FILE" "$POSTGRES_DATABASE_PASSWORD_FILE"
+    /usr/bin/rm -f "$CURRENT_STATE" "$DEGRADED_STATE" "$PURGE_REQUIRED"
+    log "preview data, secrets, and identity were purged"
+}
+
+[[ "$EUID" -eq 0 ]] || die 77 "root privileges are required"
+cd /
+/usr/bin/mkdir -p "$STATE_DIR"
+/usr/bin/chown root:root "$STATE_DIR"
+/usr/bin/chmod 0700 "$STATE_DIR"
+exec 9>"$STATE_DIR/control.lock"
+/usr/bin/flock -w 30 9 || die 75 "another preview operation holds the lock"
+/usr/bin/timeout 20s /usr/bin/docker info >/dev/null 2>&1 || die 69 "Docker is unavailable; no preview action was taken"
+
+case "${1:-}" in
+    start)
+        [[ $# -eq 4 ]] || usage
+        start_action "$2" "$3" "$4"
+        ;;
+    status)
+        [[ $# -eq 1 ]] || usage
+        status_action
+        ;;
+    stop)
+        [[ $# -eq 1 ]] || usage
+        stop_action
+        ;;
+    purge)
+        [[ $# -eq 2 && "$2" == --confirm ]] || usage
+        purge_action
+        ;;
+    *)
+        usage
+        ;;
+esac

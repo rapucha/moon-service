@@ -13,6 +13,11 @@ import org.springframework.context.annotation.Configuration;
 class FeedbackPersistenceConfiguration {
     private static final int DEFAULT_CAPACITY = 2_000;
     private static final int MAXIMUM_CAPACITY = 2_000;
+    private static final long MIGRATION_CONNECTION_TIMEOUT_MILLIS = 30_000;
+    private static final long RUNTIME_CONNECTION_TIMEOUT_MILLIS = 10_000;
+    private static final long CONNECTION_VALIDATION_TIMEOUT_MILLIS = 2_000;
+    private static final String DRIVER_CONNECT_TIMEOUT_SECONDS = "5";
+    private static final String DRIVER_SOCKET_TIMEOUT_SECONDS = "10";
 
     @Bean(destroyMethod = "close")
     CalibrationFeedbackRepository calibrationFeedbackRepository(PersistenceProperties properties) {
@@ -26,12 +31,8 @@ class FeedbackPersistenceConfiguration {
 
         HikariDataSource dataSource = null;
         try {
-            dataSource = new HikariDataSource(hikariConfig(properties));
-            Flyway.configure()
-                    .dataSource(dataSource)
-                    .locations("classpath:db/migration")
-                    .load()
-                    .migrate();
+            migrate(properties);
+            dataSource = new HikariDataSource(activeHikariConfig(properties));
             CalibrationFeedbackRepository repository =
                     new CalibrationFeedbackRepository(dataSource, capacity);
             repository.warnIfNearOrFullAtStartup();
@@ -44,19 +45,43 @@ class FeedbackPersistenceConfiguration {
         }
     }
 
-    private static HikariConfig hikariConfig(PersistenceProperties properties) {
+    private static void migrate(PersistenceProperties properties) {
+        try (HikariDataSource dataSource =
+                     new HikariDataSource(migrationHikariConfig(properties))) {
+            Flyway.configure()
+                    .dataSource(dataSource)
+                    .locations("classpath:db/migration")
+                    .load()
+                    .migrate();
+        }
+    }
+
+    private static HikariConfig migrationHikariConfig(PersistenceProperties properties) {
+        return hikariConfig(
+                properties, "moon-feedback-migration", MIGRATION_CONNECTION_TIMEOUT_MILLIS);
+    }
+
+    private static HikariConfig activeHikariConfig(PersistenceProperties properties) {
+        return hikariConfig(properties, "moon-feedback", RUNTIME_CONNECTION_TIMEOUT_MILLIS);
+    }
+
+    private static HikariConfig hikariConfig(
+            PersistenceProperties properties,
+            String poolName,
+            long connectionTimeoutMillis
+    ) {
         HikariConfig config = new HikariConfig();
-        config.setPoolName("moon-feedback");
+        config.setPoolName(poolName);
         config.setJdbcUrl(properties.normalizedJdbcUrl());
         config.setUsername(properties.normalizedUsername());
         config.setPassword(properties.getPassword());
         config.setMaximumPoolSize(2);
         config.setMinimumIdle(0);
-        config.setConnectionTimeout(1_000);
-        config.setValidationTimeout(750);
+        config.setConnectionTimeout(connectionTimeoutMillis);
+        config.setValidationTimeout(CONNECTION_VALIDATION_TIMEOUT_MILLIS);
         config.setInitializationFailTimeout(-1);
-        config.addDataSourceProperty("connectTimeout", "3");
-        config.addDataSourceProperty("socketTimeout", "5");
+        config.addDataSourceProperty("connectTimeout", DRIVER_CONNECT_TIMEOUT_SECONDS);
+        config.addDataSourceProperty("socketTimeout", DRIVER_SOCKET_TIMEOUT_SECONDS);
         return config;
     }
 

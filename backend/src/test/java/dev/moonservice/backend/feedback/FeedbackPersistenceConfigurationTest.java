@@ -1,5 +1,6 @@
 package dev.moonservice.backend.feedback;
 
+import com.zaxxer.hikari.HikariConfig;
 import dev.moonservice.backend.location.LocationResolver;
 import dev.moonservice.backend.location.openmeteo.TestOpenMeteoLocationResolver;
 import dev.moonservice.backend.weather.TestWeatherForecastProvider;
@@ -20,6 +21,7 @@ import org.springframework.boot.webtestclient.autoconfigure.AutoConfigureWebTest
 import org.springframework.context.ConfigurableApplicationContext;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Primary;
+import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.test.web.reactive.server.WebTestClient;
 
 import javax.sql.DataSource;
@@ -115,6 +117,35 @@ class FeedbackPersistenceConfigurationTest {
                         "moon.feedback.persistence.password=test-only")
                 .run(context -> assertThat(context.getBean(CalibrationFeedbackRepository.class).status())
                         .isInstanceOf(CalibrationFeedbackRepository.RepositoryStatus.Unavailable.class));
+    }
+
+    @Test
+    void migrationAndActivePoolsUseSeparateConnectionDeadlines() {
+        FeedbackPersistenceConfiguration.PersistenceProperties properties =
+                new FeedbackPersistenceConfiguration.PersistenceProperties();
+        properties.setJdbcUrl("jdbc:postgresql://database/feedback");
+        properties.setUsername("feedback");
+        properties.setPassword("test-only");
+
+        HikariConfig migration = ReflectionTestUtils.invokeMethod(
+                FeedbackPersistenceConfiguration.class, "migrationHikariConfig", properties);
+        HikariConfig active = ReflectionTestUtils.invokeMethod(
+                FeedbackPersistenceConfiguration.class, "activeHikariConfig", properties);
+
+        assertThat(migration).isNotNull();
+        assertThat(migration.getPoolName()).isEqualTo("moon-feedback-migration");
+        assertThat(migration.getConnectionTimeout()).isEqualTo(30_000);
+        assertThat(migration.getValidationTimeout()).isEqualTo(2_000);
+        assertThat(migration.getDataSourceProperties())
+                .containsEntry("connectTimeout", "5")
+                .containsEntry("socketTimeout", "10");
+        assertThat(active).isNotNull();
+        assertThat(active.getPoolName()).isEqualTo("moon-feedback");
+        assertThat(active.getConnectionTimeout()).isEqualTo(10_000);
+        assertThat(active.getValidationTimeout()).isEqualTo(2_000);
+        assertThat(active.getDataSourceProperties())
+                .containsEntry("connectTimeout", "5")
+                .containsEntry("socketTimeout", "10");
     }
 
     @Test

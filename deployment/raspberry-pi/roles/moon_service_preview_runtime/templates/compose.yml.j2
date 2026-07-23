@@ -1,0 +1,98 @@
+name: moon-service-preview
+
+services:
+  app:
+    image: "ghcr.io/rapucha/moon-service@${MOON_PREVIEW_IMAGE_DIGEST}"
+    container_name: moon-service-preview-app
+    user: "10001:10001"
+    restart: "no"
+    init: true
+    read_only: true
+    env_file:
+      - /etc/moon-service-preview/application.env
+    ports:
+      - "{{ moon_service_bind_address }}:8081:8080"
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,nodev,size=64m,mode=1777
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    pids_limit: 128
+    mem_limit: 768m
+    cpus: "0.5"
+    labels:
+      dev.moonservice.image-digest: "${MOON_PREVIEW_IMAGE_DIGEST}"
+      dev.moonservice.revision: "${MOON_PREVIEW_IMAGE_REVISION}"
+      dev.moonservice.pull-request: "${MOON_PREVIEW_PULL_REQUEST}"
+    logging:
+      driver: local
+      options:
+        max-size: "10m"
+        max-file: "2"
+    secrets:
+      - source: moon_preview_admin_token
+        target: moon.admin.token
+      - source: moon_preview_database_password
+        target: moon.feedback.persistence.password
+    networks:
+      - outbound
+      - database
+
+  postgres:
+    image: "postgres:18.4-trixie@sha256:3a82e1f56c8f0f5616a11103ac3d47e632c3938698946a7ad26da0df1334744a"
+    container_name: moon-service-preview-postgres
+    user: "999:999"
+    restart: "no"
+    read_only: true
+    environment:
+      POSTGRES_DB: moon_service_preview
+      POSTGRES_USER: moon_service_preview
+      POSTGRES_PASSWORD_FILE: /run/secrets/postgres.password
+    volumes:
+      - type: bind
+        source: /mnt/moon-service-preview/postgres
+        target: /var/lib/postgresql
+        bind:
+          create_host_path: false
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,nodev,size=64m,mode=1777
+      - /var/run/postgresql:rw,noexec,nosuid,nodev,size=16m,mode=1777
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    pids_limit: 128
+    mem_limit: 384m
+    cpus: "0.25"
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - pg_isready --username=moon_service_preview --dbname=moon_service_preview
+      interval: 5s
+      timeout: 3s
+      retries: 20
+      start_period: 10s
+    logging:
+      driver: local
+      options:
+        max-size: "10m"
+        max-file: "2"
+    secrets:
+      - source: moon_preview_postgres_password
+        target: postgres.password
+    networks:
+      - database
+
+networks:
+  outbound: {}
+  database:
+    internal: true
+
+secrets:
+  moon_preview_admin_token:
+    file: /etc/moon-service-preview/app-admin-token
+  moon_preview_database_password:
+    file: /etc/moon-service-preview/app-database-password
+  moon_preview_postgres_password:
+    file: /etc/moon-service-preview/postgres-database-password
