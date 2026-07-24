@@ -51,6 +51,8 @@ answer:
   to test the premise.
 - Existing issues or pull requests that may duplicate, supersede, or own part
   of the work.
+- For ordered delivery or rollout, the required transitions, actors,
+  permissions, artifacts, targets, and post-merge validation gates.
 - The proposed repository change category; expected paths; other paths that may
   be needed and why; an expected ordinary-file count range; informational
   churn; expected code-file sizes; base counts and deltas for existing
@@ -84,7 +86,13 @@ answer:
    unless the user, source authority, or an owner-accepted split authorizes it.
 6. Surface hidden decisions and dependencies, including new runtime components,
    providers, accounts, stored data, privacy obligations, network exposure,
-   deployment or rollback work, CI, and ongoing operations.
+   deployment or rollback work, CI, and ongoing operations. Simulate the
+   required delivery and rollout transitions. For every prerequisite, merge,
+   validation, activation, and next-work gate, name the actor, permission,
+   artifact, and target it needs. Prove each input exists at that point without
+   relying on unrelated ambient work or a later step that the same plan blocks.
+   Treat `A merges -> A validation needs open B -> B cannot start until A
+   validation passes` as a dependency cycle.
 7. Separate owner decisions from implementation details. Do not mark a draft
    ready while a material product, architecture, privacy, cost, or operational
    choice is implicit or unauthorized.
@@ -112,11 +120,13 @@ answer:
 - `ready`: the problem is supported, the smallest standard implementation was
   considered, the scope is coherent, material decisions and criteria are
   explicit and authorized, optional hardening is justified or excluded, and
-  acceptance criteria are testable.
+  acceptance criteria are testable. The required delivery sequence must also
+  be executable and acyclic.
 - `revise`: one coherent issue remains appropriate, but its premise, choices,
   dependencies, boundaries, scope authority, or acceptance criteria need
   correction before it is created or acted upon. Use this verdict when a draft
-  selects an unapproved stricter design or custom protocol client.
+  selects an unapproved stricter design or custom protocol client, contains a
+  dependency cycle, or relies on unavailable or unrelated ambient work.
 - `split_required`: the draft combines independently reviewable outcomes,
   crosses a hard project scope gate, or mixes a prerequisite decision with
   implementation that should not begin before that decision. A documentation
@@ -143,6 +153,12 @@ Ownership and duplication:
 
 Decisions and hidden dependencies:
 - <decision/dependency; owner approval state>
+
+Dependency liveness:
+- Required sequence: <pre-merge, merge, validation, activation, and next-work transitions>
+- Actors and capabilities: <who performs each transition and with which permission>
+- Artifacts and targets: <what each gate needs and when it becomes available>
+- Cycles or ambient dependencies: <list or none>
 
 Acceptance authority:
 - <material criterion> -> <user intent, evidence, correctness/safety need, owner decision, or unsupported>
@@ -191,6 +207,9 @@ project authority before it is created or treated as implementation authority.
 Read `.agents/review-policy.md` before applying its gates or triggers. Do not
 edit files or external state. Challenge the premise, alternatives, hidden
 dependencies, owner decisions, scope authority, YAGNI, and acceptance criteria.
+Simulate the required delivery and rollout transitions. Name each gate's actor,
+permission, artifact, and target. Return revise for a dependency cycle, a
+later-blocked prerequisite, or reliance on unrelated ambient work.
 Start with the smallest standard implementation that matches the user's current
 threat model. Present any materially stricter alternative with its current need,
 tradeoffs, and ongoing maintenance cost. Trace every material criterion to user

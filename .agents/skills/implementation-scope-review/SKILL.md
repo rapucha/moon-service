@@ -60,6 +60,8 @@ answer:
   vendored, or lock-file paths and reproduction information.
 - Existing parent or child issues that may already own part of the scope.
 - The issue-design verdict or summary when project policy required one.
+- For each proposed merge, validation, rollout, or activation gate, the
+  required actor, permission, artifact, target, and availability point.
 
 ## Review Method
 
@@ -116,7 +118,12 @@ answer:
    gates exist, use coherence, reviewability, independent safety, and rollback
    boundaries as heuristics and make the lack of hard gates visible.
 9. Map every acceptance criterion to one proposed PR. Identify dependencies and
-   merge order.
+   merge order. Simulate the pre-merge, merge, post-merge validation,
+   activation, and next-PR transitions. At each gate, prove the required actor,
+   permission, artifact, and target are available without depending on
+   unrelated ambient work or a later slice that the same plan blocks. Treat `A
+   merges -> A validation needs open B -> B cannot start until A validation
+   passes` as an invalid split sequence.
 10. Check that each slice is independently safe and mergeable. Keep unfinished
    capability disabled by default when partial rollout could expose it.
 11. Return exactly one verdict: `single_pr`, `split_required`, or `revise`.
@@ -130,9 +137,18 @@ be recorded through the project's normal workflow.
 Return `revise` when the proposed design has not established proportionality,
 requires an unapproved custom protocol client, converts a hypothetical threat
 into current scope, or materially expands the reviewed forecast through an
-unapproved mechanism or hardening choice. Send an issue premise or authority
-problem back through `$issue-design-review`. Do not use `split_required` to
-preserve an unnecessary design.
+unapproved mechanism or hardening choice. Also return `revise` when the current
+plan blocks an artifact or target required by a later gate, or relies on
+unrelated ambient work. Send an issue premise or authority problem back through
+`$issue-design-review`. Do not use `split_required` to preserve an unnecessary
+design.
+
+Do not approve a plan whose required transitions contain a dependency cycle.
+For a cyclic proposed split, return `split_required` only when existing
+authority permits a corrected, acyclic sequence without changing the accepted
+outcome. Identify any owner decision needed before that sequence becomes valid.
+Do not assume an unrelated pull request or other ambient resource will exist
+when a gate runs.
 
 Do not recommend a mechanical split only because it satisfies a numeric gate.
 When the smallest useful end-to-end behavior still exceeds a gate, report that
@@ -169,6 +185,12 @@ Behavioral decomposition:
 - Minimum end-to-end capability: <smallest useful observable outcome>
 - Optional hardening: <excluded, justified in current scope, or separately authorized>
 - Independent value: <why every proposed slice remains useful if later slices never land>
+
+Dependency liveness:
+- Required sequence: <pre-merge, merge, validation, activation, and next-PR transitions>
+- Actors and capabilities: <who performs each transition and with which permission>
+- Artifacts and targets: <what each gate needs and when it becomes available>
+- Cycles or ambient dependencies: <list or none>
 
 Acceptance ownership:
 - <criterion> -> <PR>
@@ -210,10 +232,12 @@ caused by an unreviewed mechanism or hardening choice. Separate optional work.
 For each slice, ask whether it remains useful if later slices never land. Allow
 a disabled foundation only when safety or dependency order requires it. Map
 every acceptance criterion to a proposed PR. Return single_pr, split_required,
-or revise. Make each slice safe and mergeable. Name dependencies, merge order,
-risks, and unknowns. Room under a limit is not scope authority or a reason for
-a mechanical split. Do not assume the primary agent's plan is correct. Use
-plain, direct language.
+or revise. Simulate pre-merge, merge, validation, activation, and next-PR
+transitions. Name each gate's actor, permission, artifact, and target. Do not
+approve a dependency cycle or reliance on unrelated ambient work. Make each
+slice safe and mergeable. Name dependencies, merge order, risks, and unknowns.
+Room under a limit is not scope authority or a reason for a mechanical split.
+Do not assume the primary agent's plan is correct. Use plain, direct language.
 ```
 
 ## Primary-Agent Follow-Up
