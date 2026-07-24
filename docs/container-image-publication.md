@@ -103,6 +103,12 @@ It lists the complete active set through the fixed user-owned route
 `/users/rapucha/packages/container/moon-service/versions?state=active&per_page=100`.
 Gets and deletes use the fixed user-owned route
 `/users/rapucha/packages/container/moon-service/versions/<positive-numeric-version-id>`.
+The workflow delegates these operations to
+`deployment/raspberry-pi/preview_package_retention.py`, using its independently
+runnable `retain` and `probe` commands. The helper calls the standard `gh` and
+Docker CLIs. Pure schema, selection, revalidation, and proof rules remain in
+`deployment/raspberry-pi/preview_package_versions.py`, without network or
+process access.
 Before selection, the workflow validates every page and every active version's
 required schema, unique positive numeric ID, digest, tag set, and creation
 instant. Exactly one version must carry `preview`, and its digest must

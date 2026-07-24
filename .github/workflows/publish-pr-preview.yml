@@ -175,7 +175,7 @@ jobs:
       packages: write
       pull-requests: read
     steps:
-      - name: Check out trusted package selector
+      - name: Check out trusted package tooling
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
           ref: ${{ github.workflow_sha }}
@@ -299,107 +299,17 @@ jobs:
         env:
           EXPECTED_DIGEST: ${{ steps.published.outputs.digest }}
           GH_TOKEN: ${{ github.token }}
-          PACKAGE_VERSIONS_PATH: /users/rapucha/packages/container/moon-service/versions
-        run: |
-          set -euo pipefail
-          state_dir="$RUNNER_TEMP/preview-package-retention"
-          mkdir "$state_dir"
-          now_epoch="$(date -u +%s)"
-          gh api --paginate \
-            "/users/rapucha/packages/container/moon-service/versions?state=active&per_page=100" \
-            >"$state_dir/snapshot.json"
-          python3 -B trusted/scripts/select_preview_package_versions.py plan \
-            --snapshot "$state_dir/snapshot.json" \
-            --expected-digest "$EXPECTED_DIGEST" \
-            --now-epoch "$now_epoch" >"$state_dir/plan.json"
-          active_id="$(jq -er '.active_version_id | tostring' "$state_dir/plan.json")"
-          [[ "$active_id" =~ ^[1-9][0-9]*$ ]]
-          jq -e '
-            .candidate_ids | type == "array"
-            and all(.[]; type == "number" and . > 0 and floor == .)
-          ' "$state_dir/plan.json" >/dev/null
-          jq -r '.candidate_ids[] | tostring' \
-            "$state_dir/plan.json" >"$state_dir/candidate-ids"
-          while IFS= read -r candidate_id; do
-            [[ "$candidate_id" =~ ^[1-9][0-9]*$ ]]
-            gh api "$PACKAGE_VERSIONS_PATH/$active_id" >"$state_dir/active.json"
-            gh api "$PACKAGE_VERSIONS_PATH/$candidate_id" >"$state_dir/candidate.json"
-            python3 -B trusted/scripts/select_preview_package_versions.py revalidate \
-              --plan "$state_dir/plan.json" \
-              --active-record "$state_dir/active.json" \
-              --candidate-record "$state_dir/candidate.json" \
-              --candidate-id "$candidate_id" >"$state_dir/revalidated.json"
-            delete_id="$(jq -er '.candidate_id | tostring' "$state_dir/revalidated.json")"
-            [[ "$delete_id" == "$candidate_id" ]]
-            [[ "$delete_id" =~ ^[1-9][0-9]*$ ]]
-            gh api --method DELETE "$PACKAGE_VERSIONS_PATH/$delete_id"
-          done <"$state_dir/candidate-ids"
+        run: >-
+          python3 -B
+          trusted/deployment/raspberry-pi/preview_package_retention.py retain
+          --expected-digest "$EXPECTED_DIGEST"
 
       - name: Probe package list get and delete capability
         if: ${{ inputs.package_capability_probe }}
         env:
           EXPECTED_DIGEST: ${{ steps.published.outputs.digest }}
           GH_TOKEN: ${{ github.token }}
-          PACKAGE_VERSIONS_PATH: /users/rapucha/packages/container/moon-service/versions
-        run: |
-          set -euo pipefail
-          state_dir="$RUNNER_TEMP/preview-package-probe"
-          mkdir "$state_dir"
-          probe_tag="preview-package-capability-probe-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT"
-          probe_ref="$IMAGE_REPOSITORY:$probe_tag"
-          gh api --paginate \
-            "/users/rapucha/packages/container/moon-service/versions?state=active&per_page=100" \
-            >"$state_dir/before.json"
-          python3 -B trusted/scripts/select_preview_package_versions.py probe-absent \
-            --snapshot "$state_dir/before.json" \
-            --expected-active-digest "$EXPECTED_DIGEST" \
-            --probe-tag "$probe_tag" >"$state_dir/before-result.json"
-          mkdir "$state_dir/context"
-          printf '%s\n' 'ARG BASE_IMAGE' 'FROM ${BASE_IMAGE}' >"$state_dir/context/Dockerfile"
-          docker buildx build \
-            --file "$state_dir/context/Dockerfile" \
-            --platform linux/arm64 \
-            --push \
-            --provenance=false \
-            --sbom=false \
-            --build-arg "BASE_IMAGE=$IMAGE_REPOSITORY@$EXPECTED_DIGEST" \
-            --label "dev.moonservice.preview.package-capability-probe=$probe_tag" \
-            --tag "$probe_ref" \
-            "$state_dir/context"
-          probe_manifest="$(docker buildx imagetools inspect \
-            "$probe_ref" --format '{{json .Manifest}}')"
-          probe_digest="$(jq -er \
-            '.digest | select(test("^sha256:[0-9a-f]{64}$"))' \
-            <<<"$probe_manifest")"
-          [[ "$probe_digest" != "$EXPECTED_DIGEST" ]]
-          gh api --paginate \
-            "/users/rapucha/packages/container/moon-service/versions?state=active&per_page=100" \
-            >"$state_dir/after-create.json"
-          python3 -B trusted/scripts/select_preview_package_versions.py probe-created \
-            --before-snapshot "$state_dir/before.json" \
-            --after-snapshot "$state_dir/after-create.json" \
-            --expected-active-digest "$EXPECTED_DIGEST" \
-            --probe-tag "$probe_tag" \
-            --expected-probe-digest "$probe_digest" >"$state_dir/created.json"
-          probe_id="$(jq -er '.probe_version_id | tostring' "$state_dir/created.json")"
-          [[ "$probe_id" =~ ^[1-9][0-9]*$ ]]
-          gh api "$PACKAGE_VERSIONS_PATH/$probe_id" >"$state_dir/probe-record.json"
-          python3 -B trusted/scripts/select_preview_package_versions.py probe-created \
-            --before-snapshot "$state_dir/before.json" \
-            --after-snapshot "$state_dir/after-create.json" \
-            --expected-active-digest "$EXPECTED_DIGEST" \
-            --probe-tag "$probe_tag" \
-            --expected-probe-digest "$probe_digest" \
-            --probe-record "$state_dir/probe-record.json" >"$state_dir/revalidated.json"
-          delete_id="$(jq -er '.probe_version_id | tostring' "$state_dir/revalidated.json")"
-          [[ "$delete_id" == "$probe_id" ]]
-          [[ "$delete_id" =~ ^[1-9][0-9]*$ ]]
-          gh api --method DELETE "$PACKAGE_VERSIONS_PATH/$delete_id"
-          gh api --paginate \
-            "/users/rapucha/packages/container/moon-service/versions?state=active&per_page=100" \
-            >"$state_dir/after-delete.json"
-          python3 -B trusted/scripts/select_preview_package_versions.py probe-absent \
-            --snapshot "$state_dir/after-delete.json" \
-            --expected-active-digest "$EXPECTED_DIGEST" \
-            --probe-tag "$probe_tag" \
-            --probe-version-id "$delete_id" >"$state_dir/after-delete-result.json"
+        run: >-
+          python3 -B
+          trusted/deployment/raspberry-pi/preview_package_retention.py probe
+          --expected-digest "$EXPECTED_DIGEST"

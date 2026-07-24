@@ -1,14 +1,18 @@
-#!/usr/bin/env python3
+"""Fail-closed selection and proof rules for preview package versions.
 
-import argparse
+The module validates GitHub Container Registry responses, creates a
+deterministic retention plan, revalidates each deletion candidate, and proves
+the lifecycle of a disposable capability probe. It is deliberately free of
+network, filesystem, and command-line behavior so callers control every input
+and side effect.
+"""
+
 import calendar
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from decimal import Decimal
 import json
-from pathlib import Path
 import re
-import sys
 
 
 AGE_SECONDS = 691200
@@ -25,15 +29,21 @@ _CREATED_AT_RE = re.compile(
 
 
 class SelectionError(ValueError):
-    pass
+    """Report input or state that cannot support a safe package action."""
 
 
 def _is_positive_id(value):
+    """Classify a package-version ID without accepting booleans or coercions.
+
+    Callers receive only a boolean and can reject any uncertain identity.
+    """
     return type(value) is int and value > 0
 
 
 @dataclass(frozen=True)
 class Version:
+    """Hold the validated identity and normalized tags of one package version."""
+
     id: int
     name: str
     created_at: str
@@ -41,6 +51,11 @@ class Version:
     created_epoch: Decimal
 
     def snapshot(self):
+        """Return the canonical identity fields used for later comparison.
+
+        The result preserves normalized tag order so API ordering alone cannot
+        resemble a state change.
+        """
         return {
             "id": self.id,
             "name": self.name,
@@ -50,24 +65,40 @@ class Version:
 
 
 def _require_digest(value, message):
+    """Validate an immutable package digest supplied by a caller.
+
+    Only an exact lowercase SHA-256 digest is accepted; other input raises
+    ``SelectionError`` with the caller's safe context message.
+    """
     if not isinstance(value, str) or _DIGEST_RE.fullmatch(value) is None:
         raise SelectionError(message)
 
 
 def _require_nonnegative_epoch(value):
+    """Validate the captured UTC epoch used throughout one retention run.
+
+    Negative values, booleans, and non-integers raise ``SelectionError`` rather
+    than being coerced.
+    """
     if type(value) is not int or value < 0:
         raise SelectionError("invalid UTC epoch")
 
 
 def _created_epoch(value):
+    """Convert an API UTC timestamp into precise epoch seconds.
+
+    The result is a ``Decimal`` so fractional ordering and age checks are
+    exact. Any format, date, or time ambiguity raises ``SelectionError``.
+    """
     if not isinstance(value, str):
         raise SelectionError("invalid package-version schema")
     match = _CREATED_AT_RE.fullmatch(value)
     if match is None:
         raise SelectionError("invalid package-version schema")
-    parts = {name: int(match.group(name)) for name in (
-        "year", "month", "day", "hour", "minute", "second"
-    )}
+    parts = {
+        name: int(match.group(name))
+        for name in ("year", "month", "day", "hour", "minute", "second")
+    }
     try:
         created = datetime(**parts, tzinfo=timezone.utc)
     except ValueError as error:
@@ -78,6 +109,12 @@ def _created_epoch(value):
 
 
 def validate_version(record):
+    """Validate one package-version API record into canonical state.
+
+    The returned ``Version`` has sorted tags, making tag sets independent of
+    API order. Missing, duplicated, or malformed identity fields fail closed
+    with ``SelectionError``.
+    """
     if not isinstance(record, dict):
         raise SelectionError("invalid package-version schema")
     version_id = record.get("id")
@@ -96,10 +133,22 @@ def validate_version(record):
         or len(tags) != len(set(tags))
     ):
         raise SelectionError("invalid package-version schema")
-    return Version(version_id, name, created_at, tuple(sorted(tags)), created_epoch)
+    return Version(
+        version_id,
+        name,
+        created_at,
+        tuple(sorted(tags)),
+        created_epoch,
+    )
 
 
 def parse_page_stream(stream):
+    """Parse the complete sequential stream emitted for paginated API pages.
+
+    The result contains validated versions in page order. Empty input,
+    non-array pages, trailing invalid content, and duplicate IDs raise
+    ``SelectionError`` so a partial snapshot cannot authorize deletion.
+    """
     if not isinstance(stream, str):
         raise SelectionError("invalid paginated JSON")
     decoder = json.JSONDecoder()
@@ -131,6 +180,11 @@ def parse_page_stream(stream):
 
 
 def parse_record(stream):
+    """Parse one JSON API response into a validated ``Version``.
+
+    Invalid JSON or package state raises ``SelectionError``; no partial record
+    is returned.
+    """
     try:
         record = json.loads(stream)
     except (json.JSONDecodeError, TypeError) as error:
@@ -139,12 +193,22 @@ def parse_record(stream):
 
 
 def _is_preview_only(version):
+    """Classify a version whose nonempty tag set contains only revision tags.
+
+    The predicate returns false for untagged, mixed, or malformed tag sets,
+    keeping uncertain versions out of the deletion candidate pool.
+    """
     return bool(version.tags) and all(
         _PREVIEW_TAG_RE.fullmatch(tag) is not None for tag in version.tags
     )
 
 
 def _active_version(versions, expected_digest):
+    """Find the sole active preview version at an expected immutable digest.
+
+    Missing, duplicate, or digest-mismatched active versions raise
+    ``SelectionError`` rather than allowing retention or probe work.
+    """
     active = [version for version in versions if "preview" in version.tags]
     if len(active) != 1 or active[0].name != expected_digest:
         raise SelectionError("active preview identity is invalid")
@@ -152,6 +216,13 @@ def _active_version(versions, expected_digest):
 
 
 def build_plan(versions, expected_digest, now_epoch):
+    """Build a deterministic retention plan from one complete snapshot.
+
+    The plan keeps the active version, the newest revision previews, and every
+    version at or inside the inclusive age boundary. Only older preview-only
+    versions can become candidates; invalid identity or timing state raises
+    ``SelectionError``.
+    """
     _require_digest(expected_digest, "invalid expected digest")
     _require_nonnegative_epoch(now_epoch)
     versions = tuple(versions)
@@ -170,7 +241,9 @@ def build_plan(versions, expected_digest, now_epoch):
     )
     boundary = Decimal(now_epoch - AGE_SECONDS)
     keep_ids = {active.id}
-    keep_ids.update(version.id for version in ordered[:NEWEST_OTHER_COUNT])
+    keep_ids.update(
+        version.id for version in ordered[:NEWEST_OTHER_COUNT]
+    )
     keep_ids.update(
         version.id
         for version in versions
@@ -196,19 +269,34 @@ def build_plan(versions, expected_digest, now_epoch):
 
 
 def _version_from_snapshot(snapshot):
+    """Recreate validated version state from one canonical plan snapshot.
+
+    Extra, missing, or malformed fields raise ``SelectionError`` so a modified
+    snapshot cannot survive plan validation.
+    """
     if not isinstance(snapshot, dict) or set(snapshot) != {
-        "id", "name", "created_at", "tags"
+        "id",
+        "name",
+        "created_at",
+        "tags",
     }:
         raise SelectionError("invalid plan")
-    return validate_version({
-        "id": snapshot["id"],
-        "name": snapshot["name"],
-        "created_at": snapshot["created_at"],
-        "metadata": {"container": {"tags": snapshot["tags"]}},
-    })
+    return validate_version(
+        {
+            "id": snapshot["id"],
+            "name": snapshot["name"],
+            "created_at": snapshot["created_at"],
+            "metadata": {"container": {"tags": snapshot["tags"]}},
+        }
+    )
 
 
 def validate_plan(plan):
+    """Validate a plan by recomputing it from its embedded snapshots.
+
+    The validated versions are returned for fresh-record comparison. Any
+    schema error or change to a derived field raises ``SelectionError``.
+    """
     if not isinstance(plan, dict) or set(plan) != {
         "schema",
         "now_epoch",
@@ -227,29 +315,34 @@ def validate_plan(plan):
         _version_from_snapshot(snapshot) for snapshot in plan["versions"]
     )
     expected = build_plan(
-        versions, plan["expected_digest"], plan["now_epoch"]
+        versions,
+        plan["expected_digest"],
+        plan["now_epoch"],
     )
-    if json.dumps(plan, sort_keys=True) != json.dumps(expected, sort_keys=True):
+    if json.dumps(plan, sort_keys=True) != json.dumps(
+        expected,
+        sort_keys=True,
+    ):
         raise SelectionError("invalid plan")
     return versions
 
 
-def parse_plan(stream):
-    try:
-        plan = json.loads(stream)
-    except (json.JSONDecodeError, TypeError) as error:
-        raise SelectionError("invalid plan JSON") from error
-    validate_plan(plan)
-    return plan
-
-
 def revalidate_candidate(plan, candidate_id, active_record, candidate_record):
+    """Revalidate one planned deletion against fresh active and candidate data.
+
+    The approved candidate ID is returned only when both records exactly match
+    the validated snapshot and the candidate remains older and preview-only.
+    Every mismatch raises ``SelectionError`` before deletion.
+    """
     versions = validate_plan(plan)
     if not _is_positive_id(candidate_id):
         raise SelectionError("invalid candidate ID")
     if candidate_id not in plan["candidate_ids"]:
         raise SelectionError("candidate is not approved")
-    if candidate_id in plan["keep_ids"] or candidate_id == plan["active_version_id"]:
+    if (
+        candidate_id in plan["keep_ids"]
+        or candidate_id == plan["active_version_id"]
+    ):
         raise SelectionError("candidate is not approved")
     snapshots = {version.id: version for version in versions}
     active_snapshot = snapshots[plan["active_version_id"]]
@@ -269,7 +362,16 @@ def revalidate_candidate(plan, candidate_id, active_record, candidate_record):
 
 
 def _require_probe_tag(probe_tag):
-    if not isinstance(probe_tag, str) or not probe_tag or probe_tag == "preview":
+    """Validate the disposable tag used to identify a capability probe.
+
+    Empty, non-string, or active ``preview`` tags raise ``SelectionError`` so
+    the proof cannot target the production alias.
+    """
+    if (
+        not isinstance(probe_tag, str)
+        or not probe_tag
+        or probe_tag == "preview"
+    ):
         raise SelectionError("invalid probe tag")
     return probe_tag
 
@@ -282,6 +384,13 @@ def prove_probe_created(
     expected_probe_digest,
     probe_record=None,
 ):
+    """Prove exact creation of one disposable package version.
+
+    The new positive ID is returned only when the probe tag was absent before,
+    exactly one new version has the expected distinct digest and sole probe
+    tag, and the active preview digest remains unchanged. Ambiguity or an
+    optional fresh-record mismatch raises ``SelectionError``.
+    """
     _require_digest(expected_active_digest, "invalid expected active digest")
     _require_digest(expected_probe_digest, "invalid expected probe digest")
     if expected_probe_digest == expected_active_digest:
@@ -294,25 +403,41 @@ def prove_probe_created(
     if any(probe_tag in version.tags for version in before):
         raise SelectionError("probe tag existed before creation")
     before_ids = {version.id for version in before}
-    new_versions = [version for version in after if version.id not in before_ids]
+    new_versions = [
+        version for version in after if version.id not in before_ids
+    ]
     if len(new_versions) != 1:
         raise SelectionError("probe creation identity is invalid")
     created = new_versions[0]
-    tagged = [version for version in after if probe_tag in version.tags]
+    tagged = [
+        version for version in after if probe_tag in version.tags
+    ]
     if (
         tagged != [created]
         or created.name != expected_probe_digest
         or created.tags != (probe_tag,)
     ):
         raise SelectionError("probe creation identity is invalid")
-    if probe_record is not None and probe_record.snapshot() != created.snapshot():
+    if (
+        probe_record is not None
+        and probe_record.snapshot() != created.snapshot()
+    ):
         raise SelectionError("probe record changed")
     return created.id
 
 
 def prove_probe_absent(
-    versions, expected_active_digest, probe_tag, probe_version_id=None
+    versions,
+    expected_active_digest,
+    probe_tag,
+    probe_version_id=None,
 ):
+    """Prove probe cleanup while preserving the active preview identity.
+
+    ``True`` is returned only when the probe tag and optional exact ID are
+    absent and the expected active digest remains unique. Residue or ambiguous
+    active state raises ``SelectionError``.
+    """
     _require_digest(expected_active_digest, "invalid expected active digest")
     probe_tag = _require_probe_tag(probe_tag)
     versions = tuple(versions)
@@ -322,135 +447,9 @@ def prove_probe_absent(
     if probe_version_id is not None:
         if not _is_positive_id(probe_version_id):
             raise SelectionError("invalid probe version ID")
-        if any(version.id == probe_version_id for version in versions):
+        if any(
+            version.id == probe_version_id
+            for version in versions
+        ):
             raise SelectionError("probe version is present")
     return True
-
-
-def _read_text(path):
-    if path == "-":
-        return sys.stdin.read()
-    return Path(path).read_text(encoding="utf-8")
-
-
-def _positive_id(value, message):
-    if not isinstance(value, str) or re.fullmatch(r"[1-9][0-9]*", value) is None:
-        raise SelectionError(message)
-    return int(value)
-
-
-def _epoch_argument(value):
-    if not isinstance(value, str) or re.fullmatch(r"[0-9]+", value) is None:
-        raise SelectionError("invalid UTC epoch")
-    return int(value)
-
-
-def _argument(command, name, help_text, optional=False):
-    command.add_argument(name, required=not optional, help=help_text)
-
-
-def _parser():
-    parser = argparse.ArgumentParser(
-        description="Select and verify conservative preview package cleanup."
-    )
-    commands = parser.add_subparsers(dest="command", required=True)
-
-    plan = commands.add_parser(
-        "plan", help="Validate a complete package snapshot and create a plan."
-    )
-    _argument(plan, "--snapshot", "Sequential JSON page arrays from gh api --paginate.")
-    _argument(plan, "--expected-digest", "Verified digest the active preview must use.")
-    _argument(plan, "--now-epoch", "One nonnegative UTC epoch for the cleanup run.")
-
-    revalidate = commands.add_parser(
-        "revalidate", help="Revalidate one planned candidate before deletion."
-    )
-    _argument(revalidate, "--plan", "Plan JSON emitted by the plan command.")
-    _argument(revalidate, "--active-record", "Fresh GET JSON for the active version.")
-    _argument(revalidate, "--candidate-record", "Fresh GET JSON for the candidate.")
-    _argument(revalidate, "--candidate-id", "Positive ID selected from the plan.")
-
-    created = commands.add_parser(
-        "probe-created", help="Prove exact disposable probe creation identity."
-    )
-    _argument(created, "--before-snapshot", "Complete pre-publication snapshot.")
-    _argument(created, "--after-snapshot", "Complete post-publication snapshot.")
-    _argument(created, "--expected-active-digest", "Preview digest that must stay active.")
-    _argument(created, "--probe-tag", "Unique disposable probe tag.")
-    _argument(created, "--expected-probe-digest", "Verified disposable probe digest.")
-    _argument(created, "--probe-record", "Optional fresh GET JSON for the probe.", True)
-
-    absent = commands.add_parser(
-        "probe-absent", help="Prove a probe tag and optional exact ID are absent."
-    )
-    _argument(absent, "--snapshot", "Complete paginated package snapshot.")
-    _argument(absent, "--expected-active-digest", "Preview digest that must stay active.")
-    _argument(absent, "--probe-tag", "Unique disposable probe tag.")
-    _argument(absent, "--probe-version-id", "Positive probe ID that must be absent.", True)
-    return parser
-
-
-def _write_json(value):
-    json.dump(value, sys.stdout, sort_keys=True, separators=(",", ":"))
-    sys.stdout.write("\n")
-
-
-def main(argv=None):
-    args = _parser().parse_args(argv)
-    try:
-        if args.command == "plan":
-            versions = parse_page_stream(_read_text(args.snapshot))
-            result = build_plan(
-                versions,
-                args.expected_digest,
-                _epoch_argument(args.now_epoch),
-            )
-        elif args.command == "revalidate":
-            candidate_id = _positive_id(
-                args.candidate_id, "invalid candidate ID"
-            )
-            result = {"candidate_id": revalidate_candidate(
-                parse_plan(_read_text(args.plan)),
-                candidate_id,
-                parse_record(_read_text(args.active_record)),
-                parse_record(_read_text(args.candidate_record)),
-            )}
-        elif args.command == "probe-created":
-            probe_record = (
-                parse_record(_read_text(args.probe_record))
-                if args.probe_record else None
-            )
-            result = {"probe_version_id": prove_probe_created(
-                parse_page_stream(_read_text(args.before_snapshot)),
-                parse_page_stream(_read_text(args.after_snapshot)),
-                args.expected_active_digest,
-                args.probe_tag,
-                args.expected_probe_digest,
-                probe_record,
-            )}
-        else:
-            probe_version_id = (
-                _positive_id(
-                    args.probe_version_id, "invalid probe version ID"
-                )
-                if args.probe_version_id else None
-            )
-            prove_probe_absent(
-                parse_page_stream(_read_text(args.snapshot)),
-                args.expected_active_digest,
-                args.probe_tag,
-                probe_version_id,
-            )
-            result = {"absent": True}
-    except SelectionError as error:
-        print(f"error: {error}", file=sys.stderr)
-        return 2
-    except (OSError, UnicodeError):
-        print("error: cannot read input", file=sys.stderr)
-        return 2
-    _write_json(result)
-    return 0
-
-
-if __name__ == "__main__":
-    raise SystemExit(main())
