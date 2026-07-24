@@ -55,10 +55,11 @@ Actions are pinned to full commit SHAs.
 
 `.github/workflows/publish-pr-preview.yml` publishes one approved pull-request
 preview without changing the production publication flow. The repository owner
-starts it from `main` and supplies only a pull-request number. The workflow
-continues only when both the original actor and the triggering actor are
-`rapucha` and the workflow itself comes from `main`. It does not run
-automatically for pull requests.
+starts it from `main` and supplies a pull-request number. The post-merge
+capability probe also enables the default-off `package_capability_probe` input
+described below. The workflow continues only when both the original actor and
+the triggering actor are `rapucha` and the workflow itself comes from `main`.
+It does not run automatically for pull requests.
 
 The workflow requires an open, same-repository pull request whose base is
 `main`. It resolves the full head revision and requires exactly one successful
@@ -82,7 +83,13 @@ ghcr.io/rapucha/moon-service:preview-pr-<number>-<full-sha>
 ghcr.io/rapucha/moon-service:preview
 ```
 
+Inspection also requires the
+`dev.moonservice.preview.pull-request=<positive-pull-request-number>` label.
+
 Both tags must resolve to the same remote manifest digest after publication.
+Package retention starts only after that equality is verified and remains
+inside the same non-cancelling serialization boundary.
+
 The job summary records the pull-request number, full revision, revision-scoped
 reference, and digest for manual deployment.
 
@@ -90,6 +97,35 @@ GHCR tags are mutable. A deliberate rerun may replace the revision-scoped tag,
 and the last successful serialized publication sets `preview`. The reported
 digest, not either tag, is the immutable deployment identity. This manual
 workflow is intended for deliberate, low-volume use.
+
+Retention uses `gh api --paginate` and the existing short-lived token.
+It lists the complete active set through the fixed user-owned route
+`/users/rapucha/packages/container/moon-service/versions?state=active&per_page=100`.
+Gets and deletes use the fixed user-owned route
+`/users/rapucha/packages/container/moon-service/versions/<positive-numeric-version-id>`.
+Before selection, the workflow validates every page and every active version's
+required schema, unique positive numeric ID, digest, tag set, and creation
+instant. Exactly one version must carry `preview`, and its digest must
+equal the verified dispatch digest. Retention protects that version and digest.
+
+The cleanup run captures one UTC `now`. It keeps the nine newest other versions
+whose nonempty tag sets contain only exact
+`preview-pr-<positive-number>-<40-lowercase-hex-sha>` tags. Newest-first order
+uses validated `created_at` descending, then numeric version ID descending.
+It also keeps every version created at or after the inclusive
+`now - 691200 seconds` boundary. A deletion candidate must be older than that
+boundary, outside every keep set, and tagged only with exact revision-scoped
+preview tags. Untagged, mixed-tagged, production-tagged, malformed, and
+unrecognized versions are never candidates.
+
+Immediately before each deletion, the workflow gets the active `preview`
+version and candidate again through the same API. The active version ID and
+digest, plus the candidate digest, tag set, and creation instant, must match the
+validated complete snapshot. The candidate must still pass the tag and age
+rules under the captured `now`; those two fresh records do not recompute the
+newest-nine set. Pagination, schema, parsing, selection, revalidation, or
+deletion failure stops cleanup. It retains extra versions, makes no further
+deletion, and does not move `preview` backward or change host state.
 
 The actor, triggering-actor, dispatch-ref, and workflow-ref checks protect
 normal use of the canonical workflow. They do not enforce an owner-only
@@ -105,13 +141,35 @@ owns the decision about stronger enforcement.
 The ordinary archive is trusted under that same repository-writer model. The
 workflow has no custom OCI parser, registry client, immutable-tag protocol, or
 producer-ordering protocol. It does not create a GitHub Deployment, contact the
-Raspberry Pi, or delete GHCR package versions. Issues
-[#200](https://github.com/rapucha/moon-service/issues/200) and
-[#201](https://github.com/rapucha/moon-service/issues/201) must be revised and
-freshly reviewed against this contract before they consume this digest or add
-preview replacement, expiry, or package retention. They must accept that a
-standard single-platform push can produce an image-manifest digest rather than
-an OCI index digest.
+Raspberry Pi, or change host lifecycle state. Host-lifecycle issue
+[#210](https://github.com/rapucha/moon-service/issues/210) may consume the label
+and digest only after #209 merges and its post-merge capability probe passes.
+It must accept that a standard single-platform push can produce an
+image-manifest digest rather than an OCI index digest.
+
+### Post-Merge Package Capability Probe
+
+After #209 merges, the owner must dispatch the canonical workflow from `main`
+once with `package_capability_probe=true`; the boolean input defaults to
+`false`. The dispatch still validates and publishes a real approved pull
+request before the probe. The probe first captures the complete active-version
+snapshot and verified `preview` digest. Its unique
+`preview-package-capability-probe-<run-id>-<run-attempt>` tag must be absent
+from that snapshot.
+
+Using only standard Docker and Buildx operations, the probe publishes that tag
+with a distinct digest and no `preview` tag. It must leave the active channel at
+the verified normal-publication digest. The new snapshot must contain exactly
+one new positive numeric version ID with the expected tag set and digest. The
+workflow gets that exact ID, deletes only that ID, and verifies its absence.
+It must never select a version that existed in the pre-test snapshot.
+
+After creation, a failure before selected-ID deletion retains the uniquely
+tagged version for explicit owner cleanup. A failure during post-delete
+verification may mean that the version is already absent. The owner must inspect
+a complete fresh snapshot before cleanup or retry. A failed probe does not
+authorize another credential, a custom protocol, or work on #210. Start #210
+only after this probe passes.
 
 ## Image Identity
 
@@ -245,8 +303,8 @@ After this workflow has completed successfully at least once:
    enabled, but the rule also prevents knowingly broken pull requests from
    merging.
 2. Open the `moon-service` package settings and confirm that the package is
-   connected to `rapucha/moon-service` with Actions access inherited from the
-   repository. The OCI source label should establish this connection on the
+   connected to `rapucha/moon-service` and repository Actions has the package
+   `Admin` role. The OCI source label should establish this connection on the
    first publication.
 3. Choose the pull boundary for the alpha host:
    - Recommended for the public-source tester alpha: change the package from
@@ -257,6 +315,10 @@ After this workflow has completed successfully at least once:
 
 Do not add a long-lived package token to GitHub Actions. Publication uses only
 the short-lived `GITHUB_TOKEN` supplied to the publishing jobs.
+Preview cleanup and its probe also require GitHub's public-preview support for
+package-version deletion with `GITHUB_TOKEN`. If Actions-admin access or that
+capability is unavailable, fail and retain extra versions without adding a
+credential.
 
 ## Operator Verification
 
@@ -324,6 +386,15 @@ external confirmation then remains queued and eventually times out.
   newer healthy revision. The older Deployment becomes `inactive` and its exact
   confirmation job fails; never roll the host back solely to make an old
   workflow green.
+- If preview cleanup fails, retain the remaining versions and repair the fixed
+  list, get, or delete capability before another approved publication. Manual
+  cleanup must start from a complete fresh snapshot and target only exact
+  verified version IDs.
+- If the capability probe fails after creating its unique version, derive its
+  tag from the failed run ID and attempt, then inspect a complete fresh
+  snapshot. If the tag remains, verify its digest and positive numeric ID
+  before deleting only that ID. If it is absent, do not select another version.
+  Confirm its absence, rerun the probe, and keep #210 blocked until it passes.
 - For explicit operator rollback or recovery, retag a previously verified
   digest; do not rebuild an old source revision under a new identity:
 
