@@ -11,12 +11,19 @@ import dev.moonservice.backend.location.LocationProvider;
 import dev.moonservice.backend.location.ProviderLocationId;
 import dev.moonservice.backend.location.ResolvedLocation;
 import dev.moonservice.backend.opportunity.InvalidOpportunitySearchRequestException;
+import dev.moonservice.backend.opportunity.search.OpportunitySearchEngine;
+import dev.moonservice.backend.opportunity.search.OpportunitySearchEngine.AzimuthMatchInterval;
+import dev.moonservice.backend.opportunity.search.OpportunitySearchEngine.PreferenceSearchResult;
 import dev.moonservice.backend.opportunity.search.OpportunitySearchRequest;
 import dev.moonservice.backend.opportunity.search.OpportunitySearchResponse;
 import dev.moonservice.backend.weather.HourlyWeather;
 import dev.moonservice.backend.weather.WeatherForecastProvider;
 import dev.moonservice.scoringprototype.PreviewEvaluator;
 import dev.moonservice.scoringprototype.fixture.WeatherFixture;
+import dev.moonservice.scoringprototype.input.OpportunityPreferences;
+import dev.moonservice.scoringprototype.input.OpportunityPreferences.AltitudeRange;
+import dev.moonservice.scoringprototype.input.OpportunityPreferences.AzimuthPreference;
+import dev.moonservice.scoringprototype.input.OpportunityPreferences.DegreeRange;
 import dev.moonservice.scoringprototype.scoring.ScoringModel;
 import org.junit.jupiter.api.Test;
 import tools.jackson.databind.JsonNode;
@@ -26,6 +33,8 @@ import tools.jackson.databind.node.ObjectNode;
 import java.lang.reflect.Method;
 import java.time.Instant;
 import java.time.ZoneId;
+import java.util.List;
+import java.util.Set;
 import java.util.concurrent.atomic.AtomicReference;
 
 class ScoringOpportunitySearchEngineTest {
@@ -204,6 +213,131 @@ class ScoringOpportunitySearchEngineTest {
         assertEquals("mostly clear", ongoing.weather().summary());
         assertEquals(22, ongoing.components().weatherFit());
         assertTrue(ongoing.reason().contains("mostly clear and 0 percent precipitation risk"));
+    }
+
+    @Test
+    void preferenceFreeTypedSearchPreservesLiveAdapterResult() {
+        OpportunitySearchEngine engine = engineWithPartlyCloudyWeather();
+        OpportunitySearchRequest request =
+                new OpportunitySearchRequest("prague-cz", "2026-06-29", 1, 12.0, 10);
+        Instant notBefore = Instant.parse("2026-06-29T00:00:00Z");
+
+        OpportunitySearchResponse ordinary = engine.search(prague(), request, notBefore);
+        PreferenceSearchResult preferenceResult =
+                engine.search(prague(), request, notBefore, OpportunityPreferences.none());
+
+        assertEquals(1, preferenceResult.appliedPreferenceVersion());
+        assertTrue(preferenceResult.normalizedActiveFilters().isEmpty());
+        assertEquals(0, preferenceResult.excludedSampleCount());
+        assertTrue(preferenceResult.azimuthMatchIntervals().isEmpty());
+        OpportunitySearchResponse typed = preferenceResult.response();
+        assertEquals(ordinary.status(), typed.status());
+        assertEquals(ordinary.location(), typed.location());
+        assertEquals(ordinary.forecastHorizonDays(), typed.forecastHorizonDays());
+        assertEquals(ordinary.startsAt(), typed.startsAt());
+        assertEquals(ordinary.endsAt(), typed.endsAt());
+        assertEquals(ordinary.candidateWindowsEvaluated(), typed.candidateWindowsEvaluated());
+        assertEquals(ordinary.maxMoonAltitudeDegrees(), typed.maxMoonAltitudeDegrees());
+        assertEquals(ordinary.opportunities(), typed.opportunities());
+        assertEquals(ordinary.rejected(), typed.rejected());
+        assertEquals(ordinary.messages(), typed.messages());
+    }
+
+    @Test
+    void passesActivePreferencesThroughTheTypedInterface() {
+        OpportunitySearchEngine engine = engineWithPartlyCloudyWeather();
+        OpportunityPreferences preferences = new OpportunityPreferences(
+                1,
+                new AltitudeRange(89.0, 90.0),
+                null,
+                null,
+                null,
+                null);
+
+        PreferenceSearchResult result = engine.search(
+                prague(),
+                new OpportunitySearchRequest("prague-cz", "2026-06-29", 1, 12.0, 10),
+                Instant.parse("2026-06-28T22:00:00Z"),
+                preferences);
+
+        assertEquals(1, result.appliedPreferenceVersion());
+        assertEquals(preferences.normalizedFilters(), result.normalizedActiveFilters());
+        assertTrue(result.excludedSampleCount() > 0);
+        assertTrue(result.response().opportunities().isEmpty());
+        assertTrue(result.azimuthMatchIntervals().isEmpty());
+    }
+
+    @Test
+    void defaultTypedSearchPreservesNoFiltersAndRejectsActivePreferences() {
+        OpportunitySearchRequest request =
+                new OpportunitySearchRequest("prague-cz", "2026-06-29", 1, 12.0, 10);
+        OpportunitySearchResponse expected = engineWithPartlyCloudyWeather().search(request);
+        OpportunitySearchEngine engine = ignored -> expected;
+        Instant notBefore = Instant.parse("2026-06-28T22:00:00Z");
+
+        PreferenceSearchResult noFilters =
+                engine.search(prague(), request, notBefore, OpportunityPreferences.none());
+
+        assertEquals(expected, noFilters.response());
+        assertTrue(noFilters.normalizedActiveFilters().isEmpty());
+        assertEquals(0, noFilters.excludedSampleCount());
+        OpportunityPreferences preferences = new OpportunityPreferences(
+                1,
+                new AltitudeRange(0.0, 12.0),
+                null,
+                null,
+                null,
+                null);
+
+        UnsupportedOperationException exception = assertThrows(
+                UnsupportedOperationException.class,
+                () -> engine.search(
+                        prague(),
+                        request,
+                        notBefore,
+                        preferences));
+
+        assertEquals(
+                "This opportunity search engine does not support active preferences.",
+                exception.getMessage());
+    }
+
+    @Test
+    void typedAzimuthIntervalsRejectZeroDurationTangency() {
+        Instant boundary = Instant.parse("2026-06-29T00:00:00Z");
+
+        IllegalArgumentException exception = assertThrows(
+                IllegalArgumentException.class,
+                () -> new AzimuthMatchInterval(boundary, boundary));
+
+        assertEquals("endsAt must be after startsAt.", exception.getMessage());
+    }
+
+    @Test
+    void preservesCompleteTypedAzimuthMaskForReturnedPass() {
+        OpportunitySearchEngine engine = engineWithPartlyCloudyWeather();
+        OpportunityPreferences preferences = new OpportunityPreferences(
+                1,
+                null,
+                new AzimuthPreference(new DegreeRange(10.0, 350.0), null),
+                null,
+                null,
+                null);
+
+        PreferenceSearchResult result = engine.search(
+                prague(),
+                new OpportunitySearchRequest("prague-cz", "2026-06-29", 1, 12.0, 1),
+                Instant.parse("2026-06-28T22:00:00Z"),
+                preferences);
+
+        assertEquals(preferences.normalizedFilters(), result.normalizedActiveFilters());
+        OpportunitySearchResponse.MoonPass pass =
+                result.response().opportunities().getFirst().moonPass();
+        assertEquals(Set.of(pass.id()), result.azimuthMatchIntervals().keySet());
+        List<AzimuthMatchInterval> intervals = result.azimuthMatchIntervals().get(pass.id());
+        assertEquals(1, intervals.size());
+        assertEquals(Instant.parse(pass.startsAt()), intervals.getFirst().startsAt());
+        assertEquals(Instant.parse(pass.endsAt()), intervals.getFirst().endsAt());
     }
 
     @Test

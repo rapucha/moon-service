@@ -154,9 +154,12 @@ Tradeoffs:
 The current code does not implement a public `EphemerisService` interface, and
 issue #17 does not add one only for hypothetical replacement. Direct Astronomy
 Engine types and calls are concentrated in `EphemerisSampler`, which emits
-Moon Service's own `MoonSample` values. `WindowGenerator.SampleProvider` keeps
-window/scoring algorithms testable without upstream types, and the backend HTTP
-surface receives product-shaped results through `PreviewEvaluator`.
+Moon Service's own `MoonSample` values and a project-owned lunar angular-radius
+value in degrees. `WindowGenerator.SampleProvider` keeps window/scoring
+algorithms testable without upstream types. The fixture-only backend path
+receives product-shaped results through `PreviewEvaluator`. Resolved-location
+and typed preference searches call `OpportunityService`, format the ordinary
+result through `ResponseFormatter`, and keep preference metadata typed.
 
 That localized adapter is sufficient for the MVP. Introduce a formal provider
 interface only when a second implementation, a move out of the retained
@@ -174,6 +177,7 @@ EphemerisService
   output:
     - Moon altitude degrees
     - Moon azimuth degrees
+    - topocentric apparent lunar angular radius degrees
     - Moon illumination fraction
     - Moon phase angle or named phase
     - observer-oriented bright-limb tilt at the sampled instant
@@ -186,6 +190,18 @@ EphemerisService
 
 This boundary allows replacing the ephemeris library later without changing
 scoring, HTTP contracts, or client code.
+
+### Topocentric apparent lunar angular radius
+
+`EphemerisSampler` obtains the observer-relative Moon distance in astronomical
+units from the `Equatorial.dist` value returned by Astronomy Engine's
+topocentric Moon calculation. It calculates the angular radius from that
+distance and the Moon's physical mean radius, then returns only the result in
+degrees.
+
+Use `1,737.4 km` as the physical mean radius, following the
+[JPL planetary-satellite physical parameters](https://ssd.jpl.nasa.gov/sats/phys_par/sep.html).
+Keep the upstream distance type and calculation inside `EphemerisSampler`.
 
 ### Observer-oriented bright-limb tilt
 

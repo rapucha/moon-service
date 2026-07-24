@@ -71,8 +71,11 @@ do not claim predictions beyond that range.
 The public result should report the broad opportunity window separately from
 the suggested best time within it.
 
-- `startsAt` and `endsAt` describe the natural interval when the Moon is visible
-  from the location and stays within the configured visible-Moon ceiling.
+- Without active hard preferences, `startsAt` and `endsAt` describe the natural
+  interval when the Moon is visible from the location and stays within the
+  configured visible-Moon ceiling.
+- With active version 1 preferences, `startsAt` and `endsAt` instead bound one
+  continuous retained interval in which every active filter matches.
 - In the target contract, `suggestedAt` is the strongest moment within the
   interval under the full v0 rule-based score.
 - The current implementation selects `suggestedAt` from five-minute candidates
@@ -82,6 +85,127 @@ the suggested best time within it.
   an exact landmark alignment, or an exact local-horizon visibility time.
 - UI, feed, and calendar wording should say that local hills, buildings, trees,
   and foreground choices may affect exact visibility and composition.
+
+## Version 1 Hard Preferences
+
+Version 1 preferences are typed, request-scoped hard filters. A present
+preference object must carry version `1`. They remove unusable times before
+ranking; they do not adjust scoring weights. The object and every filter inside
+it are optional. An absent object and a version 1 object with no active filters
+must preserve the current candidates, scores, and order.
+
+The typed model supports:
+
+- one inclusive `altitudeDegrees` range;
+- one optional included azimuth sector and one optional excluded obstruction
+  sector;
+- either local-clock windows or ambient-light buckets;
+- one or more named Moon phases; and
+- one or more inclusive `brightLimbOrientationDegrees` ranges.
+
+Altitude endpoints are inclusive. Azimuth and bright-limb ranges use absolute
+degrees in `[0, 360)`, and a directed range whose start is greater than its end
+crosses `0°`; equal endpoints are invalid. When both azimuth sectors are
+present, the excluded sector must stay inside the directed included sector.
+The named phases use the existing phase-angle ranges:
+`new_moon`, `waxing_crescent`, `first_quarter`, `waxing_gibbous`, `full_moon`,
+`waning_gibbous`, `last_quarter`, and `waning_crescent`.
+
+Local-clock windows use the resolved location's timezone, not the browser
+timezone. Their start is inclusive and their end is exclusive. A later start
+crosses midnight. A daylight-saving gap contains no matching instant; both
+instants in an overlap match when their local clock value is allowed.
+Ambient-light mode instead uses `daylight`, `golden_hour`, `civil_twilight`,
+`nautical_twilight`, or `night` from the existing Sun-altitude rules. One
+request cannot combine the two time modes.
+
+Bright-limb ranges use the observer-oriented clockwise convention:
+`0°` points toward local zenith and `90°` points right toward increasing
+azimuth. A sample with no `brightLimbTiltDegrees` does not match an active
+bright-limb filter. `northPoleTiltDegrees` is not a preference field.
+
+### Evaluation order
+
+The opportunity engine applies active preferences in this order:
+
+1. `WindowGenerator` generates every complete natural candidate window inside
+   each physical Moon pass.
+2. The hard filter evaluates the complete window. A provisional suggestion or
+   preliminary score cannot remove another matching part of that window.
+3. The hard filter refines every filter transition and splits the window into
+   zero, one, or several continuous matching intervals.
+4. For a live search, the engine applies the request's captured `notBefore`
+   after splitting. It drops an interval whose `endsAt` is not after
+   `notBefore` and starts final suggestion selection no earlier than the later
+   of the interval start and `notBefore`.
+5. The engine chooses a final `suggestedAt` inside each retained interval and
+   recomputes the current score, selected weather, and displayed facts for that
+   instant.
+6. The engine ranks all retained intervals and then applies the ordinary global
+   result limit.
+
+Every retained interval enters normal ranking. Several intervals from one
+physical pass remain flat opportunities with the same `moonPass.id`; the
+engine does not guarantee one result per pass. Preferences add no score
+component. The existing component weights, tie-break order, and result-limit
+behavior remain unchanged.
+
+### Boundary and sampling contract
+
+When a filter changes between adjacent astronomy samples, the hard filter
+calculates the transition instead of cutting at the coarse sample time. This
+applies to lunar-disk azimuth overlap, numeric and circular ranges, phase
+changes, Sun-altitude bucket boundaries, and exact local-clock boundaries.
+
+The hard filter and the azimuth mask use the same chronological astronomy
+samples and crossing-refinement calculation. The current implementation uses a
+five-minute grid anchored at the physical pass start, adds natural-window
+boundaries, and refines a detected transition to one-second tolerance.
+Sampling brackets numerical crossings; it is not an analytical guarantee. An
+enter-and-exit event that occurs entirely between two evaluated samples may be
+missed. The contract does not impose a minimum azimuth-sector width to hide
+that limitation.
+
+### Lunar-disk azimuth filter
+
+Azimuth sectors represent absolute compass bearings. The allowed set is the
+included sector minus the optional excluded obstruction. When only an excluded
+sector is present, the full compass is implicitly included.
+
+`EphemerisSampler` supplies the actual topocentric apparent lunar angular
+radius for the location and instant. The hard filter projects that radius onto
+compass bearing at the sample altitude with spherical geometry. It does not use
+the Moon's center alone or a fixed azimuth offset. When the lunar disk contains
+the zenith, its bearing footprint spans the full compass.
+
+A sample matches when the visible lunar disk has a positive-area intersection
+with the allowed set. A partially allowed disk matches. A disk entirely
+outside the included sector or completely hidden by the obstruction does not.
+An obstruction narrower than the disk's bearing footprint may be unable to
+hide the disk completely. A zero-area tangent contact does not match.
+
+### Azimuth mask and filter diagnostics
+
+When azimuth filtering is active, the engine also calculates every continuous
+azimuth-only matching interval across each complete physical pass. It does this
+before applying another hard filter, ranking retained intervals, or applying
+the result limit. The mask stays within the inclusive domain from
+`moonPass.startsAt` through `moonPass.endsAt`; a search-horizon edge may already
+truncate that domain.
+
+Mask intervals are sorted, non-overlapping transition ranges. The engine keeps
+the complete mask for every physical pass represented by a returned
+opportunity. Opportunities with the same `moonPass.id` use the same mask.
+Azimuth filtering inactive means no mask. The mask is authoritative for the
+backend's azimuth decision; clients must not infer it from useful intervals or
+center-position path samples. Applying live `notBefore` does not shorten it.
+
+The preference result reports normalized active filters and one excluded-sample
+count. Count a distinct sample once when the engine considered it as a possible
+recommendation and any active filter rejected it, even when several filters
+failed. Do not count display-only Moon-pass samples, path samples, or samples
+used only to refine a crossing. Do not return excluded samples or opportunities
+as a second result list.
 
 ## Initial Inputs
 
@@ -200,10 +324,11 @@ scoring contract.
 
 ## V0 Selection Rules
 
-The rules below define the target policy. The current implementation
-hard-rejects a retained natural window only under the thin-crescent
-near-conjunction rule. Weather and visibility change the score, and the current
-implementation has no minimum total-score threshold.
+The rules below define the target policy. For a preference-free request, the
+current implementation hard-rejects a retained natural window only under the
+thin-crescent near-conjunction rule. Active version 1 preferences separately
+remove nonmatching intervals as described above. Weather and visibility change
+the score, and the current implementation has no minimum total-score threshold.
 
 Reject opportunities when:
 
@@ -264,8 +389,8 @@ Local hills, buildings, or trees may affect exact visibility near the horizon.
 ## V0 Window Assessment
 
 Do not make the first public model claim more precision than its inputs
-support. The important output is a set of ranked natural windows, clear facts,
-and a short explanation.
+support. The important output is a set of ranked natural windows or
+preference-retained intervals, clear facts, and a short explanation.
 
 The service may use a small internal numeric score to sort windows. The v0
 product should present that score as a ranking aid, not a minute-accurate
@@ -359,26 +484,30 @@ Forecast confidence:
 
 ## Implemented V0 Evaluation Flow
 
-The diagram below shows executable behavior. It does not include every target
-rule above. For a browser GET, the engine fetches an hourly forecast before it
-enters this pipeline. It uses the forecast record that covers each retained
-window's `suggestedAt`. A direct POST instead uses the fixed Prague fixture
-weather.
+The diagram below shows the preference-free executable behavior. It does not
+include every target rule above. An active version 1 preference inserts the
+hard-filter, interval-splitting, and final-rescoring steps described above
+before ranking and limiting. For a browser GET, the engine fetches an hourly
+forecast before it enters this pipeline. It uses the forecast record that
+covers each retained window's `suggestedAt`. A direct POST instead uses the
+fixed Prague fixture weather.
 
 [![Implemented V0 opportunity-evaluation flow](diagrams/scoring-flow.svg)](diagrams/scoring-flow.svg)
 
 [PlantUML source](diagrams/scoring-flow.puml)
 
 Window generation can return no windows. For a live GET, adjustment can remove
-every window that has ended. The visibility rule can reject every retained
+every window that has ended. An active hard preference can remove every
+retained interval, and the ordinary visibility rule can reject every retained
 window. Each case still returns a successful `ok` response with an empty
 opportunity list. Weather currently raises or lowers one component score; it
-does not reject a window. The engine explicitly rejects a window only when
-Moon illumination is below 1 percent and Sun-Moon separation is below
-8 degrees.
+does not reject a window. Apart from active hard preferences, the engine
+explicitly rejects a window only when Moon illumination is below 1 percent and
+Sun-Moon separation is below 8 degrees.
 
 The implementation authority is the
 [window generator](../prototypes/jvm-scoring/src/main/java/dev/moonservice/scoringprototype/window/WindowGenerator.java),
+[hard filter](../prototypes/jvm-scoring/src/main/java/dev/moonservice/scoringprototype/window/OpportunityHardFilter.java),
 [live-window selector](../backend/src/main/java/dev/moonservice/backend/opportunity/scoring/LiveOpportunityWindowSelector.java),
 [opportunity pipeline](../prototypes/jvm-scoring/src/main/java/dev/moonservice/scoringprototype/service/OpportunityService.java),
 and [scoring model](../prototypes/jvm-scoring/src/main/java/dev/moonservice/scoringprototype/scoring/ScoringModel.java).
@@ -502,9 +631,10 @@ V0 should start with one default `photographer_balanced` scoring profile. The
 anonymous web lookup should stay simple until real usage shows which controls
 matter.
 
-Later, the scoring model should support user-selected profiles or preferences
-without changing candidate generation. Candidate windows can remain broad,
-while the score changes to match the photographer's goal.
+Later scoring profiles may adjust weights without changing candidate
+generation. They are separate from version 1 hard preferences, which remove
+unusable intervals without changing the score. Candidate windows can remain
+broad while a later profile changes ranking to match the photographer's goal.
 
 Possible profile presets:
 
@@ -521,7 +651,7 @@ Possible profile presets:
 - `recurring_event_overlap`: favors Moon windows that overlap an approximate
   recurring event pattern, with explicit timing uncertainty.
 
-Possible preference controls:
+Possible future scoring-profile controls:
 
 - Light preference: daylight, golden hour, civil twilight, nautical twilight,
   night, or any.
@@ -534,15 +664,15 @@ Possible preference controls:
 - Travel or setup lead time.
 - Recurring event pattern, days, local time window, and early/late tolerance.
 
-Preferences should adjust weights and explanations without hiding the raw
-facts. For example, a daylight profile may score daylight higher than the
-v0 default, while the default profile continues to favor golden hour and civil
-twilight. The UI should still show Sun altitude, Moon illumination, weather,
-and exposure-balance text. Users can then override the recommendation with
-their own judgment.
+Future scoring profiles should adjust weights and explanations without hiding
+the raw facts. For example, a daylight profile may score daylight higher than
+the v0 default, while the default profile continues to favor golden hour and
+civil twilight. The UI should still show Sun altitude, Moon illumination,
+weather, and exposure-balance text. Users can then override the recommendation
+with their own judgment.
 
-Do not add server-side user profiles in v0 just to support scoring preferences.
-If profile selection is added before accounts, keep it request-scoped or stored
+Do not add server-side user profiles in v0 just to support profile selection. If
+profile selection is added before accounts, keep it request-scoped or stored
 only in browser `localStorage`.
 
 ## Alert Explanation

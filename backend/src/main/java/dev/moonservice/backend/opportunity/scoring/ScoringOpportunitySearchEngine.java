@@ -3,6 +3,8 @@ package dev.moonservice.backend.opportunity.scoring;
 import dev.moonservice.backend.location.ResolvedLocation;
 import dev.moonservice.backend.opportunity.InvalidOpportunitySearchRequestException;
 import dev.moonservice.backend.opportunity.search.OpportunitySearchEngine;
+import dev.moonservice.backend.opportunity.search.OpportunitySearchEngine.AzimuthMatchInterval;
+import dev.moonservice.backend.opportunity.search.OpportunitySearchEngine.PreferenceSearchResult;
 import dev.moonservice.backend.opportunity.search.OpportunitySearchRequest;
 import dev.moonservice.backend.opportunity.search.OpportunitySearchResponse;
 import dev.moonservice.backend.weather.WeatherForecast;
@@ -10,10 +12,12 @@ import dev.moonservice.backend.weather.WeatherForecastProvider;
 import dev.moonservice.scoringprototype.PreviewEvaluator;
 import dev.moonservice.scoringprototype.UsageException;
 import dev.moonservice.scoringprototype.fixture.Location;
+import dev.moonservice.scoringprototype.input.OpportunityPreferences;
 import dev.moonservice.scoringprototype.input.PrototypeConfig;
 import dev.moonservice.scoringprototype.output.ResponseFormatter;
 import dev.moonservice.scoringprototype.service.OpportunityService;
 import dev.moonservice.scoringprototype.service.PrototypeResult;
+import dev.moonservice.scoringprototype.window.OpportunityHardFilter;
 import tools.jackson.core.JacksonException;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
@@ -21,6 +25,8 @@ import tools.jackson.databind.node.ObjectNode;
 
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
@@ -75,18 +81,45 @@ public class ScoringOpportunitySearchEngine implements OpportunitySearchEngine {
                 new LiveOpportunityWindowSelector(Objects.requireNonNull(notBefore, "notBefore")));
     }
 
+    @Override
+    public PreferenceSearchResult search(
+            ResolvedLocation location,
+            OpportunitySearchRequest request,
+            Instant notBefore,
+            OpportunityPreferences preferences
+    ) {
+        Objects.requireNonNull(notBefore, "notBefore");
+        Objects.requireNonNull(preferences, "preferences");
+        try {
+            PrototypeConfig config = toPrototypeConfig(location, request);
+            WeatherForecast forecast = weatherForecastProvider.forecastFor(
+                    location,
+                    config.start(),
+                    config.end(),
+                    request.forecastHorizonDays());
+            OpportunityService.PreferenceEvaluation evaluation = opportunityService.evaluate(
+                    config,
+                    window -> forecast.weatherAt(window.suggested().instant()).toWeatherFixture(),
+                    preferences,
+                    notBefore);
+            return new PreferenceSearchResult(
+                    toBackendResponse(responseFormatter.format(evaluation.result())),
+                    evaluation.appliedPreferenceVersion(),
+                    evaluation.normalizedActiveFilters(),
+                    evaluation.excludedSampleCount(),
+                    toBackendAzimuthMatchIntervals(evaluation.azimuthMatchIntervals()));
+        } catch (UsageException ex) {
+            throw new IllegalStateException("Resolved opportunity scoring request was invalid.", ex);
+        }
+    }
+
     private OpportunitySearchResponse searchResolvedLocation(
             ResolvedLocation location,
             OpportunitySearchRequest request,
             OpportunityService.WindowAdjustment windowAdjustment
     ) {
         try {
-            PrototypeConfig config = new PrototypeConfig(
-                    toPrototypeLocation(location),
-                    request.startDate(),
-                    request.forecastHorizonDays(),
-                    request.maxMoonAltitudeDegrees(),
-                    request.limit());
+            PrototypeConfig config = toPrototypeConfig(location, request);
             WeatherForecast forecast = weatherForecastProvider.forecastFor(
                     location,
                     config.start(),
@@ -102,6 +135,18 @@ public class ScoringOpportunitySearchEngine implements OpportunitySearchEngine {
         }
     }
 
+    private static PrototypeConfig toPrototypeConfig(
+            ResolvedLocation location,
+            OpportunitySearchRequest request
+    ) {
+        return new PrototypeConfig(
+                toPrototypeLocation(location),
+                request.startDate(),
+                request.forecastHorizonDays(),
+                request.maxMoonAltitudeDegrees(),
+                request.limit());
+    }
+
     private static Location toPrototypeLocation(ResolvedLocation location) {
         return new Location(
                 location.locationId(),
@@ -113,6 +158,18 @@ public class ScoringOpportunitySearchEngine implements OpportunitySearchEngine {
                 location.elevationMeters(),
                 location.zoneId().getId(),
                 location.countryCode());
+    }
+
+    private static Map<String, List<AzimuthMatchInterval>> toBackendAzimuthMatchIntervals(
+            Map<String, List<OpportunityHardFilter.MatchInterval>> intervalsByPassId
+    ) {
+        Map<String, List<AzimuthMatchInterval>> result = new LinkedHashMap<>();
+        intervalsByPassId.forEach((passId, intervals) -> result.put(
+                passId,
+                intervals.stream()
+                        .map(interval -> new AzimuthMatchInterval(interval.startsAt(), interval.endsAt()))
+                        .toList()));
+        return result;
     }
 
     private static OpportunitySearchResponse toBackendResponse(String prototypeJson) {
