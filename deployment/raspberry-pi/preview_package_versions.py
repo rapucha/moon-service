@@ -1,0 +1,455 @@
+"""Fail-closed selection and proof rules for preview package versions.
+
+The module validates GitHub Container Registry responses, creates a
+deterministic retention plan, revalidates each deletion candidate, and proves
+the lifecycle of a disposable capability probe. It is deliberately free of
+network, filesystem, and command-line behavior so callers control every input
+and side effect.
+"""
+
+import calendar
+from dataclasses import dataclass
+from datetime import datetime, timezone
+from decimal import Decimal
+import json
+import re
+
+
+AGE_SECONDS = 691200
+NEWEST_OTHER_COUNT = 9
+PLAN_SCHEMA = 1
+
+_DIGEST_RE = re.compile(r"sha256:[0-9a-f]{64}")
+_PREVIEW_TAG_RE = re.compile(r"preview-pr-[1-9][0-9]*-[0-9a-f]{40}")
+_CREATED_AT_RE = re.compile(
+    r"(?P<year>[0-9]{4})-(?P<month>[0-9]{2})-(?P<day>[0-9]{2})"
+    r"T(?P<hour>[0-9]{2}):(?P<minute>[0-9]{2}):"
+    r"(?P<second>[0-9]{2})(?P<fraction>\.[0-9]+)?Z"
+)
+
+
+class SelectionError(ValueError):
+    """Report input or state that cannot support a safe package action."""
+
+
+def _is_positive_id(value):
+    """Classify a package-version ID without accepting booleans or coercions.
+
+    Callers receive only a boolean and can reject any uncertain identity.
+    """
+    return type(value) is int and value > 0
+
+
+@dataclass(frozen=True)
+class Version:
+    """Hold the validated identity and normalized tags of one package version."""
+
+    id: int
+    name: str
+    created_at: str
+    tags: tuple[str, ...]
+    created_epoch: Decimal
+
+    def snapshot(self):
+        """Return the canonical identity fields used for later comparison.
+
+        The result preserves normalized tag order so API ordering alone cannot
+        resemble a state change.
+        """
+        return {
+            "id": self.id,
+            "name": self.name,
+            "created_at": self.created_at,
+            "tags": list(self.tags),
+        }
+
+
+def _require_digest(value, message):
+    """Validate an immutable package digest supplied by a caller.
+
+    Only an exact lowercase SHA-256 digest is accepted; other input raises
+    ``SelectionError`` with the caller's safe context message.
+    """
+    if not isinstance(value, str) or _DIGEST_RE.fullmatch(value) is None:
+        raise SelectionError(message)
+
+
+def _require_nonnegative_epoch(value):
+    """Validate the captured UTC epoch used throughout one retention run.
+
+    Negative values, booleans, and non-integers raise ``SelectionError`` rather
+    than being coerced.
+    """
+    if type(value) is not int or value < 0:
+        raise SelectionError("invalid UTC epoch")
+
+
+def _created_epoch(value):
+    """Convert an API UTC timestamp into precise epoch seconds.
+
+    The result is a ``Decimal`` so fractional ordering and age checks are
+    exact. Any format, date, or time ambiguity raises ``SelectionError``.
+    """
+    if not isinstance(value, str):
+        raise SelectionError("invalid package-version schema")
+    match = _CREATED_AT_RE.fullmatch(value)
+    if match is None:
+        raise SelectionError("invalid package-version schema")
+    parts = {
+        name: int(match.group(name))
+        for name in ("year", "month", "day", "hour", "minute", "second")
+    }
+    try:
+        created = datetime(**parts, tzinfo=timezone.utc)
+    except ValueError as error:
+        raise SelectionError("invalid package-version schema") from error
+    epoch = Decimal(calendar.timegm(created.utctimetuple()))
+    fraction = match.group("fraction")
+    return epoch if fraction is None else epoch + Decimal(fraction)
+
+
+def validate_version(record):
+    """Validate one package-version API record into canonical state.
+
+    The returned ``Version`` has sorted tags, making tag sets independent of
+    API order. Missing, duplicated, or malformed identity fields fail closed
+    with ``SelectionError``.
+    """
+    if not isinstance(record, dict):
+        raise SelectionError("invalid package-version schema")
+    version_id = record.get("id")
+    if not _is_positive_id(version_id):
+        raise SelectionError("invalid package-version schema")
+    name = record.get("name")
+    _require_digest(name, "invalid package-version schema")
+    created_at = record.get("created_at")
+    created_epoch = _created_epoch(created_at)
+    metadata = record.get("metadata")
+    container = metadata.get("container") if isinstance(metadata, dict) else None
+    tags = container.get("tags") if isinstance(container, dict) else None
+    if (
+        not isinstance(tags, list)
+        or any(not isinstance(tag, str) for tag in tags)
+        or len(tags) != len(set(tags))
+    ):
+        raise SelectionError("invalid package-version schema")
+    return Version(
+        version_id,
+        name,
+        created_at,
+        tuple(sorted(tags)),
+        created_epoch,
+    )
+
+
+def parse_page_stream(stream):
+    """Parse the complete sequential stream emitted for paginated API pages.
+
+    The result contains validated versions in page order. Empty input,
+    non-array pages, trailing invalid content, and duplicate IDs raise
+    ``SelectionError`` so a partial snapshot cannot authorize deletion.
+    """
+    if not isinstance(stream, str):
+        raise SelectionError("invalid paginated JSON")
+    decoder = json.JSONDecoder()
+    position = 0
+    page_count = 0
+    versions = []
+    seen_ids = set()
+    while True:
+        while position < len(stream) and stream[position].isspace():
+            position += 1
+        if position == len(stream):
+            break
+        try:
+            page, position = decoder.raw_decode(stream, position)
+        except json.JSONDecodeError as error:
+            raise SelectionError("invalid paginated JSON") from error
+        if not isinstance(page, list):
+            raise SelectionError("paginated input must contain page arrays")
+        page_count += 1
+        for record in page:
+            version = validate_version(record)
+            if version.id in seen_ids:
+                raise SelectionError("duplicate package-version ID")
+            seen_ids.add(version.id)
+            versions.append(version)
+    if page_count == 0:
+        raise SelectionError("paginated input is empty")
+    return tuple(versions)
+
+
+def parse_record(stream):
+    """Parse one JSON API response into a validated ``Version``.
+
+    Invalid JSON or package state raises ``SelectionError``; no partial record
+    is returned.
+    """
+    try:
+        record = json.loads(stream)
+    except (json.JSONDecodeError, TypeError) as error:
+        raise SelectionError("invalid record JSON") from error
+    return validate_version(record)
+
+
+def _is_preview_only(version):
+    """Classify a version whose nonempty tag set contains only revision tags.
+
+    The predicate returns false for untagged, mixed, or malformed tag sets,
+    keeping uncertain versions out of the deletion candidate pool.
+    """
+    return bool(version.tags) and all(
+        _PREVIEW_TAG_RE.fullmatch(tag) is not None for tag in version.tags
+    )
+
+
+def _active_version(versions, expected_digest):
+    """Find the sole active preview version at an expected immutable digest.
+
+    Missing, duplicate, or digest-mismatched active versions raise
+    ``SelectionError`` rather than allowing retention or probe work.
+    """
+    active = [version for version in versions if "preview" in version.tags]
+    if len(active) != 1 or active[0].name != expected_digest:
+        raise SelectionError("active preview identity is invalid")
+    return active[0]
+
+
+def build_plan(versions, expected_digest, now_epoch):
+    """Build a deterministic retention plan from one complete snapshot.
+
+    The plan keeps the active version, the newest revision previews, and every
+    version at or inside the inclusive age boundary. Only older preview-only
+    versions can become candidates; invalid identity or timing state raises
+    ``SelectionError``.
+    """
+    _require_digest(expected_digest, "invalid expected digest")
+    _require_nonnegative_epoch(now_epoch)
+    versions = tuple(versions)
+    ids = [version.id for version in versions]
+    if len(ids) != len(set(ids)):
+        raise SelectionError("duplicate package-version ID")
+    active = _active_version(versions, expected_digest)
+    ordered = sorted(
+        (
+            version
+            for version in versions
+            if version.id != active.id and _is_preview_only(version)
+        ),
+        key=lambda version: (version.created_epoch, version.id),
+        reverse=True,
+    )
+    boundary = Decimal(now_epoch - AGE_SECONDS)
+    keep_ids = {active.id}
+    keep_ids.update(
+        version.id for version in ordered[:NEWEST_OTHER_COUNT]
+    )
+    keep_ids.update(
+        version.id
+        for version in versions
+        if version.created_epoch >= boundary
+    )
+    candidates = [
+        version.id
+        for version in ordered
+        if version.id not in keep_ids and version.created_epoch < boundary
+    ]
+    return {
+        "schema": PLAN_SCHEMA,
+        "now_epoch": now_epoch,
+        "expected_digest": expected_digest,
+        "active_version_id": active.id,
+        "keep_ids": sorted(keep_ids),
+        "candidate_ids": candidates,
+        "versions": [
+            version.snapshot()
+            for version in sorted(versions, key=lambda version: version.id)
+        ],
+    }
+
+
+def _version_from_snapshot(snapshot):
+    """Recreate validated version state from one canonical plan snapshot.
+
+    Extra, missing, or malformed fields raise ``SelectionError`` so a modified
+    snapshot cannot survive plan validation.
+    """
+    if not isinstance(snapshot, dict) or set(snapshot) != {
+        "id",
+        "name",
+        "created_at",
+        "tags",
+    }:
+        raise SelectionError("invalid plan")
+    return validate_version(
+        {
+            "id": snapshot["id"],
+            "name": snapshot["name"],
+            "created_at": snapshot["created_at"],
+            "metadata": {"container": {"tags": snapshot["tags"]}},
+        }
+    )
+
+
+def validate_plan(plan):
+    """Validate a plan by recomputing it from its embedded snapshots.
+
+    The validated versions are returned for fresh-record comparison. Any
+    schema error or change to a derived field raises ``SelectionError``.
+    """
+    if not isinstance(plan, dict) or set(plan) != {
+        "schema",
+        "now_epoch",
+        "expected_digest",
+        "active_version_id",
+        "keep_ids",
+        "candidate_ids",
+        "versions",
+    }:
+        raise SelectionError("invalid plan")
+    if type(plan["schema"]) is not int or plan["schema"] != PLAN_SCHEMA:
+        raise SelectionError("invalid plan")
+    if not isinstance(plan["versions"], list):
+        raise SelectionError("invalid plan")
+    versions = tuple(
+        _version_from_snapshot(snapshot) for snapshot in plan["versions"]
+    )
+    expected = build_plan(
+        versions,
+        plan["expected_digest"],
+        plan["now_epoch"],
+    )
+    if json.dumps(plan, sort_keys=True) != json.dumps(
+        expected,
+        sort_keys=True,
+    ):
+        raise SelectionError("invalid plan")
+    return versions
+
+
+def revalidate_candidate(plan, candidate_id, active_record, candidate_record):
+    """Revalidate one planned deletion against fresh active and candidate data.
+
+    The approved candidate ID is returned only when both records exactly match
+    the validated snapshot and the candidate remains older and preview-only.
+    Every mismatch raises ``SelectionError`` before deletion.
+    """
+    versions = validate_plan(plan)
+    if not _is_positive_id(candidate_id):
+        raise SelectionError("invalid candidate ID")
+    if candidate_id not in plan["candidate_ids"]:
+        raise SelectionError("candidate is not approved")
+    if (
+        candidate_id in plan["keep_ids"]
+        or candidate_id == plan["active_version_id"]
+    ):
+        raise SelectionError("candidate is not approved")
+    snapshots = {version.id: version for version in versions}
+    active_snapshot = snapshots[plan["active_version_id"]]
+    candidate_snapshot = snapshots[candidate_id]
+    if active_record.snapshot() != active_snapshot.snapshot():
+        raise SelectionError("active preview changed")
+    if candidate_record.snapshot() != candidate_snapshot.snapshot():
+        raise SelectionError("candidate changed")
+    _active_version((active_record,), plan["expected_digest"])
+    boundary = Decimal(plan["now_epoch"] - AGE_SECONDS)
+    if (
+        not _is_preview_only(candidate_record)
+        or candidate_record.created_epoch >= boundary
+    ):
+        raise SelectionError("candidate is no longer eligible")
+    return candidate_id
+
+
+def _require_probe_tag(probe_tag):
+    """Validate the disposable tag used to identify a capability probe.
+
+    Empty, non-string, or active ``preview`` tags raise ``SelectionError`` so
+    the proof cannot target the production alias.
+    """
+    if (
+        not isinstance(probe_tag, str)
+        or not probe_tag
+        or probe_tag == "preview"
+    ):
+        raise SelectionError("invalid probe tag")
+    return probe_tag
+
+
+def prove_probe_created(
+    before,
+    after,
+    expected_active_digest,
+    probe_tag,
+    expected_probe_digest,
+    probe_record=None,
+):
+    """Prove exact creation of one disposable package version.
+
+    The new positive ID is returned only when the probe tag was absent before,
+    exactly one new version has the expected distinct digest and sole probe
+    tag, and the active preview digest remains unchanged. Ambiguity or an
+    optional fresh-record mismatch raises ``SelectionError``.
+    """
+    _require_digest(expected_active_digest, "invalid expected active digest")
+    _require_digest(expected_probe_digest, "invalid expected probe digest")
+    if expected_probe_digest == expected_active_digest:
+        raise SelectionError("probe digest is not distinct")
+    probe_tag = _require_probe_tag(probe_tag)
+    before = tuple(before)
+    after = tuple(after)
+    _active_version(before, expected_active_digest)
+    _active_version(after, expected_active_digest)
+    if any(probe_tag in version.tags for version in before):
+        raise SelectionError("probe tag existed before creation")
+    before_ids = {version.id for version in before}
+    new_versions = [
+        version for version in after if version.id not in before_ids
+    ]
+    if len(new_versions) != 1:
+        raise SelectionError("probe creation identity is invalid")
+    created = new_versions[0]
+    tagged = [
+        version for version in after if probe_tag in version.tags
+    ]
+    if (
+        tagged != [created]
+        or created.name != expected_probe_digest
+        or created.tags != (probe_tag,)
+    ):
+        raise SelectionError("probe creation identity is invalid")
+    if (
+        probe_record is not None
+        and probe_record.snapshot() != created.snapshot()
+    ):
+        raise SelectionError("probe record changed")
+    return created.id
+
+
+def prove_probe_absent(
+    versions,
+    expected_active_digest,
+    probe_tag,
+    probe_version_id=None,
+):
+    """Prove probe cleanup while preserving the active preview identity.
+
+    ``True`` is returned only when the probe tag and optional exact ID are
+    absent and the expected active digest remains unique. Residue or ambiguous
+    active state raises ``SelectionError``.
+    """
+    _require_digest(expected_active_digest, "invalid expected active digest")
+    probe_tag = _require_probe_tag(probe_tag)
+    versions = tuple(versions)
+    _active_version(versions, expected_active_digest)
+    if any(probe_tag in version.tags for version in versions):
+        raise SelectionError("probe tag is present")
+    if probe_version_id is not None:
+        if not _is_positive_id(probe_version_id):
+            raise SelectionError("invalid probe version ID")
+        if any(
+            version.id == probe_version_id
+            for version in versions
+        ):
+            raise SelectionError("probe version is present")
+    return True

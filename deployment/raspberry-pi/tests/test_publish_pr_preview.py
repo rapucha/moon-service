@@ -4,6 +4,9 @@ import unittest
 
 ROOT = Path(__file__).resolve().parents[3]
 WORKFLOW_PATH = ROOT / ".github" / "workflows" / "publish-pr-preview.yml"
+HELPER_PATH = (
+    "trusted/deployment/raspberry-pi/preview_package_retention.py"
+)
 
 
 class PublishPullRequestPreviewWorkflowTest(unittest.TestCase):
@@ -50,13 +53,19 @@ class PublishPullRequestPreviewWorkflowTest(unittest.TestCase):
             "retention-days: 1",
         ):
             self.assertIn(required, self.build)
-        self.assertIn("artifact_name: ${{ steps.archive.outputs.artifact_name }}", self.build)
-        self.assertIn("name: ${{ needs.build-preview.outputs.artifact_name }}", self.publish)
+        self.assertIn(
+            "artifact_name: ${{ steps.archive.outputs.artifact_name }}",
+            self.build,
+        )
+        self.assertIn(
+            "name: ${{ needs.build-preview.outputs.artifact_name }}",
+            self.publish,
+        )
 
     def test_publisher_uses_standard_docker_commands_and_reports_one_digest(self):
         for required in (
             'docker load --input "$RUNNER_TEMP/moon-preview-archive/preview-image.tar"',
-            ".[0].Architecture == \"arm64\"",
+            '.[0].Architecture == "arm64"',
             "docker/login-action@",
             'docker tag "$LOCAL_IMAGE" "$REVISION_REF"',
             'docker push "$REVISION_REF"',
@@ -67,6 +76,62 @@ class PublishPullRequestPreviewWorkflowTest(unittest.TestCase):
             'echo "- Digest: \\`$revision_digest\\`"',
         ):
             self.assertIn(required, self.publish)
+
+    def test_preview_pull_request_label_is_built_and_revalidated(self):
+        label = "dev.moonservice.preview.pull-request"
+        self.assertIn(f'--label "{label}=$PULL_REQUEST"', self.build)
+        self.assertIn(
+            f'.[0].Config.Labels["{label}"] == $pull_request',
+            self.publish,
+        )
+        self.assertIn(
+            "PULL_REQUEST: ${{ needs.build-preview.outputs.pull_request_number }}",
+            self.publish,
+        )
+
+    def test_package_helper_runs_only_after_digest_verification(self):
+        digest_check = self.publish.index(
+            '[[ "$preview_digest" == "$revision_digest" ]]'
+        )
+        retention = self.publish.index(
+            "- name: Retain bounded preview package versions"
+        )
+        probe = self.publish.index(
+            "- name: Probe package list get and delete capability"
+        )
+        self.assertLess(digest_check, retention)
+        self.assertLess(retention, probe)
+        self.assertEqual(2, self.publish.count(HELPER_PATH))
+
+    def test_workflow_delegates_package_orchestration_to_trusted_helper(self):
+        lifecycle = self.publish[
+            self.publish.index("- name: Retain bounded preview package versions"):
+        ]
+        self.assertIn(f"{HELPER_PATH} retain", lifecycle)
+        self.assertIn(f"{HELPER_PATH} probe", lifecycle)
+        for inline_detail in (
+            "gh api --paginate",
+            "gh api --method DELETE",
+            "PACKAGE_VERSIONS_PATH",
+            "select_preview_package_versions.py",
+            "preview-package-capability-probe-$GITHUB_RUN_ID",
+        ):
+            self.assertNotIn(inline_detail, lifecycle)
+
+    def test_capability_probe_defaults_off(self):
+        self.assertIn("package_capability_probe:", self.workflow)
+        probe_input = self.workflow[
+            self.workflow.index("      package_capability_probe:"):
+            self.workflow.index("\n\npermissions:")
+        ]
+        self.assertIn("default: false", probe_input)
+        probe = self.publish[
+            self.publish.index(
+                "- name: Probe package list get and delete capability"
+            ):
+        ]
+        self.assertIn("if: ${{ inputs.package_capability_probe }}", probe)
+        self.assertEqual(1, probe.count(f"{HELPER_PATH} probe"))
 
     def test_workflow_serializes_complete_dispatches(self):
         pre_jobs = self.workflow[: self.workflow.index("jobs:\n")]
@@ -85,7 +150,10 @@ class PublishPullRequestPreviewWorkflowTest(unittest.TestCase):
         self.assertGreaterEqual(len(action_lines), 7)
         for line in action_lines:
             with self.subTest(line=line):
-                self.assertRegex(line, r"^uses: [^@\s]+@[0-9a-f]{40}(?:\s+#.*)?$")
+                self.assertRegex(
+                    line,
+                    r"^uses: [^@\s]+@[0-9a-f]{40}(?:\s+#.*)?$",
+                )
 
     def test_custom_oci_and_registry_protocols_are_absent(self):
         forbidden = (
@@ -96,11 +164,17 @@ class PublishPullRequestPreviewWorkflowTest(unittest.TestCase):
             "type=oci",
             "expected-identity.json",
             "urllib.request",
+            "ghcr.io/v2/",
+            "skopeo",
+            "oras ",
         )
         for value in forbidden:
             self.assertNotIn(value, self.workflow)
         for name in forbidden[:4]:
             self.assertFalse((ROOT / "scripts" / name).exists())
+        self.assertFalse(
+            (ROOT / "scripts" / "select_preview_package_versions.py").exists()
+        )
 
 
 if __name__ == "__main__":
