@@ -83,6 +83,7 @@ class HostedAlphaSurfaceFunctionalTest {
             "/favicon.svg", "/styles.css", "/sun-marker-aperture-flare.svg", "/terms.js", "/types.js",
             "/moonPathLightBands.js", "/moonPathSilhouetteSymbols.js", "/moonPathSilhouettes.js",
             "/moonPathView.js", "/moonPhaseView.js", "/moonTexture.js", "/opportunityCard.js",
+            "/opportunityPreferences.css", "/opportunityPreferences.js",
             "/recentSearches.js", "/responseView.js", "/scoreView.js"
     })
     void servesExactCurrentStaticAssetInventory(String path) {

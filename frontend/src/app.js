@@ -1,5 +1,6 @@
 import { apiPathFor, fallbackPayload } from "./api.js";
 import { element } from "./dom.js";
+import { createOpportunityPreferences } from "./opportunityPreferences.js";
 import { readRecent, saveRecentLocation, writeRecent } from "./recentSearches.js";
 import { createResponseView } from "./responseView.js";
 
@@ -14,6 +15,9 @@ var recentList = /** @type {HTMLElement} */ (document.getElementById("recent-lis
 var clearRecent = /** @type {HTMLButtonElement} */ (document.getElementById("clear-recent"));
 var resultProviderCredit = /** @type {HTMLElement} */ (document.getElementById("result-provider-credit"));
 var resultObstructionNote = /** @type {HTMLElement} */ (document.getElementById("result-obstruction-note"));
+var preferenceDetails = /** @type {HTMLDetailsElement} */ (document.getElementById("opportunity-preferences"));
+var preferenceForm = /** @type {HTMLFormElement} */ (document.getElementById("preference-form"));
+var preferenceResultRegion = /** @type {HTMLElement} */ (document.getElementById("preference-result-region"));
 var submitButton = /** @type {HTMLButtonElement} */ (form.querySelector("button[type='submit']"));
 var narrowSearchLayout = window.matchMedia("(max-width: 680px)");
 var activeRequest = null;
@@ -29,6 +33,19 @@ var responseView = createResponseView(results, {
   }
 });
 
+var preferences = createOpportunityPreferences({
+  details: preferenceDetails,
+  form: preferenceForm,
+  resultRegion: preferenceResultRegion,
+  narrowLayout: narrowSearchLayout,
+  onApply: function () {
+    var request = lookupFromUrl();
+    if (request) {
+      runLookup(request, { updateUrl: false });
+    }
+  }
+});
+
 form.addEventListener("submit", function (event) {
   event.preventDefault();
   search(input.value, { updateUrl: true });
@@ -39,7 +56,7 @@ clearRecent.addEventListener("click", function () {
   renderRecent();
 });
 
-narrowSearchLayout.addEventListener("change", syncRecentDisclosure);
+narrowSearchLayout.addEventListener("change", syncSearchDisclosures);
 
 window.addEventListener("popstate", function () {
   runLookup(lookupFromUrl(), { updateUrl: false });
@@ -62,7 +79,7 @@ document.addEventListener("click", function (event) {
   });
 });
 
-syncRecentDisclosure(narrowSearchLayout);
+syncSearchDisclosures(narrowSearchLayout);
 renderRecent();
 runLookup(lookupFromUrl(), { updateUrl: false });
 
@@ -83,6 +100,7 @@ function runLookup(request, options) {
   if (!request) {
     input.value = "";
     updateResultNotes("");
+    preferences.beginSearch();
     responseView.renderIntro();
     return;
   }
@@ -106,6 +124,7 @@ function search(rawQuery, options) {
 
   if (validationMessage) {
     updateResultNotes("");
+    preferences.beginSearch();
     responseView.renderInvalid(validationMessage);
     return;
   }
@@ -127,6 +146,7 @@ function searchLocationId(rawLocationId, displayName, options) {
 
   if (validationMessage) {
     updateResultNotes("");
+    preferences.beginSearch();
     responseView.renderInvalid(validationMessage);
     return;
   }
@@ -174,17 +194,14 @@ function fetchOpportunities(request) {
 
   activeRequest = new AbortController();
   var requestController = activeRequest;
+  var searchRequest = searchRequestFor(request, requestController.signal);
   setSearchBusy(true);
   results.setAttribute("aria-busy", "true");
   updateResultNotes("");
+  preferences.beginSearch();
   responseView.renderLoading(request.label);
 
-  fetch(apiPathFor(request), {
-    headers: {
-      "Accept": "application/json"
-    },
-    signal: requestController.signal
-  })
+  fetch(searchRequest.path, searchRequest.options)
     .then(function (response) {
       return response.json()
         .catch(function () {
@@ -192,12 +209,14 @@ function fetchOpportunities(request) {
         })
         .then(function (payload) {
           updateResultNotes(payload && payload.status);
+          preferences.renderResponse(payload);
           responseView.renderResponse(payload || fallbackPayload(response.status), request, response.status);
         });
     })
     .catch(function (error) {
       if (error.name !== "AbortError") {
         updateResultNotes("");
+        preferences.renderResponse(null);
         responseView.renderResponse({
           status: "temporarily_unavailable",
           message: "The lookup could not be reached. Try again shortly."
@@ -213,8 +232,23 @@ function fetchOpportunities(request) {
     });
 }
 
-function syncRecentDisclosure(mediaQuery) {
+function searchRequestFor(request, signal) {
+  var preferenceRequest = preferences.requestFor(request, signal);
+  if (preferenceRequest) {
+    return preferenceRequest;
+  }
+  return {
+    path: apiPathFor(request),
+    options: {
+      headers: { "Accept": "application/json" },
+      signal: signal
+    }
+  };
+}
+
+function syncSearchDisclosures(mediaQuery) {
   recentSearches.open = !mediaQuery.matches;
+  preferenceDetails.open = !mediaQuery.matches;
 }
 
 function updateResultNotes(status) {

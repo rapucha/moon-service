@@ -7,7 +7,9 @@ so far, separates them from open design questions, and gives future UI work a
 stable target.
 
 The current scope is the `/search` web page, opportunity cards, Moon path
-visualization, and the calibration-feedback interaction tracked by
+visualization, the altitude and availability preferences tracked by
+[#192](https://github.com/rapucha/moon-service/issues/192), and the
+calibration-feedback interaction tracked by
 [#33](https://github.com/rapucha/moon-service/issues/33). Broader visual design,
 feeds, calendar export pages, account flows, and native apps are out of scope
 for this document until they become active product work.
@@ -95,11 +97,84 @@ The frontend module split is intended to keep future UI changes manageable:
 - `format.js`: date, time, degree, and percentage formatting;
 - `dom.js`: DOM and SVG element helpers;
 - `recentSearches.js`: localStorage behavior;
+- `opportunityPreferences.js`: preference state, controls, storage, request
+  options, result summary, and preference notices;
 - `responseView.js`: response states and result rendering;
 - `opportunityCard.js`: opportunity card layout;
 - `moonPathView.js`: Moon path, separate Sun pass, and suggested-time sky-position views;
 - `moonPhaseView.js`: Moon phase rendering;
 - `scoreView.js`: score block and score details.
+
+## Opportunity Preferences
+
+The accepted option A places the preference editor in the existing desktop
+sidebar. On mobile, the same editor uses a compact native `details` disclosure
+with a clear summary label. The active-filter summary remains beside the
+results at both widths, including while the mobile editor is closed.
+
+The first editor exposes two hard filters:
+
+- Moon altitude is one optional inclusive range. The UI labels both endpoints
+  in degrees and prevents applying preferences or starting their lookup until
+  the enabled range is valid.
+- Availability uses exactly one mode at a time. Local-clock mode accepts one or
+  more windows in the searched location's timezone and explains that a window
+  may cross midnight. Ambient-light mode accepts one or more of `Daylight`,
+  `Golden hour`, `Civil twilight`, `Nautical twilight`, and `Night`. Switching
+  modes removes the other mode from active state.
+
+These controls remove candidates that fall outside the limits. They do not
+adjust scores or change the order of candidates that remain. With no active
+filter, Search keeps its preference-free request and current default results.
+The detailed request and filtering rules remain in
+[the product preference API contract](api-shape.md#product-preference-post) and
+[the scoring model](scoring-model.md#version-1-hard-preferences).
+
+The results region shows each active filter with its own remove button and
+provides `Reset all preferences`. Altitude is one removable filter.
+Availability is one grouped removable filter, including when it contains
+several windows or buckets. Removing it clears that availability mode. Reset
+removes every active filter and removes the stored preference object when
+browser storage accepts the removal. If removal fails, the current page uses
+reset state in memory and reports the storage failure. The preference summary
+also reports the total number of candidate samples excluded by the server.
+
+Preference-specific messages stay beside the summary:
+
+- If active filters remove every candidate, the empty message says that the
+  preferences caused the result. It does not describe this state as an
+  astronomy, location, or weather failure.
+- If the server ignored fields, the warning reports them as text, never as
+  HTML.
+- If stored state is malformed or uses an unsupported version, the browser
+  discards it and says that the saved preferences could not be used.
+- If browser storage is unavailable, the browser says that preferences will
+  last only for the current page while search continues.
+- When active preferences exist, the share message says that the link includes
+  only the location. A receiving browser uses its own saved preferences, if
+  any.
+
+The browser keeps one versioned preference state for the editor, request,
+storage, reset behavior, and result explanations. It stores supported state
+under `moonService.opportunityPreferences.v1`. Version 1 storage for this
+editor retains only altitude and availability fields that the editor
+understands. The browser discards malformed or unsupported stored state rather
+than sending it. If `localStorage` is blocked or unavailable, it keeps the
+state in page memory and lets search continue.
+
+`opportunityPreferences.js` owns this state, its normalization and storage, the
+editor synchronization, preference request options, and the summary and
+notices in its own page region. `app.js` coordinates the lookup flow with that
+module. `api.js` remains responsible for the existing default request, and
+`responseView.js` remains responsible for ordinary opportunity statuses.
+
+Every preference input has a visible label. Related choices use `fieldset` and
+`legend`, and remove and reset actions use real buttons. The native disclosure,
+editor, active filters, and reset action must work from the keyboard in a
+logical order. Validation identifies the affected field in text. Summary,
+storage, ignored-field, excluded-count, and filtered-empty changes are
+announced to screen readers without depending on color. Removing a filter or
+resetting preferences leaves focus on a logical surviving control.
 
 ## Opportunity Card
 

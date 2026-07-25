@@ -10,7 +10,10 @@ feeds, and calendar exports deliberately out of scope.
 - `GET /api/opportunities?q=Praha` as the query-shaped public lookup path.
 - `GET /api/opportunities?locationId=moon-service-3067696` for selecting one
   backend location candidate after ambiguous city lookup.
-- Browser lookup page at `/search?q=Praha`, backed by the query-shaped API.
+- `POST /api/opportunities` for a live lookup with request-scoped hard
+  preferences.
+- Browser lookup page at `/search?q=Praha`, using GET without active hard
+  preferences and the product POST when at least one is active.
 - `POST /api/opportunities/search` using the same JSON request body as the scoring
   prototype fixture.
 - Disabled-by-default calibration feedback capability at
@@ -304,18 +307,35 @@ GET /search?q=Praha
 ```
 
 The browser page is the first anonymous MVP lookup flow. It serves static
-HTML/CSS/JavaScript from the backend, calls `GET /api/opportunities?q=...` only
-after an explicit form submit or a shared `/search?q=...` page load, and renders
-the documented product states without exposing provider internals. The current
-page is intentionally plain JavaScript with no frontend build step.
-Ambiguous-location choices call the same endpoint with a selected backend
-location ID, for example `GET /api/opportunities?locationId=moon-service-3067696`,
-and are shareable as `/search?locationId=moon-service-3067696`.
+HTML/CSS/JavaScript from the backend. After an explicit form submit or a shared
+`/search?q=...` page load, it calls `GET /api/opportunities` when no hard
+preference is active. When at least one is active, it sends a JSON
+`POST /api/opportunities` for the same lookup. The POST body contains exactly
+one `q` or `locationId` and the versioned preference object. Preference values
+never enter the page or share URL. The page renders the documented product
+states without exposing provider internals and uses plain JavaScript with no
+frontend build step.
 
-The page keeps recent searches only in browser `localStorage` under
-`moonService.recentSearches.v1`. Entries contain display name, location ID, and
-timezone only; the page still works if browser storage is unavailable. It does
-not create accounts, cookies, email subscriptions, or server-side user profiles.
+An ambiguous-location choice repeats the GET or POST lookup with the selected
+backend location ID. A preference-free example is
+`GET /api/opportunities?locationId=moon-service-3067696`. Its share URL is
+`/search?locationId=moon-service-3067696`; an active preference does not change
+that URL.
+
+The page uses two optional browser `localStorage` entries.
+`moonService.recentSearches.v1` keeps up to five display names, location IDs,
+and timezones. `moonService.opportunityPreferences.v1` keeps only the supported
+versioned altitude and availability hard limits. A reset removes this entry
+when browser storage accepts the removal. If storage is unavailable, including
+during reset, lookup continues with the current page's preference state in
+memory and the page reports that it cannot save preferences. The browser sends
+active preferences only for a search, and the server does not permanently store
+them. This flow does not create accounts, cookies, email subscriptions, or
+server-side user profiles.
+
+[`app.js`](../frontend/src/app.js) coordinates lookup and browser history.
+[`opportunityPreferences.js`](../frontend/src/opportunityPreferences.js) owns
+preference storage, request construction, and result explanations.
 
 Frontend tooling is repo-local Node tooling. Install once with:
 
@@ -460,15 +480,15 @@ policy to every request reaching that application instance.
 The enabled policy allows `GET` and `HEAD` for `/`, `/search`, `/about`, their
 backing HTML files, the exact static files tracked by the current build,
 `/api/opportunities`, `/readyz`, exact `/admin/status`, and the feedback
-capability route. It separately allows only `POST` for the feedback submission
-route so that route can receive its bounded JSON body. Adding a static file
-does not publish it automatically; update the explicit allowlist and test
-inventory. Every other `/admin/**` path, the fixture endpoint, `/healthz`, and
-every unapproved path returns `404`, even with the admin token. An unapproved
-method on an approved path returns `405` with the path-specific `Allow` value;
-a framed `GET` or `HEAD` body returns `400` before authentication. The feedback
-routes send no permissive CORS headers, and `OPTIONS` is not an allowed
-cross-origin preflight method.
+capability route. It also allows `POST /api/opportunities` for a bounded
+preference body and only `POST` for the feedback submission route. Adding a
+static file does not publish it automatically; update the explicit allowlist
+and test inventory. Every other `/admin/**` path, the fixture endpoint,
+`/healthz`, and every unapproved path returns `404`, even with the admin token.
+An unapproved method on an approved path returns `405` with the path-specific
+`Allow` value; a framed `GET` or `HEAD` body returns `400` before authentication.
+The feedback routes send no permissive CORS headers, and `OPTIONS` is not an
+allowed cross-origin preflight method.
 
 Hosted startup requires an explicit 64-hex-character `moon.admin.token`
 generated with `openssl rand -hex 32`; this validates format, not randomness.
@@ -494,9 +514,9 @@ Exact `/admin/status` attempts consume that capacity even when their method,
 body, or token is rejected; an admin `429` remains `no-store` and carries the
 hosted security headers.
 
-Exact `GET`/`HEAD /api/opportunities` requests also require one provider token
-and one of two concurrent provider-operation permits before controller or
-provider work.
+Exact `GET`, `HEAD`, and `POST` requests to `/api/opportunities` also require
+one provider token and one of two concurrent provider-operation permits before
+controller or provider work.
 The fixture POST, static files, admin status, and readiness do not consume those
 two resources. A rejection returns HTTP `429`, canonical `rate_limited` JSON,
 and a numeric `Retry-After` hint. The Docker carve-out is only bodyless

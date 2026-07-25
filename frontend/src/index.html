@@ -6,6 +6,7 @@
   <title>Moon Service</title>
   <link rel="icon" href="/favicon.svg" type="image/svg+xml">
   <link rel="stylesheet" href="/styles.css">
+  <link rel="stylesheet" href="/opportunityPreferences.css">
 </head>
 <body>
   <header class="topbar">
@@ -47,7 +48,7 @@
     </section>
 
     <div class="content-grid">
-      <aside class="side-column" aria-label="Lookup context">
+      <aside class="side-column" aria-label="Lookup context and hard limits">
         <details id="recent-searches" class="side-panel recent-panel">
           <summary id="recent-title">Recent searches</summary>
           <div class="panel-heading">
@@ -61,6 +62,93 @@
             <a href="https://open-meteo.com/" rel="noreferrer">Open-Meteo</a> and
             <a href="https://www.geonames.org/export/" rel="noreferrer">GeoNames</a>.
           </p>
+        </details>
+
+        <details id="opportunity-preferences" class="side-panel preference-panel">
+          <summary>
+            <span>Hard limits</span>
+            <span id="preference-count">None active</span>
+          </summary>
+          <div class="preference-body">
+            <div class="preference-heading">
+              <p class="eyebrow">Preferences</p>
+              <h2>Hard limits</h2>
+            </div>
+            <p class="preference-intro">Exclude results you cannot photograph. Hard limits do not adjust scores.</p>
+
+            <form id="preference-form" novalidate>
+              <section class="preference-group">
+                <label class="preference-choice" for="preference-altitude-enabled">
+                  <input
+                    id="preference-altitude-enabled"
+                    type="checkbox"
+                    aria-controls="preference-altitude-fields"
+                    aria-expanded="false">
+                  <span>Limit Moon altitude</span>
+                </label>
+                <p class="preference-help">Inclusive range from 0° to 90°.</p>
+                <div id="preference-altitude-fields" class="preference-range-fields">
+                  <label for="preference-altitude-minimum">
+                    <span>Minimum</span>
+                    <input
+                      id="preference-altitude-minimum"
+                      type="number"
+                      min="0"
+                      max="90"
+                      step="any"
+                      aria-label="Minimum Moon altitude in degrees">
+                  </label>
+                  <label for="preference-altitude-maximum">
+                    <span>Maximum</span>
+                    <input
+                      id="preference-altitude-maximum"
+                      type="number"
+                      min="0"
+                      max="90"
+                      step="any"
+                      aria-label="Maximum Moon altitude in degrees">
+                  </label>
+                </div>
+              </section>
+
+              <fieldset class="preference-group preference-time-group">
+                <legend>Availability</legend>
+                <div class="preference-mode-choices">
+                  <label class="preference-choice">
+                    <input type="radio" name="preference-time-mode" value="none">
+                    <span>No time limit</span>
+                  </label>
+                  <label class="preference-choice">
+                    <input type="radio" name="preference-time-mode" value="local_clock">
+                    <span>Local clock windows</span>
+                  </label>
+                  <label class="preference-choice">
+                    <input type="radio" name="preference-time-mode" value="light_bucket">
+                    <span>Ambient light</span>
+                  </label>
+                </div>
+
+                <div id="preference-clock-editor" class="preference-time-editor">
+                  <div id="preference-clock-rows" class="preference-clock-rows"></div>
+                  <button id="preference-add-window" type="button" class="text-button preference-add-window">
+                    Add another window
+                  </button>
+                  <p class="preference-help">Uses the searched location’s timezone. An end before the start crosses midnight.</p>
+                </div>
+
+                <div id="preference-light-editor" class="preference-buckets">
+                  <label class="preference-choice"><input type="checkbox" value="daylight"> <span>Daylight</span></label>
+                  <label class="preference-choice"><input type="checkbox" value="golden_hour"> <span>Golden hour</span></label>
+                  <label class="preference-choice"><input type="checkbox" value="civil_twilight"> <span>Civil twilight</span></label>
+                  <label class="preference-choice"><input type="checkbox" value="nautical_twilight"> <span>Nautical twilight</span></label>
+                  <label class="preference-choice"><input type="checkbox" value="night"> <span>Night</span></label>
+                </div>
+              </fieldset>
+
+              <p id="preference-form-status" class="preference-form-status" role="status" aria-live="polite"></p>
+              <button type="submit" class="preference-apply">Use these limits</button>
+            </form>
+          </div>
         </details>
       </aside>
 
@@ -76,6 +164,29 @@
             <span class="tooltip" title="Result pages can be opened again or sent to someone else." data-tooltip="Result pages can be opened again or sent to someone else.">Share link</span>
           </div>
         </div>
+        <div id="preference-result-region" class="preference-result-region" aria-live="polite">
+          <p id="preference-storage-notice" class="preference-notice warning" role="status" hidden></p>
+          <section
+            id="active-preference-summary"
+            class="active-preference-summary"
+            aria-labelledby="active-preference-title"
+            hidden>
+            <div class="active-preference-heading">
+              <h3 id="active-preference-title">Active hard limits</h3>
+              <button id="preference-reset" type="button" class="preference-reset">Reset all preferences</button>
+            </div>
+            <ul id="active-filter-list" class="active-filter-list"></ul>
+            <p id="preference-timezone-note" class="preference-summary-note"></p>
+            <p class="preference-share-note">
+              Share links include only the location. Another browser uses its own saved preferences, if any.
+            </p>
+            <p id="preference-excluded-notice" class="preference-notice excluded" hidden></p>
+            <p id="preference-ignored-notice" class="preference-notice ignored" hidden></p>
+            <p id="preference-empty-notice" class="preference-notice empty" hidden>
+              No opportunities match these hard limits. Remove a limit or reset the preferences.
+            </p>
+          </section>
+        </div>
         <div id="results" class="results-region" aria-live="polite" aria-busy="false"></div>
         <p id="result-provider-credit" class="panel-note provider-credit" hidden>
           Data providers:
@@ -88,6 +199,29 @@
       </section>
     </div>
   </main>
+
+  <template id="preference-clock-row-template">
+    <div class="preference-clock-row">
+      <label>
+        <span>From</span>
+        <input type="time" data-clock-start aria-label="Local clock window start">
+      </label>
+      <label>
+        <span>Until</span>
+        <input type="time" data-clock-end aria-label="Local clock window end">
+      </label>
+      <button type="button" class="text-button preference-remove-window" aria-label="Remove local clock window">
+        Remove
+      </button>
+    </div>
+  </template>
+
+  <template id="active-filter-template">
+    <li class="active-filter">
+      <span></span>
+      <button type="button" class="active-filter-remove">×</button>
+    </li>
+  </template>
 
   <script type="module" src="/app.js"></script>
 </body>
