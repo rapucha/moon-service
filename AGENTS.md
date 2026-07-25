@@ -118,10 +118,12 @@ lookup, opportunity results, RSS/Atom feeds, and `.ics` export.
   substantially exceeds the forecast because of an added mechanism, concern,
   dependency, output class, or hardening. Informational churn alone remains
   nonblocking. Obtain owner approval for the revised scope before continuing.
-- Avoid adding a public production constructor, factory, or method only to make
-  a test shorter. Keep the production API aligned with real runtime use. Put
-  test-only convenience in test helpers or builders unless a production caller
-  or established project pattern needs the API.
+- Apply the **Production-Use Evidence** rule in
+  [`.agents/review-policy.md`](.agents/review-policy.md) before adding or
+  changing a compatibility path, default or fallback behavior, public overload,
+  or extension point. An established pattern or boundary alone is not evidence.
+  Do not add a production API only to simplify a test. Keep test-only
+  convenience in test helpers or builders.
 - State technical judgment directly. Agreement should include the reason.
   Disagreement should be plain and actionable.
 - Follow [`docs/ai-agent/plain-technical-writing.md`](docs/ai-agent/plain-technical-writing.md)
@@ -224,7 +226,10 @@ lookup, opportunity results, RSS/Atom feeds, and `.ics` export.
 ### Use the repository review files
 
 - The canonical project review skills live in `.agents/skills/`. Change them
-  through the normal issue and pull-request workflow. A copy installed outside
+  through the normal issue and pull-request workflow. The narrow **In-Place
+  Guardrail Repair** rule in [`.agents/review-policy.md`](.agents/review-policy.md)
+  allows a focused repair in the implementation pull request where a failure
+  surfaced only when `rapucha` explicitly requests it. A copy installed outside
   the repository is temporary and is not an independent source of truth.
 - [`.agents/review-policy.md`](.agents/review-policy.md) defines change
   categories, review measures, gates, documentation triggers, output budgets,
@@ -331,9 +336,12 @@ or new dependency.
 - Report an incidental finding without fixing it or filing an issue when it
   does not block correctness, safety, or validation. If it blocks the work,
   stop and ask the user or owner to approve a new plan.
-- Add an abstraction, production API, configuration option, provider slot,
-  toggle, or extension point only for a current approved production use or an
-  established project boundary. Tests and possible future uses are not enough.
+- Add an abstraction, production API, configuration option, provider slot, or
+  toggle only when it satisfies the **Production-Use Evidence** rule in
+  [`.agents/review-policy.md`](.agents/review-policy.md). Apply the same rule to
+  every compatibility path, default or fallback behavior, public overload, and
+  extension point. Issue wording, tests, possible future uses, and established
+  boundaries do not replace that evidence.
 - Do not include unrelated formatting, renames, dead-code removal, dependency
   upgrades, cleanup, hardening tests, or documentation.
 - Do not add or change a manifest, lock file, workflow, provider, account,
@@ -346,7 +354,11 @@ or new dependency.
   ordinary files, resulting code size, generated output, vendored output, or
   lock files.
 - General approval of an issue or pull request is not an exception.
-- To keep oversized work in one pull request, record the exact gate, measured
+- Apply the **In-Place Guardrail Repair** exception in
+  [`.agents/review-policy.md`](.agents/review-policy.md) only to the recorded
+  concern and ordinary-file crossings caused by the named guardrail paths. Do
+  not infer it from a reviewer finding or use it to waive another gate.
+- For any other single-pull-request exception, record the exact gate, measured
   values, and the reason a split is unsafe or inseparable on the issue. Obtain
   explicit owner approval.
 - A `split_required` verdict does not authorize a GitHub change. Present the
@@ -365,8 +377,8 @@ or new dependency.
   diff crosses a hard gate; adds a concern, output class, or dependency;
   requires a custom protocol client; or materially exceeds the forecast because
   of an added mechanism or hardening.
-- Split the work unless the issue records the required exception and the owner
-  approves it.
+- Split the work unless the applicable exception is fully recorded and the
+  owner approves it as required.
 - Do not silently expand or recategorize a pull request.
 - If only a documentation threshold is crossed, record the measures and arrange
   focused staged review. Do not rerun the scope review for documentation size

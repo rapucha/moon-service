@@ -48,6 +48,11 @@ answer:
   acceptable failure, and maintenance tradeoffs.
 - Evidence or owner decisions that make robustness and hardening criteria part
   of the required current outcome rather than optional follow-up work.
+- For every proposed compatibility path, default or fallback behavior, public
+  production constructor, factory, method, or overload, configuration option,
+  provider slot, toggle, or extension point, the production-use evidence
+  required by `.agents/review-policy.md`. Identify a required interface seam
+  separately from any default or fallback body.
 - Project authority such as `AGENTS.md`, contribution rules, and PR template.
 - Only the product, architecture, API, privacy, or deployment documents needed
   to understand the work.
@@ -56,12 +61,19 @@ answer:
   ordinary-churn range; expected code-file sizes; base counts and deltas for
   existing oversized files; documentation measures; rollout constraints; and
   known dependencies.
+- When a plan changes code shape to meet a numeric gate, the clearer
+  alternative, both code-size estimates, and the independent reason for the
+  shorter design, current responsibility boundary, or recorded exception.
 - The change category selected from the accepted issue, plus any generated,
   vendored, or lock-file paths and reproduction information.
 - Existing parent or child issues that may already own part of the scope.
 - The issue-design verdict or summary when project policy required one.
 - For each proposed merge, validation, rollout, or activation gate, the
   required actor, permission, artifact, target, and availability point.
+- When the plan invokes the in-place guardrail-repair exception, `rapucha`'s
+  exact request, the observed failure, each added guardrail path, the exact
+  concern or ordinary-file gate crossings excepted, resulting concern and
+  ordinary-file counts, and causal rationale.
 
 ## Review Method
 
@@ -76,21 +88,27 @@ answer:
    accepted authority or a concrete current correctness/safety need. If the
    plan requires a custom protocol client, return `revise` unless the owner
    explicitly approved it after seeing the standard alternative.
-3. List candidate behavioral or operational slices before considering files,
+3. Apply the production-use evidence rule to every proposed compatibility path,
+   default or fallback behavior, public production constructor, factory, method,
+   or overload, configuration option, provider slot, toggle, and extension
+   point. Review a required interface seam separately from its default or
+   fallback body. Return `revise` when the required evidence is absent;
+   acceptance criteria alone do not supply it.
+4. List candidate behavioral or operational slices before considering files,
    architecture layers, or limits. State each slice's observable outcome. Ask
    whether it stays useful, operable, and verifiable if no later slice lands.
    Reject a utility, foundation, migration, or wiring-only slice chosen only to
    package the work. Allow a disabled foundation only when safety,
    compatibility, or dependency order requires it. Record that reason and keep
    activation disabled.
-4. Determine the repository-defined change category from the accepted issue, not
+5. Determine the repository-defined change category from the accepted issue, not
    from the allowance the proposed diff needs. Use the stricter applicable gate
    for ambiguous or mixed work.
-5. Enumerate independently reviewable concerns. Treat code, tests, and
+6. Enumerate independently reviewable concerns. Treat code, tests, and
    documentation supporting one behavior as one concern; do not merge distinct
    backend, frontend, deployment, CI, provider, privacy, or rollout decisions
    merely because one issue mentions them.
-6. Record expected paths and other paths that may be needed, with the reason for
+7. Record expected paths and other paths that may be needed, with the reason for
    each one. Estimate an ordinary-file count range and informational
    added-plus-deleted-line range. These forecast the implementation; they are
    not a fixed path list or permission to add work. List each changed code file
@@ -104,35 +122,48 @@ answer:
    plan with the issue-design forecast. Forecast growth alone is informational;
    return `revise` when substantial growth reveals an unreviewed mechanism,
    concern, dependency, output class, or hardening choice.
-7. Check scope authority separately from the remaining room under a limit.
+8. Check scope authority separately from the remaining room under a limit.
    Identify unrequested refactors, incidental fixes, speculative abstractions
    or extension points, opportunistic cleanup, unrelated tests/docs, and
    unapproved dependencies.
    Any required addition must stop for replan authority before editing.
-8. Apply the repository's hard scope gates. Never remove tests, documentation,
+9. Apply the repository's hard scope gates. Never remove tests, documentation,
    explanations, or safety checks needed to make a slice reviewable and
    operable, and never separate implementation from activation merely to fit a
-   gate. Documentation review thresholds require review evidence, not a split
-   or another scope review. If no behavioral split fits, request a scope change
-   or a recorded exception instead of manufacturing an inert PR. If no explicit
+   gate. Do not approve density, reduced explicitness, or order dependence
+   introduced solely to satisfy a numeric gate. Require an independently clear
+   and reviewable reason for a shorter algorithm. Allow extraction only when a
+   current production or test responsibility justifies the boundary; otherwise
+   keep the clear implementation and require a recorded exception.
+   Documentation review thresholds require review evidence, not a split or
+   another scope review. If no behavioral split fits, request a scope change or
+   a recorded exception instead of manufacturing an inert PR. If no explicit
    gates exist, use coherence, reviewability, independent safety, and rollback
    boundaries as heuristics and make the lack of hard gates visible.
-9. Map every acceptance criterion to one proposed PR. Identify dependencies and
+   When the plan invokes the in-place guardrail-repair exception, verify its
+   complete record against `.agents/review-policy.md`. Apply it only to concern
+   and ordinary-file crossings attributable to the named guardrail paths.
+   Preserving the observed failure and correction in one review remains a valid
+   rationale even when the Markdown repair is separable. Apply every other gate
+   and review normally.
+10. Map every acceptance criterion to one proposed PR. Identify dependencies and
    merge order. Simulate the pre-merge, merge, post-merge validation,
    activation, and next-PR transitions. At each gate, prove the required actor,
    permission, artifact, and target are available without depending on
    unrelated ambient work or a later slice that the same plan blocks. Treat `A
    merges -> A validation needs open B -> B cannot start until A validation
    passes` as an invalid split sequence.
-10. Check that each slice is independently safe and mergeable. Keep unfinished
+11. Check that each slice is independently safe and mergeable. Keep unfinished
    capability disabled by default when partial rollout could expose it.
-11. Return exactly one verdict: `single_pr`, `split_required`, or `revise`.
+12. Return exactly one verdict: `single_pr`, `split_required`, or `revise`.
 
-Default to `split_required` when any hard repository gate is crossed.
-Documentation review thresholds are not hard gates. Recommend a single-PR
-exception only for a concrete inseparability or safety rationale. Require the
-exact exceeded gate, measured values, rationale, and explicit owner approval to
-be recorded through the project's normal workflow.
+Default to `split_required` when any hard repository gate is crossed. A complete
+in-place guardrail-repair record permits only the concern and ordinary-file
+crossings attributable to its named guardrail paths. Documentation review
+thresholds are not hard gates. Recommend any other single-PR exception only for
+a concrete inseparability or safety rationale. Require the exact exceeded gate,
+measured values, rationale, and explicit owner approval to be recorded through
+the project's normal workflow.
 
 Return `revise` when the proposed design has not established proportionality,
 requires an unapproved custom protocol client, converts a hypothetical threat
@@ -176,10 +207,15 @@ Gate assessment:
 - Lock files: <files/lines/bytes/reproduction or none>
 - Hard-gate crossings: <list or none>
 - Review triggers: <list or none>
+- In-place guardrail repair: <not used, or explicit request; observed failure; paths; exact excepted gates; resulting concern/file counts; causal rationale>
 
 Scope-authority assessment:
 - <unrequested work, abstraction/YAGNI, incidental finding, dependency, or none>
 - Follow-up mutation authority: <explicit user/source authority or owner-accepted enumerated split, including exact authorized issues>
+
+Production-use evidence:
+- <mechanism> -> <current caller/use or approved dependent consumer; current capability/failure; compatibility target/version when applicable>
+- Interface seam/body separation: <separate evidence or unsupported>
 
 Behavioral decomposition:
 - Minimum end-to-end capability: <smallest useful observable outcome>
@@ -229,6 +265,20 @@ current accepted threat model. Present materially stricter alternatives with
 their current need, tradeoffs, and maintenance cost. Return revise for an
 unapproved stricter design, custom protocol client, or material forecast growth
 caused by an unreviewed mechanism or hardening choice. Separate optional work.
+Do not treat compliance with a numeric gate as a design goal. Return revise when
+a plan makes code denser, less explicit, or more order-dependent solely to fit
+the gate. Allow extraction only when a current production or test responsibility
+justifies the boundary. Otherwise keep the clear implementation and require a
+recorded exception.
+Apply the production-use evidence rule to every proposed compatibility path,
+default or fallback behavior, public production constructor, factory, method,
+or overload, configuration option, provider slot, toggle, and extension point.
+Review a required interface seam separately from any default or fallback body.
+Return revise when the evidence is absent; acceptance criteria alone do not
+supply it. If the plan invokes the in-place guardrail-repair exception, verify
+`rapucha`'s explicit request and the complete exception record. Apply it only
+to the named guardrail paths' concern and ordinary-file crossings. Apply every
+other gate.
 For each slice, ask whether it remains useful if later slices never land. Allow
 a disabled foundation only when safety or dependency order requires it. Map
 every acceptance criterion to a proposed PR. Return single_pr, split_required,
@@ -251,6 +301,8 @@ Do not assume the primary agent's plan is correct. Use plain, direct language.
   to `$issue-design-review`, obtain any missing owner decision, and repeat this
   review before editing.
 - If `single_pr`, record the coherent outcome and gate estimate before editing.
+- When using the in-place guardrail-repair exception, record its complete
+  evidence in the active plan and pull request.
 - If a documentation review threshold is expected, record the measures and
   focused-review requirement without splitting for size alone.
 - Re-run scope review if the actual diff crosses a hard gate or gains a new

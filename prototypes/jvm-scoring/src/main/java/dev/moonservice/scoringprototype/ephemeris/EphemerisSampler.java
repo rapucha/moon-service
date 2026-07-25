@@ -17,6 +17,7 @@ import io.github.cosinekitty.astronomy.Vector;
 import java.time.Instant;
 
 public final class EphemerisSampler {
+    private static final double MOON_MEAN_RADIUS_KM = 1_737.4;
     private static final double POLE_PROJECTION_EPSILON = 1.0e-12;
 
     public MoonSample sampleAt(Location location, Instant instant) {
@@ -44,6 +45,23 @@ public final class EphemerisSampler {
                 sun.getAltitude(),
                 sun.getAzimuth()
         );
+    }
+
+    public double topocentricLunarAngularRadiusDegrees(Location location, Instant instant) {
+        Observer observer = new Observer(location.latitude(), location.longitude(), location.elevationMeters());
+        Time time = Time.fromMillisecondsSince1970(instant.toEpochMilli());
+        Equatorial moon = Astronomy.equator(
+                Body.Moon,
+                time,
+                observer,
+                EquatorEpoch.J2000,
+                Aberration.Corrected
+        );
+        double distanceKilometers = moon.getDist() * Astronomy.KM_PER_AU;
+        if (!Double.isFinite(distanceKilometers) || distanceKilometers <= MOON_MEAN_RADIUS_KM) {
+            throw new IllegalStateException("Topocentric Moon distance was not physically valid.");
+        }
+        return Math.toDegrees(Math.asin(MOON_MEAN_RADIUS_KM / distanceKilometers));
     }
 
     private static Topocentric horizon(Time time, Observer observer, Equatorial equatorialJ2000) {
