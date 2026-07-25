@@ -136,6 +136,14 @@ after comment-only content is removed.
 - A mixed file uses the stricter limit. A test or prototype file that also
   contains production or runtime behavior uses the production limit.
 - Do not pack statements or expressions onto fewer lines to pass the gate.
+- Treat a numeric gate as a limit, not an optimization goal. Do not replace a
+  clearer implementation with denser, less explicit, or more order-dependent
+  code solely to pass the gate.
+- Keep the clear implementation. Extract code only when a current production
+  or test responsibility independently justifies the boundary; otherwise use
+  the recorded exception process.
+- Accept a shorter algorithm when clarity and reviewability justify it
+  independently of its measured line count.
 
 A new file, or an existing file below its limit, must finish within the limit.
 An existing oversized file may change only when its code-line count does not

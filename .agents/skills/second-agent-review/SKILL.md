@@ -81,6 +81,9 @@ Prefer these inputs:
   documentation authority classes, sizes, and triggers; and generated,
   vendored, and lock-file counts, sizes, reproduction commands, and validation
   evidence when present.
+- For code reshaped to meet a numeric gate, the clearer alternative, both
+  code-size results, and the independent clarity, responsibility-boundary, or
+  recorded-exception rationale for the completed design.
 - The validation commands already run and their outcomes.
 - Any intentionally untracked/generated files that should be ignored.
 
@@ -108,7 +111,12 @@ Check scope before implementation quality:
    counts, oversized-file deltas and exceptions, and generated/vendored/lock
    measurements against project policy. Record meaningful differences from the
    planned file range without treating unused range as scope. Treat mixed or
-   agent/LLM-authored files as ordinary.
+   agent/LLM-authored files as ordinary. Do not treat staying within a numeric
+   gate as proof of an acceptable design. Report density, reduced explicitness,
+   or order dependence introduced solely to satisfy the gate. Accept a shorter
+   algorithm when clarity and reviewability justify it independently. Otherwise
+   require the clear implementation with a recorded exception, or an extraction
+   justified by a current production or test responsibility.
 3. For each changed document, verify its authority class, resulting nonblank
    lines, changed nonblank lines, and review trigger. When focused review is
    required, check for removed constraints, contradictions, new authority,

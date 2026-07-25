@@ -61,6 +61,9 @@ answer:
   ordinary-churn range; expected code-file sizes; base counts and deltas for
   existing oversized files; documentation measures; rollout constraints; and
   known dependencies.
+- When a plan changes code shape to meet a numeric gate, the clearer
+  alternative, both code-size estimates, and the independent reason for the
+  shorter design, current responsibility boundary, or recorded exception.
 - The change category selected from the accepted issue, plus any generated,
   vendored, or lock-file paths and reproduction information.
 - Existing parent or child issues that may already own part of the scope.
@@ -127,9 +130,14 @@ answer:
 9. Apply the repository's hard scope gates. Never remove tests, documentation,
    explanations, or safety checks needed to make a slice reviewable and
    operable, and never separate implementation from activation merely to fit a
-   gate. Documentation review thresholds require review evidence, not a split
-   or another scope review. If no behavioral split fits, request a scope change
-   or a recorded exception instead of manufacturing an inert PR. If no explicit
+   gate. Do not approve density, reduced explicitness, or order dependence
+   introduced solely to satisfy a numeric gate. Require an independently clear
+   and reviewable reason for a shorter algorithm. Allow extraction only when a
+   current production or test responsibility justifies the boundary; otherwise
+   keep the clear implementation and require a recorded exception.
+   Documentation review thresholds require review evidence, not a split or
+   another scope review. If no behavioral split fits, request a scope change or
+   a recorded exception instead of manufacturing an inert PR. If no explicit
    gates exist, use coherence, reviewability, independent safety, and rollback
    boundaries as heuristics and make the lack of hard gates visible.
    When the plan invokes the in-place guardrail-repair exception, verify its
@@ -257,6 +265,11 @@ current accepted threat model. Present materially stricter alternatives with
 their current need, tradeoffs, and maintenance cost. Return revise for an
 unapproved stricter design, custom protocol client, or material forecast growth
 caused by an unreviewed mechanism or hardening choice. Separate optional work.
+Do not treat compliance with a numeric gate as a design goal. Return revise when
+a plan makes code denser, less explicit, or more order-dependent solely to fit
+the gate. Allow extraction only when a current production or test responsibility
+justifies the boundary. Otherwise keep the clear implementation and require a
+recorded exception.
 Apply the production-use evidence rule to every proposed compatibility path,
 default or fallback behavior, public production constructor, factory, method,
 or overload, configuration option, provider slot, toggle, and extension point.

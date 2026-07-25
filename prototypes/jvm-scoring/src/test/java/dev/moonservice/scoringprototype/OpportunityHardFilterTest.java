@@ -208,16 +208,24 @@ class OpportunityHardFilterTest {
     }
 
     @Test
-    void namedPhaseRangesKeepAllEightPhasesDistinct() {
-        double[] angles = {337.5, 22.5, 67.5, 112.5, 157.5, 202.5, 247.5, 292.5};
-        NamedPhase[] phases = NamedPhase.values();
-        for (int index = 0; index < phases.length; index++) {
+    void namedPhaseRangesUseEveryInclusiveSectorStart() {
+        Map<Double, NamedPhase> phasesByStartAngle = Map.ofEntries(
+                Map.entry(0.0, NamedPhase.NEW_MOON),
+                Map.entry(22.5, NamedPhase.WAXING_CRESCENT),
+                Map.entry(67.5, NamedPhase.FIRST_QUARTER),
+                Map.entry(112.5, NamedPhase.WAXING_GIBBOUS),
+                Map.entry(157.5, NamedPhase.FULL_MOON),
+                Map.entry(202.5, NamedPhase.WANING_GIBBOUS),
+                Map.entry(247.5, NamedPhase.LAST_QUARTER),
+                Map.entry(292.5, NamedPhase.WANING_CRESCENT),
+                Map.entry(337.5, NamedPhase.NEW_MOON));
+        for (Map.Entry<Double, NamedPhase> entry : phasesByStartAngle.entrySet()) {
             Function<Instant, MoonSample> samples =
-                    constantSamples(5.0, 100.0, angles[index], -8.0, 200.0);
-            OpportunityPreferences preference = phases(phases[index]);
+                    constantSamples(5.0, 100.0, entry.getKey(), -8.0, 200.0);
+            OpportunityPreferences preference = phases(entry.getValue());
             assertEquals(1, filter(List.of(window(BASE, BASE.plus(Duration.ofMinutes(10)), samples)),
                     samples, preference, BASE, 0.25).windows().size());
-            assertTrue(phases[index] == NamedPhase.NEW_MOON
+            assertTrue(entry.getValue() == NamedPhase.NEW_MOON
                     || filter(List.of(window(BASE, BASE.plus(Duration.ofMinutes(10)), samples)),
                     samples, phases(NamedPhase.NEW_MOON), BASE, 0.25).windows().isEmpty());
         }
