@@ -4,7 +4,7 @@ This is the canonical inventory of HTTP operations explicitly mapped by Moon
 Service controllers. It records who uses each route, why it exists, and how its
 exposure differs between the ordinary application and hosted-alpha mode.
 
-The route universe is the ten mappings declared by `WebPageController`,
+The route universe is the eleven mappings declared by `WebPageController`,
 `OpportunitySearchController`, `CalibrationFeedbackController`,
 `HealthController`, and `AdminStatusController`. Spring's implicit `HEAD`
 handling, `/error`, exception handlers, and static-resource serving are
@@ -19,6 +19,7 @@ Open-Meteo URLs are provider dependencies, not Moon Service routes.
 | `GET /search` | Lookup and share page; current product route | Web browser | Allowlisted; whole-site bound |
 | `GET /about` | Product/privacy information page | Web browser | Allowlisted; whole-site bound |
 | `GET /api/opportunities` | Location-to-opportunity product API | Browser `app.js` | Allowlisted; site and search bounds |
+| `POST /api/opportunities` | Request-scoped preference product API | None yet; browser work follows | Allowlisted POST; site and provider bounds |
 | `POST /api/opportunities/search` | Direct fixture/scoring prototype contract | None | Hidden after site admission |
 | `GET /api/calibration-feedback/v1/capability` | Public feedback feature/availability state | None yet | Allowlisted; exempt from hosted resource admission |
 | `POST /api/calibration-feedback/v1/submissions` | Bounded current-observation feedback write | None yet | Allowlisted POST; provider-bound resolution and feedback write bucket |
@@ -43,19 +44,20 @@ Open-Meteo URLs are provider dependencies, not Moon Service routes.
   and maximum allowed hosted capacity is 40, with a default and fastest allowed
   refill of one token per second; stricter settings are valid. An empty bucket
   returns `429` with a numeric `Retry-After` before the route's usual `200`,
-  `400`, `401`, `404`, `405`, or `503` behavior can be selected. `GET` returns
-  canonical `rate_limited` JSON; `HEAD` carries the same status, headers, and
-  would-be content length without a body.
-- Exact `GET`/`HEAD /api/opportunities` requests that pass the whole-site bound
-  ask the shared non-web `HostedAlphaProviderAdmission` component to acquire a
-  concurrent provider-operation permit and consume from a provider bucket. The
-  defaults and maximum allowed hosted settings are two concurrent provider
-  operations, ten provider tokens, and a one-token-per-minute refill; stricter
-  settings are valid. A refusal returns to `HostedAlphaResourceLimitFilter`,
-  which maps it to `429`; an accepted permit is released when downstream
-  handling finishes. The same two resources wrap feedback location resolution
-  as described below; they do not apply to pages, static files, admin status,
-  readiness, or the fixture POST route.
+  `400`, `401`, `404`, `405`, or `503` behavior can be selected. `GET` and the
+  product POST return canonical `rate_limited` JSON; `HEAD` carries the same
+  status, headers, and would-be content length without a body.
+- Exact `GET`/`HEAD /api/opportunities` and `POST /api/opportunities` requests
+  that pass the whole-site bound ask the shared non-web
+  `HostedAlphaProviderAdmission` component to acquire a concurrent
+  provider-operation permit and consume from a provider bucket. The defaults
+  and maximum allowed hosted settings are two concurrent provider operations,
+  ten provider tokens, and a one-token-per-minute refill; stricter settings are
+  valid. A refusal returns to `HostedAlphaResourceLimitFilter`, which maps it to
+  `429`; an accepted permit is released when downstream handling finishes. The
+  same two resources wrap feedback location resolution as described below;
+  they do not apply to pages, static files, admin status, readiness, or the
+  fixture POST route.
 - Whole-site bypasses are the bodyless `GET /readyz` whose connector reports a
   loopback remote address and `Host: localhost`, matching the Docker health
   check, and both exact feedback paths. Other readiness requests still consume
@@ -68,18 +70,24 @@ Open-Meteo URLs are provider dependencies, not Moon Service routes.
   per complete hour. Resolver failure or provider-admission refusal consumes no
   feedback write token.
 - Hosted-alpha mode exposes only exact allowlisted paths. It allows bodyless
-  `GET` or `HEAD` on every approved path except feedback submissions, where it
-  allows only `POST` and passes the body to the route's 16,384-byte bound. It
+  `GET` or `HEAD` on every approved path except feedback submissions. It also
+  allows `POST` with a body on the exact product-opportunity and feedback
+  submission paths, and passes each body to that route's 16,384-byte bound. It
   adds the hosted security headers, returns empty `404` for hidden or unknown
   paths, empty `405` with a path-specific `Allow` value for disallowed methods,
-  and empty `400` for a framed `GET` or `HEAD` body. The feedback routes send no
-  permissive CORS headers, and `OPTIONS` does not provide preflight support.
+  and empty `400` for a framed `GET` or `HEAD` body. These POST operations send
+  no permissive CORS headers, and `OPTIONS` does not provide preflight support.
   Tomcat rejects `TRACE` before the application filter, so those application
   headers and empty-body guarantees do not apply to `TRACE`.
 - The web lookup is anonymous and creates no durable user profile or preference.
   A `q` value crosses the Open-Meteo geocoding boundary; normalized queries or
   location IDs and their results are held in a bounded, process-local cache.
-  Resolved location data then drives an Open-Meteo weather lookup.
+  Resolved location data then drives an Open-Meteo weather lookup. The product
+  POST never sends preferences to either provider and returns every response
+  with `Cache-Control: no-store`. Preference field names and values are not
+  stored, logged, or placed in a shared cache. The only preference-related
+  application log is the documented aggregate event with the version, unknown
+  field count, and truncation state.
 
 Implementation authority: [request logging](../backend/src/main/java/dev/moonservice/backend/observability/RequestLoggingFilter.java),
 [hosted resource-limit filter](../backend/src/main/java/dev/moonservice/backend/web/HostedAlphaResourceLimitFilter.java),
@@ -152,7 +160,8 @@ and [hosted-alpha functional tests](../backend/src/test/java/dev/moonservice/bac
   provider IDs, coordinates, or weather contracts.
 - **Production invocation:** browser `app.js` calls it through `api.js`; query
   searches use `q`, while an ambiguity selection uses `locationId`. The browser
-  does not call the direct POST route below.
+  does not yet call the product preference POST or the direct prototype POST
+  below.
 - **Other callers:** manual HTTP/Postman requests, UI tests, application tests,
   and container/live smoke checks.
 - **Request:** exactly one usable `q` or `locationId`; values are trimmed,
@@ -179,6 +188,48 @@ and [hosted-alpha functional tests](../backend/src/test/java/dev/moonservice/bac
   [geocoding cache](../backend/src/main/java/dev/moonservice/backend/location/CachingLocationResolver.java),
   [response model](../backend/src/main/java/dev/moonservice/backend/opportunity/search/OpportunitySearchResponse.java),
   [API design](api-shape.md).
+
+### `POST /api/opportunities`
+
+- **Handler:** `OpportunitySearchController.searchWithPreferences`.
+- **Purpose/lifecycle:** anonymous same-origin product lookup with optional
+  request-scoped version 1 hard preferences.
+- **Why it exists:** preference values stay out of shareable URLs while the
+  server reuses the GET route's live location, weather, Moon-window, scoring,
+  ranking, and result-limit flow. The GET and fixture-backed POST remain
+  unchanged.
+- **Production invocation:** no browser caller yet; the preference-controls
+  child adds that caller.
+- **Other callers:** application tests and explicit manual API clients.
+- **Request:** `application/json`, including ordinary media-type parameters,
+  with exactly one usable `q` or `locationId` and optional complete version 1
+  `preferences`. The raw body is limited to 16,384 bytes for known and streamed
+  lengths. Unknown top-level fields are invalid; supported-version unknown
+  preference fields are ignored and reported through the bounded,
+  deterministic warning contract.
+- **Response:** the same product states and opportunity facts as GET. A request
+  with preferences adds the applied version, normalized active filters,
+  excluded-sample count, ignored-field warning, and authoritative per-pass
+  azimuth match intervals when azimuth filtering is active. Active filters that
+  remove every candidate return `200 ok` with the distinct preference
+  `emptyReason`. Errors use the documented `400 invalid_request`,
+  `413 request_too_large`, and `415 unsupported_media_type` shapes. Every
+  response uses `Cache-Control: no-store`.
+- **Authentication/data:** anonymous and same-origin. The current location flow
+  may send `q` or `locationId` upstream, but it never sends a preference to
+  geocoding or weather. The service does not store a request body, preference,
+  availability value, or user profile, and does not put those values in a URL,
+  cookie, application or access log, analytics event, or shared cache.
+- **Exposure:** available on the ordinary listener. Hosted alpha allows this
+  exact `POST` in addition to the existing bodyless `GET` and `HEAD`
+  operations, and permits a body only for `POST`. It applies the same whole-site
+  and provider admission as product GET, ignores forwarded identity headers,
+  returns the current `429` shape without a provider call when admission fails,
+  and does not loosen another path or method.
+- **References:** [controller](../backend/src/main/java/dev/moonservice/backend/web/OpportunitySearchController.java),
+  [service validation](../backend/src/main/java/dev/moonservice/backend/opportunity/OpportunitySearchService.java),
+  [response model](../backend/src/main/java/dev/moonservice/backend/opportunity/search/OpportunitySearchResponse.java),
+  [API contract](api-shape.md#product-preference-post).
 
 ### `POST /api/opportunities/search`
 

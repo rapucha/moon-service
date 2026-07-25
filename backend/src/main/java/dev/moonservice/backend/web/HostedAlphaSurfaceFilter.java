@@ -22,6 +22,7 @@ import java.util.Set;
 @Component
 @Order(Ordered.HIGHEST_PRECEDENCE + 10)
 public final class HostedAlphaSurfaceFilter extends OncePerRequestFilter {
+    private static final String OPPORTUNITY_PATH = "/api/opportunities";
     static final String FEEDBACK_CAPABILITY_PATH = "/api/calibration-feedback/v1/capability";
     static final String FEEDBACK_SUBMISSIONS_PATH = "/api/calibration-feedback/v1/submissions";
     static final String CONTENT_SECURITY_POLICY = "default-src 'none'; base-uri 'none'; "
@@ -33,7 +34,7 @@ public final class HostedAlphaSurfaceFilter extends OncePerRequestFilter {
 
     private static final Set<String> APPROVED_PATHS = Set.of(
             "/", "/about", "/about.html", "/index.html", "/search",
-            "/admin/status", "/api/opportunities", "/readyz",
+            "/admin/status", OPPORTUNITY_PATH, "/readyz",
             FEEDBACK_CAPABILITY_PATH, FEEDBACK_SUBMISSIONS_PATH,
             "/api.js", "/app.js", "/dom.js", "/format.js", "/terms.js", "/types.js",
             "/favicon.svg", "/styles.css", "/sun-marker-aperture-flare.svg",
@@ -59,6 +60,10 @@ public final class HostedAlphaSurfaceFilter extends OncePerRequestFilter {
             HttpServletResponse response,
             FilterChain filterChain
     ) throws ServletException, IOException {
+        String path = applicationPath(request);
+        if (isProductOpportunityPost(request.getMethod(), path)) {
+            response.setHeader("Cache-Control", "no-store");
+        }
         if (!enabled) {
             filterChain.doFilter(request, response);
             return;
@@ -66,7 +71,6 @@ public final class HostedAlphaSurfaceFilter extends OncePerRequestFilter {
 
         addSecurityHeaders(response);
 
-        String path = applicationPath(request);
         if (path.equals("/admin/status") || isFeedbackPath(path)) {
             response.setHeader("Cache-Control", "no-store");
         }
@@ -74,13 +78,13 @@ public final class HostedAlphaSurfaceFilter extends OncePerRequestFilter {
             reject(response, HttpServletResponse.SC_NOT_FOUND);
             return;
         }
-        String allowedMethods = allowedMethods(path);
-        if (!isApprovedMethod(request.getMethod(), allowedMethods)) {
-            response.setHeader("Allow", allowedMethods);
+        List<String> allowedMethods = allowedMethods(path);
+        if (!allowedMethods.contains(request.getMethod())) {
+            response.setHeader("Allow", String.join(", ", allowedMethods));
             reject(response, HttpServletResponse.SC_METHOD_NOT_ALLOWED);
             return;
         }
-        if (!isFeedbackSubmission(request.getMethod(), path) && hasFramedBody(request)) {
+        if (!allowsFramedBody(request.getMethod(), path) && hasFramedBody(request)) {
             reject(response, HttpServletResponse.SC_BAD_REQUEST);
             return;
         }
@@ -99,18 +103,22 @@ public final class HostedAlphaSurfaceFilter extends OncePerRequestFilter {
         response.setHeader("X-Frame-Options", "DENY");
     }
 
-    private static String allowedMethods(String path) {
-        return FEEDBACK_SUBMISSIONS_PATH.equals(path) ? "POST" : "GET, HEAD";
+    private static List<String> allowedMethods(String path) {
+        if (FEEDBACK_SUBMISSIONS_PATH.equals(path)) {
+            return List.of("POST");
+        }
+        return OPPORTUNITY_PATH.equals(path)
+                ? List.of("GET", "HEAD", "POST")
+                : List.of("GET", "HEAD");
     }
 
-    private static boolean isApprovedMethod(String method, String allowedMethods) {
-        return "POST".equals(allowedMethods)
-                ? "POST".equals(method)
-                : "GET".equals(method) || "HEAD".equals(method);
+    private static boolean allowsFramedBody(String method, String path) {
+        return "POST".equals(method)
+                && (FEEDBACK_SUBMISSIONS_PATH.equals(path) || OPPORTUNITY_PATH.equals(path));
     }
 
-    private static boolean isFeedbackSubmission(String method, String path) {
-        return "POST".equals(method) && FEEDBACK_SUBMISSIONS_PATH.equals(path);
+    private static boolean isProductOpportunityPost(String method, String path) {
+        return "POST".equals(method) && OPPORTUNITY_PATH.equals(path);
     }
 
     static boolean isFeedbackPath(String path) {

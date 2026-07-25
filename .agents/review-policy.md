@@ -41,6 +41,22 @@ count in the pull request, and explain a meaningful difference from the plan.
 Stop and make a new plan if the work adds behavior, a concern, a dependency, an
 output class, or a hard-gate crossing.
 
+### Near-Limit File Review
+
+A plan triggers a near-limit file review when the upper bound of its
+ordinary-file forecast reaches the applicable category maximum or is one file
+below it. A staged diff triggers the review when its actual count does the same.
+Citing unused file capacity as scope rationale also triggers this review at any
+count. This is a review trigger, not another limit, a target, or a presumption
+that the work must split.
+
+Map every changed path to the accepted outcome and its current responsibility.
+Compare the proposal with the smallest coherent implementation. A plan is not
+ready, and a staged review must report a finding, when a path is justified by
+available capacity, speculative completeness, cleanup, or bundling work that is
+independently reviewable. Passing this review does not require fewer files when
+every path is necessary for the smallest coherent slice.
+
 ## Production-Use Evidence
 
 For every proposed or changed compatibility path, default or fallback behavior,

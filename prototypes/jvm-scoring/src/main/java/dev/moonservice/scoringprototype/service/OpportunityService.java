@@ -56,6 +56,7 @@ public final class OpportunityService {
             int appliedPreferenceVersion,
             Map<String, Object> normalizedActiveFilters,
             int excludedSampleCount,
+            boolean preferencesRemovedAllLiveCandidates,
             Map<String, List<OpportunityHardFilter.MatchInterval>> azimuthMatchIntervals
     ) {
         public PreferenceEvaluation {
@@ -121,11 +122,13 @@ public final class OpportunityService {
                     (window, samples) -> window.startsAt().isAfter(notBefore)
                             ? Optional.of(window)
                             : WindowGenerator.withSuggestedAtOrAfter(window, samples, notBefore));
-            return new PreferenceEvaluation(result, preferences.version(), Map.of(), 0, Map.of());
+            return new PreferenceEvaluation(result, preferences.version(), Map.of(), 0, false, Map.of());
         }
 
         WindowGenerator.SampleProvider samples = instant -> sampler.sampleAt(config.location(), instant);
         List<MoonWindow> completeWindows = windowGenerator.findWindows(config, samples);
+        boolean hasLiveCandidate =
+                completeWindows.stream().anyMatch(window -> window.endsAt().isAfter(notBefore));
         OpportunityHardFilter.Result filtered = hardFilter.filter(
                 config.location(),
                 completeWindows,
@@ -148,6 +151,7 @@ public final class OpportunityService {
                 preferences.version(),
                 preferences.normalizedFilters(),
                 filtered.excludedSampleCount(),
+                hasLiveCandidate && filtered.windows().isEmpty(),
                 returnedMasks);
     }
 
