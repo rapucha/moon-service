@@ -231,6 +231,7 @@ class ScoringOpportunitySearchEngineTest {
         assertEquals(1, preferenceResult.appliedPreferenceVersion());
         assertTrue(preferenceResult.normalizedActiveFilters().isEmpty());
         assertEquals(0, preferenceResult.excludedSampleCount());
+        assertFalse(preferenceResult.preferencesRemovedAllLiveCandidates());
         assertTrue(preferenceResult.azimuthMatchIntervals().isEmpty());
         OpportunitySearchResponse typed = preferenceResult.response();
         assertEquals(ordinary.status(), typed.status());
@@ -265,8 +266,60 @@ class ScoringOpportunitySearchEngineTest {
         assertEquals(1, result.appliedPreferenceVersion());
         assertEquals(preferences.normalizedFilters(), result.normalizedActiveFilters());
         assertTrue(result.excludedSampleCount() > 0);
+        assertTrue(result.preferencesRemovedAllLiveCandidates());
         assertTrue(result.response().opportunities().isEmpty());
         assertTrue(result.azimuthMatchIntervals().isEmpty());
+        assertEquals(
+                "no_opportunities_match_preferences",
+                OpportunitySearchResponse.withPreferences(result, List.of(), 0).emptyReason().code());
+    }
+
+    @Test
+    void doesNotAttributeOrdinaryVisibilityRejectionToPreferences() {
+        OpportunitySearchEngine engine = engineWithPartlyCloudyWeather();
+        OpportunityPreferences preferences = new OpportunityPreferences(
+                1,
+                new AltitudeRange(0.5, 90.0),
+                null,
+                null,
+                null,
+                null);
+
+        PreferenceSearchResult result = engine.search(
+                prague(),
+                new OpportunitySearchRequest("prague-cz", "2026-07-14", 1, 90.0, 100),
+                Instant.parse("2026-07-14T00:00:00Z"),
+                preferences);
+
+        assertTrue(result.excludedSampleCount() > 0);
+        assertFalse(result.preferencesRemovedAllLiveCandidates());
+        assertTrue(result.response().opportunities().isEmpty());
+        assertFalse(result.response().rejected().isEmpty());
+        assertNull(OpportunitySearchResponse.withPreferences(result, List.of(), 0).emptyReason());
+    }
+
+    @Test
+    void doesNotAttributeExpiredWindowsToPreferences() {
+        OpportunitySearchEngine engine = engineWithPartlyCloudyWeather();
+        OpportunityPreferences preferences = new OpportunityPreferences(
+                1,
+                new AltitudeRange(89.0, 90.0),
+                null,
+                null,
+                null,
+                null);
+
+        PreferenceSearchResult result = engine.search(
+                prague(),
+                new OpportunitySearchRequest("prague-cz", "2026-06-29", 1, 12.0, 10),
+                Instant.parse("2026-06-30T00:00:00Z"),
+                preferences);
+
+        assertTrue(result.excludedSampleCount() > 0);
+        assertFalse(result.preferencesRemovedAllLiveCandidates());
+        assertTrue(result.response().opportunities().isEmpty());
+        assertTrue(result.response().rejected().isEmpty());
+        assertNull(OpportunitySearchResponse.withPreferences(result, List.of(), 0).emptyReason());
     }
 
     @Test

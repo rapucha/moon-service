@@ -78,9 +78,9 @@ public final class HostedAlphaSurfaceFilter extends OncePerRequestFilter {
             reject(response, HttpServletResponse.SC_NOT_FOUND);
             return;
         }
-        String allowedMethods = allowedMethods(path);
-        if (!isApprovedMethod(request.getMethod(), allowedMethods)) {
-            response.setHeader("Allow", allowedMethods);
+        List<String> allowedMethods = allowedMethods(path);
+        if (!allowedMethods.contains(request.getMethod())) {
+            response.setHeader("Allow", String.join(", ", allowedMethods));
             reject(response, HttpServletResponse.SC_METHOD_NOT_ALLOWED);
             return;
         }
@@ -103,20 +103,13 @@ public final class HostedAlphaSurfaceFilter extends OncePerRequestFilter {
         response.setHeader("X-Frame-Options", "DENY");
     }
 
-    private static String allowedMethods(String path) {
+    private static List<String> allowedMethods(String path) {
         if (FEEDBACK_SUBMISSIONS_PATH.equals(path)) {
-            return "POST";
+            return List.of("POST");
         }
-        return OPPORTUNITY_PATH.equals(path) ? "GET, HEAD, POST" : "GET, HEAD";
-    }
-
-    private static boolean isApprovedMethod(String method, String allowedMethods) {
-        return switch (allowedMethods) {
-            case "POST" -> "POST".equals(method);
-            case "GET, HEAD, POST" ->
-                    "GET".equals(method) || "HEAD".equals(method) || "POST".equals(method);
-            default -> "GET".equals(method) || "HEAD".equals(method);
-        };
+        return OPPORTUNITY_PATH.equals(path)
+                ? List.of("GET", "HEAD", "POST")
+                : List.of("GET", "HEAD");
     }
 
     private static boolean allowsFramedBody(String method, String path) {

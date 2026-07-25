@@ -60,6 +60,7 @@ public record OpportunitySearchResponse(
                 : response.opportunities();
         EmptyReason emptyReason = result.normalizedActiveFilters().isEmpty()
                 || result.excludedSampleCount() == 0
+                || !result.preferencesRemovedAllLiveCandidates()
                 || !opportunities.isEmpty()
                 ? null
                 : new EmptyReason(

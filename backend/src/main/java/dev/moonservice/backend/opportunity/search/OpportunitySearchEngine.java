@@ -30,6 +30,7 @@ public interface OpportunitySearchEngine {
             int appliedPreferenceVersion,
             Map<String, Object> normalizedActiveFilters,
             int excludedSampleCount,
+            boolean preferencesRemovedAllLiveCandidates,
             Map<String, List<AzimuthMatchInterval>> azimuthMatchIntervals
     ) {
         public PreferenceSearchResult {

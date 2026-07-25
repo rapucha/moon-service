@@ -64,6 +64,8 @@ answer:
 - When a plan changes code shape to meet a numeric gate, the clearer
   alternative, both code-size estimates, and the independent reason for the
   shorter design, current responsibility boundary, or recorded exception.
+- When the near-limit file review applies, each path's accepted-outcome and
+  current-responsibility mapping, plus the smallest coherent alternative.
 - The change category selected from the accepted issue, plus any generated,
   vendored, or lock-file paths and reproduction information.
 - Existing parent or child issues that may already own part of the scope.
@@ -122,6 +124,12 @@ answer:
    plan with the issue-design forecast. Forecast growth alone is informational;
    return `revise` when substantial growth reveals an unreviewed mechanism,
    concern, dependency, output class, or hardening choice.
+   Apply the near-limit file review from `.agents/review-policy.md` when it
+   triggers. Verify every path against the accepted outcome and its current
+   responsibility, then compare the plan with the smallest coherent
+   implementation. Return `revise` for capacity-filling, speculative
+   completeness, cleanup, or independently reviewable bundled work. Do not
+   infer approval, failure, or a required split from proximity alone.
 8. Check scope authority separately from the remaining room under a limit.
    Identify unrequested refactors, incidental fixes, speculative abstractions
    or extension points, opportunistic cleanup, unrelated tests/docs, and
@@ -207,6 +215,7 @@ Gate assessment:
 - Lock files: <files/lines/bytes/reproduction or none>
 - Hard-gate crossings: <list or none>
 - Review triggers: <list or none>
+- Near-limit file review: <not triggered, or trigger, path necessity, smallest coherent alternative, and findings>
 - In-place guardrail repair: <not used, or explicit request; observed failure; paths; exact excepted gates; resulting concern/file counts; causal rationale>
 
 Scope-authority assessment:
@@ -279,6 +288,11 @@ supply it. If the plan invokes the in-place guardrail-repair exception, verify
 `rapucha`'s explicit request and the complete exception record. Apply it only
 to the named guardrail paths' concern and ordinary-file crossings. Apply every
 other gate.
+Apply the near-limit file review from `.agents/review-policy.md` when it
+triggers. Require each path to support the accepted outcome through a current
+responsibility and compare the plan with the smallest coherent implementation.
+Return revise for capacity-filling, speculative completeness, cleanup, or
+independently reviewable bundled work. Do not treat proximity as a verdict.
 For each slice, ask whether it remains useful if later slices never land. Allow
 a disabled foundation only when safety or dependency order requires it. Map
 every acceptance criterion to a proposed PR. Return single_pr, split_required,

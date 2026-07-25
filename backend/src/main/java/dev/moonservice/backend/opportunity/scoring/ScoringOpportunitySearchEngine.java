@@ -101,6 +101,7 @@ public class ScoringOpportunitySearchEngine implements OpportunitySearchEngine {
                     evaluation.appliedPreferenceVersion(),
                     evaluation.normalizedActiveFilters(),
                     evaluation.excludedSampleCount(),
+                    evaluation.preferencesRemovedAllLiveCandidates(),
                     toBackendAzimuthMatchIntervals(evaluation.azimuthMatchIntervals()));
         } catch (UsageException ex) {
             throw new IllegalStateException("Resolved opportunity scoring request was invalid.", ex);
