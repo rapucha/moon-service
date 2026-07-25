@@ -110,14 +110,6 @@ public final class OpportunityService {
 
     public PreferenceEvaluation evaluate(
             PrototypeConfig config,
-            OpportunityPreferences preferences,
-            Instant notBefore
-    ) {
-        return evaluate(config, weatherProvider, preferences, notBefore);
-    }
-
-    public PreferenceEvaluation evaluate(
-            PrototypeConfig config,
             WindowWeatherProvider weatherProvider,
             OpportunityPreferences preferences,
             Instant notBefore

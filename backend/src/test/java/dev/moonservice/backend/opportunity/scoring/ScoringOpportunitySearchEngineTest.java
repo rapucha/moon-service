@@ -85,7 +85,8 @@ class ScoringOpportunitySearchEngineTest {
     void scoresResolvedLocationCoordinatesWithoutFixtureLocationId() {
         ScoringOpportunitySearchEngine engine = engineWithPartlyCloudyWeather();
 
-        OpportunitySearchResponse response = engine.search(
+        OpportunitySearchResponse response = searchWithoutLiveCutoff(
+                engine,
                 amsterdam(),
                 new OpportunitySearchRequest("amsterdam-nl", "2026-06-29", 7, 90.0, 5));
 
@@ -165,7 +166,8 @@ class ScoringOpportunitySearchEngineTest {
                 new PreviewEvaluator(),
                 provider);
 
-        OpportunitySearchResponse response = engine.search(
+        OpportunitySearchResponse response = searchWithoutLiveCutoff(
+                engine,
                 amsterdam(),
                 new OpportunitySearchRequest("amsterdam-nl", "2026-06-29", 7, 90.0, 5));
 
@@ -268,41 +270,6 @@ class ScoringOpportunitySearchEngineTest {
     }
 
     @Test
-    void defaultTypedSearchPreservesNoFiltersAndRejectsActivePreferences() {
-        OpportunitySearchRequest request =
-                new OpportunitySearchRequest("prague-cz", "2026-06-29", 1, 12.0, 10);
-        OpportunitySearchResponse expected = engineWithPartlyCloudyWeather().search(request);
-        OpportunitySearchEngine engine = ignored -> expected;
-        Instant notBefore = Instant.parse("2026-06-28T22:00:00Z");
-
-        PreferenceSearchResult noFilters =
-                engine.search(prague(), request, notBefore, OpportunityPreferences.none());
-
-        assertEquals(expected, noFilters.response());
-        assertTrue(noFilters.normalizedActiveFilters().isEmpty());
-        assertEquals(0, noFilters.excludedSampleCount());
-        OpportunityPreferences preferences = new OpportunityPreferences(
-                1,
-                new AltitudeRange(0.0, 12.0),
-                null,
-                null,
-                null,
-                null);
-
-        UnsupportedOperationException exception = assertThrows(
-                UnsupportedOperationException.class,
-                () -> engine.search(
-                        prague(),
-                        request,
-                        notBefore,
-                        preferences));
-
-        assertEquals(
-                "This opportunity search engine does not support active preferences.",
-                exception.getMessage());
-    }
-
-    @Test
     void typedAzimuthIntervalsRejectZeroDurationTangency() {
         Instant boundary = Instant.parse("2026-06-29T00:00:00Z");
 
@@ -344,10 +311,12 @@ class ScoringOpportunitySearchEngineTest {
     void rejectsNearConjunctionThinCrescentFalsePositiveForPragueAndAbuDhabi() {
         ScoringOpportunitySearchEngine engine = engineWithPartlyCloudyWeather();
 
-        assertNearConjunctionRejected(engine.search(
+        assertNearConjunctionRejected(searchWithoutLiveCutoff(
+                engine,
                 prague(),
                 new OpportunitySearchRequest("prague-cz", "2026-07-14", 1, 90.0, 100)));
-        assertNearConjunctionRejected(engine.search(
+        assertNearConjunctionRejected(searchWithoutLiveCutoff(
+                engine,
                 abuDhabi(),
                 new OpportunitySearchRequest("abu-dhabi-ae", "2026-07-14", 1, 90.0, 100)));
     }
@@ -370,7 +339,10 @@ class ScoringOpportunitySearchEngineTest {
 
         IllegalStateException exception = assertThrows(
                 IllegalStateException.class,
-                () -> engine.search(amsterdam(), new OpportunitySearchRequest("amsterdam-nl", "2026-06-29", 0, 90.0, 5)));
+                () -> searchWithoutLiveCutoff(
+                        engine,
+                        amsterdam(),
+                        new OpportunitySearchRequest("amsterdam-nl", "2026-06-29", 0, 90.0, 5)));
 
         assertEquals("Resolved opportunity scoring request was invalid.", exception.getMessage());
         assertNotNull(exception.getCause());
@@ -386,6 +358,14 @@ class ScoringOpportunitySearchEngineTest {
                 202,
                 ZoneId.of("Europe/Prague"),
                 "CZ");
+    }
+
+    private static OpportunitySearchResponse searchWithoutLiveCutoff(
+            ScoringOpportunitySearchEngine engine,
+            ResolvedLocation location,
+            OpportunitySearchRequest request
+    ) {
+        return engine.search(location, request, Instant.MIN);
     }
 
     private static ResolvedLocation abuDhabi() {

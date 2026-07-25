@@ -34,12 +34,16 @@
 - Hard-gate exception (gate; base; approved maximum; actual result; rationale; owner approval): N/A / link
 - New manifest, lock, workflow, provider, account, network, runtime, build, test, or operational dependency and consequences: None / approved decision link
 - Unrequested work and incidental findings disposition: None / omitted and reported / approved replan link
-- New abstractions or extension points: None / current accepted use or established boundary
+- Production-Use Evidence for compatibility/default/fallback behavior, public
+  production API, configuration/provider/toggle, abstraction, or extension
+  point: None / current use or approved dependent seam; capability/failure;
+  target/version when applicable
 - Follow-up issue mutation authority: None / explicit user instruction / explicit source-issue authority / owner-accepted enumerated split plan (link exact issues)
 
 - [ ] The change category was selected from accepted authority before editing and was not changed to fit the diff.
 - [ ] This PR is within every hard concern, ordinary-file, code-size, and
-  generated/vendored/lock gate.
+  generated/vendored/lock gate, or records the applicable approved exception
+  above.
 - [ ] If this PR exceeds a hard gate, the exception and owner approval are
   linked above. (N/A if within all hard gates.)
 - [ ] Documentation authority and size triggers are recorded above.

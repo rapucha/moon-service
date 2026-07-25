@@ -12,37 +12,18 @@ import java.util.Objects;
 public interface OpportunitySearchEngine {
     OpportunitySearchResponse search(OpportunitySearchRequest request);
 
-    default OpportunitySearchResponse search(ResolvedLocation location, OpportunitySearchRequest request) {
-        return search(request);
-    }
-
-    default OpportunitySearchResponse search(
+    OpportunitySearchResponse search(
             ResolvedLocation location,
             OpportunitySearchRequest request,
             Instant notBefore
-    ) {
-        return search(location, request);
-    }
+    );
 
-    default PreferenceSearchResult search(
+    PreferenceSearchResult search(
             ResolvedLocation location,
             OpportunitySearchRequest request,
             Instant notBefore,
             OpportunityPreferences preferences
-    ) {
-        Objects.requireNonNull(notBefore, "notBefore");
-        Objects.requireNonNull(preferences, "preferences");
-        if (preferences.active()) {
-            throw new UnsupportedOperationException(
-                    "This opportunity search engine does not support active preferences.");
-        }
-        return new PreferenceSearchResult(
-                search(location, request, notBefore),
-                preferences.version(),
-                preferences.normalizedFilters(),
-                0,
-                Map.of());
-    }
+    );
 
     record PreferenceSearchResult(
             OpportunitySearchResponse response,
@@ -53,8 +34,9 @@ public interface OpportunitySearchEngine {
     ) {
         public PreferenceSearchResult {
             Objects.requireNonNull(response, "response");
-            if (appliedPreferenceVersion != 1) {
-                throw new IllegalArgumentException("appliedPreferenceVersion must be 1.");
+            if (appliedPreferenceVersion != OpportunityPreferences.VERSION) {
+                throw new IllegalArgumentException(
+                        "appliedPreferenceVersion must be " + OpportunityPreferences.VERSION + ".");
             }
             if (excludedSampleCount < 0) {
                 throw new IllegalArgumentException("excludedSampleCount must not be negative.");

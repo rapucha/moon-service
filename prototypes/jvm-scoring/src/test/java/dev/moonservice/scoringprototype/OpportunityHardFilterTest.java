@@ -209,7 +209,7 @@ class OpportunityHardFilterTest {
 
     @Test
     void namedPhaseRangesKeepAllEightPhasesDistinct() {
-        double[] angles = {0, 45, 90, 135, 180, 225, 270, 315};
+        double[] angles = {337.5, 22.5, 67.5, 112.5, 157.5, 202.5, 247.5, 292.5};
         NamedPhase[] phases = NamedPhase.values();
         for (int index = 0; index < phases.length; index++) {
             Function<Instant, MoonSample> samples =
@@ -439,7 +439,8 @@ class OpportunityHardFilterTest {
         OpportunityService service = new OpportunityService();
 
         assertEquals(service.evaluate(config),
-                service.evaluate(config, OpportunityPreferences.none(), config.start()).result());
+                evaluateWithDefaultWeather(
+                        service, config, OpportunityPreferences.none(), config.start()).result());
     }
 
     @Test
@@ -485,7 +486,7 @@ class OpportunityHardFilterTest {
         PrototypeConfig fullConfig = new PrototypeConfig(
                 PRAGUE, LocalDate.parse("2026-06-29"), 1, 12.0, 100);
         OpportunityService.PreferenceEvaluation full =
-                service.evaluate(fullConfig, preferences, fullConfig.start());
+                evaluateWithDefaultWeather(service, fullConfig, preferences, fullConfig.start());
         String repeatedPassId = full.result().opportunities().stream()
                 .map(item -> item.window().passId())
                 .filter(passId -> full.result().opportunities().stream()
@@ -499,7 +500,7 @@ class OpportunityHardFilterTest {
         PrototypeConfig limitedConfig = new PrototypeConfig(
                 PRAGUE, LocalDate.parse("2026-06-29"), 1, 12.0, 1);
         OpportunityService.PreferenceEvaluation limited =
-                service.evaluate(limitedConfig, preferences, limitedConfig.start());
+                evaluateWithDefaultWeather(service, limitedConfig, preferences, limitedConfig.start());
         String returnedPassId = limited.result().opportunities().getFirst().window().passId();
 
         assertEquals(repeatedPassId, returnedPassId);
@@ -518,6 +519,16 @@ class OpportunityHardFilterTest {
             double radius
     ) {
         return FILTER.filter(PRAGUE, windows, samples::apply, ignored -> radius, preferences, notBefore);
+    }
+
+    private static OpportunityService.PreferenceEvaluation evaluateWithDefaultWeather(
+            OpportunityService service,
+            PrototypeConfig config,
+            OpportunityPreferences preferences,
+            Instant notBefore
+    ) {
+        return service.evaluate(
+                config, ignored -> WeatherFixture.PRAGUE_PARTLY_CLOUDY, preferences, notBefore);
     }
 
     private static boolean matches(OpportunityPreferences preferences, MoonSample sample, double radius) {

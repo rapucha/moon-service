@@ -11,13 +11,16 @@ import dev.moonservice.backend.location.ResolvedLocation;
 import dev.moonservice.backend.opportunity.search.LocationCandidatesResponse;
 import dev.moonservice.backend.opportunity.search.OpportunityResponse;
 import dev.moonservice.backend.opportunity.search.OpportunitySearchEngine;
+import dev.moonservice.backend.opportunity.search.OpportunitySearchEngine.PreferenceSearchResult;
 import dev.moonservice.backend.opportunity.search.OpportunitySearchRequest;
 import dev.moonservice.backend.opportunity.search.OpportunitySearchResponse;
 import dev.moonservice.backend.opportunity.search.OpportunityStatusResponse;
 import dev.moonservice.backend.weather.WeatherForecastUnavailableException;
+import dev.moonservice.scoringprototype.input.OpportunityPreferences;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneId;
+import java.util.function.Function;
 
 import org.junit.jupiter.api.Test;
 import tools.jackson.databind.ObjectMapper;
@@ -29,14 +32,14 @@ class OpportunitySearchServiceTest {
 
     @Test
     void delegatesParsedOpportunitySearchRequestToConfiguredEngine() throws Exception {
-        OpportunitySearchService opportunitySearchService = new OpportunitySearchService(request -> {
+        OpportunitySearchService opportunitySearchService = new OpportunitySearchService(preferenceFreeEngine(request -> {
             assertEquals("prague-cz", request.locationId());
             assertEquals("2026-06-29", request.start());
             assertEquals(7, request.forecastHorizonDays());
             assertEquals(12.0, request.maxMoonAltitudeDegrees());
             assertEquals(5, request.limit());
             return okResponse();
-        }, query -> {
+        }), query -> {
             throw new AssertionError("Resolver should not be called for direct request search.");
         }, defaults);
 
@@ -65,7 +68,7 @@ class OpportunitySearchServiceTest {
                 202,
                 ZoneId.of("Europe/Prague"),
                 "CZ");
-        OpportunitySearchService opportunitySearchService = new OpportunitySearchService(new OpportunitySearchEngine() {
+        OpportunitySearchService opportunitySearchService = new OpportunitySearchService(new PreferenceFreeSearchEngine() {
             @Override
             public OpportunitySearchResponse search(OpportunitySearchRequest request) {
                 fail("Query search should pass the resolved location to the engine.");
@@ -73,13 +76,18 @@ class OpportunitySearchServiceTest {
             }
 
             @Override
-            public OpportunitySearchResponse search(ResolvedLocation location, OpportunitySearchRequest request) {
+            public OpportunitySearchResponse search(
+                    ResolvedLocation location,
+                    OpportunitySearchRequest request,
+                    Instant notBefore
+            ) {
                 assertEquals(prague, location);
                 assertEquals("prague-cz", request.locationId());
                 assertEquals("2026-06-21", request.start());
                 assertEquals(7, request.forecastHorizonDays());
                 assertEquals(90.0, request.maxMoonAltitudeDegrees());
                 assertEquals(10, request.limit());
+                assertEquals(defaults.now(), notBefore);
                 return okResponse();
             }
         }, query -> {
@@ -105,7 +113,7 @@ class OpportunitySearchServiceTest {
                 202,
                 ZoneId.of("Europe/Prague"),
                 "CZ");
-        OpportunitySearchService opportunitySearchService = new OpportunitySearchService(new OpportunitySearchEngine() {
+        OpportunitySearchService opportunitySearchService = new OpportunitySearchService(new PreferenceFreeSearchEngine() {
             @Override
             public OpportunitySearchResponse search(OpportunitySearchRequest request) {
                 fail("Query search should pass the resolved location to the engine.");
@@ -132,10 +140,10 @@ class OpportunitySearchServiceTest {
 
     @Test
     void usesResolvedLocationTimezoneForDefaultStartDate() {
-        OpportunitySearchService opportunitySearchService = new OpportunitySearchService(request -> {
+        OpportunitySearchService opportunitySearchService = new OpportunitySearchService(preferenceFreeEngine(request -> {
             assertEquals("2026-06-20", request.start());
             return okResponse();
-        }, query -> LocationResolution.resolved(new ResolvedLocation(
+        }), query -> LocationResolution.resolved(new ResolvedLocation(
                 "test-location",
                 providerLocationId("test-location"),
                 "Test Location",
@@ -152,8 +160,8 @@ class OpportunitySearchServiceTest {
 
     @Test
     void returnsAmbiguousLocationWithoutCallingOpportunityEngine() {
-        OpportunitySearchService opportunitySearchService = new OpportunitySearchService(request ->
-                fail("Engine should not be called until an ambiguous location is selected."), query ->
+        OpportunitySearchService opportunitySearchService = new OpportunitySearchService(preferenceFreeEngine(request ->
+                fail("Engine should not be called until an ambiguous location is selected.")), query ->
                 LocationResolution.ambiguous(java.util.List.of(
                         new ResolvedLocation(
                                 "springfield-mo-us",
@@ -184,8 +192,8 @@ class OpportunitySearchServiceTest {
 
     @Test
     void returnsTemporarilyUnavailableWhenLocationProviderFails() {
-        OpportunitySearchService opportunitySearchService = new OpportunitySearchService(request ->
-                fail("Engine should not be called when location lookup is unavailable."), query ->
+        OpportunitySearchService opportunitySearchService = new OpportunitySearchService(preferenceFreeEngine(request ->
+                fail("Engine should not be called when location lookup is unavailable.")), query ->
                 LocationResolution.temporarilyUnavailable(), defaults);
 
         OpportunityResponse response = opportunitySearchService.searchByQuery("Praha");
@@ -204,7 +212,7 @@ class OpportunitySearchServiceTest {
                 13,
                 ZoneId.of("Europe/Amsterdam"),
                 "NL");
-        OpportunitySearchService opportunitySearchService = new OpportunitySearchService(new OpportunitySearchEngine() {
+        OpportunitySearchService opportunitySearchService = new OpportunitySearchService(new PreferenceFreeSearchEngine() {
             @Override
             public OpportunitySearchResponse search(OpportunitySearchRequest request) {
                 fail("Query search should pass the resolved location to the engine.");
@@ -212,7 +220,11 @@ class OpportunitySearchServiceTest {
             }
 
             @Override
-            public OpportunitySearchResponse search(ResolvedLocation location, OpportunitySearchRequest request) {
+            public OpportunitySearchResponse search(
+                    ResolvedLocation location,
+                    OpportunitySearchRequest request,
+                    Instant notBefore
+            ) {
                 throw new WeatherForecastUnavailableException("Weather provider failed.");
             }
         }, query -> LocationResolution.resolved(amsterdam), defaults);
@@ -236,7 +248,7 @@ class OpportunitySearchServiceTest {
                 13,
                 ZoneId.of("Europe/Amsterdam"),
                 "NL");
-        OpportunitySearchService opportunitySearchService = new OpportunitySearchService(new OpportunitySearchEngine() {
+        OpportunitySearchService opportunitySearchService = new OpportunitySearchService(new PreferenceFreeSearchEngine() {
             @Override
             public OpportunitySearchResponse search(OpportunitySearchRequest request) {
                 fail("Query search should pass the resolved location to the engine.");
@@ -244,7 +256,11 @@ class OpportunitySearchServiceTest {
             }
 
             @Override
-            public OpportunitySearchResponse search(ResolvedLocation location, OpportunitySearchRequest request) {
+            public OpportunitySearchResponse search(
+                    ResolvedLocation location,
+                    OpportunitySearchRequest request,
+                    Instant notBefore
+            ) {
                 assertEquals(amsterdam, location);
                 assertEquals("amsterdam-nl", request.locationId());
                 return okResponse();
@@ -281,5 +297,46 @@ class OpportunitySearchServiceTest {
 
     private static ProviderLocationId providerLocationId(String providerId) {
         return new ProviderLocationId(LocationProvider.OPEN_METEO, providerId);
+    }
+
+    private static OpportunitySearchEngine preferenceFreeEngine(
+            Function<OpportunitySearchRequest, OpportunitySearchResponse> search
+    ) {
+        return new PreferenceFreeSearchEngine() {
+            @Override
+            public OpportunitySearchResponse search(OpportunitySearchRequest request) {
+                return search.apply(request);
+            }
+
+            @Override
+            public OpportunitySearchResponse search(
+                    ResolvedLocation location,
+                    OpportunitySearchRequest request,
+                    Instant notBefore
+            ) {
+                return search.apply(request);
+            }
+        };
+    }
+
+    private abstract static class PreferenceFreeSearchEngine implements OpportunitySearchEngine {
+        @Override
+        public OpportunitySearchResponse search(
+                ResolvedLocation location,
+                OpportunitySearchRequest request,
+                Instant notBefore
+        ) {
+            throw new AssertionError("Resolved-location search should not be called in this service test.");
+        }
+
+        @Override
+        public PreferenceSearchResult search(
+                ResolvedLocation location,
+                OpportunitySearchRequest request,
+                Instant notBefore,
+                OpportunityPreferences preferences
+        ) {
+            throw new AssertionError("Preference-aware search should not be called in this service test.");
+        }
     }
 }

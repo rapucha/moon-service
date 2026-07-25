@@ -66,6 +66,15 @@ Prefer these inputs:
 - The staged diff, branch diff, or exact file list under review.
 - The accepted change category, scope review, explicit source-issue authority, and
   any approved exception or owner-accepted enumerated split plan.
+- For every changed compatibility path, default or fallback behavior, public
+  production constructor, factory, method, or overload, configuration option,
+  provider slot, toggle, or extension point, the production-use evidence
+  required by `.agents/review-policy.md`. Identify a required interface seam
+  separately from any default or fallback body.
+- For an in-place guardrail repair, `rapucha`'s exact request, the observed
+  failure, every added guardrail path, the exact concern or ordinary-file gate
+  crossings excepted, resulting concern and ordinary-file counts, and causal
+  rationale.
 - Expected paths, other paths that might be needed and why, the expected
   file-count range, actual paths and count, and any meaningful difference.
   Include informational churn; code-line base counts, results, and deltas;
@@ -105,15 +114,26 @@ Check scope before implementation quality:
    required, check for removed constraints, contradictions, new authority,
    repeated rules, mismatch with code, and unclear structure. Documentation
    size alone does not require a split.
-4. Look for unrequested refactors, incidental fixes, opportunistic cleanup,
-   speculative extensibility, unrelated tests/docs, and abstractions without a
-   current accepted production use or established boundary.
-5. Flag manifest, lock, workflow, provider, account, network, runtime, build, or
+4. Audit every new or changed compatibility path, default or fallback behavior,
+   public production constructor, factory, method, or overload, configuration
+   option, provider slot, toggle, and extension point against the production-use
+   evidence rule. Review a required interface seam separately from its default
+   or fallback body. Acceptance criteria, tests, hypothetical callers, and an
+   established pattern or boundary do not replace the required evidence. Report
+   each unsupported completed mechanism as a finding.
+5. When the diff includes an in-place guardrail repair, verify the complete
+   exception record and `rapucha`'s explicit request. Confirm that the exception
+   covers only concern and ordinary-file crossings attributable to the named
+   guardrail paths. Apply every other gate and review normally.
+6. Look for unrequested refactors, incidental fixes, opportunistic cleanup,
+   unrelated tests/docs, and abstractions without the required production-use
+   evidence.
+7. Flag manifest, lock, workflow, provider, account, network, runtime, build, or
    test dependencies that lack explicit source authority.
-6. Then prioritize concrete bugs, behavior regressions, public contract drift,
+8. Then prioritize concrete bugs, behavior regressions, public contract drift,
    missing or weak tests, privacy/security/provider risks, UI/layout risks,
    documentation mismatches, and validation gaps.
-7. Review changed agent-authored prose against the target project's canonical
+9. Review changed agent-authored prose against the target project's canonical
    writing guide. For Moon Service, read
    `docs/ai-agent/plain-technical-writing.md`. Flag wording only when a simpler
    version keeps the same meaning, and suggest that version. Preserve exact

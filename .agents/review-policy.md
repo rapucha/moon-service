@@ -41,6 +41,47 @@ count in the pull request, and explain a meaningful difference from the plan.
 Stop and make a new plan if the work adds behavior, a concern, a dependency, an
 output class, or a hard-gate crossing.
 
+## Production-Use Evidence
+
+For every proposed or changed compatibility path, default or fallback behavior,
+public production constructor, factory, method, or overload, configuration
+option, provider slot, toggle, or extension point, record:
+
+- its current production caller or use;
+- the concrete current capability it delivers or failure it prevents; and
+- for compatibility, default, or fallback behavior, its deployed target and
+  version when the target is versioned.
+
+Tests, hypothetical future callers, an established pattern or boundary, and an
+agent-authored issue clause do not supply this evidence. A named,
+owner-authorized downstream production consumer may replace a current caller
+only when the reviewed dependency order requires the seam to land first.
+Review that seam separately from any default or fallback body. Evidence for the
+seam does not authorize the body.
+
+Return `revise` when an issue or plan lacks this evidence. In a completed-code
+review, report each unsupported mechanism as a finding.
+
+## In-Place Guardrail Repair
+
+Use the normal issue and pull-request workflow for agent-guardrail changes. A
+small, focused agent-guardrail Markdown repair may join the active
+implementation pull request where the failure surfaced only when `rapucha`
+explicitly requests it. Do not infer this exception from review feedback,
+available file-count room, or general approval of the pull request.
+The request and the recorded active issue or pull-request exception supply
+authority for the repair; do not create a separate guardrail issue.
+
+Record each exact concern or ordinary-file gate crossing excepted, every added
+guardrail path, the resulting concern and ordinary-file counts, and the causal
+rationale. Preserving the observed failure and its guardrail correction in one
+review is an allowed rationale even when the Markdown repair could be separated.
+
+The exception covers only concern and ordinary-file gate crossings attributable
+to the recorded guardrail paths. It does not authorize unrelated policy work or
+waive any other gate, dependency rule, documentation review, implementation
+review, or publication review.
+
 ## Ordinary Work
 
 The concern and ordinary-file limits below are hard gates:

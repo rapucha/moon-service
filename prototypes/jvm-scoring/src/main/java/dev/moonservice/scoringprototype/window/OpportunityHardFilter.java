@@ -29,6 +29,7 @@ public final class OpportunityHardFilter {
     private static final Duration SAMPLE_STEP = Duration.ofMinutes(5);
     private static final Duration REFINEMENT_TOLERANCE = Duration.ofSeconds(1);
     private static final Duration KIND_SAMPLE_OFFSET = Duration.ofMinutes(1);
+    private static final List<NamedPhase> PHASES_IN_ANGLE_ORDER = List.of(NamedPhase.values());
 
     @FunctionalInterface
     public interface LunarRadiusProvider {
@@ -349,15 +350,9 @@ public final class OpportunityHardFilter {
     }
 
     private static NamedPhase namedPhase(double angle) {
-        double normalized = normalize(angle);
-        if (normalized < 22.5 || normalized >= 337.5) return NamedPhase.NEW_MOON;
-        if (normalized < 67.5) return NamedPhase.WAXING_CRESCENT;
-        if (normalized < 112.5) return NamedPhase.FIRST_QUARTER;
-        if (normalized < 157.5) return NamedPhase.WAXING_GIBBOUS;
-        if (normalized < 202.5) return NamedPhase.FULL_MOON;
-        if (normalized < 247.5) return NamedPhase.WANING_GIBBOUS;
-        if (normalized < 292.5) return NamedPhase.LAST_QUARTER;
-        return NamedPhase.WANING_CRESCENT;
+        int phaseIndex = (int) Math.floor((normalize(angle) + 22.5) / 45.0)
+                % PHASES_IN_ANGLE_ORDER.size();
+        return PHASES_IN_ANGLE_ORDER.get(phaseIndex);
     }
 
     private static List<BearingInterval> segments(DegreeRange range) {

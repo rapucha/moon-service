@@ -45,6 +45,11 @@ answer:
   agent-authored parent issue or draft for those statements.
 - The trace from each material acceptance criterion to that request, evidence,
   an established contract, or an explicit owner decision.
+- For every proposed compatibility path, default or fallback behavior, public
+  production constructor, factory, method, or overload, configuration option,
+  provider slot, toggle, or extension point, the production-use evidence
+  required by `.agents/review-policy.md`. Identify a required interface seam
+  separately from any default or fallback body.
 - Project authority such as `AGENTS.md`, contribution rules, and relevant issue
   templates.
 - Only the product, architecture, privacy, deployment, or API documents needed
@@ -72,7 +77,13 @@ answer:
    need, tradeoffs, and ongoing maintenance cost. Reject speculative
    abstractions, extension points, cleanup, or refactors that the stated
    outcome does not require.
-4. Classify proposed behavior as the minimum end-to-end capability, behavior
+4. Apply the production-use evidence rule to every proposed compatibility path,
+   default or fallback behavior, public production constructor, factory, method,
+   or overload, configuration option, provider slot, toggle, and extension
+   point. Review a required interface seam separately from its default or
+   fallback body. Return `revise` when the required evidence is absent;
+   acceptance criteria written by the drafting agent do not supply it.
+5. Classify proposed behavior as the minimum end-to-end capability, behavior
    required for current correctness or safety, or optional hardening. Require a
    concrete authority or evidence trace for each material criterion; the draft's
    own wording is not authority. Treat deduplication, pagination, recovery,
@@ -80,11 +91,11 @@ answer:
    scale or threat handling as optional unless the inputs demonstrate otherwise.
    Do not require a custom protocol client without explicit owner approval after
    the standard and stricter alternatives have been presented.
-5. Prefer an issue whose first deliverable is the smallest observable
+6. Prefer an issue whose first deliverable is the smallest observable
    user-visible or operational outcome. Defer optional hardening rather than
    embedding it in the core issue. Do not create or presume a follow-up issue
    unless the user, source authority, or an owner-accepted split authorizes it.
-6. Surface hidden decisions and dependencies, including new runtime components,
+7. Surface hidden decisions and dependencies, including new runtime components,
    providers, accounts, stored data, privacy obligations, network exposure,
    deployment or rollback work, CI, and ongoing operations. Simulate the
    required delivery and rollout transitions. For every prerequisite, merge,
@@ -93,27 +104,27 @@ answer:
    relying on unrelated ambient work or a later step that the same plan blocks.
    Treat `A merges -> A validation needs open B -> B cannot start until A
    validation passes` as a dependency cycle.
-7. Separate owner decisions from implementation details. Do not mark a draft
+8. Separate owner decisions from implementation details. Do not mark a draft
    ready while a material product, architecture, privacy, cost, or operational
    choice is implicit or unauthorized.
-8. Categorize the proposed work from its outcome and apply every repository
+9. Categorize the proposed work from its outcome and apply every repository
    gate: concerns, ordinary files, resulting code-file sizes, and separate
    generated, vendored, and lock-file budgets. Record ordinary line churn as
    information. Check documentation authority and size rules without treating
    their review thresholds as scope gates. Treat paths and count ranges as
    forecasts, not a fixed list or permission to add work. Do not choose a more
    generous category to fit an estimate.
-9. Identify incidental findings, opportunistic cleanup, unrelated tests/docs,
+10. Identify incidental findings, opportunistic cleanup, unrelated tests/docs,
    and dependencies not authorized by the user's request or existing source
    issue. Remove them or return `revise`; room under a limit is not authority.
-10. Split distinct outcomes, decision work, or independently deliverable
+11. Split distinct outcomes, decision work, or independently deliverable
    concerns rather than hiding them under one issue.
-11. Test acceptance criteria for observable outcomes, completeness,
+12. Test acceptance criteria for observable outcomes, completeness,
     feasibility, solution bias, and authority traceability. Identify
     prerequisites, dependency order, rollback boundaries, and
     disabled-by-default needs. For agent-authored issue text, flag wording that
     can be simpler without losing meaning and propose a direct replacement.
-12. Return exactly one verdict: `ready`, `revise`, or `split_required`.
+13. Return exactly one verdict: `ready`, `revise`, or `split_required`.
 
 ## Verdict Rules
 
@@ -163,6 +174,10 @@ Dependency liveness:
 Acceptance authority:
 - <material criterion> -> <user intent, evidence, correctness/safety need, owner decision, or unsupported>
 - Optional hardening: <excluded, justified in current scope, or separately authorized>
+
+Production-use evidence:
+- <mechanism> -> <current caller/use or approved dependent consumer; current capability/failure; compatibility target/version when applicable>
+- Interface seam/body separation: <separate evidence or unsupported>
 
 Scope assessment:
 - Change category: <repository-defined category and why>
@@ -216,7 +231,12 @@ tradeoffs, and ongoing maintenance cost. Trace every material criterion to user
 intent, evidence, a current correctness/safety need, or an explicit decision.
 Identify the minimum end-to-end capability and separate unsupported optional
 hardening. Return revise when an unapproved stricter design or custom protocol
-client is required. Apply the repository change category, hard scope gates,
+client is required. Apply the production-use evidence rule to every proposed
+compatibility path, default or fallback behavior, public production constructor,
+factory, method, or overload, configuration option, provider slot, toggle, and
+extension point. Review a required interface seam separately from any default
+or fallback body. Return revise when the evidence is absent; issue wording alone
+does not supply it. Apply the repository change category, hard scope gates,
 documentation review rules, and output budgets. Treat ordinary churn as
 information. Return exactly ready, revise, or split_required. Do not assume the
 drafting agent's proposed solution, its own acceptance criteria, or an

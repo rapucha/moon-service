@@ -20,12 +20,14 @@ public record OpportunityPreferences(
         Set<NamedPhase> namedPhases,
         List<DegreeRange> brightLimbOrientationDegrees
 ) {
+    public static final int VERSION = 1;
+
     private static final int MAX_RANGES = 8;
     private static final DateTimeFormatter CLOCK_FORMAT = DateTimeFormatter.ofPattern("HH:mm");
 
     public OpportunityPreferences {
-        if (version != 1) {
-            throw invalid("version must be 1.");
+        if (version != VERSION) {
+            throw invalid("version must be " + VERSION + ".");
         }
         if (namedPhases != null) {
             if (namedPhases.isEmpty() || namedPhases.stream().anyMatch(Objects::isNull)) {
@@ -48,7 +50,7 @@ public record OpportunityPreferences(
     }
 
     public static OpportunityPreferences none() {
-        return new OpportunityPreferences(1, null, null, null, null, null);
+        return new OpportunityPreferences(VERSION, null, null, null, null, null);
     }
 
     public boolean active() {
