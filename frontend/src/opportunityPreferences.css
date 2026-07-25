@@ -77,7 +77,7 @@
 
 .preference-choice input:focus-visible,
 .preference-panel input[type="number"]:focus-visible,
-.preference-panel input[type="time"]:focus-visible,
+.preference-clock-row input:focus-visible,
 .preference-panel button:focus-visible,
 .preference-panel > summary:focus-visible,
 .preference-result-region button:focus-visible {
@@ -108,7 +108,7 @@
 }
 
 .preference-panel input[type="number"],
-.preference-panel input[type="time"] {
+.preference-clock-row input {
   width: 100%;
   min-width: 0;
   max-width: 100%;
@@ -121,7 +121,7 @@
 }
 
 .preference-panel input[type="number"]:focus,
-.preference-panel input[type="time"]:focus {
+.preference-clock-row input:focus {
   border-color: var(--accent);
 }
 

@@ -149,6 +149,19 @@ test("keeps focus in invalid altitude and clock fields without requesting", asyn
   expect(calls).toHaveLength(0);
 });
 
+test("uses explicit 24-hour text fields for local clock windows", async ({ page }) => {
+  await page.goto("/search?q=Prague");
+  await openPreferences(page);
+  await page.getByLabel("Local clock windows").check();
+
+  const start = page.getByLabel("Local clock window 1 start");
+  const end = page.getByLabel("Local clock window 1 end");
+  await expect(start).toHaveAttribute("type", "text");
+  await expect(end).toHaveAttribute("type", "text");
+  await expect(start).toHaveAttribute("placeholder", "HH:mm");
+  await expect(page.locator("#preference-clock-help")).toContainText("24-hour HH:mm");
+});
+
 test("posts altitude and two cross-midnight clock windows and restores them", async ({ page }) => {
   await recordFetchOptions(page);
   const calls = await captureApiCalls(page);

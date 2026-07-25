@@ -133,7 +133,7 @@
                   <button id="preference-add-window" type="button" class="text-button preference-add-window">
                     Add another window
                   </button>
-                  <p class="preference-help">Uses the searched location’s timezone. An end before the start crosses midnight.</p>
+                  <p id="preference-clock-help" class="preference-help">Uses 24-hour HH:mm in the searched location’s timezone. An end before the start crosses midnight.</p>
                 </div>
 
                 <div id="preference-light-editor" class="preference-buckets">
@@ -204,11 +204,11 @@
     <div class="preference-clock-row">
       <label>
         <span>From</span>
-        <input type="time" data-clock-start aria-label="Local clock window start">
+        <input type="text" data-clock-start maxlength="5" placeholder="HH:mm" autocomplete="off" spellcheck="false" aria-label="Local clock window start" aria-describedby="preference-clock-help">
       </label>
       <label>
         <span>Until</span>
-        <input type="time" data-clock-end aria-label="Local clock window end">
+        <input type="text" data-clock-end maxlength="5" placeholder="HH:mm" autocomplete="off" spellcheck="false" aria-label="Local clock window end" aria-describedby="preference-clock-help">
       </label>
       <button type="button" class="text-button preference-remove-window" aria-label="Remove local clock window">
         Remove

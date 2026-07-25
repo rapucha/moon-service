@@ -123,6 +123,9 @@ The first editor exposes two hard filters:
   `Golden hour`, `Civil twilight`, `Nautical twilight`, and `Night`. Switching
   modes removes the other mode from active state.
 
+Local-clock preference inputs use 24-hour `HH:mm` text fields. They do not use
+browser-localized native time controls.
+
 These controls remove candidates that fall outside the limits. They do not
 adjust scores or change the order of candidates that remain. With no active
 filter, Search keeps its preference-free request and current default results.
