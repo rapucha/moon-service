@@ -40,6 +40,7 @@ public final class HostedAlphaSurfaceFilter extends OncePerRequestFilter {
             "/favicon.svg", "/styles.css", "/sun-marker-aperture-flare.svg",
             "/moonPathLightBands.js", "/moonPathSilhouetteSymbols.js", "/moonPathSilhouettes.js",
             "/moonPathView.js", "/moonPhaseView.js", "/moonTexture.js", "/opportunityCard.js",
+            "/opportunityPreferences.css", "/opportunityPreferences.js",
             "/recentSearches.js", "/responseView.js", "/scoreView.js"
     );
     private static final Set<String> FORWARDED_IDENTITY_HEADERS = Set.of(

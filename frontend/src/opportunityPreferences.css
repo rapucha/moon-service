@@ -1,0 +1,385 @@
+.preference-panel {
+  min-width: 0;
+}
+
+.preference-panel > summary {
+  display: none;
+}
+
+.preference-panel > .preference-body {
+  display: block;
+  min-width: 0;
+}
+
+.preference-heading h2 {
+  margin: 0;
+  font-size: 1rem;
+  letter-spacing: 0;
+}
+
+.preference-intro {
+  margin: 6px 0 0;
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+#preference-form {
+  display: grid;
+  gap: 16px;
+  min-width: 0;
+  margin-top: 18px;
+}
+
+.preference-group {
+  min-width: 0;
+  margin: 0;
+}
+
+.preference-time-group {
+  padding: 16px 0 0;
+  border: 0;
+  border-top: 1px solid var(--line);
+}
+
+.preference-time-group legend {
+  padding: 0;
+  color: var(--muted);
+  font-size: 0.76rem;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.preference-choice {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  min-width: 0;
+  min-height: 38px;
+  color: var(--ink);
+  font-size: 0.9rem;
+  font-weight: 720;
+  cursor: pointer;
+}
+
+.preference-choice span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.preference-choice input[type="checkbox"],
+.preference-choice input[type="radio"] {
+  flex: 0 0 auto;
+  width: 18px;
+  height: 18px;
+  margin: 0;
+  accent-color: var(--accent);
+}
+
+.preference-choice input:focus-visible,
+.preference-panel input[type="number"]:focus-visible,
+.preference-clock-row input:focus-visible,
+.preference-panel button:focus-visible,
+.preference-panel > summary:focus-visible,
+.preference-result-region button:focus-visible {
+  outline: 3px solid rgba(33, 111, 104, 0.24);
+  outline-offset: 2px;
+}
+
+.preference-help {
+  margin: 2px 0 10px 27px;
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+
+.preference-range-fields {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.preference-range-fields label,
+.preference-clock-row label {
+  display: grid;
+  gap: 5px;
+  min-width: 0;
+  color: var(--muted);
+  font-size: 0.76rem;
+  font-weight: 760;
+}
+
+.preference-panel input[type="number"],
+.preference-clock-row input {
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  min-height: 42px;
+  padding: 7px 9px;
+  border: 1px solid var(--line-strong);
+  border-radius: 6px;
+  background: var(--surface);
+  color: var(--ink);
+}
+
+.preference-panel input[type="number"]:focus,
+.preference-clock-row input:focus {
+  border-color: var(--accent);
+}
+
+.preference-mode-choices,
+.preference-clock-rows,
+.preference-buckets {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.preference-mode-choices {
+  margin-top: 8px;
+}
+
+.preference-time-editor,
+.preference-buckets {
+  min-width: 0;
+  margin-top: 12px;
+  padding: 10px;
+  border-radius: 6px;
+  background: var(--surface-muted);
+}
+
+.preference-clock-row {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  min-width: 0;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--line);
+}
+
+.preference-clock-row + .preference-clock-row {
+  padding-top: 10px;
+}
+
+.preference-remove-window {
+  grid-column: 1 / -1;
+  justify-self: start;
+}
+
+.preference-add-window {
+  margin-top: 10px;
+}
+
+.preference-time-editor .preference-help {
+  margin: 10px 0 0;
+}
+
+.preference-form-status {
+  min-height: 22px;
+  margin: -4px 0 0;
+  color: var(--danger);
+  font-size: 0.86rem;
+}
+
+.preference-apply {
+  width: 100%;
+  padding: 0 12px;
+  background: var(--accent);
+  color: #fff;
+  font-weight: 760;
+}
+
+.preference-apply:hover {
+  background: var(--accent-strong);
+}
+
+.preference-panel [hidden],
+.preference-result-region [hidden] {
+  display: none !important;
+}
+
+.preference-result-region {
+  min-width: 0;
+}
+
+.active-preference-summary {
+  min-width: 0;
+  margin-top: 16px;
+  padding: 14px;
+  border: 1px solid rgba(33, 111, 104, 0.42);
+  border-radius: 8px;
+  background: #f1f7f5;
+}
+
+.active-preference-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 14px;
+  flex-wrap: wrap;
+}
+
+.active-preference-heading h3 {
+  margin: 0;
+  font-size: 1rem;
+}
+
+.preference-reset {
+  min-height: 34px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--accent-strong);
+  font-size: 0.84rem;
+  font-weight: 760;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.active-filter-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  min-width: 0;
+  margin: 12px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.active-filter {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  max-width: 100%;
+  min-height: 38px;
+  padding: 4px 5px 4px 10px;
+  border: 1px solid rgba(33, 111, 104, 0.36);
+  border-radius: 999px;
+  background: var(--surface);
+  font-size: 0.84rem;
+  font-weight: 740;
+}
+
+.active-filter > span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.active-filter-remove {
+  flex: 0 0 auto;
+  width: 28px;
+  min-height: 28px;
+  padding: 0;
+  border-color: var(--line);
+  border-radius: 50%;
+  background: var(--surface-muted);
+  color: var(--accent-strong);
+  font-size: 1.05rem;
+  font-weight: 760;
+  line-height: 1;
+}
+
+.active-filter-remove:hover {
+  border-color: var(--accent);
+}
+
+.preference-summary-note,
+.preference-share-note {
+  margin: 10px 0 0;
+  color: var(--muted);
+  font-size: 0.84rem;
+}
+
+.preference-share-note {
+  padding-top: 10px;
+  border-top: 1px solid rgba(33, 111, 104, 0.22);
+}
+
+.preference-notice {
+  min-width: 0;
+  margin: 10px 0 0;
+  padding: 9px 10px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--surface);
+  font-size: 0.86rem;
+  overflow-wrap: anywhere;
+}
+
+.preference-result-region > .preference-notice {
+  margin-top: 16px;
+}
+
+.preference-notice.warning,
+.preference-notice.ignored {
+  border-color: #dfc16d;
+  background: var(--amber-soft);
+  color: #5b4216;
+}
+
+.preference-notice.excluded {
+  background: var(--blue-soft);
+  color: var(--ink);
+}
+
+.preference-notice.empty {
+  border-color: #e0ada6;
+  background: var(--danger-soft);
+  color: var(--danger);
+}
+
+@media (max-width: 680px) {
+  .preference-panel {
+    padding: 0;
+  }
+
+  .preference-panel > summary {
+    display: list-item;
+    min-height: 54px;
+    padding: 15px 16px;
+  }
+
+  .preference-panel > summary::marker {
+    color: var(--accent-strong);
+  }
+
+  #preference-count {
+    margin-left: 4px;
+    color: var(--muted);
+    font-size: 0.82rem;
+    font-weight: 720;
+  }
+
+  .preference-panel:not([open]) > .preference-body {
+    display: none;
+  }
+
+  .preference-panel[open] > .preference-body {
+    display: block;
+    padding: 16px;
+    border-top: 1px solid var(--line);
+  }
+
+  .active-filter-list {
+    display: grid;
+  }
+
+  .active-filter {
+    width: 100%;
+    justify-content: space-between;
+    border-radius: 7px;
+  }
+}
+
+@media (max-width: 380px) {
+  .preference-range-fields,
+  .preference-clock-row {
+    grid-template-columns: 1fr;
+  }
+
+  .preference-remove-window {
+    grid-column: auto;
+  }
+
+  .active-preference-heading {
+    align-items: start;
+  }
+}

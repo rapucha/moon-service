@@ -19,7 +19,7 @@ Open-Meteo URLs are provider dependencies, not Moon Service routes.
 | `GET /search` | Lookup and share page; current product route | Web browser | Allowlisted; whole-site bound |
 | `GET /about` | Product/privacy information page | Web browser | Allowlisted; whole-site bound |
 | `GET /api/opportunities` | Location-to-opportunity product API | Browser `app.js` | Allowlisted; site and search bounds |
-| `POST /api/opportunities` | Request-scoped preference product API | None yet; browser work follows | Allowlisted POST; site and provider bounds |
+| `POST /api/opportunities` | Request-scoped preference product API | Browser `app.js` through `opportunityPreferences.js` | Allowlisted POST; site and provider bounds |
 | `POST /api/opportunities/search` | Direct fixture/scoring prototype contract | None | Hidden after site admission |
 | `GET /api/calibration-feedback/v1/capability` | Public feedback feature/availability state | None yet | Allowlisted; exempt from hosted resource admission |
 | `POST /api/calibration-feedback/v1/submissions` | Bounded current-observation feedback write | None yet | Allowlisted POST; provider-bound resolution and feedback write bucket |
@@ -117,18 +117,25 @@ and [hosted-alpha functional tests](../backend/src/test/java/dev/moonservice/bac
 - **Purpose/audience:** current lookup page and shareable result URL.
 - **Production invocation:** navigation links, browser history, and generated
   share links use `/search?q=...` or `/search?locationId=...`. Browser code reads
-  those parameters and calls `GET /api/opportunities`; `locationId` wins if both
-  are present in a page URL.
+  those parameters. It calls `GET /api/opportunities` when no hard preference is
+  active and `POST /api/opportunities` when at least one is active. `locationId`
+  wins if both lookup fields are present in a page URL. Preference values never
+  enter the page URL or a generated share link.
 - **Other callers:** browser and application functional tests.
 - **Authentication/data:** none. The URL can contain a location query or
   selected location ID and is therefore visible in browser history/share links.
-  The browser also keeps up to five successful display names, location IDs, and
-  timezones in its own `localStorage`; this storage is optional and client-side.
+  The browser keeps up to five successful display names, location IDs, and
+  timezones under `moonService.recentSearches.v1`. It keeps the supported
+  versioned altitude and availability preferences under
+  `moonService.opportunityPreferences.v1`. Both `localStorage` entries are
+  optional and client-side; the page still works when browser storage is
+  unavailable.
 - **Exposure:** available on the ordinary listener; allowlisted but subject to
   the whole-site admission bound in hosted-alpha mode.
 - **References:** [controller](../backend/src/main/java/dev/moonservice/backend/web/WebPageController.java),
   [browser flow](../frontend/src/app.js),
-  [browser storage](../frontend/src/recentSearches.js),
+  [recent-search storage](../frontend/src/recentSearches.js),
+  [preference state and transport](../frontend/src/opportunityPreferences.js),
   [share paths](../frontend/src/api.js).
 
 ### `GET /about`
@@ -155,13 +162,14 @@ and [hosted-alpha functional tests](../backend/src/test/java/dev/moonservice/bac
   and can return candidate choices; `locationId` continues from a selected
   candidate without another fuzzy search. After resolution, the server applies
   its current search defaults, fetches live weather, generates Moon windows,
-  and scores them. The `/search` page can therefore reconstruct an idempotent
-  lookup from its shareable URL without knowing prototype scoring controls,
-  provider IDs, coordinates, or weather contracts.
-- **Production invocation:** browser `app.js` calls it through `api.js`; query
-  searches use `q`, while an ambiguity selection uses `locationId`. The browser
-  does not yet call the product preference POST or the direct prototype POST
-  below.
+  and scores them. The `/search` page reconstructs location intent from its
+  shareable URL without knowing prototype scoring controls, provider IDs,
+  coordinates, or weather contracts. The receiving browser then uses GET or
+  the product POST based on its own active preferences.
+- **Production invocation:** browser `app.js` calls it through `api.js` when no
+  hard preference is active. Query searches use `q`, while an ambiguity
+  selection uses `locationId`. The browser does not call the direct prototype
+  POST below.
 - **Other callers:** manual HTTP/Postman requests, UI tests, application tests,
   and container/live smoke checks.
 - **Request:** exactly one usable `q` or `locationId`; values are trimmed,
@@ -198,8 +206,11 @@ and [hosted-alpha functional tests](../backend/src/test/java/dev/moonservice/bac
   server reuses the GET route's live location, weather, Moon-window, scoring,
   ranking, and result-limit flow. The GET and fixture-backed POST remain
   unchanged.
-- **Production invocation:** no browser caller yet; the preference-controls
-  child adds that caller.
+- **Production invocation:** browser `app.js` calls it through
+  `opportunityPreferences.js` when at least one supported hard preference is
+  active. The module sends exactly one `q` or `locationId` with the versioned
+  preference object, disables request caching, and keeps preference values out
+  of the page and share URLs.
 - **Other callers:** application tests and explicit manual API clients.
 - **Request:** `application/json`, including ordinary media-type parameters,
   with exactly one usable `q` or `locationId` and optional complete version 1
@@ -227,6 +238,8 @@ and [hosted-alpha functional tests](../backend/src/test/java/dev/moonservice/bac
   returns the current `429` shape without a provider call when admission fails,
   and does not loosen another path or method.
 - **References:** [controller](../backend/src/main/java/dev/moonservice/backend/web/OpportunitySearchController.java),
+  [browser flow](../frontend/src/app.js),
+  [browser preference state and transport](../frontend/src/opportunityPreferences.js),
   [service validation](../backend/src/main/java/dev/moonservice/backend/opportunity/OpportunitySearchService.java),
   [response model](../backend/src/main/java/dev/moonservice/backend/opportunity/search/OpportunitySearchResponse.java),
   [API contract](api-shape.md#product-preference-post).

@@ -35,8 +35,8 @@ shareable result flow, and
 [#16](https://github.com/rapucha/moon-service/issues/16) for feeds and
 calendar exports.
 
-The current web page uses the shareable GET endpoint to search for
-opportunities:
+When no hard preference is active, the current web page uses the shareable GET
+endpoint to search for opportunities:
 
 ```http
 GET /api/opportunities?q=Praha&lang=cs
@@ -45,8 +45,8 @@ GET /api/opportunities?q=Praha&lang=cs
 `lang` is optional. When it is absent, use `Accept-Language` only as a hint for
 display and ranking.
 
-The same-origin product API also accepts request-scoped version 1 preferences
-without putting them in a URL:
+When at least one is active, the page sends request-scoped version 1
+preferences to the same-origin product API without putting them in a URL:
 
 ```http
 POST /api/opportunities
@@ -247,8 +247,9 @@ limit as `GET /api/opportunities`.
 
 The existing routes keep their current contracts:
 
-- `GET /api/opportunities` remains the preference-free default and share-link
-  route.
+- `GET /api/opportunities` remains the preference-free default. A location-only
+  share URL does not choose the API method; the receiving browser uses GET or
+  the product POST based on its own active preferences.
 - `POST /api/opportunities/search` remains the fixture-backed direct scoring
   route. It does not accept this product request.
 
@@ -1589,12 +1590,12 @@ RSS/Atom:
 
 ## Implemented Opportunity-Search Sequence
 
-The current browser uses only `GET /api/opportunities`. The product preference
-POST uses the same live location, weather, window-generation, and scoring
-sequence, then maps the preference evaluation metadata into the response. The
-browser controls that call it are tracked separately. The direct prototype POST
-at the bottom remains for ordinary-mode prototype and test callers and bypasses
-both live providers.
+The current browser uses `GET /api/opportunities` when no hard preference is
+active. When at least one is active, it uses the product preference
+`POST /api/opportunities`. That POST uses the same live location, weather,
+window-generation, and scoring sequence, then maps the preference evaluation
+metadata into the response. The direct prototype POST at the bottom remains
+for ordinary-mode prototype and test callers and bypasses both live providers.
 
 In hosted-alpha mode, resource admission can return `429` before an application
 sequence begins. The separate

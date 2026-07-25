@@ -155,6 +155,30 @@ project-owned subreddit later. Do not post automatically to an existing
 subreddit without moderator approval. Mastodon and Bluesky are not planned for
 now.
 
+## Browser Opportunity Preference Boundary
+
+The browser may keep version 1 opportunity preferences in `localStorage` under
+`moonService.opportunityPreferences.v1`. The child tracked by
+[#192](https://github.com/rapucha/moon-service/issues/192) stores only an
+optional Moon-altitude range and one availability mode: local-clock windows or
+ambient-light buckets. It does not store later preference types. Resetting all
+preferences removes this object when browser storage accepts the removal. If
+removal fails, the current page uses reset state in memory and reports that it
+cannot save preferences; the stored value may remain for a later page load.
+
+For each search with active preferences, the browser sends the altitude and
+availability values to the Moon Service server in that request. The server
+uses them as hard limits for that search. It must not permanently store the
+request body or preferences, add them to a server-side profile, cookie, or
+analytics event, or put them in a URL, access log, application log, or shared
+cache.
+
+Share links remain location-only and contain no preference or availability
+value. A browser opening a share link applies its own saved preferences, if
+any. If `localStorage` is blocked or unavailable, the browser keeps preferences
+only in page memory and search continues. There is no server preference
+profile or cross-device sync.
+
 ## Calibration Feedback Boundary
 
 Moon Service may collect optional reports from alpha testers about the real

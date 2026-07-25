@@ -48,7 +48,7 @@ export function createResponseView(results, callbacks) {
           element("p", {}, "Top-ranked forecast candidates will appear here with Moon position, ambient light, weather, and caveats.")),
         element("dl", { className: "intro-grid" },
           fact("Location", "City or town"),
-          fact("Storage", "Browser recent list only"),
+          fact("Storage", "Recent searches and hard limits in this browser"),
           fact("Output", "Shareable result page")))
     );
   }
@@ -181,8 +181,8 @@ export function createResponseView(results, callbacks) {
     return element("section", { className: "status-panel warning" },
       element("p", {
         className: "eyebrow tooltip",
-        title: "No candidate window met the current scoring threshold.",
-        "data-tooltip": "No candidate window met the current scoring threshold."
+        title: "No candidate window matched this search.",
+        "data-tooltip": "No candidate window matched this search."
       }, "No match"),
       element("h3", {}, "No ranked windows"),
       element("p", {}, reason));
