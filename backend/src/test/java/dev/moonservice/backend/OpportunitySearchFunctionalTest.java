@@ -2,8 +2,15 @@ package dev.moonservice.backend;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.clearInvocations;
+import static org.mockito.Mockito.spy;
+import static org.mockito.Mockito.verify;
 
+import dev.moonservice.backend.location.LocationQuery;
 import dev.moonservice.backend.location.LocationResolver;
 import dev.moonservice.backend.location.openmeteo.TestOpenMeteoLocationResolver;
 import dev.moonservice.backend.observability.RequestLoggingFilter;
@@ -12,17 +19,31 @@ import dev.moonservice.backend.weather.TestWeatherForecastProvider;
 import dev.moonservice.backend.weather.WeatherForecastProvider;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.context.TestConfiguration;
+import org.springframework.boot.test.system.CapturedOutput;
+import org.springframework.boot.test.system.OutputCaptureExtension;
 import org.springframework.boot.webtestclient.autoconfigure.AutoConfigureWebTestClient;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Primary;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.reactive.server.WebTestClient;
+import tools.jackson.core.JacksonException;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
+
+import java.time.Clock;
+import java.time.Instant;
+import java.time.ZoneOffset;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.stream.Collectors;
+import java.util.stream.IntStream;
 
 @SpringBootTest(
         webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
@@ -34,26 +55,41 @@ import org.springframework.test.web.reactive.server.WebTestClient;
                 "moon.build.revision=test-revision"
         })
 @AutoConfigureWebTestClient
+@ExtendWith(OutputCaptureExtension.class)
 @Tag("functional")
 class OpportunitySearchFunctionalTest {
+    private static final ObjectMapper MAPPER = new ObjectMapper();
+
     @Autowired
     private WebTestClient webTestClient;
 
     @Autowired
     private OpenMeteoObservability openMeteoObservability;
 
+    @Autowired
+    private LocationResolver locationResolver;
+
+    @Autowired
+    private WeatherForecastProvider weatherForecastProvider;
+
     @TestConfiguration
     static class TestOpenMeteoLocationResolverConfiguration {
         @Bean
         @Primary
         LocationResolver testOpenMeteoLocationResolver() {
-            return new TestOpenMeteoLocationResolver();
+            return spy(new TestOpenMeteoLocationResolver());
         }
 
         @Bean
         @Primary
         WeatherForecastProvider testWeatherForecastProvider() {
-            return new TestWeatherForecastProvider();
+            return spy(new TestWeatherForecastProvider());
+        }
+
+        @Bean
+        @Primary
+        Clock fixedOpportunityClock() {
+            return Clock.fixed(Instant.parse("2026-06-29T00:00:00Z"), ZoneOffset.UTC);
         }
     }
 
@@ -371,6 +407,137 @@ class OpportunitySearchFunctionalTest {
     }
 
     @Test
+    void productPostPreservesDefaultResultsAndMarksResponsesNoStore() throws JacksonException {
+        JsonNode get = responseJson(webTestClient.get()
+                .uri("/api/opportunities?q=Prague").exchange().expectStatus().isOk(), false);
+        JsonNode absent = productPostOk("{\"q\":\"Prague\"}");
+        JsonNode empty = productPostOk("{\"q\":\"Prague\",\"preferences\":{\"version\":1}}");
+
+        assertEquals(get.path("opportunities"), absent.path("opportunities"));
+        assertEquals(get.path("opportunities"), empty.path("opportunities"));
+        assertFalse(absent.has("appliedPreferenceVersion"));
+        assertEquals(1, empty.path("appliedPreferenceVersion").intValue());
+        assertTrue(empty.path("normalizedActiveFilters").isEmpty());
+        assertEquals(0, empty.path("excludedSampleCount").intValue());
+        assertFalse(empty.path("opportunities").get(0).path("moonPass").has("azimuthMatchIntervals"));
+        assertEquals("location_not_found",
+                productPostOk("{\"q\":\"Not A Real Test City\"}").path("status").asString());
+        webTestClient.post().uri("/api/opportunities")
+                .accept(MediaType.APPLICATION_XML)
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue("{\"q\":\"Prague\"}").exchange()
+                .expectStatus().isEqualTo(406)
+                .expectHeader().valueEquals("Cache-Control", "no-store");
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {
+            "\"included\":{\"start\":10,\"end\":350}",
+            "\"excluded\":{\"start\":350,\"end\":10}",
+            "\"included\":{\"start\":10,\"end\":350},\"excluded\":{\"start\":100,\"end\":120}",
+            "\"included\":{\"start\":330,\"end\":30}"
+    })
+    void acceptsEveryAzimuthPreferenceShape(String azimuth) throws JacksonException {
+        JsonNode response = productPostOk("""
+                {"q":"Prague","preferences":{"version":1,"azimuthDegrees":{%s}}}
+                """.formatted(azimuth));
+
+        assertEquals(1, response.path("appliedPreferenceVersion").intValue());
+        assertTrue(response.path("normalizedActiveFilters").has("azimuthDegrees"));
+    }
+
+    @Test
+    void returnsNormalizedFiltersAndPreferenceEmptyReason() throws JacksonException {
+        JsonNode response = productPostOk("""
+                {"locationId":"prague-cz","preferences":{"version":1,
+                  "altitudeDegrees":{"minimum":90,"maximum":90},
+                  "azimuthDegrees":{"excluded":{"start":100,"end":110}},
+                  "time":{"mode":"light_bucket","buckets":["night"]},
+                  "namedPhases":["full_moon"],
+                  "brightLimbOrientationDegrees":[{"start":0,"end":180}]}}
+                """);
+
+        JsonNode filters = response.path("normalizedActiveFilters");
+        assertTrue(filters.has("altitudeDegrees") && filters.has("azimuthDegrees")
+                && filters.has("time") && filters.has("namedPhases")
+                && filters.has("brightLimbOrientationDegrees"));
+        assertTrue(response.path("excludedSampleCount").intValue() > 0);
+        assertTrue(response.path("opportunities").isEmpty());
+        assertEquals("no_opportunities_match_preferences", response.at("/emptyReason/code").asString());
+    }
+
+    @Test
+    void returnsCompleteAzimuthMasksForRepeatedPasses() throws JacksonException {
+        JsonNode response = productPostOk("""
+                {"q":"Prague","preferences":{"version":1,
+                  "azimuthDegrees":{"included":{"start":10,"end":350}},
+                  "time":{"mode":"local_clock","windows":[{"start":"00:00","end":"04:00"}]}}}
+                """);
+        Map<String, JsonNode> masksByPass = new HashMap<>();
+        boolean repeatedPass = false;
+        boolean maskExtendsUsefulWindow = false;
+        for (JsonNode opportunity : response.path("opportunities")) {
+            JsonNode pass = opportunity.path("moonPass");
+            JsonNode mask = pass.path("azimuthMatchIntervals");
+            assertFalse(mask.isEmpty());
+            JsonNode previous = masksByPass.putIfAbsent(pass.path("id").asString(), mask);
+            if (previous != null) {
+                repeatedPass = true;
+                assertEquals(previous, mask);
+            }
+            Instant passStart = Instant.parse(pass.path("startsAt").asString());
+            Instant passEnd = Instant.parse(pass.path("endsAt").asString());
+            for (JsonNode interval : mask) {
+                Instant start = Instant.parse(interval.path("startsAt").asString());
+                Instant end = Instant.parse(interval.path("endsAt").asString());
+                assertTrue(!start.isBefore(passStart) && !end.isAfter(passEnd) && end.isAfter(start));
+                maskExtendsUsefulWindow |= start.isBefore(Instant.parse(opportunity.path("startsAt").asString()))
+                        || end.isAfter(Instant.parse(opportunity.path("endsAt").asString()));
+            }
+        }
+        JsonNode azimuthOnly = productPostOk("""
+                {"q":"Prague","preferences":{"version":1,
+                  "azimuthDegrees":{"included":{"start":10,"end":350}}}}
+                """);
+        assertTrue(IntStream.range(0, azimuthOnly.path("opportunities").size())
+                .mapToObj(azimuthOnly.path("opportunities")::get)
+                .map(opportunity -> opportunity.path("moonPass"))
+                .anyMatch(pass -> pass.path("azimuthMatchIntervals").equals(
+                        masksByPass.get(pass.path("id").asString()))));
+        assertTrue(repeatedPass);
+        assertTrue(maskExtendsUsefulWindow);
+    }
+
+    @Test
+    void boundsUnknownPreferenceWarningsAndKeepsProvidersAndLogsClean(
+            CapturedOutput output
+    ) throws JacksonException {
+        clearInvocations(locationResolver, weatherForecastProvider);
+        String extras = IntStream.range(0, 21)
+                .mapToObj(index -> "\"extra" + index + "\":{\"child\":\"private-marker\"}")
+                .collect(Collectors.joining(","));
+        JsonNode response = productPostOk("""
+                {"q":"Prague","preferences":{"version":1,
+                  "altitudeDegrees":{"minimum":0,"maximum":90,"alt/tilde~":7},
+                  "time":{"mode":"local_clock","windows":[
+                    {"start":"00:00","end":"23:59","win/~":"private-marker"}]},
+                  "private-marker":{"child":"private-marker"},%s}}
+                """.formatted(extras));
+
+        assertEquals(24, response.path("ignoredPreferenceFieldCount").intValue());
+        assertEquals(20, response.path("ignoredPreferenceFields").size());
+        assertEquals(4, response.path("additionalIgnoredPreferenceFieldCount").intValue());
+        assertEquals("/altitudeDegrees/alt~1tilde~0", response.at("/ignoredPreferenceFields/0").asString());
+        assertEquals("/time/windows/0/win~1~0", response.at("/ignoredPreferenceFields/1").asString());
+        assertEquals("/private-marker", response.at("/ignoredPreferenceFields/2").asString());
+        assertTrue(output.getOut().contains(
+                "ignored_preference_fields preferenceVersion=1 count=24 truncated=true"));
+        assertFalse(output.getOut().contains("private-marker"));
+        verify(locationResolver).resolve(new LocationQuery("Prague"));
+        verify(weatherForecastProvider).forecastFor(any(), any(), any(), eq(7));
+    }
+
+    @Test
     void returnsOpportunitySearchResponseForPragueFixtureRequest() {
         webTestClient.post().uri("/api/opportunities/search")
                 .contentType(MediaType.APPLICATION_JSON)
@@ -459,4 +626,24 @@ class OpportunitySearchFunctionalTest {
                 .jsonPath("$.status").isEqualTo("invalid_request")
                 .jsonPath("$.message").isEqualTo("Request body must be valid JSON.");
     }
+
+    private JsonNode productPostOk(String body) throws JacksonException {
+        return responseJson(webTestClient.post().uri("/api/opportunities")
+                .contentType(MediaType.APPLICATION_JSON).bodyValue(body).exchange()
+                .expectStatus().isOk(), true);
+    }
+
+    private static JsonNode responseJson(
+            WebTestClient.ResponseSpec response,
+            boolean noStore
+    ) throws JacksonException {
+        if (noStore) {
+            response.expectHeader().valueEquals("Cache-Control", "no-store");
+        }
+        String body = response.expectHeader().contentTypeCompatibleWith(MediaType.APPLICATION_JSON)
+                .expectBody(String.class).returnResult().getResponseBody();
+        assertNotNull(body);
+        return MAPPER.readTree(body);
+    }
+
 }

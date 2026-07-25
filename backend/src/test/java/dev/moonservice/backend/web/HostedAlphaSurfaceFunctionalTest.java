@@ -1,6 +1,8 @@
 package dev.moonservice.backend.web;
 
+import dev.moonservice.backend.admission.HostedAlphaProviderAdmission;
 import dev.moonservice.backend.observability.RequestLoggingFilter;
+import dev.moonservice.backend.observability.OpenMeteoObservability;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -18,9 +20,11 @@ import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.reactive.server.WebTestClient;
 import org.mockito.Mockito;
+import reactor.core.publisher.Flux;
 
 import java.time.Clock;
 import java.time.Instant;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -40,18 +44,26 @@ import static org.assertj.core.api.Assertions.assertThat;
 class HostedAlphaSurfaceFunctionalTest {
     private static final String ADMIN_TOKEN =
             "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
+    private static final AtomicLong CLOCK_SECONDS = new AtomicLong();
+    private static final AtomicBoolean CLOCK_FROZEN = new AtomicBoolean();
 
     @Autowired
     private WebTestClient webTestClient;
+
+    @Autowired
+    private OpenMeteoObservability openMeteoObservability;
+
+    @Autowired
+    private HostedAlphaProviderAdmission providerAdmission;
 
     @TestConfiguration
     static class ResourceLimitClockConfiguration {
         @Bean
         @Primary
         Clock resourceLimitClock() {
-            AtomicLong seconds = new AtomicLong();
             Clock clock = Mockito.mock(Clock.class);
-            Mockito.when(clock.instant()).thenAnswer(ignored -> Instant.EPOCH.plusSeconds(seconds.getAndIncrement()));
+            Mockito.when(clock.instant()).thenAnswer(ignored -> Instant.EPOCH.plusSeconds(
+                    CLOCK_FROZEN.get() ? CLOCK_SECONDS.get() : CLOCK_SECONDS.getAndIncrement()));
             return clock;
         }
     }
@@ -97,6 +109,82 @@ class HostedAlphaSurfaceFunctionalTest {
                 .exchange()
                 .expectStatus().isBadRequest()
                 .expectHeader().contentTypeCompatibleWith(MediaType.APPLICATION_JSON));
+    }
+
+    @Test
+    void admitsProductPostAndRejectsInvalidBodiesBeforeProviderCalls() {
+        long geocodingCalls = openMeteoObservability.geocodingSnapshot().calls();
+        long weatherCalls = openMeteoObservability.weatherSnapshot().calls();
+        for (String body : java.util.List.of(
+                "", "{", "null", "[]", "{}", "{\"q\":\"Prague\",\"locationId\":\"prague-cz\"}",
+                "{\"q\":\"   \"}", "{\"q\":\"" + "a".repeat(101) + "\"}", "{\"q\":\"\\u0001\"}",
+                "{\"locationId\":\"\"}", "{\"locationId\":\"" + "a".repeat(101) + "\"}",
+                "{\"q\":\"Prague\",\"unknown\":1}", "{\"q\":\"Prague\",\"preferences\":null}",
+                "{\"q\":\"Prague\",\"preferences\":{\"version\":2}}",
+                "{\"q\":\"Prague\",\"preferences\":{\"version\":1,\"altitudeDegrees\":"
+                        + "{\"minimum\":20,\"maximum\":10}}}",
+                "{\"q\":\"Prague\",\"preferences\":{\"version\":1,\"azimuthDegrees\":{}}}",
+                "{\"q\":\"Prague\",\"preferences\":{\"version\":1,\"azimuthDegrees\":"
+                        + "{\"included\":{\"start\":10,\"end\":20},\"excluded\":{\"start\":30,\"end\":40}}}}",
+                "{\"q\":\"Prague\",\"preferences\":{\"version\":1,\"namedPhases\":[\"private-marker\"]}}")) {
+            advanceProviderRefill();
+            expectProductError(productPost(body, MediaType.APPLICATION_JSON), 400, "invalid_request");
+        }
+        assertProviderCalls(geocodingCalls, weatherCalls);
+    }
+
+    @Test
+    void enforcesProductPostMediaTypeAndKnownAndStreamedBodyLimits() {
+        long geocodingCalls = openMeteoObservability.geocodingSnapshot().calls();
+        long weatherCalls = openMeteoObservability.weatherSnapshot().calls();
+        String large = "{\"q\":\"Prague\",\"padding\":\"" + "x".repeat(16_384) + "\"}";
+
+        advanceProviderRefill();
+        expectProductError(productPost("{\"q\":\"Prague\"}", MediaType.TEXT_PLAIN),
+                415, "unsupported_media_type");
+        advanceProviderRefill();
+        expectProductError(webTestClient.post().uri("/api/opportunities")
+                .bodyValue("{\"q\":\"Prague\"}").exchange(), 415, "unsupported_media_type");
+        advanceProviderRefill();
+        expectProductError(productPost(large, MediaType.APPLICATION_JSON), 413, "request_too_large");
+        advanceProviderRefill();
+        expectProductError(webTestClient.post().uri("/api/opportunities")
+                .contentType(MediaType.APPLICATION_JSON)
+                .body(Flux.just(large), String.class)
+                .exchange(), 413, "request_too_large");
+        advanceProviderRefill();
+        expectProductError(productPost(
+                "{}", MediaType.parseMediaType("application/json;charset=UTF-8")),
+                400, "invalid_request");
+        assertProviderCalls(geocodingCalls, weatherCalls);
+    }
+
+    @Test
+    void appliesProviderConcurrencyToGetAndProductPost() {
+        CLOCK_SECONDS.addAndGet(600);
+        try (HostedAlphaProviderAdmission.Admission first = providerAdmission.tryAcquire();
+             HostedAlphaProviderAdmission.Admission second = providerAdmission.tryAcquire()) {
+            assertThat(first.accepted()).isTrue();
+            assertThat(second.accepted()).isTrue();
+            expectRateLimited(webTestClient.get().uri("/api/opportunities?q=Prague").exchange(), false);
+            expectRateLimited(productPost("{}", MediaType.APPLICATION_JSON), true);
+        }
+    }
+
+    @Test
+    void appliesWholeSiteAdmissionToGetAndProductPost() {
+        CLOCK_SECONDS.addAndGet(600);
+        CLOCK_FROZEN.set(true);
+        try {
+            for (int request = 0; request < 40; request++) {
+                webTestClient.get().uri("/about").exchange().expectStatus().isOk();
+            }
+            expectRateLimited(webTestClient.get().uri("/api/opportunities?q=Prague").exchange(), false);
+            expectRateLimited(productPost("{}", MediaType.APPLICATION_JSON), true);
+        } finally {
+            CLOCK_FROZEN.set(false);
+            CLOCK_SECONDS.incrementAndGet();
+        }
     }
 
     @ParameterizedTest
@@ -147,6 +235,16 @@ class HostedAlphaSurfaceFunctionalTest {
                 .expectHeader().valueEquals("Cache-Control", "no-store"));
     }
 
+    @ParameterizedTest
+    @ValueSource(strings = {"PUT", "PATCH", "DELETE", "OPTIONS"})
+    void limitsProductPathMethodsWithoutChangingOtherPaths(String method) {
+        expectHostedHeaders(webTestClient.method(HttpMethod.valueOf(method))
+                .uri("/api/opportunities")
+                .exchange()
+                .expectStatus().isEqualTo(405)
+                .expectHeader().valueEquals("Allow", "GET, HEAD, POST"));
+    }
+
     @Test
     void connectorRejectsTraceBeforeTheApplicationFilter() {
         webTestClient.method(HttpMethod.TRACE)
@@ -176,9 +274,54 @@ class HostedAlphaSurfaceFunctionalTest {
                 .exchange()
                 .expectStatus().isOk();
 
+        advanceProviderRefill();
+        productPost(
+                "{\"q\":\"private-body-marker\",\"preferences\":{\"version\":2}}",
+                MediaType.APPLICATION_JSON)
+                .expectStatus().isBadRequest();
+
         assertThat(output)
                 .doesNotContain("forwarded-identity-marker.invalid")
-                .doesNotContain(ADMIN_TOKEN);
+                .doesNotContain(ADMIN_TOKEN)
+                .doesNotContain("private-body-marker");
+    }
+
+    private WebTestClient.ResponseSpec productPost(String body, MediaType contentType) {
+        return webTestClient.post().uri("/api/opportunities")
+                .contentType(contentType)
+                .bodyValue(body)
+                .exchange();
+    }
+
+    private static void expectProductError(
+            WebTestClient.ResponseSpec response,
+            int httpStatus,
+            String status
+    ) {
+        expectHostedHeaders(response.expectStatus().isEqualTo(httpStatus)
+                .expectHeader().valueEquals("Cache-Control", "no-store"));
+        response.expectBody()
+                .jsonPath("$.status").isEqualTo(status)
+                .jsonPath("$.generatedAt").exists();
+    }
+
+    private static void expectRateLimited(WebTestClient.ResponseSpec response, boolean noStore) {
+        WebTestClient.ResponseSpec checked = response.expectStatus().isEqualTo(429)
+                .expectHeader().exists("Retry-After");
+        if (noStore) {
+            checked.expectHeader().valueEquals("Cache-Control", "no-store");
+        }
+        expectHostedHeaders(checked);
+        checked.expectBody().jsonPath("$.status").isEqualTo("rate_limited");
+    }
+
+    private static void advanceProviderRefill() {
+        CLOCK_SECONDS.addAndGet(60);
+    }
+
+    private void assertProviderCalls(long geocodingCalls, long weatherCalls) {
+        assertThat(openMeteoObservability.geocodingSnapshot().calls()).isEqualTo(geocodingCalls);
+        assertThat(openMeteoObservability.weatherSnapshot().calls()).isEqualTo(weatherCalls);
     }
 
     private static void expectAdminHeaders(WebTestClient.ResponseSpec response) {

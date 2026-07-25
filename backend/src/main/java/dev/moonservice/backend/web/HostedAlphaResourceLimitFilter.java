@@ -94,7 +94,8 @@ final class HostedAlphaResourceLimitFilter extends OncePerRequestFilter {
             long retryAfterSeconds
     ) throws IOException {
         HostedAlphaSurfaceFilter.addSecurityHeaders(response);
-        if (ADMIN_STATUS_PATH.equals(path)) {
+        if (ADMIN_STATUS_PATH.equals(path)
+                || (OPPORTUNITY_PATH.equals(path) && "POST".equals(request.getMethod()))) {
             response.setHeader("Cache-Control", "no-store");
         }
         response.setStatus(429);
@@ -112,7 +113,9 @@ final class HostedAlphaResourceLimitFilter extends OncePerRequestFilter {
 
     private static boolean isProviderBackedOpportunityRequest(HttpServletRequest request, String path) {
         return OPPORTUNITY_PATH.equals(path)
-                && ("GET".equals(request.getMethod()) || "HEAD".equals(request.getMethod()));
+                && ("GET".equals(request.getMethod())
+                || "HEAD".equals(request.getMethod())
+                || "POST".equals(request.getMethod()));
     }
 
     private static boolean isCalibrationFeedbackRequest(HttpServletRequest request) {

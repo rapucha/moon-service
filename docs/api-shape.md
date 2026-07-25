@@ -35,7 +35,8 @@ shareable result flow, and
 [#16](https://github.com/rapucha/moon-service/issues/16) for feeds and
 calendar exports.
 
-The web page can use one endpoint to search for opportunities:
+The current web page uses the shareable GET endpoint to search for
+opportunities:
 
 ```http
 GET /api/opportunities?q=Praha&lang=cs
@@ -43,6 +44,14 @@ GET /api/opportunities?q=Praha&lang=cs
 
 `lang` is optional. When it is absent, use `Accept-Language` only as a hint for
 display and ranking.
+
+The same-origin product API also accepts request-scoped version 1 preferences
+without putting them in a URL:
+
+```http
+POST /api/opportunities
+Content-Type: application/json
+```
 
 ## Request Parameters
 
@@ -86,6 +95,8 @@ location_not_found
 invalid_request
 temporarily_unavailable
 rate_limited
+request_too_large
+unsupported_media_type
 ```
 
 Meanings:
@@ -104,6 +115,10 @@ Meanings:
   another required dependency fails.
 - `rate_limited`: the request was valid, but the client or service exceeded an
   application-level rate limit.
+- `request_too_large`: the product preference POST exceeded its raw-body
+  limit.
+- `unsupported_media_type`: the product preference POST did not use
+  `application/json`.
 
 For a resolved real location, `status: "ok"` with `opportunities: []` means the
 backend completed evaluation but produced no scored result. Today, this can
@@ -116,6 +131,8 @@ HTTP status codes can stay conventional:
 
 - `200` for product states such as `ok`, `ambiguous_location`, and `location_not_found`.
 - `400` for `invalid_request`.
+- `413` for `request_too_large`.
+- `415` for `unsupported_media_type`.
 - `429` for `rate_limited`.
 - `503` for `temporarily_unavailable`.
 
@@ -220,6 +237,226 @@ Safety rules:
 - Cache negative lookups briefly. Cap the negative-cache size and TTL to avoid
   cache pollution.
 - Keep provider call counters and rate limits visible in `/admin/status`.
+
+## Product Preference POST
+
+`POST /api/opportunities` is the anonymous same-origin product route for one
+request-scoped version 1 preference search. It uses the same location
+resolution, live weather lookup, Moon-window generation, scoring, and result
+limit as `GET /api/opportunities`.
+
+The existing routes keep their current contracts:
+
+- `GET /api/opportunities` remains the preference-free default and share-link
+  route.
+- `POST /api/opportunities/search` remains the fixture-backed direct scoring
+  route. It does not accept this product request.
+
+### Request
+
+The top-level JSON object must contain exactly one usable `q` or `locationId`.
+It may also contain `preferences`:
+
+```json
+{
+  "q": "Prague",
+  "preferences": {
+    "version": 1,
+    "altitudeDegrees": { "minimum": 2, "maximum": 15 },
+    "azimuthDegrees": {
+      "included": { "start": 330, "end": 30 },
+      "excluded": { "start": 350, "end": 10 }
+    }
+  }
+}
+```
+
+The route applies the existing normalization and limits to `q` and
+`locationId`. It rejects a missing, blank, oversized, or unsupported-control
+value. It also rejects a request that contains both lookup fields or neither
+one. A field outside `q`, `locationId`, and `preferences` is an unknown
+top-level field and makes the request invalid.
+
+When `preferences` is present, `version` is required and must be `1`. Every
+filter is optional:
+
+- `altitudeDegrees` contains finite `minimum` and `maximum` values in
+  `[0, 90]`. Both endpoints are inclusive. `minimum` may equal `maximum`, but
+  it must not exceed it.
+- `azimuthDegrees` contains an optional `included` sector, an optional
+  `excluded` obstruction sector, or both. At least one sector is required.
+  Each sector contains finite `start` and `end` absolute compass bearings in
+  `[0, 360)`. A greater start crosses north through `0°`; equal endpoints are
+  invalid. With only `excluded`, the full compass is implicitly included. When
+  both are present, the directed excluded sector must be contained in the
+  directed included sector.
+- `time` selects exactly one mode. `local_clock` mode requires `windows` and no
+  `buckets`. Each window contains `start` and `end` in 24-hour `HH:mm` format,
+  starts inclusively, and ends exclusively. A later start crosses midnight;
+  equal endpoints are invalid. The route allows one to eight windows and uses
+  the resolved location's timezone. `light_bucket` mode instead requires
+  `buckets` and no `windows`.
+- Ambient-light bucket values are `daylight`, `golden_hour`,
+  `civil_twilight`, `nautical_twilight`, and `night`.
+- `namedPhases` contains one or more of `new_moon`, `waxing_crescent`,
+  `first_quarter`, `waxing_gibbous`, `full_moon`, `waning_gibbous`,
+  `last_quarter`, and `waning_crescent`.
+- `brightLimbOrientationDegrees` contains one to eight inclusive directed
+  ranges. Every range uses finite `start` and `end` values in `[0, 360)`.
+  Greater starts cross `0°`, equal endpoints are invalid, and the ranges form a
+  union.
+
+The complete filter semantics, including lunar-disk azimuth matching,
+transition refinement, local-clock daylight-saving behavior, and the
+bright-limb orientation convention, are defined in
+[Version 1 Hard Preferences](scoring-model.md#version-1-hard-preferences).
+`northPoleTiltDegrees` is not a preference field.
+
+An absent `preferences` member must produce the same candidates, scores, and
+order as GET for the same location and captured server time. A preferences
+object that contains only `{"version": 1}` must preserve that candidate set,
+scores, and order.
+
+### Transport and errors
+
+The client must send `Content-Type: application/json`. Normal media-type
+parameters such as a charset are allowed. The raw request body must not exceed
+16,384 bytes. The server checks a known body length and also enforces the limit
+while receiving a body whose length is unknown. It must reject an oversized
+body before a location or weather provider call.
+
+Every validation error uses the existing opportunity error fields `status`,
+`generatedAt`, and `message`:
+
+| HTTP status | `status` | Applies when |
+| ---: | --- | --- |
+| `400` | `invalid_request` | The body is empty or invalid JSON; a known field, version, lookup value, or top-level field is invalid. |
+| `413` | `request_too_large` | The raw body exceeds 16,384 bytes, whether its length is known or streamed. |
+| `415` | `unsupported_media_type` | `Content-Type` is missing or is not `application/json`. |
+
+An error message or log must not contain a raw preference value or request
+body. Invalid requests must not call the location or weather provider.
+
+### Unknown preference fields
+
+For supported preference version `1`, the server ignores unknown members below
+`preferences` and still applies every valid known field. Unknown top-level
+members remain invalid.
+
+The response describes ignored members with deterministic JSON Pointer paths
+rooted at the preferences value. Paths use RFC 6901 escaping. For example, an
+unknown member in the first known clock window has path
+`/time/windows/0/unknown`.
+
+The server walks known object members in input order and known arrays by
+ascending index, depth first. When a member itself is unknown, the server
+counts that path once and does not descend into its object or array value.
+Unknown members inside a known object or known array element receive their own
+paths.
+
+The warning fields are:
+
+- `ignoredPreferenceFieldCount`: the total number of unknown paths;
+- `ignoredPreferenceFields`: the first 20 JSON-string paths in traversal order;
+  clients must render them as text, not HTML; and
+- `additionalIgnoredPreferenceFieldCount`:
+  `max(0, ignoredPreferenceFieldCount - 20)`.
+
+The server writes one structured `ignored_preference_fields` event for the
+request when it finds unknown preference members. That event records only
+preference version `1`, the total count, and whether the returned list was
+truncated. It must not record field names, field values, or the raw body.
+
+### Successful response
+
+When `preferences` is present, the successful response adds:
+
+```json
+{
+  "appliedPreferenceVersion": 1,
+  "normalizedActiveFilters": {
+    "altitudeDegrees": { "minimum": 2.0, "maximum": 15.0 }
+  },
+  "excludedSampleCount": 12,
+  "ignoredPreferenceFieldCount": 0,
+  "ignoredPreferenceFields": [],
+  "additionalIgnoredPreferenceFieldCount": 0
+}
+```
+
+`normalizedActiveFilters` contains every active filter and its normalized
+value. `excludedSampleCount` counts candidate samples rejected by one or more
+hard filters according to the scoring-model contract. The server counts a
+sample once even when several filters reject it. It does not return the
+excluded candidates.
+
+When azimuth filtering is active, every returned `moonPass` also contains
+`azimuthMatchIntervals`:
+
+```json
+{
+  "azimuthMatchIntervals": [
+    { "startsAt": "2026-06-29T18:41:12Z", "endsAt": "2026-06-29T19:26:08Z" }
+  ]
+}
+```
+
+The intervals are chronological and non-overlapping. They contain every
+continuous interval where the core filter marked that physical pass as an
+azimuth match, within the existing inclusive domain from `moonPass.startsAt`
+through `moonPass.endsAt`. Search-horizon edges may already bound the pass; the
+preference route does not extend it.
+
+The engine calculates this authoritative azimuth-only mask before altitude,
+time, phase, bright-limb, and other candidate filters, and before ranking and
+the global result limit. An interval may therefore have no returned
+opportunity. Repeated opportunities with the same `moonPass.id` must carry
+identical arrays. A transition timestamp where the lunar disk only touches a
+sector boundary locates the visual boundary but remains nonmatching. Clients
+must not infer the mask from opportunity windows or center-position path
+samples. The response omits `azimuthMatchIntervals` when azimuth filtering is
+inactive.
+
+When active filters remove every candidate, the server returns HTTP `200`,
+`status: "ok"`, an empty `opportunities` array, and:
+
+```json
+{
+  "emptyReason": {
+    "code": "no_opportunities_match_preferences",
+    "text": "No opportunity matched the active preferences."
+  }
+}
+```
+
+This state is not an astronomy, geocoding, or weather-provider failure. A
+preference response keeps the existing scores and raw Moon, Sun,
+ambient-light, weather, and forecast-confidence facts.
+
+When `preferences` is absent, the response omits all preference-only metadata,
+including ignored-field fields and azimuth masks, so the current GET and
+preference-free response contract remain unchanged.
+
+### Privacy, caches, and hosted alpha
+
+Every response from `POST /api/opportunities`, including a validation error,
+location state, provider failure, or hosted-alpha rejection, must contain
+`Cache-Control: no-store`.
+
+The service may send `q` or `locationId` through the current location flow. It
+must not send a preference field to a geocoding or weather provider. It must
+not put a preference in a URL, cookie, access log, application log,
+server-side profile, analytics event, or shared cache. The server must not
+permanently store the body, a preference, an availability window, or a personal
+profile.
+
+Hosted alpha allows a bounded JSON body only for this exact product POST and
+the separately specified feedback submission route. It applies the same
+whole-site token, provider token, and provider-concurrency admission as the
+product GET. A rejected request keeps the existing `429 rate_limited` shape,
+does not call a provider, and includes `Cache-Control: no-store`. Forwarded
+identity headers remain ignored. The new route does not loosen another
+hosted-alpha path, method, body, CORS, or preflight rule.
 
 ## Admin Status Endpoint
 
@@ -1342,17 +1579,29 @@ RSS/Atom:
 - No cookies for remembering users.
 - The server may cache geocoding, weather, and scoring data by provider,
   canonical location, rounded coordinate, and forecast time.
+- The preference POST must not place a preference or availability value in a
+  URL, cookie, server-side profile, analytics event, access or application log,
+  or shared cache. Every response from that route uses
+  `Cache-Control: no-store`.
 - The browser may keep recent searches locally with `localStorage`.
 - Backend logs should avoid raw query strings and exact coordinates where
   possible.
 
 ## Implemented Opportunity-Search Sequence
 
-The browser uses only `GET /api/opportunities`. The direct POST contract at the
-bottom is for ordinary-mode prototype and test callers. In hosted-alpha mode,
-resource admission can return `429` before this application sequence begins.
-The separate [resource-admission diagrams](diagrams/hosted-alpha-resource-limits.pdf)
-show that filter, its token buckets, and its concurrency permit.
+The current browser uses only `GET /api/opportunities`. The product preference
+POST uses the same live location, weather, window-generation, and scoring
+sequence, then maps the preference evaluation metadata into the response. The
+browser controls that call it are tracked separately. The direct prototype POST
+at the bottom remains for ordinary-mode prototype and test callers and bypasses
+both live providers.
+
+In hosted-alpha mode, resource admission can return `429` before an application
+sequence begins. The separate
+[resource-admission diagrams](diagrams/hosted-alpha-resource-limits.pdf) show
+that filter, its token buckets, and its concurrency permit. The product GET and
+product preference POST share those provider resources; the fixture POST does
+not.
 
 ### Browser GET
 
@@ -1369,9 +1618,12 @@ show that filter, its token buckets, and its concurrency permit.
 GET first validates one lookup input and resolves it through a status-aware
 cache. It stops when the location is ambiguous, missing, or unavailable.
 Otherwise, it gets a cached hourly forecast and runs the opportunity pipeline.
-A successful pipeline may return an empty list. POST bypasses both live
-provider paths. It uses the scoring prototype's only `prague-cz` fixture and
-fixed fixture weather.
+A successful pipeline may return an empty list. The product preference POST
+performs the same steps after validating its bounded JSON body. It passes the
+typed version 1 preferences only to the opportunity engine and does not send
+them to either provider. The direct prototype POST bypasses both live provider
+paths. It uses the scoring prototype's only `prague-cz` fixture and fixed
+fixture weather.
 
 These files define the current implementation:
 [controller](../backend/src/main/java/dev/moonservice/backend/web/OpportunitySearchController.java),
