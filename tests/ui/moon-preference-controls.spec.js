@@ -209,7 +209,9 @@ test("rejects invalid manual compass sectors without sending a request", async (
   await expect(includedStart).toHaveValue("330");
 });
 
-test("widens an upper altitude range from overlapping handles", async ({ page }, testInfo) => {
+test("keeps the lower altitude handle accessible at an upper overlap", async ({
+  page
+}, testInfo) => {
   await preloadState(page, {
     version: 1,
     altitudeDegrees: { minimum: 89, maximum: 89 }
@@ -233,32 +235,33 @@ test("widens an upper altitude range from overlapping handles", async ({ page },
     x: minimumBox.x + minimumBox.width / 2,
     y: minimumBox.y + minimumBox.height / 2
   };
-  const end = {
-    x: trackBox.x + trackBox.width / 2,
-    y: trackBox.y + trackBox.height / 9
-  };
+  const lowerHandleIsTarget = await page.evaluate(position => {
+    return Boolean(document.elementFromPoint(position.x, position.y)
+      ?.closest("[data-altitude-minimum]"));
+  }, start);
+  expect(lowerHandleIsTarget).toBe(true);
+
   if (testInfo.project.name === "mobile") {
-    const client = await page.context().newCDPSession(page);
-    await client.send("Input.dispatchTouchEvent", {
-      type: "touchStart",
-      touchPoints: [start]
+    await minimum.evaluate(element => {
+      element.addEventListener("pointerdown", function () {
+        element.setAttribute("data-test-pointer-hit", "true");
+      }, { once: true });
     });
-    await client.send("Input.dispatchTouchEvent", {
-      type: "touchMove",
-      touchPoints: [end]
-    });
-    await client.send("Input.dispatchTouchEvent", {
-      type: "touchEnd",
-      touchPoints: []
-    });
+    await page.touchscreen.tap(start.x, start.y);
+    await expect(minimum).toHaveAttribute("data-test-pointer-hit", "true");
+    await expect(minimum).toHaveAttribute("aria-valuenow", "89");
   } else {
+    const end = {
+      x: trackBox.x + trackBox.width / 2,
+      y: trackBox.y + trackBox.height / 9
+    };
     await page.mouse.move(start.x, start.y);
     await page.mouse.down();
     await page.mouse.move(end.x, end.y);
     await page.mouse.up();
+    await expect(minimum).toHaveAttribute("aria-valuenow", "80");
   }
 
-  await expect(minimum).toHaveAttribute("aria-valuenow", "80");
   await expect(maximum).toHaveAttribute("aria-valuenow", "89");
 });
 
