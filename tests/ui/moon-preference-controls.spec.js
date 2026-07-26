@@ -224,6 +224,7 @@ test("keeps the lower altitude handle accessible at an upper overlap", async ({
   const minimum = page.getByRole("slider", { name: "Minimum Moon altitude" });
   const maximum = page.getByRole("slider", { name: "Maximum Moon altitude" });
   const track = page.locator("#preference-altitude-track");
+  await minimum.scrollIntoViewIfNeeded();
   const minimumBox = await minimum.boundingBox();
   const trackBox = await track.boundingBox();
   expect(minimumBox).not.toBeNull();
