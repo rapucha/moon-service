@@ -16,6 +16,14 @@ const ALTITUDE_PREFERENCES = {
   }
 };
 
+const SLIDER_ALTITUDE_PREFERENCES = {
+  version: 1,
+  altitudeDegrees: {
+    minimum: 3,
+    maximum: 15
+  }
+};
+
 const CLOCK_PREFERENCES = {
   ...ALTITUDE_PREFERENCES,
   time: {
@@ -104,7 +112,7 @@ test("uses GET by default and keeps the hard-limit disclosure responsive", async
   expect(horizontalOverflow).toBeLessThanOrEqual(1);
 });
 
-test("keeps focus in invalid altitude and clock fields without requesting", async ({ page }) => {
+test("keeps focus in an invalid clock field without requesting", async ({ page }) => {
   const calls = await captureApiCalls(page);
 
   await page.goto("/search?q=Prague");
@@ -112,30 +120,8 @@ test("keeps focus in invalid altitude and clock fields without requesting", asyn
   calls.length = 0;
   await openPreferences(page);
 
-  const minimum = page.getByLabel("Minimum");
-  const maximum = page.getByLabel("Maximum");
   const status = page.locator("#preference-form-status");
   const apply = page.getByRole("button", { name: "Use these limits" });
-  await page.getByLabel("Limit Moon altitude").check();
-  await minimum.fill("");
-  await maximum.fill("18");
-  await apply.click();
-
-  await expect(status).toHaveText(
-    "Use an altitude range from 0° to 90°, with minimum not above maximum."
-  );
-  await expect(minimum).toBeFocused();
-  expect(calls).toHaveLength(0);
-
-  await minimum.fill("19");
-  await maximum.fill("18");
-  await apply.click();
-
-  await expect(status).toContainText("minimum not above maximum");
-  await expect(minimum).toBeFocused();
-  expect(calls).toHaveLength(0);
-
-  await minimum.fill("3.14");
   await page.getByLabel("Local clock windows").check();
   const start = page.getByLabel("Local clock window 1 start");
   await start.fill("22:30");
@@ -162,8 +148,12 @@ test("uses explicit 24-hour text fields for local clock windows", async ({ page 
   await expect(page.locator("#preference-clock-help")).toContainText("24-hour HH:mm");
 });
 
-test("posts altitude and two cross-midnight clock windows and restores them", async ({ page }) => {
+test("posts restored altitude and two cross-midnight clock windows", async ({ page }) => {
   await recordFetchOptions(page);
+  await page.goto("/about");
+  await page.evaluate(({ key, value }) => {
+    window.localStorage.setItem(key, JSON.stringify(value));
+  }, { key: STORAGE_KEY, value: ALTITUDE_PREFERENCES });
   const calls = await captureApiCalls(page);
 
   await page.goto("/search?q=Prague");
@@ -171,12 +161,10 @@ test("posts altitude and two cross-midnight clock windows and restores them", as
   calls.length = 0;
   await openPreferences(page);
 
-  await page.getByLabel("Limit Moon altitude").check();
-  await page.getByLabel("Minimum").fill("3.14");
-  await page.getByLabel("Maximum").fill("18");
-  expect(await page.getByLabel("Minimum").evaluate(input =>
-    /** @type {HTMLInputElement} */ (input).validity.stepMismatch
-  )).toBe(false);
+  await expect(page.getByRole("slider", { name: "Minimum Moon altitude" }))
+    .toHaveAttribute("aria-valuenow", "3.14");
+  await expect(page.getByRole("slider", { name: "Maximum Moon altitude" }))
+    .toHaveAttribute("aria-valuenow", "18");
   await page.getByLabel("Local clock windows").check();
   await page.getByLabel("Local clock window 1 start").fill("22:30");
   await page.getByLabel("Local clock window 1 end").fill("02:15");
@@ -200,35 +188,32 @@ test("posts altitude and two cross-midnight clock windows and restores them", as
   });
 
   await expect(page).toHaveURL("/search?q=Prague");
-  await expect(page.locator("#active-filter-list > li")).toHaveCount(2);
-  await expect(page.locator("#active-filter-list > li").first())
-    .toContainText("Moon altitude 3.14°–18°");
-  await expect(page.locator("#active-filter-list > li").nth(1))
-    .toContainText("Local time 22:30–02:15, 04:30–07:15");
   await expect(page.locator("#preference-count")).toHaveText("2 active");
-  await expect(page.locator("#preference-timezone-note")).toBeVisible();
-  await expect(page.locator("#preference-timezone-note")).toContainText("Europe/Prague");
+  await expect(page.locator("#preference-timezone-note"))
+    .toHaveText("Clock windows use Europe/Prague.");
   expect(await storedPreferences(page)).toEqual(CLOCK_PREFERENCES);
 
   await page.reload();
   await waitForCallCount(calls, 2);
+  await openPreferences(page);
   expect(calls[1].method).toBe("POST");
   expect(calls[1].body).toEqual({
     q: "Prague",
     preferences: CLOCK_PREFERENCES
   });
   await expect(page.getByLabel("Limit Moon altitude")).toBeChecked();
-  await expect(page.getByLabel("Minimum")).toHaveValue("3.14");
-  await expect(page.getByLabel("Maximum")).toHaveValue("18");
+  await expect(page.getByRole("slider", { name: "Minimum Moon altitude" }))
+    .toHaveAttribute("aria-valuenow", "3.14");
+  await expect(page.getByRole("slider", { name: "Maximum Moon altitude" }))
+    .toHaveAttribute("aria-valuenow", "18");
   await expect(page.getByLabel("Local clock windows")).toBeChecked();
   await expect(page.getByLabel("Local clock window 1 start")).toHaveValue("22:30");
   await expect(page.getByLabel("Local clock window 1 end")).toHaveValue("02:15");
   await expect(page.getByLabel("Local clock window 2 start")).toHaveValue("04:30");
   await expect(page.getByLabel("Local clock window 2 end")).toHaveValue("07:15");
-  await expect(page.locator("#active-filter-list > li")).toHaveCount(2);
 });
 
-test("switches to one ambient-light constraint, removes it as a group, and resets", async ({ page }, testInfo) => {
+test("switches, removes the availability group in its control, and resets", async ({ page }, testInfo) => {
   await preloadState(page, CLOCK_PREFERENCES);
   const calls = await captureApiCalls(page);
 
@@ -252,14 +237,11 @@ test("switches to one ambient-light constraint, removes it as a group, and reset
     locationId: "moon-service-3067696",
     preferences: AMBIENT_PREFERENCES
   });
-  await expect(page.locator("#active-filter-list > li")).toHaveCount(2);
-  await expect(page.locator("#active-filter-list > li").nth(1))
-    .toContainText("Light: Golden hour, Civil twilight, Night");
-  await expect(page.locator("#active-filter-list")).not.toContainText("Local time");
+  await expect(page.locator("#preference-count")).toHaveText("2 active");
 
-  await page.getByRole("button", {
-    name: "Remove Light: Golden hour, Civil twilight, Night"
-  }).click();
+  await openPreferences(page);
+  await page.getByLabel("No time limit").check();
+  await page.getByRole("button", { name: "Use these limits" }).click();
 
   await waitForCallCount(calls, 2);
   expect(calls[1].method).toBe("POST");
@@ -267,13 +249,10 @@ test("switches to one ambient-light constraint, removes it as a group, and reset
     locationId: "moon-service-3067696",
     preferences: ALTITUDE_PREFERENCES
   });
-  await expect(page.locator("#active-filter-list > li")).toHaveCount(1);
-  await expect(page.locator("#active-filter-list")).toContainText("Moon altitude 3.14°–18°");
-  await expect(page.locator("#active-filter-list")).not.toContainText("Light:");
-  await expect(page.getByRole("button", { name: "Remove Moon altitude 3.14°–18°" }))
-    .toBeFocused();
+  await expect(page.locator("#preference-count")).toHaveText("1 active");
   expect(await storedPreferences(page)).toEqual(ALTITUDE_PREFERENCES);
 
+  await openPreferences(page);
   await page.getByRole("button", { name: "Reset all preferences" }).click();
 
   await waitForCallCount(calls, 3);
@@ -281,7 +260,7 @@ test("switches to one ambient-light constraint, removes it as a group, and reset
   expect(calls[2].body).toBeNull();
   expect([...new URL(calls[2].url).searchParams.entries()])
     .toEqual([["locationId", "moon-service-3067696"]]);
-  await expect(page.locator("#active-preference-summary")).toBeHidden();
+  await expect(page.locator("#active-preference-summary")).toHaveCount(0);
   await expect(page.locator("#preference-count")).toHaveText("None active");
   const resetFocus = testInfo.project.name === "mobile"
     ? page.locator("#opportunity-preferences > summary")
@@ -309,12 +288,6 @@ test("normalizes supported version-one storage before sending or saving it", asy
         };
       })
     },
-    azimuthDegrees: {
-      minimum: 90,
-      maximum: 270
-    },
-    namedPhases: ["waning_crescent"],
-    brightLimbOrientationDegrees: 42,
     future: {
       nested: true
     }
@@ -330,9 +303,7 @@ test("normalizes supported version-one storage before sending or saving it", asy
     preferences: CLOCK_PREFERENCES
   });
   expect(await storedPreferences(page)).toEqual(CLOCK_PREFERENCES);
-  await expect(page.locator("#active-filter-list > li")).toHaveCount(2);
-  await expect(page.locator("#active-filter-list")).not.toContainText("azimuth");
-  await expect(page.locator("#active-filter-list")).not.toContainText("phase");
+  await expect(page.locator("#preference-count")).toHaveText("2 active");
 });
 
 const discardedStorageCases = [
@@ -427,6 +398,7 @@ test("continues with GET in page memory when reset cannot remove storage", async
   await waitForCallCount(calls, 1);
   expect(calls[0].method).toBe("POST");
 
+  await openPreferences(page);
   await page.getByRole("button", { name: "Reset all preferences" }).click();
 
   await waitForCallCount(calls, 2);
@@ -435,7 +407,7 @@ test("continues with GET in page memory when reset cannot remove storage", async
   await expect(page.locator("#preference-storage-notice")).toBeVisible();
   await expect(page.locator("#preference-storage-notice"))
     .toHaveText(MEMORY_ONLY_NOTICE);
-  await expect(page.locator("#active-preference-summary")).toBeHidden();
+  await expect(page.locator("#active-preference-summary")).toHaveCount(0);
   expect(await storedPreferences(page)).toEqual(ALTITUDE_PREFERENCES);
 
   await page.getByLabel("City or town").fill("Kyoto");
@@ -465,14 +437,14 @@ test("keeps preferences in page memory when browser storage blocks writes", asyn
   await openPreferences(page);
 
   await page.getByLabel("Limit Moon altitude").check();
-  await page.getByLabel("Minimum").fill("3.14");
-  await page.getByLabel("Maximum").fill("18");
+  await page.getByRole("slider", { name: "Minimum Moon altitude" }).focus();
+  await page.keyboard.press("ArrowUp");
   await page.getByRole("button", { name: "Use these limits" }).click();
 
   await waitForCallCount(calls, 1);
   expect(calls[0].body).toEqual({
     q: "Prague",
-    preferences: ALTITUDE_PREFERENCES
+    preferences: SLIDER_ALTITUDE_PREFERENCES
   });
   await expect(page.locator("#preference-storage-notice")).toBeVisible();
   await expect(page.locator("#preference-storage-notice"))
@@ -485,7 +457,7 @@ test("keeps preferences in page memory when browser storage blocks writes", asyn
   await waitForCallCount(calls, 2);
   expect(calls[1].body).toEqual({
     q: "Kyoto",
-    preferences: ALTITUDE_PREFERENCES
+    preferences: SLIDER_ALTITUDE_PREFERENCES
   });
 });
 
@@ -524,8 +496,8 @@ test("renders server preference metadata as safe text without changing the share
   expect(await page.evaluate(() => Reflect.get(window, "preferenceInjectionRan")))
     .toBeUndefined();
 
-  await expect(page.locator("#active-filter-list > li")).toHaveCount(1);
-  await expect(page.locator("#active-filter-list")).toContainText("Moon altitude 3.14°–18°");
+  await expect(page.locator("#active-preference-summary")).toHaveCount(0);
+  await expect(page.locator("#preference-count")).toHaveText("1 active");
   await expect(page.locator("#preference-timezone-note")).toBeHidden();
   await expect(page.locator(".status-panel.warning .tooltip"))
     .toHaveAttribute("title", "No candidate window matched this search.");
@@ -540,13 +512,13 @@ test("documents local preference storage, request use, and location-only sharing
 
   const privacy = page.locator("#privacy-and-providers");
   await expect(privacy).toContainText(
-    "Moon altitude and time preferences are stored in this browser."
+    "Moon altitude, availability, included and blocked compass sectors, selected named phases, and bright-limb orientation preferences are stored in this browser."
   );
   await expect(privacy).toContainText(
-    "Each search with active preferences sends them to the Moon Service server"
+    "Each search with active preferences sends them to the Moon Service server for that search only."
   );
   await expect(privacy).toContainText(
-    "uses them for that search and does not permanently store them"
+    "The server does not permanently store them"
   );
   await expect(privacy).toContainText(
     "Share links include only the location, not the preferences."

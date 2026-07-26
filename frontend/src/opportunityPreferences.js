@@ -1,3 +1,12 @@
+import {
+  createAngularPreferenceControls,
+  normalizeAngularPreferences
+} from "./angularPreferenceControls.js";
+import {
+  createMoonAppearanceControls,
+  normalizeMoonAppearancePreferences
+} from "./moonAppearanceControls.js";
+
 var STORAGE_KEY = "moonService.opportunityPreferences.v1";
 var VERSION = 1;
 var MAX_WINDOWS = 8;
@@ -10,18 +19,14 @@ export function createOpportunityPreferences(options) {
   var form = options.form;
   var resultRegion = options.resultRegion;
   var narrowLayout = options.narrowLayout;
-  var altitudeEnabled = form.querySelector("#preference-altitude-enabled");
-  var altitudeFields = form.querySelector("#preference-altitude-fields");
-  var altitudeMinimum = form.querySelector("#preference-altitude-minimum");
-  var altitudeMaximum = form.querySelector("#preference-altitude-maximum");
   var clockEditor = form.querySelector("#preference-clock-editor");
   var clockRows = form.querySelector("#preference-clock-rows");
   var addWindow = form.querySelector("#preference-add-window");
   var lightEditor = form.querySelector("#preference-light-editor");
   var formStatus = form.querySelector("#preference-form-status");
   var rowTemplate = /** @type {HTMLTemplateElement} */ (document.querySelector("#preference-clock-row-template"));
-  var filterTemplate = /** @type {HTMLTemplateElement} */ (document.querySelector("#active-filter-template"));
-  var activeList = resultRegion.querySelector("#active-filter-list");
+  var angularControls = createAngularPreferenceControls(form);
+  var appearanceControls = createMoonAppearanceControls(form);
   var storage = getStorage();
   var storageNotice = storage ? "" : MEMORY_ONLY_NOTICE;
   var state = emptyState();
@@ -31,7 +36,7 @@ export function createOpportunityPreferences(options) {
   renderForm();
   renderResult();
 
-  form.addEventListener("change", syncEditors);
+  form.addEventListener("change", syncTimeEditors);
   addWindow.addEventListener("click", function () {
     if (clockRows.children.length < MAX_WINDOWS) {
       appendClockRow({ start: "18:00", end: "23:00" });
@@ -40,7 +45,7 @@ export function createOpportunityPreferences(options) {
     }
   });
   form.addEventListener("submit", applyForm);
-  resultRegion.querySelector("#preference-reset").addEventListener("click", resetAll);
+  details.querySelector("#preference-reset").addEventListener("click", resetAll);
 
   return {
     requestFor: requestFor,
@@ -131,7 +136,7 @@ export function createOpportunityPreferences(options) {
 
   function applyForm(event) {
     event.preventDefault();
-    var parsed = readForm(form);
+    var parsed = readForm(form, angularControls, appearanceControls);
     if (parsed.error) {
       formStatus.textContent = parsed.error;
       parsed.focus.focus();
@@ -142,11 +147,8 @@ export function createOpportunityPreferences(options) {
   }
 
   function renderForm() {
-    var altitude = state.altitudeDegrees || { minimum: 0, maximum: 90 };
-    altitudeEnabled.checked = Boolean(state.altitudeDegrees);
-    altitudeMinimum.value = altitude.minimum;
-    altitudeMaximum.value = altitude.maximum;
-
+    angularControls.render(state);
+    appearanceControls.render(state);
     var mode = state.time ? state.time.mode : "none";
     form.querySelector("[name='preference-time-mode'][value='" + mode + "']").checked = true;
     clockRows.replaceChildren();
@@ -158,13 +160,11 @@ export function createOpportunityPreferences(options) {
     lightEditor.querySelectorAll("input").forEach(function (input) {
       input.checked = selected.includes(input.value);
     });
-    syncEditors();
+    syncTimeEditors();
     updateClockButtons();
   }
 
-  function syncEditors() {
-    altitudeFields.hidden = !altitudeEnabled.checked;
-    altitudeEnabled.setAttribute("aria-expanded", String(altitudeEnabled.checked));
+  function syncTimeEditors() {
     var mode = form.querySelector("[name='preference-time-mode']:checked").value;
     clockEditor.hidden = mode !== "local_clock";
     lightEditor.hidden = mode !== "light_bucket";
@@ -198,32 +198,12 @@ export function createOpportunityPreferences(options) {
   }
 
   function renderResult() {
-    var restoreResultFocus = activeList.contains(document.activeElement)
-      || resultRegion.querySelector("#preference-reset") === document.activeElement;
     setNotice(resultRegion.querySelector("#preference-storage-notice"), storageNotice);
-    var normalized = response && response.appliedPreferenceVersion === VERSION
-      ? normalizeState(response.normalizedActiveFilters, false)
-      : null;
-    var displayedState = normalized || state;
-    var filters = filterEntries(displayedState);
-    resultRegion.querySelector("#active-preference-summary").hidden = filters.length === 0;
-    activeList.replaceChildren();
-    filters.forEach(function (filter) {
-      var item = /** @type {HTMLElement} */ (filterTemplate.content.firstElementChild.cloneNode(true));
-      item.querySelector("span").textContent = filter.label;
-      var button = item.querySelector("button");
-      button.setAttribute("aria-label", "Remove " + filter.label);
-      button.addEventListener("click", function () {
-        removeFilter(filter);
-      });
-      activeList.append(item);
-    });
-    var timezoneNote = resultRegion.querySelector("#preference-timezone-note");
-    timezoneNote.hidden = displayedState.time?.mode !== "local_clock";
-    timezoneNote.textContent = "Applied before ranking. Clock windows use "
-      + (typeof response?.location?.timezone === "string"
-        ? response.location.timezone
-        : "the searched location’s timezone") + ".";
+    var timezoneNote = details.querySelector("#preference-timezone-note");
+    timezoneNote.hidden = state.time?.mode !== "local_clock";
+    timezoneNote.textContent = typeof response?.location?.timezone === "string"
+      ? "Clock windows use " + response.location.timezone + "."
+      : "Clock windows use the searched location’s timezone.";
     setNotice(resultRegion.querySelector("#preference-excluded-notice"),
       response && Number.isFinite(response.excludedSampleCount)
       ? "Candidate samples excluded before ranking: " + response.excludedSampleCount + "."
@@ -234,25 +214,19 @@ export function createOpportunityPreferences(options) {
       : "");
     resultRegion.querySelector("#preference-empty-notice").hidden = !(response && response.emptyReason
       && response.emptyReason.code === "no_opportunities_match_preferences");
-    var total = filterEntries(state).length;
+    var total = activeFilterCount(state);
     details.querySelector("#preference-count").textContent =
       total === 0 ? "None active" : total + " active";
-    if (restoreResultFocus) {
-      focusAfterChange();
-    }
   }
 
   function resetAll() {
+    formStatus.textContent = "";
     commit(emptyState(), false);
-  }
-
-  function removeFilter(filter) {
-    if (filter.kind === "altitude") {
-      delete state.altitudeDegrees;
+    if (narrowLayout.matches) {
+      details.querySelector("summary").focus();
     } else {
-      delete state.time;
+      angularControls.focusFirst();
     }
-    commit(state, false);
   }
 
   function commit(next, closeDisclosure) {
@@ -268,27 +242,15 @@ export function createOpportunityPreferences(options) {
     options.onApply();
   }
 
-  function focusAfterChange() {
-    var target = resultRegion.querySelector(".active-filter-remove")
-      || (narrowLayout.matches ? details.querySelector("summary") : altitudeEnabled);
-    target.focus();
-  }
-
 }
 
-function readForm(form) {
+function readForm(form, angularControls, appearanceControls) {
   var next = emptyState();
-  var minimum = form.querySelector("#preference-altitude-minimum");
-  var maximum = form.querySelector("#preference-altitude-maximum");
-  if (form.querySelector("#preference-altitude-enabled").checked) {
-    var low = Number(minimum.value);
-    var high = Number(maximum.value);
-    if (minimum.value === "" || maximum.value === "" || !validAltitude(low, high)) {
-      return formError("Use an altitude range from 0° to 90°, with minimum not above maximum.",
-        minimum);
-    }
-    next.altitudeDegrees = { minimum: low, maximum: high };
+  var angular = angularControls.read();
+  if (angular.error) {
+    return angular;
   }
+  Object.assign(next, angular.state);
 
   var mode = form.querySelector("[name='preference-time-mode']:checked").value;
   if (mode === "local_clock") {
@@ -315,6 +277,11 @@ function readForm(form) {
     }
     next.time = { mode: mode, buckets: buckets };
   }
+  var appearance = appearanceControls.read();
+  if (appearance.error) {
+    return appearance;
+  }
+  Object.assign(next, appearance.state);
   return { state: next };
 }
 
@@ -325,14 +292,12 @@ function normalizeState(value, requireVersion) {
     return null;
   }
   var next = emptyState();
-  if (value.altitudeDegrees !== undefined) {
-    if (!objectValue(value.altitudeDegrees)
-        || !validAltitude(value.altitudeDegrees.minimum, value.altitudeDegrees.maximum)) {
-      return null;
-    }
-    var altitude = value.altitudeDegrees;
-    next.altitudeDegrees = { minimum: altitude.minimum, maximum: altitude.maximum };
+  var angular = normalizeAngularPreferences(value);
+  var appearance = normalizeMoonAppearancePreferences(value);
+  if (!angular || !appearance) {
+    return null;
   }
+  Object.assign(next, angular, appearance);
   if (value.time !== undefined) {
     var time = normalizeTime(value.time);
     if (!time) {
@@ -369,26 +334,6 @@ function normalizeTime(value) {
   return null;
 }
 
-function filterEntries(value) {
-  var filters = [];
-  if (value.altitudeDegrees) {
-    filters.push({
-      kind: "altitude",
-      label: "Moon altitude " + numberText(value.altitudeDegrees.minimum)
-        + "°–" + numberText(value.altitudeDegrees.maximum) + "°"
-    });
-  }
-  if (value.time) {
-    var label = value.time.mode === "local_clock"
-      ? "Local time " + value.time.windows.map(function (window) {
-        return window.start + "–" + window.end;
-      }).join(", ")
-      : "Light: " + value.time.buckets.map(lightLabel).join(", ");
-    filters.push({ kind: "time", label: label });
-  }
-  return filters;
-}
-
 function setNotice(node, text) {
   node.textContent = text;
   node.hidden = !text;
@@ -408,12 +353,16 @@ function ignoredText(payload) {
 
 function emptyState() { return { version: VERSION }; }
 
-function active(value) { return Boolean(value.altitudeDegrees || value.time); }
+function active(value) {
+  return activeFilterCount(value) > 0;
+}
 
-function validAltitude(minimum, maximum) {
-  return typeof minimum === "number" && Number.isFinite(minimum)
-    && typeof maximum === "number" && Number.isFinite(maximum)
-    && minimum >= 0 && maximum <= 90 && minimum <= maximum;
+function activeFilterCount(value) {
+  return Number(Boolean(value.altitudeDegrees))
+    + Number(Boolean(value.azimuthDegrees))
+    + Number(Boolean(value.time))
+    + Number(Boolean(value.namedPhases))
+    + Number(Boolean(value.brightLimbOrientationDegrees));
 }
 
 function validClockWindow(window) {
@@ -422,13 +371,6 @@ function validClockWindow(window) {
 }
 
 function objectValue(value) { return value !== null && typeof value === "object" && !Array.isArray(value); }
-
-function numberText(value) { return String(value); }
-
-function lightLabel(value) {
-  var label = value.replaceAll("_", " ");
-  return label.charAt(0).toUpperCase() + label.slice(1);
-}
 
 function getStorage() {
   try {

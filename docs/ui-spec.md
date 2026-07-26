@@ -8,7 +8,9 @@ stable target.
 
 The current scope is the `/search` web page, opportunity cards, Moon path
 visualization, the altitude and availability preferences tracked by
-[#192](https://github.com/rapucha/moon-service/issues/192), and the
+[#192](https://github.com/rapucha/moon-service/issues/192), the direction,
+phase, and bright-limb preference controls tracked by
+[#193](https://github.com/rapucha/moon-service/issues/193), and the
 calibration-feedback interaction tracked by
 [#33](https://github.com/rapucha/moon-service/issues/33). Broader visual design,
 feeds, calendar export pages, account flows, and native apps are out of scope
@@ -97,8 +99,14 @@ The frontend module split is intended to keep future UI changes manageable:
 - `format.js`: date, time, degree, and percentage formatting;
 - `dom.js`: DOM and SVG element helpers;
 - `recentSearches.js`: localStorage behavior;
-- `opportunityPreferences.js`: preference state, controls, storage, request
-  options, result summary, and preference notices;
+- `opportunityPreferences.js`: preference state, storage, request options,
+  notices, and coordination of the focused preference controls;
+- `angularPreferenceControls.js`: vertical-altitude and shared-axis azimuth
+  controls, validation, and keyboard interaction;
+- `moonAppearanceControls.js`: named-phase selection and the textured
+  bright-limb dial;
+- `moonPreferenceControls.css`: vertical slider, shared compass axis, phase,
+  and Moon-dial presentation;
 - `responseView.js`: response states and result rendering;
 - `opportunityCard.js`: opportunity card layout;
 - `moonPathView.js`: Moon path, separate Sun pass, and suggested-time sky-position views;
@@ -109,22 +117,54 @@ The frontend module split is intended to keep future UI changes manageable:
 
 The accepted option A places the preference editor in the existing desktop
 sidebar. On mobile, the same editor uses a compact native `details` disclosure
-with a clear summary label. The active-filter summary remains beside the
-results at both widths, including while the mobile editor is closed.
+with a clear summary label. Active state and `Reset all preferences` remain
+inside this editor. The results region does not repeat them in an active-limit
+summary or removable filter chips.
 
-The first editor exposes two hard filters:
+The editor exposes these hard filters:
 
-- Moon altitude is one optional inclusive range. The UI labels both endpoints
-  in degrees and prevents applying preferences or starting their lookup until
-  the enabled range is valid.
+- Moon altitude is one optional inclusive range edited with a vertical
+  dual-handle slider over `[0°, 90°]`. The bottom is `0°`, the top is `90°`,
+  and a visible readout shows both selected endpoints.
 - Availability uses exactly one mode at a time. Local-clock mode accepts one or
   more windows in the searched location's timezone and explains that a window
   may cross midnight. Ambient-light mode accepts one or more of `Daylight`,
   `Golden hour`, `Civil twilight`, `Nautical twilight`, and `Night`. Switching
   modes removes the other mode from active state.
+- Moon direction is optional as a whole. When enabled, one shared compass axis
+  contains distinct fills and handle pairs for an included sector and a blocked
+  sector contained inside it. Both sectors are always active and the request
+  contains both `azimuthDegrees.included` and `azimuthDegrees.excluded`.
+  Disabling direction filtering omits `azimuthDegrees`.
+- Named phase uses eight checkboxes for `new_moon`, `waxing_crescent`,
+  `first_quarter`, `waxing_gibbous`, `full_moon`, `waning_gibbous`,
+  `last_quarter`, and `waning_crescent`. Any selected phase may match. An empty
+  selection omits `namedPhases`.
+- Bright-limb orientation is optional and has one target on a circular,
+  single-handle dial. It has no editable numeric range inputs. The browser
+  applies a fixed ±10° tolerance and sends exactly one normalized range in
+  `brightLimbOrientationDegrees`; the range may cross `0°`.
 
 Local-clock preference inputs use 24-hour `HH:mm` text fields. They do not use
 browser-localized native time controls.
+
+The shared compass axis uses absolute bearings: `0°` is north, `90°` east,
+`180°` south, and `270°` west. Both sectors may cross north. The blocked sector
+must remain inside the included sector. The browser does not replace the
+backend's lunar-disk matching geometry with a Moon-center calculation.
+
+The bright-limb dial explains the observer-oriented convention: `0°` points
+toward local zenith, `90°` points right toward increasing azimuth, and angles
+increase clockwise. It uses `moonPhaseView.js` and the canonical textured Moon.
+The texture stays north-up while the illumination rotates. The illustrative
+crescent is thicker than the earlier mockup but remains below quarter phase,
+and the disk has a neutral or dark rim rather than a bright circumference.
+`northPoleTiltDegrees` is not a preference.
+
+When named phase and bright-limb orientation are both active, a sample must
+match any selected named phase and the single bright-limb interval. A sample
+with no reported bright-limb orientation does not match an active orientation
+preference.
 
 These controls remove candidates that fall outside the limits. They do not
 adjust scores or change the order of candidates that remain. With no active
@@ -133,16 +173,17 @@ The detailed request and filtering rules remain in
 [the product preference API contract](api-shape.md#product-preference-post) and
 [the scoring model](scoring-model.md#version-1-hard-preferences).
 
-The results region shows each active filter with its own remove button and
-provides `Reset all preferences`. Altitude is one removable filter.
-Availability is one grouped removable filter, including when it contains
-several windows or buckets. Removing it clears that availability mode. Reset
-removes every active filter and removes the stored preference object when
-browser storage accepts the removal. If removal fails, the current page uses
-reset state in memory and reports the storage failure. The preference summary
-also reports the total number of candidate samples excluded by the server.
+Each enabled preference can be removed through its own editor control without
+changing the others. Reset removes every active filter and removes the stored
+preference object when browser storage accepts the removal. If removal fails,
+the current page uses reset state in memory and reports the storage failure.
+The location-timezone and location-only share explanations stay with the
+relevant controls in Preferences. When preferences are active, the share
+explanation says that the link still contains only the location and that a
+receiving browser applies its own saved preferences, if any.
 
-Preference-specific messages stay beside the summary:
+Result-specific messages remain near the results without recreating an active
+preference summary:
 
 - If active filters remove every candidate, the empty message says that the
   preferences caused the result. It does not describe this state as an
@@ -153,31 +194,47 @@ Preference-specific messages stay beside the summary:
   discards it and says that the saved preferences could not be used.
 - If browser storage is unavailable, the browser says that preferences will
   last only for the current page while search continues.
-- When active preferences exist, the share message says that the link includes
-  only the location. A receiving browser uses its own saved preferences, if
-  any.
+- The excluded-count message reports the total number of candidate samples
+  excluded by the server.
 
 The browser keeps one versioned preference state for the editor, request,
 storage, reset behavior, and result explanations. It stores supported state
-under `moonService.opportunityPreferences.v1`. Version 1 storage for this
-editor retains only altitude and availability fields that the editor
-understands. The browser discards malformed or unsupported stored state rather
-than sending it. If `localStorage` is blocked or unavailable, it keeps the
-state in page memory and lets search continue.
+under `moonService.opportunityPreferences.v1`. Version 1 storage retains only
+the supported `altitudeDegrees`, `time`, `azimuthDegrees`, `namedPhases`, and
+`brightLimbOrientationDegrees` fields. A bright-limb target is stored as an
+array containing exactly one normalized `{start, end}` range; the browser
+derives the dial midpoint when restoring it. The browser discards malformed or
+unsupported stored state rather than sending it. If `localStorage` is blocked
+or unavailable, it keeps the state in page memory and lets search continue.
 
 `opportunityPreferences.js` owns this state, its normalization and storage, the
-editor synchronization, preference request options, and the summary and
-notices in its own page region. `app.js` coordinates the lookup flow with that
-module. `api.js` remains responsible for the existing default request, and
-`responseView.js` remains responsible for ordinary opportunity statuses.
+editor coordination, preference request options, and result notices.
+`angularPreferenceControls.js` and `moonAppearanceControls.js` own their
+focused editor interactions. `app.js` coordinates the lookup flow with the
+preference module. `api.js` remains responsible for the existing default
+request, and `responseView.js` remains responsible for ordinary opportunity
+statuses.
 
 Every preference input has a visible label. Related choices use `fieldset` and
-`legend`, and remove and reset actions use real buttons. The native disclosure,
-editor, active filters, and reset action must work from the keyboard in a
-logical order. Validation identifies the affected field in text. Summary,
-storage, ignored-field, excluded-count, and filtered-empty changes are
-announced to screen readers without depending on color. Removing a filter or
-resetting preferences leaves focus on a logical surviving control.
+`legend`, and reset uses a real button. Every handle supports an equivalent
+keyboard interaction and exposes its name, value, and instructions to
+assistive technology. Distinct sector labels, not color alone, identify the
+included and blocked compass handles. The native disclosure, editor, and reset
+action work from the keyboard in a logical order.
+
+The browser rejects nonnumeric, non-finite, out-of-range, equal-endpoint,
+uncontained blocked-sector, duplicate-phase, and unknown-phase values before
+sending a request. Validation identifies the affected control in text and
+moves focus to it. Storage, ignored-field, excluded-count, and filtered-empty
+changes are announced to screen readers without depending on color. Removing a
+preference or resetting all preferences leaves focus on a logical surviving
+control.
+
+When azimuth filtering is active, the Moon-pass chart dims only the portions
+outside the authoritative `moonPass.azimuthMatchIntervals`. It must not infer
+the mask from returned opportunity windows or center-position path samples.
+Another hard preference or the global result limit must not dim an interval
+that the backend marked as an azimuth match.
 
 ## Opportunity Card
 
