@@ -209,7 +209,7 @@ test("rejects invalid manual compass sectors without sending a request", async (
   await expect(includedStart).toHaveValue("330");
 });
 
-test("widens an upper altitude range from overlapping handles", async ({ page }) => {
+test("widens an upper altitude range from overlapping handles", async ({ page }, testInfo) => {
   await preloadState(page, {
     version: 1,
     altitudeDegrees: { minimum: 89, maximum: 89 }
@@ -229,16 +229,34 @@ test("widens an upper altitude range from overlapping handles", async ({ page })
   await expect(minimum).toHaveAttribute("aria-valuenow", "89");
   await expect(maximum).toHaveAttribute("aria-valuenow", "89");
 
-  await page.mouse.move(
-    minimumBox.x + minimumBox.width / 2,
-    minimumBox.y + minimumBox.height / 2
-  );
-  await page.mouse.down();
-  await page.mouse.move(
-    trackBox.x + trackBox.width / 2,
-    trackBox.y + trackBox.height / 9
-  );
-  await page.mouse.up();
+  const start = {
+    x: minimumBox.x + minimumBox.width / 2,
+    y: minimumBox.y + minimumBox.height / 2
+  };
+  const end = {
+    x: trackBox.x + trackBox.width / 2,
+    y: trackBox.y + trackBox.height / 9
+  };
+  if (testInfo.project.name === "mobile") {
+    const client = await page.context().newCDPSession(page);
+    await client.send("Input.dispatchTouchEvent", {
+      type: "touchStart",
+      touchPoints: [start]
+    });
+    await client.send("Input.dispatchTouchEvent", {
+      type: "touchMove",
+      touchPoints: [end]
+    });
+    await client.send("Input.dispatchTouchEvent", {
+      type: "touchEnd",
+      touchPoints: []
+    });
+  } else {
+    await page.mouse.move(start.x, start.y);
+    await page.mouse.down();
+    await page.mouse.move(end.x, end.y);
+    await page.mouse.up();
+  }
 
   await expect(minimum).toHaveAttribute("aria-valuenow", "80");
   await expect(maximum).toHaveAttribute("aria-valuenow", "89");
