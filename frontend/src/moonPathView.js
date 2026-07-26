@@ -8,6 +8,11 @@ import {
   readableToken,
   round1
 } from "./format.js";
+import {
+  azimuthMaskGaps,
+  azimuthRailLabels,
+  compassDirection
+} from "./angularPreferenceControls.js";
 import { lightBandSegments } from "./moonPathLightBands.js";
 import { moonPhaseImageDataUrl } from "./moonPhaseView.js";
 import { altitudeForegroundArtwork } from "./moonPathSilhouettes.js";
@@ -16,7 +21,6 @@ var DESKTOP_ALTITUDE_WIDTH = 730;
 var DESKTOP_PLOT_WIDTH = 672;
 var MOBILE_ALTITUDE_WIDTH = 320;
 var MOBILE_PLOT_WIDTH = 272;
-var AZIMUTH_RAIL_LABEL_EDGE_INSET = 10;
 var SUN_SAMPLE_MARKER_IMAGE_URL = "/sun-marker-aperture-flare.svg";
 var SUN_BEST_MARKER_SIZE = 42;
 var SUN_ALTERNATE_MARKER_SIZE = 28;
@@ -70,7 +74,14 @@ export function moonPathPanel(opportunity, timezone, countryCode, chartContext) 
       element("p", {}, description)),
     summary,
     element("div", { className: "moon-path-charts" },
-      chartBlock("Moon altitude", altitudeChart(samples, timezone, countryCode, chartContext, opportunity.moon || {}, chartSubject))),
+      chartBlock("Moon altitude", altitudeChart(
+        samples,
+        timezone,
+        countryCode,
+        chartContext,
+        opportunity.moon || {},
+        chartSubject,
+        (opportunity.moonPass || {}).azimuthMatchIntervals))),
     element("div", { className: "sky-picture-list" },
       sunPassDetails,
       skyDomeDetails));
@@ -108,12 +119,13 @@ function chartBlock(label, chart) {
     chart);
 }
 
-function altitudeChart(samples, timezone, countryCode, chartContext, moon, chartSubject) {
+function altitudeChart(samples, timezone, countryCode, chartContext, moon, chartSubject, intervals) {
   return bodyAltitudeChart(samples, timezone, countryCode, chartContext, {
     body: "moon",
     subject: "Moon",
     chartSubject: chartSubject,
     moon: moon,
+    azimuthMatchIntervals: intervals,
     includeForeground: true
   });
 }
@@ -212,6 +224,17 @@ function altitudeChartSvg(sourcePoints, lightBandSourcePoints, azimuthSourcePoin
   var timeTicks = altitudeHourTicks(firstTime, lastTime, left, chartWidth, timezone, bottom + 29);
   var azimuthLabels = azimuthRailLabels(azimuthPoints, mode);
   var visibleMarkers = visibleAltitudeMarkers(points, mode, options.body);
+  var maskGaps = options.body === "moon"
+    ? azimuthMaskGaps(options.azimuthMatchIntervals, firstTime, lastTime)
+    : null;
+  var maskRects = (maskGaps || []).map(function (gap) {
+    return {
+      start: gap.start,
+      end: gap.end,
+      x: left + ((gap.start - firstTime) / timeSpan) * chartWidth,
+      width: ((gap.end - gap.start) / timeSpan) * chartWidth
+    };
+  });
   var markerImageUrl = options.body === "moon"
     ? moonPhaseImageDataUrl(
       (options.moon || {}).phaseAngleDegrees,
@@ -224,9 +247,10 @@ function altitudeChartSvg(sourcePoints, lightBandSourcePoints, azimuthSourcePoin
     className: "altitude-chart altitude-chart-" + mode + " " + roleClass(options.subject) + "-altitude-chart",
     viewBox: "0 0 " + width + " " + height,
     role: "img",
-    ariaLabel: mode === "mobile"
+    ariaLabel: (mode === "mobile"
       ? options.subject + " altitude and azimuth across the " + options.chartSubject + "; chart fits the card width"
-      : options.subject + " altitude and azimuth across the " + options.chartSubject + "; chart fills the card width"
+      : options.subject + " altitude and azimuth across the " + options.chartSubject + "; chart fills the card width")
+        + (maskGaps === null ? "" : "; dimmed portions fall outside the Moon-direction preference")
   },
     svgElement("rect", {
       className: "azimuth-rail-bg",
@@ -275,6 +299,18 @@ function altitudeChartSvg(sourcePoints, lightBandSourcePoints, azimuthSourcePoin
     }),
     visibleMarkers.map(function (point) {
       return bodyAltitudeMarker(point, markerImageUrl, options.body);
+    }),
+    maskRects.map(function (rect) {
+      return svgElement("rect", {
+        className: "azimuth-preference-excluded",
+        x: round1(rect.x),
+        y: top,
+        width: round1(rect.width),
+        height: chartHeight,
+        "data-start-at": new Date(rect.start).toISOString(),
+        "data-end-at": new Date(rect.end).toISOString()
+      },
+        svgElement("title", {}, "Outside the selected Moon-direction preference"));
     })
   );
 }
@@ -420,42 +456,6 @@ function altitudeHourTicks(firstTime, lastTime, left, chartWidth, timezone, labe
   return ticks;
 }
 
-function azimuthRailLabels(points, mode) {
-  var first = points[0];
-  var last = points[points.length - 1];
-  var span = Math.max(1, last.time - first.time);
-  var left = first.x;
-  var chartWidth = Math.max(1, last.x - first.x);
-  var edgeInset = Math.min(AZIMUTH_RAIL_LABEL_EDGE_INSET, chartWidth / 2);
-  var count = mode === "mobile" ? 4 : 5;
-  var labels = [];
-  var previousText = "";
-
-  for (var index = 0; index < count; index += 1) {
-    var ratio = count === 1 ? 0 : index / (count - 1);
-    var time = first.time + span * ratio;
-    var azimuth = interpolatedAzimuth(points, time);
-    var text = compassDirection(azimuth);
-    if (!text || (text === previousText && index > 0 && index < count - 1)) {
-      continue;
-    }
-    var x = clamp(
-      left + chartWidth * ratio,
-      left + edgeInset,
-      left + chartWidth - edgeInset
-    );
-    labels.push({
-      text: text,
-      azimuthDegrees: azimuth,
-      x: x,
-      anchor: tickTextAnchor(x, left, left + chartWidth)
-    });
-    previousText = text;
-  }
-
-  return labels;
-}
-
 function azimuthRailLabel(label, y) {
   var arrowX = -12;
   var textX = 2;
@@ -483,27 +483,6 @@ function azimuthRailLabel(label, y) {
       y: 4,
       textAnchor: textAnchor
     }, label.text));
-}
-
-function interpolatedAzimuth(points, time) {
-  if (time <= points[0].time) {
-    return points[0].azimuthDegrees;
-  }
-  for (var index = 0; index < points.length - 1; index += 1) {
-    var current = points[index];
-    var next = points[index + 1];
-    if (time <= next.time) {
-      var span = Math.max(1, next.time - current.time);
-      var ratio = clamp((time - current.time) / span, 0, 1);
-      return interpolateAngle(current.azimuthDegrees, next.azimuthDegrees, ratio);
-    }
-  }
-  return points[points.length - 1].azimuthDegrees;
-}
-
-function interpolateAngle(start, end, ratio) {
-  var delta = normalizeDegrees(end - start + 180) - 180;
-  return normalizeDegrees(start + delta * ratio);
 }
 
 function firstLocalHourAtOrAfter(time, timezone) {
@@ -1048,14 +1027,6 @@ function signedDegrees(value) {
     return "unavailable";
   }
   return (value > 0 ? "+" : "") + value + "°";
-}
-
-function compassDirection(value) {
-  if (!Number.isFinite(value)) {
-    return "";
-  }
-  var directions = ["N", "NNE", "NE", "ENE", "E", "ESE", "SE", "SSE", "S", "SSW", "SW", "WSW", "W", "WNW", "NW", "NNW"];
-  return directions[Math.round(normalizeDegrees(value) / 22.5) % directions.length];
 }
 
 function chartSamples(samples) {

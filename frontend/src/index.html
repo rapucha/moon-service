@@ -7,6 +7,7 @@
   <link rel="icon" href="/favicon.svg" type="image/svg+xml">
   <link rel="stylesheet" href="/styles.css">
   <link rel="stylesheet" href="/opportunityPreferences.css">
+  <link rel="stylesheet" href="/moonPreferenceControls.css">
 </head>
 <body>
   <header class="topbar">
@@ -71,13 +72,19 @@
           </summary>
           <div class="preference-body">
             <div class="preference-heading">
-              <p class="eyebrow">Preferences</p>
-              <h2>Hard limits</h2>
+              <div>
+                <p class="eyebrow">Preferences</p>
+                <h2>Hard limits</h2>
+              </div>
+              <button id="preference-reset" type="button" class="preference-reset">
+                Reset all
+                <span class="visually-hidden"> preferences</span>
+              </button>
             </div>
             <p class="preference-intro">Exclude results you cannot photograph. Hard limits do not adjust scores.</p>
 
             <form id="preference-form" novalidate>
-              <section class="preference-group">
+              <section class="preference-group preference-altitude-group">
                 <label class="preference-choice" for="preference-altitude-enabled">
                   <input
                     id="preference-altitude-enabled"
@@ -86,28 +93,44 @@
                     aria-expanded="false">
                   <span>Limit Moon altitude</span>
                 </label>
-                <p class="preference-help">Inclusive range from 0° to 90°.</p>
-                <div id="preference-altitude-fields" class="preference-range-fields">
-                  <label for="preference-altitude-minimum">
-                    <span>Minimum</span>
-                    <input
-                      id="preference-altitude-minimum"
-                      type="number"
-                      min="0"
-                      max="90"
-                      step="any"
-                      aria-label="Minimum Moon altitude in degrees">
-                  </label>
-                  <label for="preference-altitude-maximum">
-                    <span>Maximum</span>
-                    <input
-                      id="preference-altitude-maximum"
-                      type="number"
-                      min="0"
-                      max="90"
-                      step="any"
-                      aria-label="Maximum Moon altitude in degrees">
-                  </label>
+                <p id="preference-altitude-help" class="preference-help">
+                  Drag the minimum and maximum. The range is inclusive.
+                </p>
+                <div id="preference-altitude-fields" hidden>
+                  <div class="preference-control-heading">
+                    <span>Altitude range</span>
+                    <output id="preference-altitude-output">2°–15°</output>
+                  </div>
+                  <div id="preference-altitude-track" class="preference-altitude-track">
+                    <div class="preference-altitude-ticks" aria-hidden="true">
+                      <span class="is-90">90°</span>
+                      <span class="is-60">60°</span>
+                      <span class="is-30">30°</span>
+                      <span class="is-0">0°</span>
+                    </div>
+                    <div class="preference-altitude-base"></div>
+                    <div class="preference-altitude-fill"></div>
+                    <button
+                      type="button"
+                      class="preference-track-handle preference-altitude-handle"
+                      role="slider"
+                      aria-label="Minimum Moon altitude"
+                      aria-describedby="preference-altitude-help"
+                      aria-valuemin="0"
+                      aria-valuemax="15"
+                      aria-valuenow="2"
+                      data-altitude-minimum><span aria-hidden="true">2°</span></button>
+                    <button
+                      type="button"
+                      class="preference-track-handle preference-altitude-handle"
+                      role="slider"
+                      aria-label="Maximum Moon altitude"
+                      aria-describedby="preference-altitude-help"
+                      aria-valuemin="2"
+                      aria-valuemax="90"
+                      aria-valuenow="15"
+                      data-altitude-maximum><span aria-hidden="true">15°</span></button>
+                  </div>
                 </div>
               </section>
 
@@ -145,6 +168,145 @@
                 </div>
               </fieldset>
 
+              <section class="preference-group preference-direction-group">
+                <label class="preference-choice" for="preference-direction-enabled">
+                  <input
+                    id="preference-direction-enabled"
+                    type="checkbox"
+                    aria-controls="preference-direction-fields"
+                    aria-expanded="false">
+                  <span>Limit Moon direction</span>
+                </label>
+                <p id="preference-direction-help" class="preference-help">
+                  Choose one useful compass sector and the blocked part inside it.
+                  0° is north, 90° east, 180° south, and 270° west.
+                </p>
+                <div id="preference-direction-fields" hidden>
+                  <div class="preference-control-heading">
+                    <span>Included compass sector</span>
+                    <output id="preference-included-output">330° through 30°</output>
+                  </div>
+                  <div id="preference-compass-track" class="preference-compass-track">
+                    <div class="preference-compass-ticks" aria-hidden="true">
+                      <span class="is-north-start">N</span>
+                      <span class="is-east">E</span>
+                      <span class="is-south">S</span>
+                      <span class="is-west">W</span>
+                      <span class="is-north-end">N</span>
+                    </div>
+                    <div class="preference-compass-base"></div>
+                    <div class="preference-included-fill" data-azimuth-fill="included-left"></div>
+                    <div class="preference-included-fill" data-azimuth-fill="included-right"></div>
+                    <div class="preference-blocked-fill" data-azimuth-fill="excluded-left"></div>
+                    <div class="preference-blocked-fill" data-azimuth-fill="excluded-right"></div>
+                    <button type="button" class="preference-track-handle preference-included-handle"
+                      role="slider" aria-label="Included compass sector start"
+                      aria-describedby="preference-direction-help"
+                      data-bearing-handle="included-start"><span aria-hidden="true">330°</span></button>
+                    <button type="button" class="preference-track-handle preference-included-handle"
+                      role="slider" aria-label="Included compass sector end"
+                      aria-describedby="preference-direction-help"
+                      data-bearing-handle="included-end"><span aria-hidden="true">30°</span></button>
+                    <button type="button" class="preference-track-handle preference-blocked-handle"
+                      role="slider" aria-label="Blocked view start"
+                      aria-describedby="preference-direction-help"
+                      data-bearing-handle="excluded-start"><span aria-hidden="true">350°</span></button>
+                    <button type="button" class="preference-track-handle preference-blocked-handle"
+                      role="slider" aria-label="Blocked view end"
+                      aria-describedby="preference-direction-help"
+                      data-bearing-handle="excluded-end"><span aria-hidden="true">10°</span></button>
+                  </div>
+                  <div class="preference-degree-fields">
+                    <label>From <span><input id="preference-included-start" type="number"
+                      min="0" max="359.999999" step="any" value="330"
+                      aria-label="Included compass sector start in degrees"
+                      aria-describedby="preference-direction-help">°</span></label>
+                    <label>Through <span><input id="preference-included-end" type="number"
+                      min="0" max="359.999999" step="any" value="30"
+                      aria-label="Included compass sector end in degrees"
+                      aria-describedby="preference-direction-help">°</span></label>
+                  </div>
+                  <div class="preference-control-heading preference-blocked-heading">
+                    <span>Blocked view</span>
+                    <output id="preference-excluded-output">350° through 10°</output>
+                  </div>
+                  <div class="preference-degree-fields">
+                    <label>From <span><input id="preference-excluded-start" type="number"
+                      min="0" max="359.999999" step="any" value="350"
+                      aria-label="Blocked view start in degrees"
+                      aria-describedby="preference-direction-help">°</span></label>
+                    <label>Through <span><input id="preference-excluded-end" type="number"
+                      min="0" max="359.999999" step="any" value="10"
+                      aria-label="Blocked view end in degrees"
+                      aria-describedby="preference-direction-help">°</span></label>
+                  </div>
+                </div>
+              </section>
+
+              <fieldset class="preference-group preference-phase-group">
+                <legend>Named Moon phase</legend>
+                <p class="preference-help preference-help-unindented">
+                  Choose any combination. A result may match any selected phase.
+                </p>
+                <div class="preference-phase-grid">
+                  <label><input type="checkbox" data-named-phase value="new_moon"> <span>New</span></label>
+                  <label><input type="checkbox" data-named-phase value="waxing_crescent"> <span>Waxing crescent</span></label>
+                  <label><input type="checkbox" data-named-phase value="first_quarter"> <span>First quarter</span></label>
+                  <label><input type="checkbox" data-named-phase value="waxing_gibbous"> <span>Waxing gibbous</span></label>
+                  <label><input type="checkbox" data-named-phase value="full_moon"> <span>Full</span></label>
+                  <label><input type="checkbox" data-named-phase value="waning_gibbous"> <span>Waning gibbous</span></label>
+                  <label><input type="checkbox" data-named-phase value="last_quarter"> <span>Last quarter</span></label>
+                  <label><input type="checkbox" data-named-phase value="waning_crescent"> <span>Waning crescent</span></label>
+                </div>
+              </fieldset>
+
+              <fieldset class="preference-group preference-limb-group">
+                <legend>Bright-limb orientation</legend>
+                <label class="preference-choice" for="preference-limb-enabled">
+                  <input
+                    id="preference-limb-enabled"
+                    type="checkbox"
+                    aria-controls="preference-limb-fields"
+                    aria-expanded="false">
+                  <span>Limit illuminated-edge direction</span>
+                </label>
+                <p class="preference-help">
+                  Drag one target around the Moon. The tolerance is built in.
+                </p>
+                <div id="preference-limb-fields" class="preference-limb-editor" hidden>
+                  <div
+                    id="preference-limb-dial"
+                    class="preference-limb-dial"
+                    aria-describedby="preference-limb-instructions">
+                    <span class="preference-dial-direction is-top">Zenith</span>
+                    <span class="preference-dial-direction is-right">Right</span>
+                    <span class="preference-dial-direction is-bottom">Nadir</span>
+                    <span class="preference-dial-direction is-left">Left</span>
+                    <div class="preference-tolerance-ring" aria-hidden="true"></div>
+                    <canvas id="preference-limb-moon" width="160" height="160" aria-hidden="true"></canvas>
+                    <button
+                      id="preference-limb-handle"
+                      type="button"
+                      role="slider"
+                      aria-label="Bright-limb target orientation"
+                      aria-describedby="preference-limb-instructions"
+                      aria-valuemin="0"
+                      aria-valuemax="359"
+                      aria-valuenow="35">
+                      <span class="visually-hidden">Move bright-limb target</span>
+                    </button>
+                  </div>
+                  <output id="preference-limb-output">Illuminated edge: upper right</output>
+                  <p id="preference-limb-instructions" class="preference-help preference-help-unindented">
+                    Angles run clockwise from local zenith. Use arrow keys to adjust the target.
+                  </p>
+                </div>
+              </fieldset>
+
+              <div class="preference-context-note">
+                <p id="preference-timezone-note" hidden></p>
+                <p>Share links include only the location. Another browser uses its own saved preferences, if any.</p>
+              </div>
               <p id="preference-form-status" class="preference-form-status" role="status" aria-live="polite"></p>
               <button type="submit" class="preference-apply">Use these limits</button>
             </form>
@@ -166,26 +328,11 @@
         </div>
         <div id="preference-result-region" class="preference-result-region" aria-live="polite">
           <p id="preference-storage-notice" class="preference-notice warning" role="status" hidden></p>
-          <section
-            id="active-preference-summary"
-            class="active-preference-summary"
-            aria-labelledby="active-preference-title"
-            hidden>
-            <div class="active-preference-heading">
-              <h3 id="active-preference-title">Active hard limits</h3>
-              <button id="preference-reset" type="button" class="preference-reset">Reset all preferences</button>
-            </div>
-            <ul id="active-filter-list" class="active-filter-list"></ul>
-            <p id="preference-timezone-note" class="preference-summary-note"></p>
-            <p class="preference-share-note">
-              Share links include only the location. Another browser uses its own saved preferences, if any.
-            </p>
-            <p id="preference-excluded-notice" class="preference-notice excluded" hidden></p>
-            <p id="preference-ignored-notice" class="preference-notice ignored" hidden></p>
-            <p id="preference-empty-notice" class="preference-notice empty" hidden>
-              No opportunities match these hard limits. Remove a limit or reset the preferences.
-            </p>
-          </section>
+          <p id="preference-excluded-notice" class="preference-notice excluded" hidden></p>
+          <p id="preference-ignored-notice" class="preference-notice ignored" hidden></p>
+          <p id="preference-empty-notice" class="preference-notice empty" hidden>
+            No opportunities match these hard limits. Remove a limit or reset the preferences.
+          </p>
         </div>
         <div id="results" class="results-region" aria-live="polite" aria-busy="false"></div>
         <p id="result-provider-credit" class="panel-note provider-credit" hidden>
@@ -214,13 +361,6 @@
         Remove
       </button>
     </div>
-  </template>
-
-  <template id="active-filter-template">
-    <li class="active-filter">
-      <span></span>
-      <button type="button" class="active-filter-remove">×</button>
-    </li>
   </template>
 
   <script type="module" src="/app.js"></script>

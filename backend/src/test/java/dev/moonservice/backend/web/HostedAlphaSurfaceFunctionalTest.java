@@ -79,8 +79,10 @@ class HostedAlphaSurfaceFunctionalTest {
 
     @ParameterizedTest
     @ValueSource(strings = {
-            "/about.html", "/index.html", "/api.js", "/app.js", "/dom.js", "/format.js",
-            "/favicon.svg", "/styles.css", "/sun-marker-aperture-flare.svg", "/terms.js", "/types.js",
+            "/about.html", "/index.html", "/angularPreferenceControls.js", "/api.js", "/app.js",
+            "/dom.js", "/format.js", "/favicon.svg", "/moonAppearanceControls.js",
+            "/moonPreferenceControls.css", "/styles.css", "/sun-marker-aperture-flare.svg",
+            "/terms.js", "/types.js",
             "/moonPathLightBands.js", "/moonPathSilhouetteSymbols.js", "/moonPathSilhouettes.js",
             "/moonPathView.js", "/moonPhaseView.js", "/moonTexture.js", "/opportunityCard.js",
             "/opportunityPreferences.css", "/opportunityPreferences.js",

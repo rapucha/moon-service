@@ -1,0 +1,466 @@
+@media (min-width: 921px) {
+  .content-grid {
+    grid-template-columns: 370px minmax(0, 1fr);
+    width: min(1264px, calc(100% - 40px));
+  }
+}
+
+.preference-heading {
+  display: flex;
+  align-items: start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.preference-heading .eyebrow {
+  margin-bottom: 3px;
+}
+
+.preference-reset {
+  flex: 0 0 auto;
+}
+
+.preference-altitude-group,
+.preference-direction-group,
+.preference-phase-group,
+.preference-limb-group {
+  padding-top: 16px;
+  border: 0;
+  border-top: 1px solid var(--line);
+}
+
+.preference-altitude-group {
+  padding-top: 0;
+  border-top: 0;
+}
+
+.preference-phase-group legend,
+.preference-limb-group legend {
+  padding: 0;
+  color: var(--muted);
+  font-size: 0.76rem;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.preference-help-unindented {
+  margin-left: 0;
+}
+
+.preference-control-heading {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 5px;
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 730;
+}
+
+.preference-control-heading output {
+  color: var(--accent-strong);
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+.preference-altitude-track {
+  position: relative;
+  width: 102px;
+  height: 190px;
+  margin: 10px auto 4px;
+  touch-action: none;
+}
+
+.preference-altitude-base,
+.preference-altitude-fill {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 38px;
+  width: 8px;
+  border-radius: 999px;
+}
+
+.preference-altitude-base {
+  background: var(--line-strong);
+}
+
+.preference-altitude-fill {
+  top: auto;
+  height: 0;
+  background: var(--accent);
+  box-shadow: 0 0 12px rgba(33, 111, 104, 0.2);
+}
+
+.preference-altitude-ticks {
+  position: absolute;
+  inset: 0 0 0 69px;
+  color: var(--muted);
+  font-size: 0.7rem;
+}
+
+.preference-altitude-ticks span {
+  position: absolute;
+  left: 0;
+  transform: translateY(50%);
+}
+
+.preference-altitude-ticks .is-90 {
+  bottom: 100%;
+  transform: translateY(50%);
+}
+
+.preference-altitude-ticks .is-60 {
+  bottom: 66.666%;
+}
+
+.preference-altitude-ticks .is-30 {
+  bottom: 33.333%;
+}
+
+.preference-altitude-ticks .is-0 {
+  bottom: 0;
+}
+
+.preference-track-handle {
+  position: absolute;
+  z-index: 3;
+  min-height: 0;
+  padding: 0;
+  border: 2px solid var(--surface);
+  border-radius: 5px;
+  background: var(--accent);
+  box-shadow: 0 2px 7px rgba(20, 31, 34, 0.34);
+  touch-action: none;
+}
+
+.preference-track-handle:focus-visible,
+#preference-limb-handle:focus-visible {
+  outline: 3px solid rgba(33, 111, 104, 0.3);
+  outline-offset: 3px;
+}
+
+.preference-track-handle > span {
+  position: absolute;
+  color: var(--ink);
+  font-size: 0.7rem;
+  font-weight: 760;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.preference-altitude-handle {
+  left: 42px;
+  width: 30px;
+  height: 18px;
+  cursor: ns-resize;
+  transform: translate(-50%, 50%);
+}
+
+.preference-altitude-handle > span {
+  top: 50%;
+  left: 36px;
+  transform: translateY(-50%);
+}
+
+.preference-compass-track {
+  position: relative;
+  height: 80px;
+  margin: 4px 13px 8px;
+  touch-action: none;
+}
+
+.preference-compass-base,
+.preference-included-fill,
+.preference-blocked-fill {
+  position: absolute;
+  top: 39px;
+  height: 8px;
+  border-radius: 999px;
+}
+
+.preference-compass-base {
+  right: 0;
+  left: 0;
+  background: var(--line-strong);
+}
+
+.preference-included-fill {
+  background: var(--accent);
+  box-shadow: 0 0 12px rgba(33, 111, 104, 0.18);
+}
+
+.preference-blocked-fill {
+  z-index: 2;
+  top: 41px;
+  height: 4px;
+  background: #a76870;
+  box-shadow: 0 0 10px rgba(167, 104, 112, 0.22);
+}
+
+.preference-compass-ticks {
+  position: absolute;
+  inset: 3px 0 auto;
+  height: 18px;
+  color: var(--muted);
+  font-size: 0.68rem;
+}
+
+.preference-compass-ticks span {
+  position: absolute;
+  transform: translateX(-50%);
+}
+
+.preference-compass-ticks .is-north-start {
+  left: 0;
+}
+
+.preference-compass-ticks .is-east {
+  left: 25%;
+}
+
+.preference-compass-ticks .is-south {
+  left: 50%;
+}
+
+.preference-compass-ticks .is-west {
+  left: 75%;
+}
+
+.preference-compass-ticks .is-north-end {
+  left: 100%;
+}
+
+.preference-included-handle {
+  top: 29px;
+  width: 18px;
+  height: 28px;
+  cursor: ew-resize;
+  transform: translateX(-50%);
+}
+
+.preference-included-handle > span {
+  top: 32px;
+  left: 50%;
+  transform: translateX(-50%);
+}
+
+.preference-blocked-handle {
+  top: 33px;
+  width: 14px;
+  height: 20px;
+  border-color: #74464d;
+  background: #c68f96;
+  cursor: ew-resize;
+  transform: translateX(-50%);
+}
+
+.preference-blocked-handle > span {
+  top: 23px;
+  left: 50%;
+  color: #74464d;
+  transform: translateX(-50%);
+}
+
+.preference-degree-fields {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.preference-degree-fields label {
+  display: grid;
+  gap: 5px;
+  color: var(--muted);
+  font-size: 0.76rem;
+  font-weight: 760;
+}
+
+.preference-degree-fields label > span {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 4px;
+}
+
+.preference-blocked-heading {
+  margin-top: 16px;
+}
+
+.preference-phase-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.preference-phase-grid label {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  min-width: 0;
+  min-height: 38px;
+  padding: 7px 8px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--surface-subtle);
+  font-size: 0.78rem;
+  cursor: pointer;
+}
+
+.preference-phase-grid label:has(input:checked) {
+  border-color: rgba(33, 111, 104, 0.62);
+  background: #e4f0ed;
+}
+
+.preference-phase-grid input {
+  flex: 0 0 auto;
+  width: 17px;
+  height: 17px;
+  margin: 0;
+  accent-color: var(--accent);
+}
+
+.preference-limb-editor {
+  text-align: center;
+}
+
+.preference-limb-dial {
+  --preference-limb-angle: 35deg;
+  position: relative;
+  width: 238px;
+  height: 238px;
+  margin: 10px auto 8px;
+  border: 1px solid #59636e;
+  border-radius: 50%;
+  background: radial-gradient(circle, #171c24 0 52%, #10141a 53% 67%, #303946 68% 69%, #11151b 70%);
+  touch-action: none;
+}
+
+.preference-dial-direction {
+  position: absolute;
+  z-index: 2;
+  color: #b2bac4;
+  font-size: 0.68rem;
+}
+
+.preference-dial-direction.is-top {
+  top: 7px;
+  left: 50%;
+  transform: translateX(-50%);
+}
+
+.preference-dial-direction.is-right {
+  top: 50%;
+  right: 7px;
+  transform: translateY(-50%);
+}
+
+.preference-dial-direction.is-bottom {
+  bottom: 7px;
+  left: 50%;
+  transform: translateX(-50%);
+}
+
+.preference-dial-direction.is-left {
+  top: 50%;
+  left: 8px;
+  transform: translateY(-50%);
+}
+
+.preference-tolerance-ring {
+  position: absolute;
+  inset: 26px;
+  border-radius: 50%;
+  background: conic-gradient(
+    from calc(var(--preference-limb-angle) - 10deg),
+    #d9ad55 0deg 20deg,
+    transparent 20deg 360deg
+  );
+  -webkit-mask: radial-gradient(circle, transparent 67%, #000 68% 77%, transparent 78%);
+  mask: radial-gradient(circle, transparent 67%, #000 68% 77%, transparent 78%);
+}
+
+#preference-limb-moon {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 132px;
+  height: 132px;
+  border-radius: 50%;
+  filter: drop-shadow(0 0 12px rgba(244, 226, 182, 0.17));
+  transform: translate(-50%, -50%);
+}
+
+#preference-limb-handle {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 24px;
+  min-height: 24px;
+  padding: 0;
+  border: 3px solid #11161d;
+  border-radius: 50%;
+  background: #e0b45a;
+  box-shadow: 0 0 0 4px rgba(224, 180, 90, 0.18), 0 2px 8px rgba(0, 0, 0, 0.7);
+  cursor: grab;
+  transform: translate(-50%, -50%) rotate(var(--preference-limb-angle))
+    translateY(-90px) rotate(calc(-1 * var(--preference-limb-angle)));
+}
+
+#preference-limb-output {
+  display: block;
+  color: var(--accent-strong);
+  font-size: 0.84rem;
+  font-weight: 780;
+}
+
+.preference-limb-editor .preference-help {
+  margin-top: 5px;
+  text-align: center;
+}
+
+.preference-context-note {
+  padding: 10px;
+  border-radius: 6px;
+  background: var(--surface-muted);
+  color: var(--muted);
+  font-size: 0.78rem;
+}
+
+.preference-context-note p {
+  margin: 0;
+}
+
+.preference-context-note p + p {
+  margin-top: 5px;
+}
+
+.azimuth-preference-excluded {
+  fill: rgba(25, 31, 34, 0.62);
+  pointer-events: none;
+}
+
+.visually-hidden {
+  position: absolute !important;
+  width: 1px !important;
+  height: 1px !important;
+  padding: 0 !important;
+  margin: -1px !important;
+  overflow: hidden !important;
+  clip: rect(0 0 0 0) !important;
+  clip-path: inset(50%) !important;
+  border: 0 !important;
+  white-space: nowrap !important;
+}
+
+@media (max-width: 380px) {
+  .preference-phase-grid,
+  .preference-degree-fields {
+    grid-template-columns: 1fr;
+  }
+
+  .preference-limb-dial {
+    width: 226px;
+    height: 226px;
+  }
+}
