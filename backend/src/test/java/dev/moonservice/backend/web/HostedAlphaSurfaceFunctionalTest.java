@@ -79,7 +79,8 @@ class HostedAlphaSurfaceFunctionalTest {
 
     @ParameterizedTest
     @ValueSource(strings = {
-            "/about.html", "/index.html", "/angularPreferenceControls.js", "/api.js", "/app.js",
+            "/about.html", "/index.html", "/angularPreferenceControls.js",
+            "/angularPreferencePreview.css", "/angularPreferencePreview.js", "/api.js", "/app.js",
             "/dom.js", "/format.js", "/favicon.svg", "/moonAppearanceControls.js",
             "/moonPreferenceControls.css", "/styles.css", "/sun-marker-aperture-flare.svg",
             "/terms.js", "/types.js",

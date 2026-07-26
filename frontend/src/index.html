@@ -8,6 +8,7 @@
   <link rel="stylesheet" href="/styles.css">
   <link rel="stylesheet" href="/opportunityPreferences.css">
   <link rel="stylesheet" href="/moonPreferenceControls.css">
+  <link rel="stylesheet" href="/angularPreferencePreview.css">
 </head>
 <body>
   <header class="topbar">
@@ -84,53 +85,106 @@
             <p class="preference-intro">Exclude results you cannot photograph. Hard limits do not adjust scores.</p>
 
             <form id="preference-form" novalidate>
-              <section class="preference-group preference-altitude-group">
-                <label class="preference-choice" for="preference-altitude-enabled">
-                  <input
-                    id="preference-altitude-enabled"
-                    type="checkbox"
-                    aria-controls="preference-altitude-fields"
-                    aria-expanded="false">
-                  <span>Limit Moon altitude</span>
-                </label>
-                <p id="preference-altitude-help" class="preference-help">
-                  Drag the minimum and maximum. The range is inclusive.
-                </p>
-                <div id="preference-altitude-fields" hidden>
-                  <div class="preference-control-heading">
-                    <span>Altitude range</span>
-                    <output id="preference-altitude-output">2°–15°</output>
+              <section class="preference-group preference-angular-group">
+                <div class="preference-angular-toggles">
+                  <div>
+                    <label class="preference-choice" for="preference-altitude-enabled">
+                      <input
+                        id="preference-altitude-enabled"
+                        type="checkbox">
+                      <span>Limit Moon altitude</span>
+                    </label>
+                    <p id="preference-altitude-help" class="preference-help">
+                      Drag the inclusive minimum and maximum.
+                    </p>
                   </div>
-                  <div id="preference-altitude-track" class="preference-altitude-track">
-                    <div class="preference-altitude-ticks" aria-hidden="true">
-                      <span class="is-90">90°</span>
-                      <span class="is-60">60°</span>
-                      <span class="is-30">30°</span>
-                      <span class="is-0">0°</span>
+                  <div>
+                    <label class="preference-choice" for="preference-direction-enabled">
+                      <input
+                        id="preference-direction-enabled"
+                        type="checkbox">
+                      <span>Limit Moon direction</span>
+                    </label>
+                    <p id="preference-direction-help" class="preference-help">
+                      Choose a compass sector and the blocked part inside it.
+                    </p>
+                  </div>
+                </div>
+                <div id="preference-angular-fields" class="preference-angular-fields" hidden>
+                  <p class="preference-preview-caption">
+                    Illustrative selector — not a Moon pass for the searched location.
+                  </p>
+                  <div class="preference-angular-readouts">
+                    <span class="preference-altitude-readout">
+                      Altitude <output id="preference-altitude-output">2°–15°</output>
+                    </span>
+                    <span class="preference-direction-readout">
+                      Included <output id="preference-included-output">330° through 30°</output>
+                    </span>
+                    <span class="preference-direction-readout preference-blocked-readout">
+                      Blocked <output id="preference-excluded-output">350° through 10°</output>
+                    </span>
+                  </div>
+                  <div class="preference-angular-preview">
+                    <svg
+                      id="preference-angular-artwork"
+                      viewBox="0 0 360 260"
+                      preserveAspectRatio="xMidYMid meet"
+                      aria-hidden="true"
+                      focusable="false"></svg>
+                    <div id="preference-altitude-track" class="preference-altitude-track">
+                      <div class="preference-altitude-base"></div>
+                      <div class="preference-altitude-fill"></div>
+                      <button
+                        type="button"
+                        class="preference-track-handle preference-altitude-handle"
+                        role="slider"
+                        aria-label="Minimum Moon altitude"
+                        aria-describedby="preference-altitude-help preference-preview-instructions"
+                        aria-valuemin="0"
+                        aria-valuemax="15"
+                        aria-valuenow="2"
+                        data-altitude-minimum><span aria-hidden="true">2°</span></button>
+                      <button
+                        type="button"
+                        class="preference-track-handle preference-altitude-handle"
+                        role="slider"
+                        aria-label="Maximum Moon altitude"
+                        aria-describedby="preference-altitude-help preference-preview-instructions"
+                        aria-valuemin="2"
+                        aria-valuemax="90"
+                        aria-valuenow="15"
+                        data-altitude-maximum><span aria-hidden="true">15°</span></button>
                     </div>
-                    <div class="preference-altitude-base"></div>
-                    <div class="preference-altitude-fill"></div>
-                    <button
-                      type="button"
-                      class="preference-track-handle preference-altitude-handle"
-                      role="slider"
-                      aria-label="Minimum Moon altitude"
-                      aria-describedby="preference-altitude-help"
-                      aria-valuemin="0"
-                      aria-valuemax="15"
-                      aria-valuenow="2"
-                      data-altitude-minimum><span aria-hidden="true">2°</span></button>
-                    <button
-                      type="button"
-                      class="preference-track-handle preference-altitude-handle"
-                      role="slider"
-                      aria-label="Maximum Moon altitude"
-                      aria-describedby="preference-altitude-help"
-                      aria-valuemin="2"
-                      aria-valuemax="90"
-                      aria-valuenow="15"
-                      data-altitude-maximum><span aria-hidden="true">15°</span></button>
+                    <div id="preference-compass-track" class="preference-compass-track">
+                      <div class="preference-compass-base"></div>
+                      <div class="preference-included-fill" data-azimuth-fill="included-left"></div>
+                      <div class="preference-included-fill" data-azimuth-fill="included-right"></div>
+                      <div class="preference-blocked-fill" data-azimuth-fill="excluded-left"></div>
+                      <div class="preference-blocked-fill" data-azimuth-fill="excluded-right"></div>
+                      <button type="button" class="preference-track-handle preference-included-handle"
+                        role="slider" aria-label="Included compass sector start"
+                        aria-describedby="preference-direction-help preference-preview-instructions"
+                        data-bearing-handle="included-start"><span aria-hidden="true">330°</span></button>
+                      <button type="button" class="preference-track-handle preference-included-handle"
+                        role="slider" aria-label="Included compass sector end"
+                        aria-describedby="preference-direction-help preference-preview-instructions"
+                        data-bearing-handle="included-end"><span aria-hidden="true">30°</span></button>
+                      <button type="button" class="preference-track-handle preference-blocked-handle"
+                        role="slider" aria-label="Blocked view start"
+                        aria-describedby="preference-direction-help preference-preview-instructions"
+                        data-bearing-handle="excluded-start"><span aria-hidden="true">350°</span></button>
+                      <button type="button" class="preference-track-handle preference-blocked-handle"
+                        role="slider" aria-label="Blocked view end"
+                        aria-describedby="preference-direction-help preference-preview-instructions"
+                        data-bearing-handle="excluded-end"><span aria-hidden="true">10°</span></button>
+                    </div>
                   </div>
+                  <p id="preference-preview-instructions" class="preference-help preference-help-unindented">
+                    Altitude runs from 0° at the bottom to 90° at the top.
+                    Bearing increases from north through east, south, west, and north again.
+                    Use arrow keys for 1° steps or Shift plus an arrow for 10°.
+                  </p>
                 </div>
               </section>
 
@@ -167,81 +221,6 @@
                   <label class="preference-choice"><input type="checkbox" value="night"> <span>Night</span></label>
                 </div>
               </fieldset>
-
-              <section class="preference-group preference-direction-group">
-                <label class="preference-choice" for="preference-direction-enabled">
-                  <input
-                    id="preference-direction-enabled"
-                    type="checkbox"
-                    aria-controls="preference-direction-fields"
-                    aria-expanded="false">
-                  <span>Limit Moon direction</span>
-                </label>
-                <p id="preference-direction-help" class="preference-help">
-                  Choose one useful compass sector and the blocked part inside it.
-                  0° is north, 90° east, 180° south, and 270° west.
-                </p>
-                <div id="preference-direction-fields" hidden>
-                  <div class="preference-control-heading">
-                    <span>Included compass sector</span>
-                    <output id="preference-included-output">330° through 30°</output>
-                  </div>
-                  <div id="preference-compass-track" class="preference-compass-track">
-                    <div class="preference-compass-ticks" aria-hidden="true">
-                      <span class="is-north-start">N</span>
-                      <span class="is-east">E</span>
-                      <span class="is-south">S</span>
-                      <span class="is-west">W</span>
-                      <span class="is-north-end">N</span>
-                    </div>
-                    <div class="preference-compass-base"></div>
-                    <div class="preference-included-fill" data-azimuth-fill="included-left"></div>
-                    <div class="preference-included-fill" data-azimuth-fill="included-right"></div>
-                    <div class="preference-blocked-fill" data-azimuth-fill="excluded-left"></div>
-                    <div class="preference-blocked-fill" data-azimuth-fill="excluded-right"></div>
-                    <button type="button" class="preference-track-handle preference-included-handle"
-                      role="slider" aria-label="Included compass sector start"
-                      aria-describedby="preference-direction-help"
-                      data-bearing-handle="included-start"><span aria-hidden="true">330°</span></button>
-                    <button type="button" class="preference-track-handle preference-included-handle"
-                      role="slider" aria-label="Included compass sector end"
-                      aria-describedby="preference-direction-help"
-                      data-bearing-handle="included-end"><span aria-hidden="true">30°</span></button>
-                    <button type="button" class="preference-track-handle preference-blocked-handle"
-                      role="slider" aria-label="Blocked view start"
-                      aria-describedby="preference-direction-help"
-                      data-bearing-handle="excluded-start"><span aria-hidden="true">350°</span></button>
-                    <button type="button" class="preference-track-handle preference-blocked-handle"
-                      role="slider" aria-label="Blocked view end"
-                      aria-describedby="preference-direction-help"
-                      data-bearing-handle="excluded-end"><span aria-hidden="true">10°</span></button>
-                  </div>
-                  <div class="preference-degree-fields">
-                    <label>From <span><input id="preference-included-start" type="number"
-                      min="0" max="359.999999" step="any" value="330"
-                      aria-label="Included compass sector start in degrees"
-                      aria-describedby="preference-direction-help">°</span></label>
-                    <label>Through <span><input id="preference-included-end" type="number"
-                      min="0" max="359.999999" step="any" value="30"
-                      aria-label="Included compass sector end in degrees"
-                      aria-describedby="preference-direction-help">°</span></label>
-                  </div>
-                  <div class="preference-control-heading preference-blocked-heading">
-                    <span>Blocked view</span>
-                    <output id="preference-excluded-output">350° through 10°</output>
-                  </div>
-                  <div class="preference-degree-fields">
-                    <label>From <span><input id="preference-excluded-start" type="number"
-                      min="0" max="359.999999" step="any" value="350"
-                      aria-label="Blocked view start in degrees"
-                      aria-describedby="preference-direction-help">°</span></label>
-                    <label>Through <span><input id="preference-excluded-end" type="number"
-                      min="0" max="359.999999" step="any" value="10"
-                      aria-label="Blocked view end in degrees"
-                      aria-describedby="preference-direction-help">°</span></label>
-                  </div>
-                </div>
-              </section>
 
               <fieldset class="preference-group preference-phase-group">
                 <legend>Named Moon phase</legend>

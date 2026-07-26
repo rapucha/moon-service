@@ -101,11 +101,15 @@ The frontend module split is intended to keep future UI changes manageable:
 - `recentSearches.js`: localStorage behavior;
 - `opportunityPreferences.js`: preference state, storage, request options,
   notices, and coordination of the focused preference controls;
-- `angularPreferenceControls.js`: vertical-altitude and shared-axis azimuth
-  controls, validation, and keyboard interaction;
+- `angularPreferenceControls.js`: altitude and azimuth preference
+  coordination, normalization, and result-chart azimuth helpers;
+- `angularPreferencePreview.js`: schematic altitude and bearing sliders,
+  validation, fixed local Moon samples, and live dimming;
+- `angularPreferencePreview.css`: schematic axes, handle lanes, generic
+  foreground, dimming, and responsive presentation;
 - `moonAppearanceControls.js`: named-phase selection and the textured
   bright-limb dial;
-- `moonPreferenceControls.css`: vertical slider, shared compass axis, phase,
+- `moonPreferenceControls.css`: shared preference-control base, named-phase,
   and Moon-dial presentation;
 - `responseView.js`: response states and result rendering;
 - `opportunityCard.js`: opportunity card layout;
@@ -124,18 +128,20 @@ summary or removable filter chips.
 The editor exposes these hard filters:
 
 - Moon altitude is one optional inclusive range edited with a vertical
-  dual-handle slider over `[0°, 90°]`. The bottom is `0°`, the top is `90°`,
-  and a visible readout shows both selected endpoints.
+  dual-handle slider over `[0°, 90°]` on the schematic Moon-pass selector.
+  The bottom is `0°`, the top is `90°`, and a visible readout shows both
+  selected endpoints.
 - Availability uses exactly one mode at a time. Local-clock mode accepts one or
   more windows in the searched location's timezone and explains that a window
   may cross midnight. Ambient-light mode accepts one or more of `Daylight`,
   `Golden hour`, `Civil twilight`, `Nautical twilight`, and `Night`. Switching
   modes removes the other mode from active state.
-- Moon direction is optional as a whole. When enabled, one shared compass axis
-  contains distinct fills and handle pairs for an included sector and a blocked
-  sector contained inside it. Both sectors are always active and the request
-  contains both `azimuthDegrees.included` and `azimuthDegrees.excluded`.
-  Disabling direction filtering omits `azimuthDegrees`.
+- Moon direction is optional as a whole. When enabled, the schematic's shared
+  compass axis contains distinct fills and handle pairs for an included sector
+  and a blocked sector contained inside it. It has no visible numeric bearing
+  inputs. Both sectors are always active and the request contains both
+  `azimuthDegrees.included` and `azimuthDegrees.excluded`. Disabling direction
+  filtering omits `azimuthDegrees`.
 - Named phase uses eight checkboxes for `new_moon`, `waxing_crescent`,
   `first_quarter`, `waxing_gibbous`, `full_moon`, `waning_gibbous`,
   `last_quarter`, and `waning_crescent`. Any selected phase may match. An empty
@@ -148,10 +154,28 @@ The editor exposes these hard filters:
 Local-clock preference inputs use 24-hour `HH:mm` text fields. They do not use
 browser-localized native time controls.
 
-The shared compass axis uses absolute bearings: `0°` is north, `90°` east,
-`180°` south, and `270°` west. Both sectors may cross north. The blocked sector
-must remain inside the included sector. The browser does not replace the
-backend's lunar-disk matching geometry with a Moon-center calculation.
+Altitude and direction use one responsive schematic selector. Its vertical
+altitude axis and horizontal absolute-bearing axis contain the real slider
+handles; there are no duplicate standalone tracks. The bearing axis runs from
+north at `0°` through east, south, and west to a repeated north label at
+`360°`. Its arrows mean increasing bearing, not Moon travel direction. Handle
+values remain in `[0°, 360°)`.
+
+The schematic uses a fixed illustrative arc, small textured Moon images, and
+the existing generic moving hills, trees, and buildings. It shows no time or
+ambient-light buckets and does not claim to describe the searched location's
+Moon path, skyline, terrain, or obstructions. Altitude and bearing changes dim
+fixed center samples immediately. This local preview does not model lunar-disk
+intersection and is not authoritative `azimuthMatchIntervals`.
+
+Both compass sectors may cross north. A temporary drag may put the blocked
+sector outside the included sector, but Apply then sends no request and focuses
+the responsible blocked-sector handle. The browser does not silently clamp a
+handle, move another handle, or replace the backend's lunar-disk matching
+geometry with a Moon-center calculation. Coincident handles retain separate
+pointer and touch hit regions. Decorative Moon and landscape SVG content stays
+outside hit testing and the accessibility tree. Reduced motion stops the
+generic foreground drift without removing the schematic.
 
 The bright-limb dial explains the observer-oriented convention: `0°` points
 toward local zenith, `90°` points right toward increasing azimuth, and angles
@@ -209,11 +233,11 @@ or unavailable, it keeps the state in page memory and lets search continue.
 
 `opportunityPreferences.js` owns this state, its normalization and storage, the
 editor coordination, preference request options, and result notices.
-`angularPreferenceControls.js` and `moonAppearanceControls.js` own their
-focused editor interactions. `app.js` coordinates the lookup flow with the
-preference module. `api.js` remains responsible for the existing default
-request, and `responseView.js` remains responsible for ordinary opportunity
-statuses.
+`angularPreferenceControls.js` coordinates `angularPreferencePreview.js`;
+the preview module and `moonAppearanceControls.js` own their focused editor
+interactions. `app.js` coordinates the lookup flow with the preference module.
+`api.js` remains responsible for the existing default request, and
+`responseView.js` remains responsible for ordinary opportunity statuses.
 
 Every preference input has a visible label. Related choices use `fieldset` and
 `legend`, and reset uses a real button. Every handle supports an equivalent

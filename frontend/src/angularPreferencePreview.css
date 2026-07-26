@@ -1,0 +1,271 @@
+.preference-angular-group {
+  padding-top: 0;
+  border: 0;
+}
+
+.preference-angular-toggles {
+  display: grid;
+  gap: 12px;
+}
+
+.preference-angular-fields {
+  min-width: 0;
+  margin-top: 12px;
+  padding: 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface-subtle);
+}
+
+.preference-preview-caption {
+  margin: 0 0 8px;
+  color: var(--muted);
+  font-size: 0.72rem;
+  line-height: 1.35;
+  text-align: center;
+}
+
+.preference-angular-readouts {
+  display: grid;
+  grid-template-columns: minmax(0, 0.8fr) minmax(0, 1.25fr);
+  gap: 5px 12px;
+  margin-bottom: 7px;
+  color: var(--muted);
+  font-size: 0.72rem;
+  font-weight: 730;
+}
+
+.preference-angular-readouts span {
+  display: flex;
+  justify-content: space-between;
+  gap: 6px;
+  min-width: 0;
+}
+
+.preference-angular-readouts output {
+  color: var(--accent-strong);
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+.preference-altitude-readout {
+  grid-row: span 2;
+  align-self: center;
+}
+
+.preference-blocked-readout output {
+  color: #74464d;
+}
+
+.preference-angular-preview {
+  position: relative;
+  width: 100%;
+  min-width: 0;
+  aspect-ratio: 360 / 260;
+  overflow: hidden;
+  border: 1px solid rgba(83, 105, 102, 0.3);
+  border-radius: 7px;
+  background: linear-gradient(#e8f2f3 0%, #f5f0e3 72%, #e1e7df 100%);
+}
+
+#preference-angular-artwork {
+  display: block;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  user-select: none;
+}
+
+.preference-preview-grid line {
+  stroke: rgba(76, 96, 96, 0.2);
+  stroke-width: 1;
+  stroke-dasharray: 2 4;
+}
+
+.preference-preview-grid text {
+  fill: #5e6b6c;
+  font-size: 9px;
+  font-weight: 720;
+  paint-order: stroke;
+  stroke: rgba(245, 249, 247, 0.9);
+  stroke-width: 2.5px;
+}
+
+.preference-preview-grid .preference-preview-bearing-direction {
+  fill: #657273;
+  font-size: 8px;
+  font-weight: 650;
+}
+
+.preference-preview-segment {
+  stroke: #3d8179;
+  stroke-width: 2.5;
+  stroke-linecap: round;
+  transition: opacity 120ms ease;
+}
+
+.preference-preview-moon {
+  filter: drop-shadow(0 1px 2px rgba(18, 30, 33, 0.3));
+  transition: opacity 120ms ease, filter 120ms ease;
+}
+
+.preference-preview-segment.is-dimmed {
+  opacity: 0.25;
+}
+
+.preference-preview-moon.is-dimmed {
+  filter: grayscale(0.7);
+  opacity: 0.4;
+}
+
+.preference-angular-preview .moon-path-foreground {
+  opacity: calc(var(--moon-path-foreground-opacity, 0.16) * 1.7);
+}
+
+.preference-altitude-track {
+  position: absolute;
+  top: 6.92%;
+  bottom: 26.92%;
+  left: 11.11%;
+  width: 36px;
+  height: auto;
+  margin: 0;
+  transform: translateX(-50%);
+  touch-action: none;
+}
+
+.preference-altitude-base,
+.preference-altitude-fill {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 50%;
+  width: 6px;
+  border-radius: 999px;
+  transform: translateX(-50%);
+}
+
+.preference-altitude-base {
+  background: #81918e;
+}
+
+.preference-altitude-fill {
+  top: auto;
+  height: 0;
+  background: var(--accent);
+  box-shadow: 0 0 9px rgba(33, 111, 104, 0.28);
+}
+
+.preference-track-handle {
+  z-index: 5;
+  min-width: 0;
+  min-height: 0;
+  padding: 0;
+  border: 2px solid var(--surface);
+  border-radius: 6px;
+  background: var(--accent);
+  box-shadow: 0 2px 7px rgba(20, 31, 34, 0.34);
+  touch-action: none;
+}
+
+.preference-track-handle > span {
+  display: none;
+}
+
+.preference-altitude-handle {
+  left: 50%;
+  width: 32px;
+  height: 28px;
+  cursor: ns-resize;
+  transform: translate(calc(-50% + var(--preference-overlap-offset, 0px)), 50%);
+}
+
+.preference-compass-track {
+  position: absolute;
+  right: 24px;
+  bottom: 10px;
+  left: 11.11%;
+  height: 62px;
+  margin: 0;
+  touch-action: none;
+}
+
+.preference-compass-base,
+.preference-included-fill,
+.preference-blocked-fill {
+  position: absolute;
+  top: 13px;
+  height: 8px;
+  border-radius: 999px;
+}
+
+.preference-compass-base {
+  right: 0;
+  left: 0;
+  background: #81918e;
+}
+
+.preference-included-fill {
+  background: var(--accent);
+  box-shadow: 0 0 10px rgba(33, 111, 104, 0.2);
+}
+
+.preference-blocked-fill {
+  z-index: 2;
+  top: 15px;
+  height: 4px;
+  background: #a76870;
+  box-shadow: 0 0 8px rgba(167, 104, 112, 0.22);
+}
+
+.preference-included-handle {
+  top: -1px;
+  width: 24px;
+  height: 28px;
+  cursor: ew-resize;
+  transform: translateX(calc(-50% + var(--preference-overlap-offset, 0px)));
+}
+
+.preference-blocked-handle {
+  top: 33px;
+  width: 28px;
+  height: 26px;
+  border-color: #74464d;
+  background: #c68f96;
+  cursor: ew-resize;
+  transform: translateX(calc(-50% + var(--preference-overlap-offset, 0px)));
+}
+
+.preference-angular-fields.is-altitude-disabled .preference-altitude-fill,
+.preference-angular-fields.is-altitude-disabled .preference-altitude-handle,
+.preference-angular-fields.is-altitude-disabled .preference-altitude-readout,
+.preference-angular-fields.is-direction-disabled .preference-included-fill,
+.preference-angular-fields.is-direction-disabled .preference-blocked-fill,
+.preference-angular-fields.is-direction-disabled .preference-included-handle,
+.preference-angular-fields.is-direction-disabled .preference-blocked-handle,
+.preference-angular-fields.is-direction-disabled .preference-direction-readout {
+  display: none;
+}
+
+.preference-angular-fields .preference-help {
+  margin: 8px 0 0;
+  text-align: left;
+}
+
+@media (max-width: 380px) {
+  .preference-angular-fields {
+    padding: 7px;
+  }
+
+  .preference-angular-readouts {
+    grid-template-columns: 1fr;
+  }
+
+  .preference-altitude-readout {
+    grid-row: auto;
+  }
+
+  .preference-preview-caption {
+    font-size: 0.68rem;
+  }
+}

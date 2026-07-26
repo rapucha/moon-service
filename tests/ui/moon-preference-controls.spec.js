@@ -37,11 +37,18 @@ test("edits, persists, removes, and resets the accepted controls", async ({ page
   await expect(page.locator("#preference-count")).toHaveText("None active");
   await expect(page.getByLabel("Limit Moon altitude")).not.toBeChecked();
   await expect(page.getByLabel("Limit Moon direction")).not.toBeChecked();
+  await expect(page.getByLabel("Limit Moon altitude")).not.toHaveAttribute("aria-expanded");
+  await expect(page.getByLabel("Limit Moon direction")).not.toHaveAttribute("aria-expanded");
   await expect(page.getByLabel("Limit illuminated-edge direction")).not.toBeChecked();
   await expect(page.locator("[data-named-phase]:checked")).toHaveCount(0);
   await expect(page.locator("#active-preference-summary")).toHaveCount(0);
 
   await page.getByLabel("Limit Moon altitude").check();
+  await expect(page.locator("#preference-angular-fields")).toBeVisible();
+  await expect(page.locator("#preference-angular-fields input[type=number]")).toHaveCount(0);
+  await expect(page.getByRole("slider", {
+    name: "Included compass sector start"
+  })).not.toBeVisible();
   const altitudeMinimum = page.getByRole("slider", { name: "Minimum Moon altitude" });
   const altitudeMaximum = page.getByRole("slider", { name: "Maximum Moon altitude" });
   await expect(altitudeMinimum).toHaveAttribute("aria-orientation", "vertical");
@@ -76,12 +83,10 @@ test("edits, persists, removes, and resets the accepted controls", async ({ page
   await includedStartHandle.focus();
   await page.keyboard.press("ArrowLeft");
   await expect(includedStartHandle).toHaveAttribute("aria-valuenow", "329");
-  await expect(page.getByLabel("Included compass sector start in degrees")).toHaveValue("329");
   const blockedStartHandle = page.getByRole("slider", { name: "Blocked view start" });
   await blockedStartHandle.focus();
   await page.keyboard.press("ArrowLeft");
   await expect(blockedStartHandle).toHaveAttribute("aria-valuenow", "349");
-  await expect(page.getByLabel("Blocked view start in degrees")).toHaveValue("349");
 
   for (const phase of PHASES) {
     await page.getByLabel(phase[0], { exact: true }).check();
@@ -138,8 +143,8 @@ test("edits, persists, removes, and resets the accepted controls", async ({ page
   await waitForCallCount(calls, 2);
   await openPreferences(page);
   await expect(page.getByLabel("Limit Moon direction")).toBeChecked();
-  await expect(page.getByLabel("Included compass sector start in degrees")).toHaveValue("329");
-  await expect(page.getByLabel("Blocked view start in degrees")).toHaveValue("349");
+  await expect(includedStartHandle).toHaveAttribute("aria-valuenow", "329");
+  await expect(blockedStartHandle).toHaveAttribute("aria-valuenow", "349");
   await expect(page.locator("[data-named-phase]:checked")).toHaveCount(8);
   await expect(limbHandle).toHaveAttribute("aria-valuenow", "0");
 
@@ -162,7 +167,9 @@ test("edits, persists, removes, and resets the accepted controls", async ({ page
   await expect(focusTarget).toBeFocused();
 });
 
-test("rejects invalid manual compass sectors without sending a request", async ({ page }) => {
+test("rejects temporary invalid slider sectors without sending a request", async ({
+  page
+}, testInfo) => {
   const calls = await captureApiCalls(page);
   await page.goto("/search?q=Prague");
   await waitForCallCount(calls, 1);
@@ -171,42 +178,55 @@ test("rejects invalid manual compass sectors without sending a request", async (
   await page.getByLabel("Limit Moon direction").check();
   const status = page.locator("#preference-form-status");
   const apply = page.getByRole("button", { name: "Use these limits" });
-  const includedStart = page.locator("#preference-included-start");
-  const includedEnd = page.locator("#preference-included-end");
-  const blockedStart = page.locator("#preference-excluded-start");
+  const includedStart = page.getByRole("slider", { name: "Included compass sector start" });
+  const includedEnd = page.getByRole("slider", { name: "Included compass sector end" });
+  const blockedStart = page.getByRole("slider", { name: "Blocked view start" });
+  const blockedEnd = page.getByRole("slider", { name: "Blocked view end" });
 
-  await includedStart.fill("");
-  await apply.click();
-  await expect(status).toContainText("Use compass bearings");
-  await expect(includedStart).toBeFocused();
-  expect(calls).toHaveLength(0);
-
-  await includedStart.fill("10");
-  await includedEnd.fill("10");
+  await includedStart.focus();
+  await pressKeys(page, ["Home", "Shift+ArrowRight", "Shift+ArrowRight", "Shift+ArrowRight"]);
+  await expect(includedStart).toHaveAttribute("aria-valuenow", "30");
+  const startBox = await includedStart.boundingBox();
+  const endBox = await includedEnd.boundingBox();
+  expect(startBox).not.toBeNull();
+  expect(endBox).not.toBeNull();
+  expect(Math.abs(startBox.x - endBox.x)).toBeGreaterThan(5);
+  await verifyPointerTargets(page, [
+    [includedStart, "[data-bearing-handle='included-start']"],
+    [includedEnd, "[data-bearing-handle='included-end']"]
+  ], testInfo.project.name === "mobile");
   await apply.click();
   await expect(status).toHaveText("The included compass-sector endpoints must differ.");
   await expect(includedEnd).toBeFocused();
   expect(calls).toHaveLength(0);
 
-  await includedStart.fill("330");
-  await includedEnd.fill("30");
-  await blockedStart.fill("40");
+  await includedStart.focus();
+  await pressKeys(page, ["End", "Shift+ArrowLeft", "Shift+ArrowLeft",
+    "Shift+ArrowLeft", "ArrowRight"]);
+  await expect(includedStart).toHaveAttribute("aria-valuenow", "330");
+  await blockedStart.focus();
+  await pressKeys(page, ["Home", "Shift+ArrowRight"]);
+  await expect(blockedStart).toHaveAttribute("aria-valuenow", "10");
+  await apply.click();
+  await expect(status).toHaveText("The blocked-view endpoints must differ.");
+  await expect(blockedEnd).toBeFocused();
+  expect(calls).toHaveLength(0);
+
+  await blockedStart.focus();
+  await pressKeys(page, ["Home", "Shift+ArrowRight", "Shift+ArrowRight",
+    "Shift+ArrowRight", "Shift+ArrowRight"]);
+  await expect(blockedStart).toHaveAttribute("aria-valuenow", "40");
   await apply.click();
   await expect(status).toHaveText("Keep the blocked view inside the included compass sector.");
   await expect(blockedStart).toBeFocused();
   expect(calls).toHaveLength(0);
 
-  await blockedStart.fill("350");
-  await includedStart.fill("360");
-  await apply.click();
-  await expect(status).toContainText("Use compass bearings");
-  await expect(includedStart).toBeFocused();
-  expect(calls).toHaveLength(0);
-
   await page.getByRole("button", { name: "Reset all preferences" }).click();
   await waitForCallCount(calls, 1);
   await expect(status).toHaveText("");
-  await expect(includedStart).toHaveValue("330");
+  await openPreferences(page);
+  await page.getByLabel("Limit Moon direction").check();
+  await expect(includedStart).toHaveAttribute("aria-valuenow", "330");
 });
 
 test("keeps the lower altitude handle accessible at an upper overlap", async ({
@@ -231,27 +251,20 @@ test("keeps the lower altitude handle accessible at an upper overlap", async ({
   expect(trackBox).not.toBeNull();
   await expect(minimum).toHaveAttribute("aria-valuenow", "89");
   await expect(maximum).toHaveAttribute("aria-valuenow", "89");
+  const maximumBox = await maximum.boundingBox();
+  expect(maximumBox).not.toBeNull();
+  expect(Math.abs(minimumBox.x - maximumBox.x)).toBeGreaterThan(5);
 
-  const start = {
-    x: minimumBox.x + minimumBox.width / 2,
-    y: minimumBox.y + minimumBox.height / 2
-  };
-  const lowerHandleIsTarget = await page.evaluate(position => {
-    return Boolean(document.elementFromPoint(position.x, position.y)
-      ?.closest("[data-altitude-minimum]"));
-  }, start);
-  expect(lowerHandleIsTarget).toBe(true);
+  await verifyPointerTargets(page, [
+    [minimum, "[data-altitude-minimum]"],
+    [maximum, "[data-altitude-maximum]"]
+  ], testInfo.project.name === "mobile");
 
-  if (testInfo.project.name === "mobile") {
-    await minimum.evaluate(element => {
-      element.addEventListener("pointerdown", function () {
-        element.setAttribute("data-test-pointer-hit", "true");
-      }, { once: true });
-    });
-    await page.touchscreen.tap(start.x, start.y);
-    await expect(minimum).toHaveAttribute("data-test-pointer-hit", "true");
-    await expect(minimum).toHaveAttribute("aria-valuenow", "89");
-  } else {
+  if (testInfo.project.name !== "mobile") {
+    const start = {
+      x: minimumBox.x + minimumBox.width / 2,
+      y: minimumBox.y + minimumBox.height / 2
+    };
     const end = {
       x: trackBox.x + trackBox.width / 2,
       y: trackBox.y + trackBox.height / 9
@@ -264,6 +277,117 @@ test("keeps the lower altitude handle accessible at an upper overlap", async ({
   }
 
   await expect(maximum).toHaveAttribute("aria-valuenow", "89");
+});
+
+test("keeps coincident bearing drags anchored and endpoint handles unclipped", async ({
+  page
+}, testInfo) => {
+  const calls = await captureApiCalls(page);
+  await page.goto("/search?q=Prague");
+  await waitForCallCount(calls, 1);
+  await openPreferences(page);
+  await page.getByLabel("Limit Moon direction").check();
+
+  const start = page.getByRole("slider", { name: "Included compass sector start" });
+  const end = page.getByRole("slider", { name: "Included compass sector end" });
+  for (const handle of [start, end]) {
+    await handle.focus();
+    await pressKeys(page, [
+      "Home", "Shift+ArrowRight", "Shift+ArrowRight", "Shift+ArrowRight",
+      "Shift+ArrowRight", "Shift+ArrowRight", "Shift+ArrowRight"
+    ]);
+    await expect(handle).toHaveAttribute("aria-valuenow", "60");
+  }
+
+  const trackBox = await page.locator("#preference-compass-track").boundingBox();
+  expect(trackBox).not.toBeNull();
+  const dragPixels = 20;
+  const expectedStep = Math.round(dragPixels / trackBox.width * 359);
+  if (testInfo.project.name === "mobile") {
+    await dragTouchHandle(page, end, -dragPixels);
+    expect(Math.abs(Number(await end.getAttribute("aria-valuenow"))
+      - (60 - expectedStep))).toBeLessThanOrEqual(1);
+  } else {
+    await dragMouseHandle(page, start, dragPixels);
+    expect(Math.abs(Number(await start.getAttribute("aria-valuenow"))
+      - (60 + expectedStep))).toBeLessThanOrEqual(1);
+  }
+
+  const previewBox = await page.locator(".preference-angular-preview").boundingBox();
+  expect(previewBox).not.toBeNull();
+  for (const edgeKey of ["Home", "End"]) {
+    for (const handle of [start, end]) {
+      await handle.focus();
+      await page.keyboard.press(edgeKey);
+    }
+    for (const handle of [start, end]) {
+      const box = await handle.boundingBox();
+      expect(box).not.toBeNull();
+      expect(box.x).toBeGreaterThanOrEqual(previewBox.x);
+      expect(box.x + box.width).toBeLessThanOrEqual(previewBox.x + previewBox.width + 0.5);
+    }
+  }
+});
+
+test("uses the schematic sliders to explain and preview angular limits", async ({
+  page
+}, testInfo) => {
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  const calls = await captureApiCalls(page);
+  await page.goto("/search?q=Prague");
+  await waitForCallCount(calls, 1);
+  await openPreferences(page);
+  await page.getByLabel("Limit Moon altitude").check();
+  await page.getByLabel("Limit Moon direction").check();
+
+  const preview = page.locator(".preference-angular-preview");
+  await expect(preview).toBeVisible();
+  await expect(page.locator("#preference-angular-artwork")).toHaveAttribute("aria-hidden", "true");
+  await expect(page.locator(".preference-preview-moon")).toHaveCount(13);
+  expect(await page.locator("[data-moon-path-artwork='true']").count()).toBeGreaterThan(0);
+  await expect(preview).not.toContainText(/time|daylight|twilight|night/i);
+  await expect(page.locator(".moon-path-foreground").first()).toHaveCSS("animation-name", "none");
+  await expect(page.locator("#preference-angular-artwork")).toHaveCSS("pointer-events", "none");
+
+  const altitudeMinimum = page.getByRole("slider", { name: "Minimum Moon altitude" });
+  const altitudeMaximum = page.getByRole("slider", { name: "Maximum Moon altitude" });
+  await altitudeMinimum.focus();
+  await page.keyboard.press("Home");
+  await altitudeMaximum.focus();
+  await page.keyboard.press("End");
+
+  const northMoon = page.locator(
+    ".preference-preview-moon[data-preview-bearing='0'][data-preview-altitude='8']"
+  ).first();
+  const eastMoon = page.locator(
+    ".preference-preview-moon[data-preview-bearing='90'][data-preview-altitude='42']"
+  );
+  const northWestSegment = page.locator(
+    ".preference-preview-segment[data-preview-bearing='345']"
+  );
+  await expect(northMoon).toHaveAttribute("data-filtered", "true");
+  await expect(eastMoon).toHaveAttribute("data-filtered", "true");
+  await expect(northWestSegment).toHaveAttribute("data-filtered", "false");
+
+  const blockedStart = page.getByRole("slider", { name: "Blocked view start" });
+  await blockedStart.focus();
+  await page.keyboard.press("Shift+ArrowLeft");
+  await expect(blockedStart).toHaveAttribute("aria-valuenow", "340");
+  await expect(northWestSegment).toHaveAttribute("data-filtered", "true");
+
+  const previewBox = await preview.boundingBox();
+  const formBox = await page.locator("#preference-form").boundingBox();
+  expect(previewBox).not.toBeNull();
+  expect(formBox).not.toBeNull();
+  expect(previewBox.x).toBeGreaterThanOrEqual(formBox.x);
+  expect(previewBox.x + previewBox.width).toBeLessThanOrEqual(
+    formBox.x + formBox.width + 1
+  );
+  const viewport = page.viewportSize();
+  expect(previewBox.x + previewBox.width).toBeLessThanOrEqual(viewport.width);
+  if (testInfo.project.name === "mobile") {
+    expect(previewBox.width).toBeLessThanOrEqual(350);
+  }
 });
 
 const invalidStoredStates = [
@@ -325,6 +449,71 @@ test("dims only the complement of the authoritative full-pass azimuth mask", asy
   await expect(masks.nth(2)).toHaveAttribute("data-start-at", "2026-07-04T07:00:00.000Z");
   await expect(masks.nth(2)).toHaveAttribute("data-end-at", "2026-07-04T07:25:00.000Z");
 });
+
+async function pressKeys(page, keys) {
+  for (const key of keys) {
+    await page.keyboard.press(key);
+  }
+}
+
+async function verifyPointerTargets(page, entries, useTouch) {
+  for (const [locator, selector] of entries) {
+    const box = await locator.boundingBox();
+    expect(box).not.toBeNull();
+    const center = {
+      x: box.x + box.width / 2,
+      y: box.y + box.height / 2
+    };
+    expect(await page.evaluate(({ point, target }) => {
+      return Boolean(document.elementFromPoint(point.x, point.y)?.closest(target));
+    }, { point: center, target: selector })).toBe(true);
+    await locator.evaluate(element => {
+      element.addEventListener("pointerdown", function () {
+        element.setAttribute("data-test-pointer-hit", "true");
+      }, { once: true });
+    });
+    if (useTouch) {
+      await page.touchscreen.tap(center.x, center.y);
+    } else {
+      await page.mouse.click(center.x, center.y);
+    }
+    await expect(locator).toHaveAttribute("data-test-pointer-hit", "true");
+  }
+}
+
+async function dragMouseHandle(page, locator, deltaX) {
+  const box = await locator.boundingBox();
+  expect(box).not.toBeNull();
+  const x = box.x + box.width / 2;
+  const y = box.y + box.height / 2;
+  await page.mouse.move(x, y);
+  await page.mouse.down();
+  await page.mouse.move(x + deltaX, y);
+  await page.mouse.up();
+}
+
+async function dragTouchHandle(page, locator, deltaX) {
+  const box = await locator.boundingBox();
+  expect(box).not.toBeNull();
+  const x = box.x + box.width / 2;
+  const y = box.y + box.height / 2;
+  const session = await page.context().newCDPSession(page);
+  try {
+    await session.send("Input.dispatchTouchEvent", {
+      type: "touchStart",
+      touchPoints: [{ x: x, y: y, id: 1, radiusX: 1, radiusY: 1, force: 1 }]
+    });
+    await session.send("Input.dispatchTouchEvent", {
+      type: "touchMove",
+      touchPoints: [{
+        x: x + deltaX, y: y, id: 1, radiusX: 1, radiusY: 1, force: 1
+      }]
+    });
+    await session.send("Input.dispatchTouchEvent", { type: "touchEnd", touchPoints: [] });
+  } finally {
+    await session.detach();
+  }
+}
 
 async function captureApiCalls(page, responseForCall = successfulResponse) {
   const calls = [];
