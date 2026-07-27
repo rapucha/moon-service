@@ -17,46 +17,6 @@
   background: var(--surface-subtle);
 }
 
-.preference-preview-caption {
-  margin: 0 0 8px;
-  color: var(--muted);
-  font-size: 0.72rem;
-  line-height: 1.35;
-  text-align: center;
-}
-
-.preference-angular-readouts {
-  display: grid;
-  grid-template-columns: minmax(0, 0.8fr) minmax(0, 1.25fr);
-  gap: 5px 12px;
-  margin-bottom: 7px;
-  color: var(--muted);
-  font-size: 0.72rem;
-  font-weight: 730;
-}
-
-.preference-angular-readouts span {
-  display: flex;
-  justify-content: space-between;
-  gap: 6px;
-  min-width: 0;
-}
-
-.preference-angular-readouts output {
-  color: var(--accent-strong);
-  font-variant-numeric: tabular-nums;
-  text-align: right;
-}
-
-.preference-altitude-readout {
-  grid-row: span 2;
-  align-self: center;
-}
-
-.preference-blocked-readout output {
-  color: #74464d;
-}
-
 .preference-angular-preview {
   position: relative;
   width: 100%;
@@ -101,21 +61,15 @@
   stroke: #3d8179;
   stroke-width: 2.5;
   stroke-linecap: round;
-  transition: opacity 120ms ease;
 }
 
 .preference-preview-moon {
   filter: drop-shadow(0 1px 2px rgba(18, 30, 33, 0.3));
-  transition: opacity 120ms ease, filter 120ms ease;
 }
 
-.preference-preview-segment.is-dimmed {
-  opacity: 0.25;
-}
-
-.preference-preview-moon.is-dimmed {
-  filter: grayscale(0.7);
-  opacity: 0.4;
+.preference-preview-exclusion {
+  fill: rgba(70, 82, 82, 0.25);
+  pointer-events: none;
 }
 
 .preference-angular-preview .moon-path-foreground {
@@ -140,7 +94,7 @@
   top: 0;
   bottom: 0;
   left: 50%;
-  width: 6px;
+  width: 4px;
   border-radius: 999px;
   transform: translateX(-50%);
 }
@@ -161,11 +115,19 @@
   min-width: 0;
   min-height: 0;
   padding: 0;
-  border: 2px solid var(--surface);
-  border-radius: 6px;
-  background: var(--accent);
-  box-shadow: 0 2px 7px rgba(20, 31, 34, 0.34);
+  border: 0;
+  background: transparent;
+  box-shadow: none;
   touch-action: none;
+}
+
+.preference-track-handle::before {
+  position: absolute;
+  content: "";
+  border: 1px solid var(--surface);
+  border-radius: 5px;
+  background: var(--accent);
+  box-shadow: 0 2px 5px rgba(20, 31, 34, 0.32);
 }
 
 .preference-track-handle > span {
@@ -178,6 +140,10 @@
   height: 28px;
   cursor: ns-resize;
   transform: translate(calc(-50% + var(--preference-overlap-offset, 0px)), 50%);
+}
+
+.preference-altitude-handle::before {
+  inset: 10px 2px;
 }
 
 .preference-compass-track {
@@ -195,7 +161,7 @@
 .preference-blocked-fill {
   position: absolute;
   top: 13px;
-  height: 8px;
+  height: 4px;
   border-radius: 999px;
 }
 
@@ -212,8 +178,8 @@
 
 .preference-blocked-fill {
   z-index: 2;
-  top: 15px;
-  height: 4px;
+  top: 14px;
+  height: 2px;
   background: #a76870;
   box-shadow: 0 0 8px rgba(167, 104, 112, 0.22);
 }
@@ -226,24 +192,30 @@
   transform: translateX(calc(-50% + var(--preference-overlap-offset, 0px)));
 }
 
+.preference-included-handle::before {
+  inset: 2px 8px;
+}
+
 .preference-blocked-handle {
   top: 33px;
   width: 28px;
   height: 26px;
-  border-color: #74464d;
-  background: #c68f96;
   cursor: ew-resize;
   transform: translateX(calc(-50% + var(--preference-overlap-offset, 0px)));
 }
 
+.preference-blocked-handle::before {
+  inset: 2px 9px;
+  border-color: #74464d;
+  background: #c68f96;
+}
+
 .preference-angular-fields.is-altitude-disabled .preference-altitude-fill,
 .preference-angular-fields.is-altitude-disabled .preference-altitude-handle,
-.preference-angular-fields.is-altitude-disabled .preference-altitude-readout,
 .preference-angular-fields.is-direction-disabled .preference-included-fill,
 .preference-angular-fields.is-direction-disabled .preference-blocked-fill,
 .preference-angular-fields.is-direction-disabled .preference-included-handle,
-.preference-angular-fields.is-direction-disabled .preference-blocked-handle,
-.preference-angular-fields.is-direction-disabled .preference-direction-readout {
+.preference-angular-fields.is-direction-disabled .preference-blocked-handle {
   display: none;
 }
 
@@ -255,17 +227,5 @@
 @media (max-width: 380px) {
   .preference-angular-fields {
     padding: 7px;
-  }
-
-  .preference-angular-readouts {
-    grid-template-columns: 1fr;
-  }
-
-  .preference-altitude-readout {
-    grid-row: auto;
-  }
-
-  .preference-preview-caption {
-    font-size: 0.68rem;
   }
 }

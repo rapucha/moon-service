@@ -104,9 +104,9 @@ The frontend module split is intended to keep future UI changes manageable:
 - `angularPreferenceControls.js`: altitude and azimuth preference
   coordination, normalization, and result-chart azimuth helpers;
 - `angularPreferencePreview.js`: schematic altitude and bearing sliders,
-  validation, fixed local Moon samples, and live dimming;
+  validation, fixed local Moon samples, and live exclusion shading;
 - `angularPreferencePreview.css`: schematic axes, handle lanes, generic
-  foreground, dimming, and responsive presentation;
+  foreground, exclusion shading, and responsive presentation;
 - `moonAppearanceControls.js`: named-phase selection and the textured
   bright-limb dial;
 - `moonPreferenceControls.css`: shared preference-control base, named-phase,
@@ -129,8 +129,7 @@ The editor exposes these hard filters:
 
 - Moon altitude is one optional inclusive range edited with a vertical
   dual-handle slider over `[0°, 90°]` on the schematic Moon-pass selector.
-  The bottom is `0°`, the top is `90°`, and a visible readout shows both
-  selected endpoints.
+  The bottom is `0°` and the top is `90°`.
 - Availability uses exactly one mode at a time. Local-clock mode accepts one or
   more windows in the searched location's timezone and explains that a window
   may cross midnight. Ambient-light mode accepts one or more of `Daylight`,
@@ -165,7 +164,8 @@ The schematic uses a fixed illustrative arc, small textured Moon images, and
 the existing generic moving hills, trees, and buildings. It shows no time or
 ambient-light buckets and does not claim to describe the searched location's
 Moon path, skyline, terrain, or obstructions. Altitude and bearing changes dim
-fixed center samples immediately. This local preview does not model lunar-disk
+the excluded sky and landscape regions behind the fixed arc. The Moon images
+and arc remain fully visible. This local preview does not model lunar-disk
 intersection and is not authoritative `azimuthMatchIntervals`.
 
 Both compass sectors may cross north. A temporary drag may put the blocked

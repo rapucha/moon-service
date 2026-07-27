@@ -46,6 +46,7 @@ test("edits, persists, removes, and resets the accepted controls", async ({ page
   await page.getByLabel("Limit Moon altitude").check();
   await expect(page.locator("#preference-angular-fields")).toBeVisible();
   await expect(page.locator("#preference-angular-fields input[type=number]")).toHaveCount(0);
+  await expect(page.locator(".preference-angular-readouts")).toHaveCount(0);
   await expect(page.getByRole("slider", {
     name: "Included compass sector start"
   })).not.toBeVisible();
@@ -75,8 +76,6 @@ test("edits, persists, removes, and resets the accepted controls", async ({ page
   ]) {
     await expect(page.getByRole("slider", { name })).toHaveAttribute("aria-orientation", "horizontal");
   }
-  await expect(page.locator("#preference-included-output")).toHaveText("330° through 30°");
-  await expect(page.locator("#preference-excluded-output")).toHaveText("350° through 10°");
   const includedStartHandle = page.getByRole("slider", {
     name: "Included compass sector start"
   });
@@ -342,12 +341,15 @@ test("uses the schematic sliders to explain and preview angular limits", async (
 
   const preview = page.locator(".preference-angular-preview");
   await expect(preview).toBeVisible();
+  await expect(page.locator(".preference-preview-caption")).toHaveCount(0);
   await expect(page.locator("#preference-angular-artwork")).toHaveAttribute("aria-hidden", "true");
   await expect(page.locator(".preference-preview-moon")).toHaveCount(13);
   expect(await page.locator("[data-moon-path-artwork='true']").count()).toBeGreaterThan(0);
   await expect(preview).not.toContainText(/time|daylight|twilight|night/i);
   await expect(page.locator(".moon-path-foreground").first()).toHaveCSS("animation-name", "none");
   await expect(page.locator("#preference-angular-artwork")).toHaveCSS("pointer-events", "none");
+  await expect(page.locator(".preference-altitude-base")).toHaveCSS("width", "4px");
+  await expect(page.locator(".preference-compass-base")).toHaveCSS("height", "4px");
 
   const altitudeMinimum = page.getByRole("slider", { name: "Minimum Moon altitude" });
   const altitudeMaximum = page.getByRole("slider", { name: "Maximum Moon altitude" });
@@ -356,24 +358,23 @@ test("uses the schematic sliders to explain and preview angular limits", async (
   await altitudeMaximum.focus();
   await page.keyboard.press("End");
 
-  const northMoon = page.locator(
-    ".preference-preview-moon[data-preview-bearing='0'][data-preview-altitude='8']"
-  ).first();
-  const eastMoon = page.locator(
-    ".preference-preview-moon[data-preview-bearing='90'][data-preview-altitude='42']"
-  );
-  const northWestSegment = page.locator(
-    ".preference-preview-segment[data-preview-bearing='345']"
-  );
-  await expect(northMoon).toHaveAttribute("data-filtered", "true");
-  await expect(eastMoon).toHaveAttribute("data-filtered", "true");
-  await expect(northWestSegment).toHaveAttribute("data-filtered", "false");
+  const exclusion = page.locator("[data-preview-exclusion]");
+  const beforeBlockedChange = await exclusion.getAttribute("d");
+  expect(beforeBlockedChange).toBeTruthy();
+  await expect(page.locator(".preference-preview-moon.is-dimmed")).toHaveCount(0);
+  await expect(page.locator(".preference-preview-segment.is-dimmed")).toHaveCount(0);
+  expect(await page.locator("#preference-angular-artwork").evaluate(artwork => {
+    const children = Array.from(artwork.children);
+    const exclusionIndex = children.indexOf(artwork.querySelector("[data-preview-exclusion]"));
+    return exclusionIndex < children.indexOf(artwork.querySelector(".preference-preview-segment"))
+      && exclusionIndex < children.indexOf(artwork.querySelector(".preference-preview-moon"));
+  })).toBe(true);
 
   const blockedStart = page.getByRole("slider", { name: "Blocked view start" });
   await blockedStart.focus();
   await page.keyboard.press("Shift+ArrowLeft");
   await expect(blockedStart).toHaveAttribute("aria-valuenow", "340");
-  await expect(northWestSegment).toHaveAttribute("data-filtered", "true");
+  expect(await exclusion.getAttribute("d")).not.toBe(beforeBlockedChange);
 
   const previewBox = await preview.boundingBox();
   const formBox = await page.locator("#preference-form").boundingBox();
