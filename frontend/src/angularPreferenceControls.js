@@ -47,14 +47,16 @@ export function normalizeAngularPreferences(value) {
   }
   if (value.azimuthDegrees !== undefined) {
     var azimuth = value.azimuthDegrees;
+    var excluded = azimuth && azimuth.excluded;
     if (!objectValue(azimuth) || !validRange(azimuth.included)
-        || !validRange(azimuth.excluded) || !contained(azimuth.included, azimuth.excluded)) {
+        || (excluded !== undefined
+          && (!validRange(excluded) || !contained(azimuth.included, excluded)))) {
       return null;
     }
     state.azimuthDegrees = {
-      included: copyRange(azimuth.included),
-      excluded: copyRange(azimuth.excluded)
+      included: copyRange(azimuth.included)
     };
+    if (excluded !== undefined) state.azimuthDegrees.excluded = copyRange(excluded);
   }
   return state;
 }

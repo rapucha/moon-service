@@ -129,7 +129,9 @@ The editor exposes these hard filters:
 
 - Moon altitude is one optional inclusive range edited with a vertical
   dual-handle slider over `[0°, 90°]` on the schematic Moon-pass selector.
-  The bottom is `0°` and the top is `90°`.
+  The bottom is `0°` and the top is `90°`. The display position is
+  `(altitude / 90)^0.85`, which gives low altitudes mildly more room. Pointer
+  input uses the inverse mapping and request values remain degrees.
 - Availability uses exactly one mode at a time. Local-clock mode accepts one or
   more windows in the searched location's timezone and explains that a window
   may cross midnight. Ambient-light mode accepts one or more of `Daylight`,
@@ -138,9 +140,10 @@ The editor exposes these hard filters:
 - Moon direction is optional as a whole. When enabled, the schematic's shared
   compass axis contains distinct fills and handle pairs for an included sector
   and a blocked sector contained inside it. It has no visible numeric bearing
-  inputs. Both sectors are always active and the request contains both
-  `azimuthDegrees.included` and `azimuthDegrees.excluded`. Disabling direction
-  filtering omits `azimuthDegrees`.
+  inputs. The included sector is always active. Coincident blocked-sector
+  endpoints mean there is no blocked sector, so the request omits
+  `azimuthDegrees.excluded`. Disabling direction filtering omits
+  `azimuthDegrees`.
 - Named phase uses eight checkboxes for `new_moon`, `waxing_crescent`,
   `first_quarter`, `waxing_gibbous`, `full_moon`, `waning_gibbous`,
   `last_quarter`, and `waning_crescent`. Any selected phase may match. An empty
@@ -157,8 +160,14 @@ Altitude and direction use one responsive schematic selector. Its vertical
 altitude axis and horizontal absolute-bearing axis contain the real slider
 handles; there are no duplicate standalone tracks. The bearing axis runs from
 north at `0°` through east, south, and west to a repeated north label at
-`360°`. Its arrows mean increasing bearing, not Moon travel direction. Handle
-values remain in `[0°, 360°)`.
+`360°`. Short tick marks divide it every `15°`; longer ticks align only with
+the `90°` cardinal divisions. Its arrows mean increasing bearing, not Moon
+travel direction. Handle values remain in `[0°, 360°)`.
+
+Each range handle is a directional boundary. Its inner edge marks the exact
+logical angle, while its visible body and pointer target extend away from the
+selected zone. Meeting handles share that edge and remain edge-to-edge with a
+visible seam instead of overlapping.
 
 The schematic uses a fixed illustrative arc, small textured Moon images, and
 the existing generic moving hills, trees, and buildings. It shows no time or
@@ -168,14 +177,19 @@ the excluded sky and landscape regions behind the fixed arc. The Moon images
 and arc remain fully visible. This local preview does not model lunar-disk
 intersection and is not authoritative `azimuthMatchIntervals`.
 
-Both compass sectors may cross north. A temporary drag may put the blocked
-sector outside the included sector, but Apply then sends no request and focuses
-the responsible blocked-sector handle. The browser does not silently clamp a
-handle, move another handle, or replace the backend's lunar-disk matching
-geometry with a Moon-center calculation. Coincident handles retain separate
-pointer and touch hit regions. Decorative Moon and landscape SVG content stays
-outside hit testing and the accessibility tree. Reduced motion stops the
-generic foreground drift without removing the schematic.
+The altitude mapping applies to the handles, grid, fill, fixed arc, Moon
+samples, foreground height, and exclusion shading.
+
+Both compass sectors may cross north. Pointer, touch, and keyboard interaction
+keep the blocked boundaries inside the included boundaries. A boundary stops
+at its adjacent boundary and does not move another handle. Included-sector
+endpoints remain distinct. Blocked-sector endpoints may meet; then the browser
+draws no blocked fill or shading and omits `azimuthDegrees.excluded`. When an
+included-only stored value is loaded, the coincident blocked handles appear at
+the included sector's clockwise midpoint. That display position has no request
+meaning. Decorative Moon and landscape SVG content stays outside hit testing
+and the accessibility tree. Reduced motion stops the generic foreground drift
+without removing the schematic.
 
 The bright-limb dial explains the observer-oriented convention: `0°` points
 toward local zenith, `90°` points right toward increasing azimuth, and angles
@@ -246,13 +260,14 @@ assistive technology. Distinct sector labels, not color alone, identify the
 included and blocked compass handles. The native disclosure, editor, and reset
 action work from the keyboard in a logical order.
 
-The browser rejects nonnumeric, non-finite, out-of-range, equal-endpoint,
-uncontained blocked-sector, duplicate-phase, and unknown-phase values before
-sending a request. Validation identifies the affected control in text and
-moves focus to it. Storage, ignored-field, excluded-count, and filtered-empty
-changes are announced to screen readers without depending on color. Removing a
-preference or resetting all preferences leaves focus on a logical surviving
-control.
+The schematic prevents included-sector equality and uncontained blocked
+sectors while a handle moves. Coincident blocked-sector endpoints are valid
+and omit the blocked sector. Before sending, the browser rejects any remaining
+nonnumeric, non-finite, out-of-range, duplicate-phase, or unknown-phase value.
+Validation identifies the affected control in text and moves focus to it.
+Storage, ignored-field, excluded-count, and filtered-empty changes are
+announced to screen readers without depending on color. Removing a preference
+or resetting all preferences leaves focus on a logical surviving control.
 
 When azimuth filtering is active, the Moon-pass chart dims only the portions
 outside the authoritative `moonPass.azimuthMatchIntervals`. It must not infer

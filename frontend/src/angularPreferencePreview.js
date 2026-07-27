@@ -5,8 +5,7 @@ import { altitudeForegroundArtwork } from "./moonPathSilhouettes.js";
 
 var DEFAULT_ALTITUDE = { minimum: 2, maximum: 15 };
 var DEFAULT_AZIMUTH = { included: { start: 330, end: 30 }, excluded: { start: 350, end: 10 } };
-var EPSILON = 1.0e-9;
-var PREVIEW = { left: 40, right: 340, top: 18, bottom: 190 };
+var PREVIEW = { left: 40, right: 340, top: 30, bottom: 190 };
 var SAMPLES = [
   { bearing: 0, altitude: 8 }, { bearing: 30, altitude: 16 },
   { bearing: 60, altitude: 28 }, { bearing: 90, altitude: 42 },
@@ -51,11 +50,7 @@ export function createAngularPreferencePreview(form) {
     return { minimum: altitude.minimum, maximum: 90 };
   });
   Object.entries(bearingHandles).forEach(function (entry) {
-    wireBearingHandle(entry[1], function () {
-      return bearingValue(entry[0]);
-    }, function (value) {
-      setBearingValue(entry[0], value);
-    });
+    wireBearingHandle(entry[0], entry[1]);
   });
 
   return {
@@ -82,11 +77,7 @@ export function createAngularPreferencePreview(form) {
         state.altitudeDegrees = copyAltitude(altitude);
       }
       if (directionEnabled) {
-        var parsed = readAzimuth();
-        if (parsed.error) {
-          return parsed;
-        }
-        state.azimuthDegrees = parsed.value;
+        state.azimuthDegrees = readAzimuth();
       }
       return { state: state };
     }
@@ -97,19 +88,25 @@ export function createAngularPreferencePreview(form) {
       update(value);
       sync();
     }, function (event, bounds) {
-      return Math.round(((bounds.bottom - event.clientY) / bounds.height) * 90);
-    }, limits, sync);
+      return ((bounds.bottom - event.clientY) / bounds.height) * 90;
+    }, limits, function () {
+      return altitudePosition(current()) * 90;
+    }, function (value) {
+      return Math.round(altitudeFromPosition(value / 90));
+    });
   }
 
-  function wireBearingHandle(handle, current, update) {
-    wireHandle(handle, compassTrack, "horizontal", current, function (value) {
-      update(normalizeDegrees(value));
+  function wireBearingHandle(key, handle) {
+    wireHandle(handle, compassTrack, "horizontal", function () {
+      return bearingValue(key);
+    }, function (value) {
+      setRawBearingValue(key, normalizeDegrees(value));
       sync();
     }, function (event, bounds) {
       return Math.round(((event.clientX - bounds.left) / bounds.width) * 359);
     }, function () {
-      return { minimum: 0, maximum: 359 };
-    }, sync);
+      return bearingLimits(key);
+    });
   }
 
   function bearingValue(key) {
@@ -119,7 +116,35 @@ export function createAngularPreferencePreview(form) {
     return azimuth.excluded.end;
   }
 
-  function setBearingValue(key, value) {
+  function bearingLimits(key) {
+    var neighbors = {
+      includedStart: ["includedEnd", "excludedStart", 1, 0],
+      excludedStart: ["includedStart", "excludedEnd", 0, 0],
+      excludedEnd: ["excludedStart", "includedEnd", 0, 0],
+      includedEnd: ["excludedEnd", "includedStart", 0, 1]
+    }[key];
+    var current = bearingValue(key);
+    var minimum = current
+      - clockwiseDistance(bearingValue(neighbors[0]), current) + neighbors[2];
+    var maximum = current
+      + clockwiseDistance(current, bearingValue(neighbors[1])) - neighbors[3];
+    if (key === "includedStart"
+        && azimuth.excluded.start === azimuth.included.end) {
+      maximum = Math.max(current, maximum - 1);
+    }
+    if (key === "includedEnd"
+        && azimuth.excluded.end === azimuth.included.start) {
+      minimum = Math.min(current, minimum + 1);
+    }
+    return {
+      minimum: minimum,
+      maximum: maximum,
+      home: unwrappedTarget(0, minimum, maximum, minimum),
+      end: unwrappedTarget(359, minimum, maximum, maximum)
+    };
+  }
+
+  function setRawBearingValue(key, value) {
     if (key === "includedStart") azimuth.included.start = value;
     else if (key === "includedEnd") azimuth.included.end = value;
     else if (key === "excludedStart") azimuth.excluded.start = value;
@@ -135,32 +160,21 @@ export function createAngularPreferencePreview(form) {
   function syncAltitude() {
     setVerticalHandle(altitudeMinimumHandle, altitude.minimum, 0, altitude.maximum);
     setVerticalHandle(altitudeMaximumHandle, altitude.maximum, altitude.minimum, 90);
-    var coincident = altitude.minimum === altitude.maximum;
-    setOverlapOffset(altitudeMinimumHandle, coincident ? "-10px" : "0px");
-    setOverlapOffset(altitudeMaximumHandle, coincident ? "10px" : "0px");
     var fill = form.querySelector(".preference-altitude-fill");
-    fill.style.bottom = (altitude.minimum / 90 * 100) + "%";
-    fill.style.height = ((altitude.maximum - altitude.minimum) / 90 * 100) + "%";
+    var minimumPosition = altitudePosition(altitude.minimum) * 100;
+    fill.style.bottom = minimumPosition + "%";
+    fill.style.height = (altitudePosition(altitude.maximum) * 100 - minimumPosition) + "%";
   }
 
   function syncCompass() {
     syncSector("included", azimuth.included);
     syncSector("excluded", azimuth.excluded);
-    syncBearingOverlap("included", bearingHandles.includedStart, bearingHandles.includedEnd);
-    syncBearingOverlap("excluded", bearingHandles.excludedStart, bearingHandles.excludedEnd);
   }
 
   function syncSector(kind, range) {
     setHorizontalHandle(bearingHandles[kind + "Start"], range.start);
     setHorizontalHandle(bearingHandles[kind + "End"], range.end);
     setWrappedFill(kind, range.start, range.end);
-  }
-
-  function syncBearingOverlap(_kind, startHandle, endHandle) {
-    var coincident = startHandle.getAttribute("aria-valuenow")
-      === endHandle.getAttribute("aria-valuenow");
-    setOverlapOffset(startHandle, coincident ? "-10px" : "0px");
-    setOverlapOffset(endHandle, coincident ? "10px" : "0px");
   }
 
   function setWrappedFill(kind, start, end) {
@@ -200,21 +214,11 @@ export function createAngularPreferencePreview(form) {
   }
 
   function readAzimuth() {
-    if (azimuth.included.start === azimuth.included.end) {
-      return controlError(
-        "The included compass-sector endpoints must differ.",
-        bearingHandles.includedEnd);
+    var value = { included: copyRange(azimuth.included) };
+    if (azimuth.excluded.start !== azimuth.excluded.end) {
+      value.excluded = copyRange(azimuth.excluded);
     }
-    if (azimuth.excluded.start === azimuth.excluded.end) {
-      return controlError("The blocked-view endpoints must differ.", bearingHandles.excludedEnd);
-    }
-    if (!contained(azimuth.included, azimuth.excluded)) {
-      var focus = inRange(azimuth.included, azimuth.excluded.start)
-        ? bearingHandles.excludedEnd
-        : bearingHandles.excludedStart;
-      return controlError("Keep the blocked view inside the included compass sector.", focus);
-    }
-    return { value: copyAzimuth(azimuth) };
+    return value;
   }
 }
 
@@ -225,7 +229,8 @@ function buildArtwork(artwork) {
   var children = [
     gridArtwork(),
     altitudeForegroundArtwork(
-      PREVIEW.left, PREVIEW.top, PREVIEW.bottom, chartWidth, "preference", 217, 90, chartHeight),
+      PREVIEW.left, PREVIEW.top, PREVIEW.bottom, chartWidth, "preference", 217, 90, chartHeight,
+      function (altitude) { return altitudePosition(altitude) * chartHeight; }),
     svgElement("path", {
       className: "preference-preview-exclusion",
       "data-preview-exclusion": "true"
@@ -260,7 +265,17 @@ function gridArtwork() {
     { bearing: 180, label: "S" }, { bearing: 270, label: "W" },
     { bearing: 360, label: "N" }
   ];
+  var ticks = Array.from({ length: 25 }, function (_unused, index) {
+    var bearing = index * 15;
+    var cardinal = bearing % 90 === 0;
+    return svgElement("line", {
+      className: "preference-preview-bearing-tick" + (cardinal ? " is-cardinal" : ""),
+      x1: previewX(bearing), x2: previewX(bearing),
+      y1: cardinal ? 193 : 197, y2: 209
+    });
+  });
   return svgElement("g", { className: "preference-preview-grid" },
+    ticks,
     [0, 30, 60, 90].map(function (altitude) {
       return svgElement("g", {},
         svgElement("line", {
@@ -290,8 +305,11 @@ function gridArtwork() {
     }, "bearing increases →"));
 }
 
-function wireHandle(handle, track, orientation, current, update, pointerValue, limits, finish) {
+function wireHandle(
+  handle, track, orientation, current, update, pointerValue, limits,
+  pointerCurrent, pointerResult) {
   var pointerGrabOffset = 0;
+  var pointerLimits;
   handle.addEventListener("keydown", function (event) {
     var step = event.shiftKey ? 10 : 1;
     var bounds = limits();
@@ -304,12 +322,15 @@ function wireHandle(handle, track, orientation, current, update, pointerValue, l
       update(clamp(value + step, bounds.minimum, bounds.maximum));
     } else if (event.key === "Home" || event.key === "End") {
       event.preventDefault();
-      update(event.key === "Home" ? bounds.minimum : bounds.maximum);
+      update(event.key === "Home"
+        ? (bounds.home ?? bounds.minimum)
+        : (bounds.end ?? bounds.maximum));
     }
   });
   handle.addEventListener("pointerdown", function (event) {
-    pointerGrabOffset = current() - pointerValue(event, track.getBoundingClientRect());
-    handle.classList.add("is-overlap-dragging");
+    pointerGrabOffset = (pointerCurrent ? pointerCurrent() : current())
+      - pointerValue(event, track.getBoundingClientRect());
+    pointerLimits = limits();
     handle.setPointerCapture(event.pointerId);
   });
   handle.addEventListener("pointermove", function (event) {
@@ -317,31 +338,19 @@ function wireHandle(handle, track, orientation, current, update, pointerValue, l
       updatePointer(event);
     }
   });
-  handle.addEventListener("pointerup", finishPointer);
-  handle.addEventListener("pointercancel", finishPointer);
+  handle.addEventListener("pointerup", function () { pointerLimits = null; });
+  handle.addEventListener("pointercancel", function () { pointerLimits = null; });
   function updatePointer(event) {
     var bounds = track.getBoundingClientRect();
-    var range = limits();
-    update(clamp(
-      pointerValue(event, bounds) + pointerGrabOffset,
-      range.minimum,
-      range.maximum));
-  }
-  function finishPointer() {
-    handle.classList.remove("is-overlap-dragging");
-    finish();
+    var range = pointerLimits || limits();
+    var value = pointerValue(event, bounds) + pointerGrabOffset;
+    update(clamp(pointerResult ? pointerResult(value) : value, range.minimum, range.maximum));
   }
   handle.setAttribute("aria-orientation", orientation);
 }
 
-function setOverlapOffset(handle, value) {
-  if (!handle.classList.contains("is-overlap-dragging")) {
-    handle.style.setProperty("--preference-overlap-offset", value);
-  }
-}
-
 function setVerticalHandle(handle, value, minimum, maximum) {
-  handle.style.bottom = (value / 90 * 100) + "%";
+  handle.style.bottom = (altitudePosition(value) * 100) + "%";
   setSliderValue(handle, value, minimum, maximum, numberText(value) + " degrees altitude");
 }
 
@@ -361,7 +370,13 @@ function setSliderValue(handle, value, minimum, maximum, text) {
 
 function previewX(bearing) { return PREVIEW.left + (bearing / 360) * (PREVIEW.right - PREVIEW.left); }
 
-function previewY(altitude) { return PREVIEW.bottom - (altitude / 90) * (PREVIEW.bottom - PREVIEW.top); }
+function previewY(altitude) {
+  return PREVIEW.bottom - altitudePosition(altitude) * (PREVIEW.bottom - PREVIEW.top);
+}
+
+function altitudePosition(altitude) { return Math.pow(clamp(altitude / 90, 0, 1), 0.85); }
+
+function altitudeFromPosition(position) { return Math.pow(clamp(position, 0, 1), 1 / 0.85) * 90; }
 
 function bearingSegments(range, complement) {
   if (range.start === range.end) return complement ? [[0, 360]] : [];
@@ -382,27 +397,28 @@ function validAltitude(minimum, maximum) {
     && minimum >= 0 && maximum <= 90 && minimum <= maximum;
 }
 
-function contained(outer, inner) {
-  return clockwiseDistance(outer.start, inner.start)
-    + clockwiseDistance(inner.start, inner.end)
-    <= clockwiseDistance(outer.start, outer.end) + EPSILON;
-}
-
-function inRange(range, value) {
-  return clockwiseDistance(range.start, normalizeDegrees(value))
-    <= clockwiseDistance(range.start, range.end) + EPSILON;
-}
-
 function clockwiseDistance(start, end) { return normalizeDegrees(end - start); }
+
+function unwrappedTarget(target, minimum, maximum, fallback) {
+  var value = target;
+  while (value < minimum) value += 360;
+  while (value > maximum) value -= 360;
+  return value < minimum || value > maximum ? fallback : value;
+}
 
 function copyAltitude(value) { return { minimum: value.minimum, maximum: value.maximum }; }
 
 function copyAzimuth(value) {
+  var midpoint = normalizeDegrees(value.included.start
+    + clockwiseDistance(value.included.start, value.included.end) / 2);
+  var excluded = value.excluded || { start: midpoint, end: midpoint };
   return {
-    included: { start: value.included.start, end: value.included.end },
-    excluded: { start: value.excluded.start, end: value.excluded.end }
+    included: copyRange(value.included),
+    excluded: copyRange(excluded)
   };
 }
+
+function copyRange(value) { return { start: value.start, end: value.end }; }
 
 function finiteNumber(value) { return typeof value === "number" && Number.isFinite(value); }
 

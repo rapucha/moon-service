@@ -60,6 +60,8 @@ test("edits, persists, removes, and resets the accepted controls", async ({ page
   expect(maximumBox).not.toBeNull();
   expect(Math.abs(minimumBox.x - maximumBox.x)).toBeLessThanOrEqual(1);
   expect(minimumBox.y).toBeGreaterThan(maximumBox.y);
+  const altitudePercent = await altitudeMaximum.evaluate(handle => parseFloat(handle.style.bottom));
+  expect(altitudePercent).toBeCloseTo(Math.pow(15 / 90, 0.85) * 100, 4);
   await altitudeMinimum.focus();
   await page.keyboard.press("ArrowUp");
   await expect(altitudeMinimum).toHaveAttribute("aria-valuenow", "3");
@@ -166,7 +168,7 @@ test("edits, persists, removes, and resets the accepted controls", async ({ page
   await expect(focusTarget).toBeFocused();
 });
 
-test("rejects temporary invalid slider sectors without sending a request", async ({
+test("stops nested boundaries and omits a collapsed blocked view", async ({
   page
 }, testInfo) => {
   const calls = await captureApiCalls(page);
@@ -175,60 +177,121 @@ test("rejects temporary invalid slider sectors without sending a request", async
   calls.length = 0;
   await openPreferences(page);
   await page.getByLabel("Limit Moon direction").check();
-  const status = page.locator("#preference-form-status");
   const apply = page.getByRole("button", { name: "Use these limits" });
   const includedStart = page.getByRole("slider", { name: "Included compass sector start" });
   const includedEnd = page.getByRole("slider", { name: "Included compass sector end" });
   const blockedStart = page.getByRole("slider", { name: "Blocked view start" });
   const blockedEnd = page.getByRole("slider", { name: "Blocked view end" });
 
-  await includedStart.focus();
-  await pressKeys(page, ["Home", "Shift+ArrowRight", "Shift+ArrowRight", "Shift+ArrowRight"]);
-  await expect(includedStart).toHaveAttribute("aria-valuenow", "30");
-  const startBox = await includedStart.boundingBox();
-  const endBox = await includedEnd.boundingBox();
+  await focusAndPress(page, includedStart, ["Shift+ArrowRight", "Shift+ArrowRight", "ArrowRight"]);
+  await expect(includedStart).toHaveAttribute("aria-valuenow", "350");
+
+  await focusAndPress(page, includedEnd, ["Shift+ArrowLeft", "Shift+ArrowLeft", "ArrowLeft"]);
+  await expect(includedEnd).toHaveAttribute("aria-valuenow", "10");
+  await pressKeys(page, ["Shift+ArrowRight", "Shift+ArrowRight"]);
+  await expect(includedEnd).toHaveAttribute("aria-valuenow", "30");
+
+  await focusAndPress(page, blockedEnd, ["Shift+ArrowRight", "Shift+ArrowRight", "ArrowRight"]);
+  await expect(blockedEnd).toHaveAttribute("aria-valuenow", "30");
+  await pressKeys(page, ["Shift+ArrowLeft", "Shift+ArrowLeft"]);
+  await expect(blockedEnd).toHaveAttribute("aria-valuenow", "10");
+
+  await focusAndPress(page, blockedStart, ["Shift+ArrowRight", "Shift+ArrowRight", "ArrowRight"]);
+  await expect(blockedStart).toHaveAttribute("aria-valuenow", "10");
+  expect(await page.locator("[data-azimuth-fill^='excluded']").evaluateAll(fills =>
+    fills.every(fill => fill.style.width === "0%"))).toBe(true);
+  const startBox = await blockedStart.boundingBox();
+  const endBox = await blockedEnd.boundingBox();
   expect(startBox).not.toBeNull();
   expect(endBox).not.toBeNull();
-  expect(Math.abs(startBox.x - endBox.x)).toBeGreaterThan(5);
+  expect(Math.abs(startBox.x + startBox.width - endBox.x)).toBeLessThanOrEqual(1);
   await verifyPointerTargets(page, [
-    [includedStart, "[data-bearing-handle='included-start']"],
-    [includedEnd, "[data-bearing-handle='included-end']"]
+    [blockedStart, "[data-bearing-handle='excluded-start']"],
+    [blockedEnd, "[data-bearing-handle='excluded-end']"]
   ], testInfo.project.name === "mobile");
-  await apply.click();
-  await expect(status).toHaveText("The included compass-sector endpoints must differ.");
-  await expect(includedEnd).toBeFocused();
-  expect(calls).toHaveLength(0);
 
-  await includedStart.focus();
-  await pressKeys(page, ["End", "Shift+ArrowLeft", "Shift+ArrowLeft",
-    "Shift+ArrowLeft", "ArrowRight"]);
-  await expect(includedStart).toHaveAttribute("aria-valuenow", "330");
-  await blockedStart.focus();
-  await pressKeys(page, ["Home", "Shift+ArrowRight"]);
-  await expect(blockedStart).toHaveAttribute("aria-valuenow", "10");
   await apply.click();
-  await expect(status).toHaveText("The blocked-view endpoints must differ.");
-  await expect(blockedEnd).toBeFocused();
-  expect(calls).toHaveLength(0);
-
-  await blockedStart.focus();
-  await pressKeys(page, ["Home", "Shift+ArrowRight", "Shift+ArrowRight",
-    "Shift+ArrowRight", "Shift+ArrowRight"]);
-  await expect(blockedStart).toHaveAttribute("aria-valuenow", "40");
-  await apply.click();
-  await expect(status).toHaveText("Keep the blocked view inside the included compass sector.");
-  await expect(blockedStart).toBeFocused();
-  expect(calls).toHaveLength(0);
-
-  await page.getByRole("button", { name: "Reset all preferences" }).click();
   await waitForCallCount(calls, 1);
-  await expect(status).toHaveText("");
+  expect(calls[0].body.preferences.azimuthDegrees).toEqual({
+    included: { start: 350, end: 30 }
+  });
+  expect(await storedPreferences(page)).toEqual(calls[0].body.preferences);
+
+  await page.reload();
+  await waitForCallCount(calls, 2);
   await openPreferences(page);
-  await page.getByLabel("Limit Moon direction").check();
-  await expect(includedStart).toHaveAttribute("aria-valuenow", "330");
+  await expect(page.getByLabel("Limit Moon direction")).toBeChecked();
+  await expect(blockedStart).toHaveAttribute("aria-valuenow", "10");
+  await expect(blockedEnd).toHaveAttribute("aria-valuenow", "10");
+  await focusAndPress(page, blockedEnd, ["Shift+ArrowRight", "Shift+ArrowRight"]);
+  await focusAndPress(page, blockedStart, ["Shift+ArrowRight", "Shift+ArrowRight"]);
+  await focusAndPress(page, includedStart, Array(4).fill("Shift+ArrowRight"));
+  await expect(includedStart).toHaveAttribute("aria-valuenow", "29");
+  await focusAndPress(page, blockedStart, ["ArrowLeft"]);
+  await focusAndPress(page, blockedEnd, ["ArrowLeft"]);
+  await focusAndPress(page, includedEnd, ["ArrowLeft"]);
+  await expect(includedEnd).toHaveAttribute("aria-valuenow", "30");
+
+  await preloadState(page, {
+    version: 1, azimuthDegrees: { included: { start: 29.5, end: 30 } }
+  });
+  await page.reload();
+  await waitForCallCount(calls, 3);
+  await openPreferences(page);
+  await focusAndPress(page, blockedEnd, ["ArrowRight"]);
+  await focusAndPress(page, blockedStart, ["ArrowRight"]);
+  await focusAndPress(page, includedStart, ["ArrowRight"]);
+  await expect(includedStart).toHaveAttribute("aria-valuenow", "29.5");
 });
 
-test("keeps the lower altitude handle accessible at an upper overlap", async ({
+test("stops every bearing pointer at its adjacent boundary", async ({ page }, testInfo) => {
+  await preloadState(page, {
+    version: 1,
+    azimuthDegrees: DIRECTION
+  });
+  const calls = await captureApiCalls(page);
+  await page.goto("/search?q=Prague");
+  await waitForCallCount(calls, 1);
+  await openPreferences(page);
+  const trackBox = await page.locator("#preference-compass-track").boundingBox();
+  expect(trackBox).not.toBeNull();
+  /** @type {Array<[string, number, string, string | null]>} */
+  const cases = [
+    ["Included compass sector start", trackBox.width * 0.2, "350", "Shift+ArrowLeft"],
+    ["Blocked view start", -trackBox.width * 0.9, "330", "Shift+ArrowRight"],
+    ["Blocked view end", trackBox.width * 0.9, "30", "Shift+ArrowLeft"],
+    ["Included compass sector end", -trackBox.width * 0.2, "10", null]
+  ];
+  for (const [name, deltaX, expected, restoreKey] of cases) {
+    const handle = page.getByRole("slider", { name });
+    if (testInfo.project.name === "mobile") {
+      await dragTouchHandle(page, handle, deltaX);
+    } else {
+      await dragMouseHandle(page, handle, deltaX);
+    }
+    await expect(handle).toHaveAttribute("aria-valuenow", expected);
+    if (restoreKey) {
+      await handle.focus();
+      await pressKeys(page, [restoreKey, restoreKey]);
+    }
+  }
+  const includedStart = page.getByRole("slider", { name: "Included compass sector start" });
+  await includedStart.focus();
+  for (const [key, expected] of [["End", "350"], ["Home", "11"]]) {
+    await page.keyboard.press(key);
+    await expect(includedStart).toHaveAttribute("aria-valuenow", expected);
+  }
+  for (const name of ["Blocked view start", "Blocked view end"]) {
+    const handle = page.getByRole("slider", { name });
+    await handle.focus();
+    for (const [key, expected] of [["Home", "0"], ["End", "359"]]) {
+      await page.keyboard.press(key);
+      await expect(handle).toHaveAttribute("aria-valuenow", expected);
+    }
+  }
+});
+
+test("keeps coincident altitude boundaries edge-to-edge and draggable", async ({
   page
 }, testInfo) => {
   await preloadState(page, {
@@ -252,80 +315,83 @@ test("keeps the lower altitude handle accessible at an upper overlap", async ({
   await expect(maximum).toHaveAttribute("aria-valuenow", "89");
   const maximumBox = await maximum.boundingBox();
   expect(maximumBox).not.toBeNull();
-  expect(Math.abs(minimumBox.x - maximumBox.x)).toBeGreaterThan(5);
+  expect(Math.abs(minimumBox.x - maximumBox.x)).toBeLessThanOrEqual(1);
+  expect(Math.abs(minimumBox.y - maximumBox.y - maximumBox.height)).toBeLessThanOrEqual(1);
 
   await verifyPointerTargets(page, [
     [minimum, "[data-altitude-minimum]"],
     [maximum, "[data-altitude-maximum]"]
   ], testInfo.project.name === "mobile");
 
-  if (testInfo.project.name !== "mobile") {
-    const start = {
-      x: minimumBox.x + minimumBox.width / 2,
-      y: minimumBox.y + minimumBox.height / 2
-    };
-    const end = {
-      x: trackBox.x + trackBox.width / 2,
-      y: trackBox.y + trackBox.height / 9
-    };
-    await page.mouse.move(start.x, start.y);
-    await page.mouse.down();
-    await page.mouse.move(end.x, end.y);
-    await page.mouse.up();
-    await expect(minimum).toHaveAttribute("aria-valuenow", "80");
-  }
+  if (testInfo.project.name === "mobile") await dragTouchHandle(page, minimum, 0, 12);
+  else await dragMouseHandle(page, minimum, 0, 12);
+  const movedBox = await minimum.boundingBox();
+  expect(movedBox).not.toBeNull();
+  expect(Math.abs(movedBox.y - minimumBox.y - 12)).toBeLessThanOrEqual(2);
+  await expect(maximum).toHaveAttribute("aria-valuenow", "89");
 
+  await minimum.focus();
+  await page.keyboard.press("Home");
+  const homeBox = await minimum.boundingBox();
+  expect(homeBox).not.toBeNull();
+  const homeCenter = { x: homeBox.x + homeBox.width / 2, y: homeBox.y + homeBox.height / 2 };
+  expect(await page.evaluate(point => document.elementFromPoint(point.x, point.y)
+    ?.closest("[data-altitude-minimum]") !== null, homeCenter)).toBe(true);
+  const targetY = trackBox.y + trackBox.height * (1 - Math.pow(0.5, 0.85));
+  const deltaY = targetY + homeBox.height / 2 - homeCenter.y;
+  if (testInfo.project.name === "mobile") await dragTouchHandle(page, minimum, 0, deltaY);
+  else await dragMouseHandle(page, minimum, 0, deltaY);
+  await expect(minimum).toHaveAttribute("aria-valuenow", "45");
   await expect(maximum).toHaveAttribute("aria-valuenow", "89");
 });
 
-test("keeps coincident bearing drags anchored and endpoint handles unclipped", async ({
+test("keeps directional bearing hit targets anchored and unclipped", async ({
   page
 }, testInfo) => {
+  await preloadState(page, {
+    version: 1,
+    altitudeDegrees: { minimum: 0, maximum: 15 },
+    azimuthDegrees: {
+      included: { start: 0, end: 359 },
+      excluded: { start: 0, end: 359 }
+    }
+  });
   const calls = await captureApiCalls(page);
   await page.goto("/search?q=Prague");
   await waitForCallCount(calls, 1);
   await openPreferences(page);
-  await page.getByLabel("Limit Moon direction").check();
 
   const start = page.getByRole("slider", { name: "Included compass sector start" });
   const end = page.getByRole("slider", { name: "Included compass sector end" });
-  for (const handle of [start, end]) {
-    await handle.focus();
-    await pressKeys(page, [
-      "Home", "Shift+ArrowRight", "Shift+ArrowRight", "Shift+ArrowRight",
-      "Shift+ArrowRight", "Shift+ArrowRight", "Shift+ArrowRight"
-    ]);
-    await expect(handle).toHaveAttribute("aria-valuenow", "60");
-  }
-
-  const trackBox = await page.locator("#preference-compass-track").boundingBox();
-  expect(trackBox).not.toBeNull();
-  const dragPixels = 20;
-  const expectedStep = Math.round(dragPixels / trackBox.width * 359);
-  if (testInfo.project.name === "mobile") {
-    await dragTouchHandle(page, end, -dragPixels);
-    expect(Math.abs(Number(await end.getAttribute("aria-valuenow"))
-      - (60 - expectedStep))).toBeLessThanOrEqual(1);
-  } else {
-    await dragMouseHandle(page, start, dragPixels);
-    expect(Math.abs(Number(await start.getAttribute("aria-valuenow"))
-      - (60 + expectedStep))).toBeLessThanOrEqual(1);
-  }
-
+  const blockedStart = page.getByRole("slider", { name: "Blocked view start" });
+  const blockedEnd = page.getByRole("slider", { name: "Blocked view end" });
+  const altitudeMinimum = page.getByRole("slider", { name: "Minimum Moon altitude" });
   const previewBox = await page.locator(".preference-angular-preview").boundingBox();
   expect(previewBox).not.toBeNull();
-  for (const edgeKey of ["Home", "End"]) {
-    for (const handle of [start, end]) {
-      await handle.focus();
-      await page.keyboard.press(edgeKey);
-    }
-    for (const handle of [start, end]) {
-      const box = await handle.boundingBox();
-      expect(box).not.toBeNull();
-      expect(box.x).toBeGreaterThanOrEqual(previewBox.x);
-      expect(box.x + box.width).toBeLessThanOrEqual(previewBox.x + previewBox.width + 0.5);
-    }
+  for (const handle of [start, end, blockedStart, blockedEnd]) {
+    const box = await handle.boundingBox();
+    expect(box).not.toBeNull();
+    expect(box.x).toBeGreaterThanOrEqual(previewBox.x);
+    expect(box.x + box.width).toBeLessThanOrEqual(previewBox.x + previewBox.width + 0.5);
   }
+  await verifyPointerTargets(page, [
+    [altitudeMinimum, "[data-altitude-minimum]"],
+    [start, "[data-bearing-handle='included-start']"],
+    [end, "[data-bearing-handle='included-end']"],
+    [blockedStart, "[data-bearing-handle='excluded-start']"],
+    [blockedEnd, "[data-bearing-handle='excluded-end']"]
+  ], testInfo.project.name === "mobile");
+
+  const blocked = testInfo.project.name === "mobile" ? blockedEnd : blockedStart;
+  const trackBox = await page.locator("#preference-compass-track").boundingBox();
+  expect(trackBox).not.toBeNull();
+  const deltaX = testInfo.project.name === "mobile" ? -20 : 20;
+  const initial = Number(await blocked.getAttribute("aria-valuenow"));
+  const expected = initial + Math.round(deltaX / trackBox.width * 359);
+  if (testInfo.project.name === "mobile") await dragTouchHandle(page, blocked, deltaX);
+  else await dragMouseHandle(page, blocked, deltaX);
+  expect(Math.abs(Number(await blocked.getAttribute("aria-valuenow")) - expected))
+    .toBeLessThanOrEqual(1);
 });
 
 test("uses the schematic sliders to explain and preview angular limits", async ({
@@ -350,6 +416,12 @@ test("uses the schematic sliders to explain and preview angular limits", async (
   await expect(page.locator("#preference-angular-artwork")).toHaveCSS("pointer-events", "none");
   await expect(page.locator(".preference-altitude-base")).toHaveCSS("width", "4px");
   await expect(page.locator(".preference-compass-base")).toHaveCSS("height", "4px");
+  const bearingTicks = page.locator(".preference-preview-bearing-tick");
+  await expect(bearingTicks).toHaveCount(25);
+  const cardinalTicks = page.locator(".preference-preview-bearing-tick.is-cardinal");
+  await expect(cardinalTicks).toHaveCount(5);
+  expect(await cardinalTicks.evaluateAll(ticks => ticks.map(tick => Number(tick.getAttribute("x1")))))
+    .toEqual([40, 115, 190, 265, 340]);
 
   const altitudeMinimum = page.getByRole("slider", { name: "Minimum Moon altitude" });
   const altitudeMaximum = page.getByRole("slider", { name: "Maximum Moon altitude" });
@@ -392,10 +464,6 @@ test("uses the schematic sliders to explain and preview angular limits", async (
 });
 
 const invalidStoredStates = [
-  {
-    name: "a missing blocked sector",
-    state: { version: 1, azimuthDegrees: { included: { start: 330, end: 30 } } }
-  },
   {
     name: "duplicate named phases",
     state: { version: 1, namedPhases: ["full_moon", "full_moon"] }
@@ -457,8 +525,14 @@ async function pressKeys(page, keys) {
   }
 }
 
+async function focusAndPress(page, locator, keys) {
+  await locator.focus();
+  await pressKeys(page, keys);
+}
+
 async function verifyPointerTargets(page, entries, useTouch) {
   for (const [locator, selector] of entries) {
+    await locator.scrollIntoViewIfNeeded();
     const box = await locator.boundingBox();
     expect(box).not.toBeNull();
     const center = {
@@ -482,18 +556,20 @@ async function verifyPointerTargets(page, entries, useTouch) {
   }
 }
 
-async function dragMouseHandle(page, locator, deltaX) {
+async function dragMouseHandle(page, locator, deltaX, deltaY = 0) {
+  await locator.scrollIntoViewIfNeeded();
   const box = await locator.boundingBox();
   expect(box).not.toBeNull();
   const x = box.x + box.width / 2;
   const y = box.y + box.height / 2;
   await page.mouse.move(x, y);
   await page.mouse.down();
-  await page.mouse.move(x + deltaX, y);
+  await page.mouse.move(x + deltaX, y + deltaY);
   await page.mouse.up();
 }
 
-async function dragTouchHandle(page, locator, deltaX) {
+async function dragTouchHandle(page, locator, deltaX, deltaY = 0) {
+  await locator.scrollIntoViewIfNeeded();
   const box = await locator.boundingBox();
   expect(box).not.toBeNull();
   const x = box.x + box.width / 2;
@@ -507,7 +583,7 @@ async function dragTouchHandle(page, locator, deltaX) {
     await session.send("Input.dispatchTouchEvent", {
       type: "touchMove",
       touchPoints: [{
-        x: x + deltaX, y: y, id: 1, radiusX: 1, radiusY: 1, force: 1
+        x: x + deltaX, y: y + deltaY, id: 1, radiusX: 1, radiusY: 1, force: 1
       }]
     });
     await session.send("Input.dispatchTouchEvent", { type: "touchEnd", touchPoints: [] });

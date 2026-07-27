@@ -42,6 +42,16 @@
   stroke-dasharray: 2 4;
 }
 
+.preference-preview-grid .preference-preview-bearing-tick {
+  stroke: rgba(76, 96, 96, 0.55);
+  stroke-dasharray: none;
+}
+
+.preference-preview-grid .preference-preview-bearing-tick.is-cardinal {
+  stroke: #526564;
+  stroke-width: 1.5;
+}
+
 .preference-preview-grid text {
   fill: #5e6b6c;
   font-size: 9px;
@@ -78,13 +88,15 @@
 
 .preference-altitude-track {
   position: absolute;
-  top: 6.92%;
+  z-index: 6;
+  top: 11.54%;
   bottom: 26.92%;
   left: 11.11%;
   width: 36px;
   height: auto;
   margin: 0;
   transform: translateX(-50%);
+  pointer-events: none;
   touch-action: none;
 }
 
@@ -128,6 +140,7 @@
   border-radius: 5px;
   background: var(--accent);
   box-shadow: 0 2px 5px rgba(20, 31, 34, 0.32);
+  pointer-events: none;
 }
 
 .preference-track-handle > span {
@@ -135,15 +148,36 @@
 }
 
 .preference-altitude-handle {
+  z-index: 6;
   left: 50%;
   width: 32px;
   height: 28px;
   cursor: ns-resize;
-  transform: translate(calc(-50% + var(--preference-overlap-offset, 0px)), 50%);
+  pointer-events: auto;
 }
 
 .preference-altitude-handle::before {
-  inset: 10px 2px;
+  right: 2px;
+  left: 2px;
+  height: 4px;
+}
+
+.preference-altitude-handle[data-altitude-minimum] {
+  transform: translate(-50%, 100%);
+}
+
+.preference-altitude-handle[data-altitude-minimum]::before {
+  top: 0;
+  border-radius: 0 0 5px 5px;
+}
+
+.preference-altitude-handle[data-altitude-maximum] {
+  transform: translateX(-50%);
+}
+
+.preference-altitude-handle[data-altitude-maximum]::before {
+  bottom: 0;
+  border-radius: 5px 5px 0 0;
 }
 
 .preference-compass-track {
@@ -153,6 +187,7 @@
   left: 11.11%;
   height: 62px;
   margin: 0;
+  pointer-events: none;
   touch-action: none;
 }
 
@@ -185,29 +220,51 @@
 }
 
 .preference-included-handle {
-  top: -1px;
+  top: -29px;
   width: 24px;
   height: 28px;
   cursor: ew-resize;
-  transform: translateX(calc(-50% + var(--preference-overlap-offset, 0px)));
+  pointer-events: auto;
 }
 
 .preference-included-handle::before {
-  inset: 2px 8px;
+  top: 2px;
+  bottom: -14px;
+  width: 8px;
 }
 
 .preference-blocked-handle {
   top: 33px;
-  width: 28px;
+  width: 24px;
   height: 26px;
   cursor: ew-resize;
-  transform: translateX(calc(-50% + var(--preference-overlap-offset, 0px)));
+  pointer-events: auto;
 }
 
 .preference-blocked-handle::before {
-  inset: 2px 9px;
+  top: 2px;
+  bottom: 2px;
+  width: 8px;
   border-color: #74464d;
   background: #c68f96;
+}
+
+.preference-track-handle[data-bearing-handle$="-start"] {
+  transform: translateX(-100%);
+}
+
+.preference-track-handle[data-bearing-handle$="-start"]::before {
+  right: 0;
+  border-radius: 5px 0 0 5px;
+}
+
+.preference-track-handle[data-bearing-handle$="-end"]::before {
+  left: 0;
+  border-radius: 0 5px 5px 0;
+}
+
+.preference-track-handle[data-bearing-handle$="-end"] {
+  transform: translateX(0);
 }
 
 .preference-angular-fields.is-altitude-disabled .preference-altitude-fill,
