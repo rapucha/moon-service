@@ -2,6 +2,11 @@ import { clamp, normalizeDegrees } from "./format.js";
 import { svgElement } from "./dom.js";
 import { moonPhaseImageDataUrl } from "./moonPhaseView.js";
 import { altitudeForegroundArtwork } from "./moonPathSilhouettes.js";
+import {
+  altitudeFromPosition, altitudePosition, bearingLimits, bearingValue,
+  copyAzimuth, excludedBearingSegments, MINIMUM_USABLE_DEGREES,
+  moveBearing, validAltitude
+} from "./angularPreferenceRules.js";
 
 var DEFAULT_ALTITUDE = { minimum: 2, maximum: 15 };
 var DEFAULT_AZIMUTH = { included: { start: 330, end: 30 }, excluded: { start: 350, end: 10 } };
@@ -29,25 +34,33 @@ export function createAngularPreferencePreview(form) {
   };
   var artwork = form.querySelector("#preference-angular-artwork");
   var editor = form.querySelector("#preference-angular-fields");
+  var status = form.querySelector("#preference-angular-status");
   var altitude = copyAltitude(DEFAULT_ALTITUDE);
   var azimuth = copyAzimuth(DEFAULT_AZIMUTH);
   var altitudeEnabled = false;
   var directionEnabled = false;
+  var statusTimer;
 
   buildArtwork(artwork);
   wireAltitudeHandle(altitudeMinimumHandle, function () {
     return altitude.minimum;
-  }, function (value) {
+  }, function (value, interaction) {
     altitude.minimum = Math.min(value, altitude.maximum);
+    if (interaction.limited && interaction.attempted > interaction.maximum) {
+      altitudeRebound(altitudeMinimumHandle, "up");
+    }
   }, function () {
-    return { minimum: 0, maximum: altitude.maximum };
+    return { minimum: 0, maximum: altitude.maximum - MINIMUM_USABLE_DEGREES };
   });
   wireAltitudeHandle(altitudeMaximumHandle, function () {
     return altitude.maximum;
-  }, function (value) {
+  }, function (value, interaction) {
     altitude.maximum = Math.max(value, altitude.minimum);
+    if (interaction.limited && interaction.attempted < interaction.minimum) {
+      altitudeRebound(altitudeMaximumHandle, "down");
+    }
   }, function () {
-    return { minimum: altitude.minimum, maximum: 90 };
+    return { minimum: altitude.minimum + MINIMUM_USABLE_DEGREES, maximum: 90 };
   });
   Object.entries(bearingHandles).forEach(function (entry) {
     wireBearingHandle(entry[0], entry[1]);
@@ -71,7 +84,7 @@ export function createAngularPreferencePreview(form) {
       if (altitudeEnabled) {
         if (!validAltitude(altitude.minimum, altitude.maximum)) {
           return controlError(
-            "Use an altitude range from 0° to 90°, with minimum not above maximum.",
+            "Use an altitude range from 0° to 90° that is at least 10° wide.",
             altitudeMinimumHandle);
         }
         state.altitudeDegrees = copyAltitude(altitude);
@@ -84,8 +97,8 @@ export function createAngularPreferencePreview(form) {
   };
 
   function wireAltitudeHandle(handle, current, update, limits) {
-    wireHandle(handle, altitudeTrack, "vertical", current, function (value) {
-      update(value);
+    wireHandle(handle, altitudeTrack, "vertical", current, function (value, interaction) {
+      update(value, interaction);
       sync();
     }, function (event, bounds) {
       return ((bounds.bottom - event.clientY) / bounds.height) * 90;
@@ -98,57 +111,22 @@ export function createAngularPreferencePreview(form) {
 
   function wireBearingHandle(key, handle) {
     wireHandle(handle, compassTrack, "horizontal", function () {
-      return bearingValue(key);
-    }, function (value) {
-      setRawBearingValue(key, normalizeDegrees(value));
+      return bearingValue(azimuth, key);
+    }, function (value, interaction) {
+      var moved = moveBearing(azimuth, key, value, interaction.direction);
+      azimuth = moved.azimuth;
       sync();
+      if (key.startsWith("excluded") && interaction.limited
+          && (interaction.attempted < 0 || interaction.attempted > 359)) {
+        announce("Blocked-view handles stop at north.");
+      } else {
+        announceBearingEffect(moved.effect);
+      }
     }, function (event, bounds) {
-      return Math.round(((event.clientX - bounds.left) / bounds.width) * 359);
+      return Math.round(((event.clientX - bounds.left) / bounds.width) * 360);
     }, function () {
-      return bearingLimits(key);
+      return bearingLimits(azimuth, key);
     });
-  }
-
-  function bearingValue(key) {
-    if (key === "includedStart") return azimuth.included.start;
-    if (key === "includedEnd") return azimuth.included.end;
-    if (key === "excludedStart") return azimuth.excluded.start;
-    return azimuth.excluded.end;
-  }
-
-  function bearingLimits(key) {
-    var neighbors = {
-      includedStart: ["includedEnd", "excludedStart", 1, 0],
-      excludedStart: ["includedStart", "excludedEnd", 0, 0],
-      excludedEnd: ["excludedStart", "includedEnd", 0, 0],
-      includedEnd: ["excludedEnd", "includedStart", 0, 1]
-    }[key];
-    var current = bearingValue(key);
-    var minimum = current
-      - clockwiseDistance(bearingValue(neighbors[0]), current) + neighbors[2];
-    var maximum = current
-      + clockwiseDistance(current, bearingValue(neighbors[1])) - neighbors[3];
-    if (key === "includedStart"
-        && azimuth.excluded.start === azimuth.included.end) {
-      maximum = Math.max(current, maximum - 1);
-    }
-    if (key === "includedEnd"
-        && azimuth.excluded.end === azimuth.included.start) {
-      minimum = Math.min(current, minimum + 1);
-    }
-    return {
-      minimum: minimum,
-      maximum: maximum,
-      home: unwrappedTarget(0, minimum, maximum, minimum),
-      end: unwrappedTarget(359, minimum, maximum, maximum)
-    };
-  }
-
-  function setRawBearingValue(key, value) {
-    if (key === "includedStart") azimuth.included.start = value;
-    else if (key === "includedEnd") azimuth.included.end = value;
-    else if (key === "excludedStart") azimuth.excluded.start = value;
-    else azimuth.excluded.end = value;
   }
 
   function sync() {
@@ -158,8 +136,12 @@ export function createAngularPreferencePreview(form) {
   }
 
   function syncAltitude() {
-    setVerticalHandle(altitudeMinimumHandle, altitude.minimum, 0, altitude.maximum);
-    setVerticalHandle(altitudeMaximumHandle, altitude.maximum, altitude.minimum, 90);
+    setVerticalHandle(
+      altitudeMinimumHandle, altitude.minimum, 0,
+      altitude.maximum - MINIMUM_USABLE_DEGREES);
+    setVerticalHandle(
+      altitudeMaximumHandle, altitude.maximum,
+      altitude.minimum + MINIMUM_USABLE_DEGREES, 90);
     var fill = form.querySelector(".preference-altitude-fill");
     var minimumPosition = altitudePosition(altitude.minimum) * 100;
     fill.style.bottom = minimumPosition + "%";
@@ -201,8 +183,7 @@ export function createAngularPreferencePreview(form) {
       rectangles.push([PREVIEW.left, previewY(altitude.minimum), PREVIEW.right, PREVIEW.bottom]);
     }
     if (directionEnabled) {
-      bearingSegments(azimuth.included, true)
-        .concat(bearingSegments(azimuth.excluded, false))
+      excludedBearingSegments(azimuth.included, azimuth.excluded)
         .forEach(function (segment) {
           rectangles.push([
             previewX(segment[0]), PREVIEW.top, previewX(segment[1]), PREVIEW.bottom
@@ -220,12 +201,43 @@ export function createAngularPreferencePreview(form) {
     }
     return value;
   }
+
+  function altitudeRebound(handle, direction) {
+    var className = "is-rebounding-" + direction;
+    if (handle.classList.contains(className)) return;
+    handle.classList.add(className);
+    window.setTimeout(function () {
+      handle.classList.remove(className);
+    }, 360);
+    announce("Altitude keeps at least 10° visible.");
+  }
+
+  function announceBearingEffect(effect) {
+    var messages = {
+      minimum: "A usable direction must remain at least 10° wide.",
+      opened: "That usable direction opened to the 10° minimum.",
+      closed: "That usable direction snapped closed; the other side remains usable.",
+      transferred: "The last 10° moved to the other side so one direction remains usable.",
+      "transfer-seam": "The last 10° cannot transfer across north.",
+      "block-removed": "The blocked sector closed, leaving the selected direction usable."
+    };
+    announce(messages[effect]);
+  }
+
+  function announce(message) {
+    if (!message || status.textContent === message) return;
+    window.clearTimeout(statusTimer);
+    status.textContent = message;
+    statusTimer = window.setTimeout(function () {
+      status.textContent = "";
+    }, 3200);
+  }
 }
 
 function buildArtwork(artwork) {
   var chartWidth = PREVIEW.right - PREVIEW.left;
   var chartHeight = PREVIEW.bottom - PREVIEW.top;
-  var moonImage = moonPhaseImageDataUrl(65, 42, 35, 0);
+  var moonImage = moonPhaseImageDataUrl(65, 42, 325, 0);
   var children = [
     gridArtwork(),
     altitudeForegroundArtwork(
@@ -309,6 +321,7 @@ function wireHandle(
   handle, track, orientation, current, update, pointerValue, limits,
   pointerCurrent, pointerResult) {
   var pointerGrabOffset = 0;
+  var previousPointerValue;
   var pointerLimits;
   handle.addEventListener("keydown", function (event) {
     var step = event.shiftKey ? 10 : 1;
@@ -316,20 +329,23 @@ function wireHandle(
     var value = current();
     if (event.key === "ArrowDown" || event.key === "ArrowLeft") {
       event.preventDefault();
-      update(clamp(value - step, bounds.minimum, bounds.maximum));
+      updateWithin(value - step, bounds, -1);
     } else if (event.key === "ArrowUp" || event.key === "ArrowRight") {
       event.preventDefault();
-      update(clamp(value + step, bounds.minimum, bounds.maximum));
+      updateWithin(value + step, bounds, 1);
     } else if (event.key === "Home" || event.key === "End") {
       event.preventDefault();
-      update(event.key === "Home"
+      var target = event.key === "Home"
         ? (bounds.home ?? bounds.minimum)
-        : (bounds.end ?? bounds.maximum));
+        : (bounds.end ?? bounds.maximum);
+      updateWithin(target, bounds, Math.sign(target - value));
     }
   });
   handle.addEventListener("pointerdown", function (event) {
-    pointerGrabOffset = (pointerCurrent ? pointerCurrent() : current())
-      - pointerValue(event, track.getBoundingClientRect());
+    var value = pointerValue(event, track.getBoundingClientRect());
+    pointerGrabOffset = (pointerCurrent ? pointerCurrent() : current()) - value;
+    var adjusted = value + pointerGrabOffset;
+    previousPointerValue = pointerResult ? pointerResult(adjusted) : adjusted;
     pointerLimits = limits();
     handle.setPointerCapture(event.pointerId);
   });
@@ -338,13 +354,30 @@ function wireHandle(
       updatePointer(event);
     }
   });
-  handle.addEventListener("pointerup", function () { pointerLimits = null; });
-  handle.addEventListener("pointercancel", function () { pointerLimits = null; });
+  handle.addEventListener("pointerup", clearPointer);
+  handle.addEventListener("pointercancel", clearPointer);
   function updatePointer(event) {
     var bounds = track.getBoundingClientRect();
     var range = pointerLimits || limits();
-    var value = pointerValue(event, bounds) + pointerGrabOffset;
-    update(clamp(pointerResult ? pointerResult(value) : value, range.minimum, range.maximum));
+    var rawValue = pointerValue(event, bounds) + pointerGrabOffset;
+    var attempted = pointerResult ? pointerResult(rawValue) : rawValue;
+    var direction = Math.sign(attempted - previousPointerValue);
+    previousPointerValue = attempted;
+    updateWithin(attempted, range, direction);
+  }
+  function updateWithin(attempted, bounds, direction) {
+    var constrained = clamp(attempted, bounds.minimum, bounds.maximum);
+    update(constrained, {
+      attempted: attempted,
+      direction: direction,
+      limited: constrained !== attempted,
+      minimum: bounds.minimum,
+      maximum: bounds.maximum
+    });
+  }
+  function clearPointer() {
+    pointerLimits = null;
+    previousPointerValue = undefined;
   }
   handle.setAttribute("aria-orientation", orientation);
 }
@@ -356,6 +389,7 @@ function setVerticalHandle(handle, value, minimum, maximum) {
 
 function setHorizontalHandle(handle, value) {
   handle.style.left = (value / 360 * 100) + "%";
+  handle.dataset.tooltipAlign = value <= 110 ? "start" : (value < 250 ? "center" : "end");
   setSliderValue(handle, value, 0, 359,
     numberText(value) + " degrees, " + compassDirection(value));
 }
@@ -374,53 +408,15 @@ function previewY(altitude) {
   return PREVIEW.bottom - altitudePosition(altitude) * (PREVIEW.bottom - PREVIEW.top);
 }
 
-function altitudePosition(altitude) { return Math.pow(clamp(altitude / 90, 0, 1), 0.85); }
-
-function altitudeFromPosition(position) { return Math.pow(clamp(position, 0, 1), 1 / 0.85) * 90; }
-
-function bearingSegments(range, complement) {
-  if (range.start === range.end) return complement ? [[0, 360]] : [];
-  if (range.start < range.end) {
-    return complement ? [[0, range.start], [range.end, 360]] : [[range.start, range.end]];
-  }
-  return complement ? [[range.end, range.start]] : [[0, range.end], [range.start, 360]];
-}
-
 function rectanglePath(rectangle) {
   if (rectangle[0] >= rectangle[2] || rectangle[1] >= rectangle[3]) return "";
   return "M" + rectangle[0] + " " + rectangle[1] + "H" + rectangle[2]
     + "V" + rectangle[3] + "H" + rectangle[0] + "Z";
 }
 
-function validAltitude(minimum, maximum) {
-  return finiteNumber(minimum) && finiteNumber(maximum)
-    && minimum >= 0 && maximum <= 90 && minimum <= maximum;
-}
-
-function clockwiseDistance(start, end) { return normalizeDegrees(end - start); }
-
-function unwrappedTarget(target, minimum, maximum, fallback) {
-  var value = target;
-  while (value < minimum) value += 360;
-  while (value > maximum) value -= 360;
-  return value < minimum || value > maximum ? fallback : value;
-}
-
 function copyAltitude(value) { return { minimum: value.minimum, maximum: value.maximum }; }
 
-function copyAzimuth(value) {
-  var midpoint = normalizeDegrees(value.included.start
-    + clockwiseDistance(value.included.start, value.included.end) / 2);
-  var excluded = value.excluded || { start: midpoint, end: midpoint };
-  return {
-    included: copyRange(value.included),
-    excluded: copyRange(excluded)
-  };
-}
-
 function copyRange(value) { return { start: value.start, end: value.end }; }
-
-function finiteNumber(value) { return typeof value === "number" && Number.isFinite(value); }
 
 function controlError(message, focus) { return { error: message, focus: focus }; }
 

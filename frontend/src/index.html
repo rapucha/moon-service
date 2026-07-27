@@ -118,6 +118,24 @@
                       preserveAspectRatio="xMidYMid meet"
                       aria-hidden="true"
                       focusable="false"></svg>
+                    <button type="button"
+                      class="preference-axis-help preference-altitude-axis-help"
+                      aria-label="About the altitude axis"
+                      aria-describedby="preference-altitude-axis-description">?
+                      <span class="preference-control-tooltip" aria-hidden="true">
+                        Altitude is 0° at the bottom and 90° at the top.
+                      </span>
+                    </button>
+                    <button type="button"
+                      class="preference-axis-help preference-bearing-axis-help"
+                      aria-label="About the bearing axis"
+                      aria-describedby="preference-bearing-axis-description">?
+                      <span class="preference-control-tooltip" aria-hidden="true">
+                        Bearing increases from N through E, S, W, and back to N.
+                      </span>
+                    </button>
+                    <p id="preference-angular-status" class="preference-angular-status"
+                      role="status" aria-live="polite" aria-atomic="true"></p>
                     <div id="preference-altitude-track" class="preference-altitude-track">
                       <div class="preference-altitude-base"></div>
                       <div class="preference-altitude-fill"></div>
@@ -126,21 +144,31 @@
                         class="preference-track-handle preference-altitude-handle"
                         role="slider"
                         aria-label="Minimum Moon altitude"
-                        aria-describedby="preference-altitude-help preference-preview-instructions"
+                        aria-describedby="preference-altitude-help preference-altitude-axis-description preference-handle-instructions preference-altitude-minimum-description"
                         aria-valuemin="0"
                         aria-valuemax="15"
                         aria-valuenow="2"
-                        data-altitude-minimum><span aria-hidden="true">2°</span></button>
+                        data-altitude-minimum><span aria-hidden="true">2°</span>
+                        <span class="preference-control-tooltip" aria-hidden="true">
+                          Drag this edge. Arrow keys move 1°; Shift plus an arrow moves 10°.
+                          Altitude keeps at least 10° visible.
+                        </span>
+                      </button>
                       <button
                         type="button"
                         class="preference-track-handle preference-altitude-handle"
                         role="slider"
                         aria-label="Maximum Moon altitude"
-                        aria-describedby="preference-altitude-help preference-preview-instructions"
+                        aria-describedby="preference-altitude-help preference-altitude-axis-description preference-handle-instructions preference-altitude-minimum-description"
                         aria-valuemin="2"
                         aria-valuemax="90"
                         aria-valuenow="15"
-                        data-altitude-maximum><span aria-hidden="true">15°</span></button>
+                        data-altitude-maximum><span aria-hidden="true">15°</span>
+                        <span class="preference-control-tooltip" aria-hidden="true">
+                          Drag this edge. Arrow keys move 1°; Shift plus an arrow moves 10°.
+                          Altitude keeps at least 10° visible.
+                        </span>
+                      </button>
                     </div>
                     <div id="preference-compass-track" class="preference-compass-track">
                       <div class="preference-compass-base"></div>
@@ -148,29 +176,51 @@
                       <div class="preference-included-fill" data-azimuth-fill="included-right"></div>
                       <div class="preference-blocked-fill" data-azimuth-fill="excluded-left"></div>
                       <div class="preference-blocked-fill" data-azimuth-fill="excluded-right"></div>
-                      <button type="button" class="preference-track-handle preference-included-handle"
+                      <button type="button"
+                        class="preference-track-handle preference-included-handle"
                         role="slider" aria-label="Included compass sector start"
-                        aria-describedby="preference-direction-help preference-preview-instructions"
-                        data-bearing-handle="included-start"><span aria-hidden="true">330°</span></button>
-                      <button type="button" class="preference-track-handle preference-included-handle"
+                        aria-describedby="preference-direction-help preference-bearing-axis-description preference-handle-instructions preference-bearing-minimum-description"
+                        data-bearing-handle="included-start"><span aria-hidden="true">330°</span>
+                        <span class="preference-control-tooltip" aria-hidden="true">
+                          Drag this usable-sector edge. Usable pieces are closed or at least 10° wide.
+                        </span>
+                      </button>
+                      <button type="button"
+                        class="preference-track-handle preference-included-handle"
                         role="slider" aria-label="Included compass sector end"
-                        aria-describedby="preference-direction-help preference-preview-instructions"
-                        data-bearing-handle="included-end"><span aria-hidden="true">30°</span></button>
-                      <button type="button" class="preference-track-handle preference-blocked-handle"
+                        aria-describedby="preference-direction-help preference-bearing-axis-description preference-handle-instructions preference-bearing-minimum-description"
+                        data-bearing-handle="included-end"><span aria-hidden="true">30°</span>
+                        <span class="preference-control-tooltip" aria-hidden="true">
+                          Drag this usable-sector edge. Usable pieces are closed or at least 10° wide.
+                        </span>
+                      </button>
+                      <button type="button"
+                        class="preference-track-handle preference-blocked-handle"
                         role="slider" aria-label="Blocked view start"
-                        aria-describedby="preference-direction-help preference-preview-instructions"
-                        data-bearing-handle="excluded-start"><span aria-hidden="true">350°</span></button>
-                      <button type="button" class="preference-track-handle preference-blocked-handle"
+                        aria-describedby="preference-direction-help preference-bearing-axis-description preference-handle-instructions preference-bearing-minimum-description"
+                        data-bearing-handle="excluded-start"><span aria-hidden="true">350°</span>
+                        <span class="preference-control-tooltip" aria-hidden="true">
+                          Drag this blocked edge. The last usable 10° transfers to the other side.
+                        </span>
+                      </button>
+                      <button type="button"
+                        class="preference-track-handle preference-blocked-handle"
                         role="slider" aria-label="Blocked view end"
-                        aria-describedby="preference-direction-help preference-preview-instructions"
-                        data-bearing-handle="excluded-end"><span aria-hidden="true">10°</span></button>
+                        aria-describedby="preference-direction-help preference-bearing-axis-description preference-handle-instructions preference-bearing-minimum-description"
+                        data-bearing-handle="excluded-end"><span aria-hidden="true">10°</span>
+                        <span class="preference-control-tooltip" aria-hidden="true">
+                          Drag this blocked edge. The last usable 10° transfers to the other side.
+                        </span>
+                      </button>
                     </div>
                   </div>
-                  <p id="preference-preview-instructions" class="preference-help preference-help-unindented">
-                    Altitude runs from 0° at the bottom to 90° at the top.
-                    Bearing increases from north through east, south, west, and north again.
-                    Use arrow keys for 1° steps or Shift plus an arrow for 10°.
-                  </p>
+                  <div class="visually-hidden">
+                    <p id="preference-altitude-axis-description">Altitude is 0° at the bottom and 90° at the top.</p>
+                    <p id="preference-bearing-axis-description">Bearing increases from north through east, south, west, and north again.</p>
+                    <p id="preference-handle-instructions">Drag a handle, use an arrow key for 1°, or use Shift plus an arrow key for 10°.</p>
+                    <p id="preference-altitude-minimum-description">The altitude range stays at least 10° wide and rebounds when it reaches that limit.</p>
+                    <p id="preference-bearing-minimum-description">Each usable direction is closed or at least 10° wide. At least one remains usable.</p>
+                  </div>
                 </div>
               </section>
 

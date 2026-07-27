@@ -160,14 +160,15 @@ now.
 The browser may keep version 1 opportunity preferences in `localStorage` under
 `moonService.opportunityPreferences.v1`. It may store an optional
 `altitudeDegrees` range; one `time` availability mode using local-clock windows
-or ambient-light buckets; an enabled `azimuthDegrees` preference containing
-both an included sector and a contained blocked sector; any nonempty selection
-of `namedPhases`; and one `brightLimbOrientationDegrees` range.
+or ambient-light buckets; an enabled `azimuthDegrees` preference containing an
+included sector and, when an obstruction is selected, a contained blocked
+sector; any nonempty selection of `namedPhases`; and one
+`brightLimbOrientationDegrees` range.
 
 Direction filtering is one preference. When it is enabled, the browser stores
-and sends both sectors, and the blocked sector stays inside the included
-sector. The named phases are alternatives: a sample may match any selected
-phase.
+and sends the included sector. It stores and sends the blocked sector only when
+an obstruction is selected, and that sector stays inside the included sector.
+The named phases are alternatives: a sample may match any selected phase.
 
 The browser's bright-limb control has one target and a fixed tolerance, initially
 ±10°. It stores and sends that target as an array containing exactly one

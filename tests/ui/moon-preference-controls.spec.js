@@ -168,83 +168,69 @@ test("edits, persists, removes, and resets the accepted controls", async ({ page
   await expect(focusTarget).toBeFocused();
 });
 
-test("stops nested boundaries and omits a collapsed blocked view", async ({
-  page
-}, testInfo) => {
+test("snaps, transfers, and preserves usable compass sectors", async ({ page }) => {
+  await preloadState(page, { version: 1, azimuthDegrees: DIRECTION });
   const calls = await captureApiCalls(page);
   await page.goto("/search?q=Prague");
   await waitForCallCount(calls, 1);
   calls.length = 0;
   await openPreferences(page);
-  await page.getByLabel("Limit Moon direction").check();
   const apply = page.getByRole("button", { name: "Use these limits" });
   const includedStart = page.getByRole("slider", { name: "Included compass sector start" });
   const includedEnd = page.getByRole("slider", { name: "Included compass sector end" });
   const blockedStart = page.getByRole("slider", { name: "Blocked view start" });
   const blockedEnd = page.getByRole("slider", { name: "Blocked view end" });
+  const status = page.locator("#preference-angular-status");
 
-  await focusAndPress(page, includedStart, ["Shift+ArrowRight", "Shift+ArrowRight", "ArrowRight"]);
-  await expect(includedStart).toHaveAttribute("aria-valuenow", "350");
-
-  await focusAndPress(page, includedEnd, ["Shift+ArrowLeft", "Shift+ArrowLeft", "ArrowLeft"]);
-  await expect(includedEnd).toHaveAttribute("aria-valuenow", "10");
-  await pressKeys(page, ["Shift+ArrowRight", "Shift+ArrowRight"]);
-  await expect(includedEnd).toHaveAttribute("aria-valuenow", "30");
-
-  await focusAndPress(page, blockedEnd, ["Shift+ArrowRight", "Shift+ArrowRight", "ArrowRight"]);
+  await focusAndPress(page, blockedStart, ["Shift+ArrowLeft", "ArrowLeft"]);
+  await expect(blockedStart).toHaveAttribute("aria-valuenow", "330");
+  await expect(status).toContainText("snapped closed");
+  await focusAndPress(page, blockedEnd, ["Shift+ArrowRight", "ArrowRight"]);
+  await expect(blockedStart).toHaveAttribute("aria-valuenow", "340");
   await expect(blockedEnd).toHaveAttribute("aria-valuenow", "30");
-  await pressKeys(page, ["Shift+ArrowLeft", "Shift+ArrowLeft"]);
-  await expect(blockedEnd).toHaveAttribute("aria-valuenow", "10");
+  await expect(status).toContainText("moved to the other side");
 
-  await focusAndPress(page, blockedStart, ["Shift+ArrowRight", "Shift+ArrowRight", "ArrowRight"]);
-  await expect(blockedStart).toHaveAttribute("aria-valuenow", "10");
-  expect(await page.locator("[data-azimuth-fill^='excluded']").evaluateAll(fills =>
-    fills.every(fill => fill.style.width === "0%"))).toBe(true);
-  const startBox = await blockedStart.boundingBox();
-  const endBox = await blockedEnd.boundingBox();
-  expect(startBox).not.toBeNull();
-  expect(endBox).not.toBeNull();
-  expect(Math.abs(startBox.x + startBox.width - endBox.x)).toBeLessThanOrEqual(1);
-  await verifyPointerTargets(page, [
-    [blockedStart, "[data-bearing-handle='excluded-start']"],
-    [blockedEnd, "[data-bearing-handle='excluded-end']"]
-  ], testInfo.project.name === "mobile");
+  await focusAndPress(page, blockedStart, ["ArrowLeft"]);
+  await expect(blockedStart).toHaveAttribute("aria-valuenow", "330");
+  await expect(blockedEnd).toHaveAttribute("aria-valuenow", "20");
+  await focusAndPress(page, blockedStart, ["ArrowRight"]);
+  await expect(blockedStart).toHaveAttribute("aria-valuenow", "340");
+  await expect(status).toContainText("opened to the 10° minimum");
+
+  await focusAndPress(page, includedStart, ["ArrowRight"]);
+  await expect(includedStart).toHaveAttribute("aria-valuenow", "340");
+  await expect(status).toContainText("snapped closed");
+  await focusAndPress(page, includedEnd, ["ArrowLeft"]);
+  await expect(includedEnd).toHaveAttribute("aria-valuenow", "30");
+  await expect(status).toContainText("must remain at least 10°");
 
   await apply.click();
   await waitForCallCount(calls, 1);
   expect(calls[0].body.preferences.azimuthDegrees).toEqual({
-    included: { start: 350, end: 30 }
+    included: { start: 340, end: 30 },
+    excluded: { start: 340, end: 20 }
   });
-  expect(await storedPreferences(page)).toEqual(calls[0].body.preferences);
 
+  await preloadState(page, {
+    version: 1, azimuthDegrees: { included: { start: 40, end: 140 } }
+  });
   await page.reload();
   await waitForCallCount(calls, 2);
   await openPreferences(page);
-  await expect(page.getByLabel("Limit Moon direction")).toBeChecked();
-  await expect(blockedStart).toHaveAttribute("aria-valuenow", "10");
-  await expect(blockedEnd).toHaveAttribute("aria-valuenow", "10");
-  await focusAndPress(page, blockedEnd, ["Shift+ArrowRight", "Shift+ArrowRight"]);
-  await focusAndPress(page, blockedStart, ["Shift+ArrowRight", "Shift+ArrowRight"]);
-  await focusAndPress(page, includedStart, Array(4).fill("Shift+ArrowRight"));
-  await expect(includedStart).toHaveAttribute("aria-valuenow", "29");
-  await focusAndPress(page, blockedStart, ["ArrowLeft"]);
-  await focusAndPress(page, blockedEnd, ["ArrowLeft"]);
-  await focusAndPress(page, includedEnd, ["ArrowLeft"]);
-  await expect(includedEnd).toHaveAttribute("aria-valuenow", "30");
-
-  await preloadState(page, {
-    version: 1, azimuthDegrees: { included: { start: 29.5, end: 30 } }
-  });
-  await page.reload();
+  for (const handle of [blockedStart, blockedEnd]) {
+    await expect(handle).toHaveAttribute("aria-valuenow", "90");
+  }
+  await apply.click();
   await waitForCallCount(calls, 3);
-  await openPreferences(page);
-  await focusAndPress(page, blockedEnd, ["ArrowRight"]);
-  await focusAndPress(page, blockedStart, ["ArrowRight"]);
-  await focusAndPress(page, includedStart, ["ArrowRight"]);
-  await expect(includedStart).toHaveAttribute("aria-valuenow", "29.5");
+  expect(calls[2].body.preferences.azimuthDegrees).toEqual({
+    included: { start: 40, end: 140 }
+  });
+  expect(await storedPreferences(page)).toEqual(calls[2].body.preferences);
 });
 
-test("stops every bearing pointer at its adjacent boundary", async ({ page }, testInfo) => {
+test("stops red bearing handles at the visible north endpoints", async ({
+  page
+}, testInfo) => {
   await preloadState(page, {
     version: 1,
     azimuthDegrees: DIRECTION
@@ -255,48 +241,27 @@ test("stops every bearing pointer at its adjacent boundary", async ({ page }, te
   await openPreferences(page);
   const trackBox = await page.locator("#preference-compass-track").boundingBox();
   expect(trackBox).not.toBeNull();
-  /** @type {Array<[string, number, string, string | null]>} */
-  const cases = [
-    ["Included compass sector start", trackBox.width * 0.2, "350", "Shift+ArrowLeft"],
-    ["Blocked view start", -trackBox.width * 0.9, "330", "Shift+ArrowRight"],
-    ["Blocked view end", trackBox.width * 0.9, "30", "Shift+ArrowLeft"],
-    ["Included compass sector end", -trackBox.width * 0.2, "10", null]
-  ];
-  for (const [name, deltaX, expected, restoreKey] of cases) {
-    const handle = page.getByRole("slider", { name });
-    if (testInfo.project.name === "mobile") {
-      await dragTouchHandle(page, handle, deltaX);
-    } else {
-      await dragMouseHandle(page, handle, deltaX);
-    }
-    await expect(handle).toHaveAttribute("aria-valuenow", expected);
-    if (restoreKey) {
-      await handle.focus();
-      await pressKeys(page, [restoreKey, restoreKey]);
-    }
-  }
-  const includedStart = page.getByRole("slider", { name: "Included compass sector start" });
-  await includedStart.focus();
-  for (const [key, expected] of [["End", "350"], ["Home", "11"]]) {
-    await page.keyboard.press(key);
-    await expect(includedStart).toHaveAttribute("aria-valuenow", expected);
-  }
-  for (const name of ["Blocked view start", "Blocked view end"]) {
-    const handle = page.getByRole("slider", { name });
-    await handle.focus();
-    for (const [key, expected] of [["Home", "0"], ["End", "359"]]) {
-      await page.keyboard.press(key);
-      await expect(handle).toHaveAttribute("aria-valuenow", expected);
-    }
-  }
+  const blockedStart = page.getByRole("slider", { name: "Blocked view start" });
+  const blockedEnd = page.getByRole("slider", { name: "Blocked view end" });
+  const drag = testInfo.project.name === "mobile" ? dragTouchHandle : dragMouseHandle;
+  await drag(page, blockedStart, trackBox.width * 2);
+  await expect(blockedStart).toHaveAttribute("aria-valuenow", "359");
+  await focusAndPress(page, blockedStart, ["ArrowRight"]);
+  await expect(blockedStart).toHaveAttribute("aria-valuenow", "359");
+  await expect(page.locator("#preference-angular-status")).toContainText("stop at north");
+
+  await drag(page, blockedEnd, -trackBox.width * 2);
+  await expect(blockedEnd).toHaveAttribute("aria-valuenow", "0");
+  await focusAndPress(page, blockedEnd, ["ArrowLeft"]);
+  await expect(blockedEnd).toHaveAttribute("aria-valuenow", "0");
 });
 
-test("keeps coincident altitude boundaries edge-to-edge and draggable", async ({
+test("keeps the last 10 altitude degrees elastic without changing logical state", async ({
   page
 }, testInfo) => {
   await preloadState(page, {
     version: 1,
-    altitudeDegrees: { minimum: 89, maximum: 89 }
+    altitudeDegrees: { minimum: 2, maximum: 15 }
   });
   const calls = await captureApiCalls(page);
   await page.goto("/search?q=Prague");
@@ -305,55 +270,38 @@ test("keeps coincident altitude boundaries edge-to-edge and draggable", async ({
 
   const minimum = page.getByRole("slider", { name: "Minimum Moon altitude" });
   const maximum = page.getByRole("slider", { name: "Maximum Moon altitude" });
-  const track = page.locator("#preference-altitude-track");
-  await minimum.scrollIntoViewIfNeeded();
-  const minimumBox = await minimum.boundingBox();
-  const trackBox = await track.boundingBox();
-  expect(minimumBox).not.toBeNull();
-  expect(trackBox).not.toBeNull();
-  await expect(minimum).toHaveAttribute("aria-valuenow", "89");
-  await expect(maximum).toHaveAttribute("aria-valuenow", "89");
-  const maximumBox = await maximum.boundingBox();
-  expect(maximumBox).not.toBeNull();
-  expect(Math.abs(minimumBox.x - maximumBox.x)).toBeLessThanOrEqual(1);
-  expect(Math.abs(minimumBox.y - maximumBox.y - maximumBox.height)).toBeLessThanOrEqual(1);
+  await focusAndPress(page, maximum, ["Shift+ArrowDown"]);
+  await expect(maximum).toHaveAttribute("aria-valuenow", "12");
+  await minimum.evaluate(element => {
+    const observer = new MutationObserver(() => {
+      if (element.classList.contains("is-rebounding-up")) {
+        element.setAttribute("data-test-rebound-seen", "true");
+        observer.disconnect();
+      }
+    });
+    observer.observe(element, { attributeFilter: ["class"] });
+  });
+  await focusAndPress(page, minimum, ["ArrowUp"]);
+  await expect(minimum).toHaveAttribute("aria-valuenow", "2");
+  await expect(minimum).toHaveAttribute("data-test-rebound-seen", "true");
+  await expect(page.locator("#preference-angular-status"))
+    .toContainText("keeps at least 10° visible");
 
-  await verifyPointerTargets(page, [
-    [minimum, "[data-altitude-minimum]"],
-    [maximum, "[data-altitude-maximum]"]
-  ], testInfo.project.name === "mobile");
-
-  if (testInfo.project.name === "mobile") await dragTouchHandle(page, minimum, 0, 12);
-  else await dragMouseHandle(page, minimum, 0, 12);
-  const movedBox = await minimum.boundingBox();
-  expect(movedBox).not.toBeNull();
-  expect(Math.abs(movedBox.y - minimumBox.y - 12)).toBeLessThanOrEqual(2);
-  await expect(maximum).toHaveAttribute("aria-valuenow", "89");
-
-  await minimum.focus();
-  await page.keyboard.press("Home");
-  const homeBox = await minimum.boundingBox();
-  expect(homeBox).not.toBeNull();
-  const homeCenter = { x: homeBox.x + homeBox.width / 2, y: homeBox.y + homeBox.height / 2 };
-  expect(await page.evaluate(point => document.elementFromPoint(point.x, point.y)
-    ?.closest("[data-altitude-minimum]") !== null, homeCenter)).toBe(true);
-  const targetY = trackBox.y + trackBox.height * (1 - Math.pow(0.5, 0.85));
-  const deltaY = targetY + homeBox.height / 2 - homeCenter.y;
-  if (testInfo.project.name === "mobile") await dragTouchHandle(page, minimum, 0, deltaY);
-  else await dragMouseHandle(page, minimum, 0, deltaY);
-  await expect(minimum).toHaveAttribute("aria-valuenow", "45");
-  await expect(maximum).toHaveAttribute("aria-valuenow", "89");
+  const drag = testInfo.project.name === "mobile" ? dragTouchHandle : dragMouseHandle;
+  await drag(page, minimum, 0, -30);
+  await expect(minimum).toHaveAttribute("aria-valuenow", "2");
+  await expect(maximum).toHaveAttribute("aria-valuenow", "12");
 });
 
-test("keeps directional bearing hit targets anchored and unclipped", async ({
+test("aligns bearing boundaries and mirrors red markers without moving hit targets", async ({
   page
 }, testInfo) => {
   await preloadState(page, {
     version: 1,
     altitudeDegrees: { minimum: 0, maximum: 15 },
     azimuthDegrees: {
-      included: { start: 0, end: 359 },
-      excluded: { start: 0, end: 359 }
+      included: { start: 40, end: 320 },
+      excluded: { start: 40, end: 280 }
     }
   });
   const calls = await captureApiCalls(page);
@@ -378,20 +326,39 @@ test("keeps directional bearing hit targets anchored and unclipped", async ({
     [altitudeMinimum, "[data-altitude-minimum]"],
     [start, "[data-bearing-handle='included-start']"],
     [end, "[data-bearing-handle='included-end']"],
-    [blockedStart, "[data-bearing-handle='excluded-start']"],
-    [blockedEnd, "[data-bearing-handle='excluded-end']"]
+    [blockedStart, "[data-bearing-handle='excluded-start']", "right"],
+    [blockedEnd, "[data-bearing-handle='excluded-end']", "left"]
   ], testInfo.project.name === "mobile");
+  for (const handle of [blockedStart, blockedEnd]) {
+    await handle.hover();
+    const tooltipBox = await handle.locator(".preference-control-tooltip").boundingBox();
+    expect(tooltipBox).not.toBeNull();
+    expect(tooltipBox.x).toBeGreaterThanOrEqual(previewBox.x);
+    expect(tooltipBox.x + tooltipBox.width)
+      .toBeLessThanOrEqual(previewBox.x + previewBox.width);
+  }
 
-  const blocked = testInfo.project.name === "mobile" ? blockedEnd : blockedStart;
-  const trackBox = await page.locator("#preference-compass-track").boundingBox();
-  expect(trackBox).not.toBeNull();
-  const deltaX = testInfo.project.name === "mobile" ? -20 : 20;
-  const initial = Number(await blocked.getAttribute("aria-valuenow"));
-  const expected = initial + Math.round(deltaX / trackBox.width * 359);
-  if (testInfo.project.name === "mobile") await dragTouchHandle(page, blocked, deltaX);
-  else await dragMouseHandle(page, blocked, deltaX);
-  expect(Math.abs(Number(await blocked.getAttribute("aria-valuenow")) - expected))
-    .toBeLessThanOrEqual(1);
+  const edges = await page.evaluate(() => {
+    const rectangle = selector => document.querySelector(selector).getBoundingClientRect();
+    const svg = rectangle("#preference-angular-artwork");
+    const start = rectangle("[data-bearing-handle='included-start']");
+    const end = rectangle("[data-bearing-handle='included-end']");
+    const fill = rectangle("[data-azimuth-fill='included-left']");
+    const svgX = bearing => svg.left + (40 + bearing / 360 * 300) / 360 * svg.width;
+    return {
+      start: [start.right, fill.left, svgX(40)],
+      end: [end.left, fill.right, svgX(320)]
+    };
+  });
+  for (const aligned of [edges.start, edges.end]) {
+    expect(Math.max(...aligned) - Math.min(...aligned)).toBeLessThanOrEqual(1);
+  }
+  expect(await page.locator("[data-preview-exclusion]").evaluate(path =>
+    (path.getAttribute("d").match(/M/g) || []).length)).toBe(3);
+  expect(await blockedStart.evaluate(element =>
+    getComputedStyle(element, "::before").left)).toBe("24px");
+  expect(await blockedEnd.evaluate(element =>
+    getComputedStyle(element, "::before").right)).toBe("24px");
 });
 
 test("uses the schematic sliders to explain and preview angular limits", async ({
@@ -408,8 +375,15 @@ test("uses the schematic sliders to explain and preview angular limits", async (
   const preview = page.locator(".preference-angular-preview");
   await expect(preview).toBeVisible();
   await expect(page.locator(".preference-preview-caption")).toHaveCount(0);
+  await expect(page.locator("#preference-preview-instructions")).toHaveCount(0);
   await expect(page.locator("#preference-angular-artwork")).toHaveAttribute("aria-hidden", "true");
   await expect(page.locator(".preference-preview-moon")).toHaveCount(13);
+  expect(await page.evaluate(async () => {
+    const module = await import(window.location.origin + "/moonPhaseView.js");
+    const expected = module.moonPhaseImageDataUrl(65, 42, 325, 0);
+    return Array.from(document.querySelectorAll(".preference-preview-moon"))
+      .every(image => image.getAttribute("href") === expected);
+  })).toBe(true);
   expect(await page.locator("[data-moon-path-artwork='true']").count()).toBeGreaterThan(0);
   await expect(preview).not.toContainText(/time|daylight|twilight|night/i);
   await expect(page.locator(".moon-path-foreground").first()).toHaveCSS("animation-name", "none");
@@ -425,6 +399,16 @@ test("uses the schematic sliders to explain and preview angular limits", async (
 
   const altitudeMinimum = page.getByRole("slider", { name: "Minimum Moon altitude" });
   const altitudeMaximum = page.getByRole("slider", { name: "Maximum Moon altitude" });
+  await expect(page.getByRole("button", { name: "About the altitude axis" }))
+    .toContainText(/0° at the bottom.*90° at the top/);
+  await expect(page.getByRole("button", { name: "About the bearing axis" }))
+    .toContainText(/N through E, S, W/);
+  await expect(altitudeMinimum).toHaveAttribute(
+    "aria-describedby", /preference-handle-instructions preference-altitude-minimum-description/);
+  await altitudeMinimum.hover();
+  const altitudeTooltip = altitudeMinimum.locator(".preference-control-tooltip");
+  await expect(altitudeTooltip).toHaveCSS("opacity", "1");
+  await expect(altitudeTooltip).toHaveCSS("white-space", "normal");
   await altitudeMinimum.focus();
   await page.keyboard.press("Home");
   await altitudeMaximum.focus();
@@ -443,6 +427,16 @@ test("uses the schematic sliders to explain and preview angular limits", async (
   })).toBe(true);
 
   const blockedStart = page.getByRole("slider", { name: "Blocked view start" });
+  await blockedStart.hover();
+  const tooltipPreviewBox = await preview.boundingBox();
+  const blockedTooltipBox = await blockedStart.locator(
+    ".preference-control-tooltip"
+  ).boundingBox();
+  expect(tooltipPreviewBox).not.toBeNull();
+  expect(blockedTooltipBox).not.toBeNull();
+  expect(blockedTooltipBox.y).toBeGreaterThanOrEqual(tooltipPreviewBox.y);
+  expect(blockedTooltipBox.y + blockedTooltipBox.height)
+    .toBeLessThanOrEqual(tooltipPreviewBox.y + tooltipPreviewBox.height);
   await blockedStart.focus();
   await page.keyboard.press("Shift+ArrowLeft");
   await expect(blockedStart).toHaveAttribute("aria-valuenow", "340");
@@ -531,12 +525,13 @@ async function focusAndPress(page, locator, keys) {
 }
 
 async function verifyPointerTargets(page, entries, useTouch) {
-  for (const [locator, selector] of entries) {
+  for (const [locator, selector, markerEdge] of entries) {
     await locator.scrollIntoViewIfNeeded();
     const box = await locator.boundingBox();
     expect(box).not.toBeNull();
     const center = {
-      x: box.x + box.width / 2,
+      x: markerEdge === "left" ? box.x + 4
+        : (markerEdge === "right" ? box.x + box.width - 4 : box.x + box.width / 2),
       y: box.y + box.height / 2
     };
     expect(await page.evaluate(({ point, target }) => {

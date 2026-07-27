@@ -86,6 +86,102 @@
   opacity: calc(var(--moon-path-foreground-opacity, 0.16) * 1.7);
 }
 
+.preference-axis-help {
+  position: absolute;
+  z-index: 8;
+  width: 24px;
+  min-width: 0;
+  height: 24px;
+  min-height: 0;
+  padding: 0;
+  border: 1px solid rgba(82, 101, 100, 0.65);
+  border-radius: 50%;
+  background: rgba(248, 250, 249, 0.94);
+  color: #455755;
+  font-size: 0.75rem;
+  font-weight: 800;
+  line-height: 1;
+  text-decoration: none;
+}
+
+.preference-altitude-axis-help {
+  top: 37%;
+  left: 3px;
+}
+
+.preference-control-tooltip {
+  position: absolute;
+  display: block;
+  right: 0;
+  bottom: calc(100% + 8px);
+  z-index: 30;
+  width: min(180px, 70vw);
+  padding: 8px 10px;
+  border: 1px solid var(--line-strong);
+  border-radius: 6px;
+  background: var(--ink);
+  box-shadow: var(--shadow);
+  color: #fff;
+  font-size: 0.74rem;
+  font-weight: 640;
+  line-height: 1.35;
+  opacity: 0;
+  pointer-events: none;
+  text-align: left;
+  transition: opacity 0.12s ease-in-out;
+}
+
+.preference-axis-help:hover .preference-control-tooltip,
+.preference-axis-help:focus .preference-control-tooltip,
+.preference-track-handle:hover .preference-control-tooltip,
+.preference-track-handle:focus .preference-control-tooltip {
+  display: block;
+  opacity: 1;
+}
+
+.preference-altitude-axis-help .preference-control-tooltip {
+  top: calc(100% + 5px);
+  bottom: auto;
+  left: 0;
+  right: auto;
+}
+
+.preference-bearing-axis-help {
+  bottom: 2px;
+  left: 70%;
+  transform: translateX(-50%);
+}
+
+.preference-bearing-axis-help .preference-control-tooltip {
+  right: auto;
+  bottom: calc(100% + 5px);
+  left: 50%;
+  transform: translateX(-50%);
+}
+
+.preference-angular-status {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  z-index: 9;
+  width: min(235px, 72%);
+  margin: 0;
+  padding: 7px 9px;
+  border: 1px solid rgba(60, 80, 78, 0.45);
+  border-radius: 6px;
+  background: rgba(248, 250, 249, 0.96);
+  box-shadow: 0 3px 10px rgba(20, 31, 34, 0.2);
+  color: #344644;
+  font-size: 0.74rem;
+  font-weight: 680;
+  line-height: 1.3;
+  pointer-events: none;
+}
+
+.preference-angular-status:empty {
+  opacity: 0;
+}
+
 .preference-altitude-track {
   position: absolute;
   z-index: 6;
@@ -147,6 +243,20 @@
   display: none;
 }
 
+.preference-track-handle > .preference-control-tooltip {
+  display: block;
+  top: auto;
+  right: 0;
+  bottom: calc(100% + 8px);
+  left: auto;
+  color: #fff;
+  font-size: 0.74rem;
+  font-weight: 640;
+  font-variant-numeric: normal;
+  white-space: normal;
+  transform: none;
+}
+
 .preference-altitude-handle {
   z-index: 6;
   left: 50%;
@@ -154,6 +264,14 @@
   height: 28px;
   cursor: ns-resize;
   pointer-events: auto;
+}
+
+.preference-altitude-handle .preference-control-tooltip {
+  top: 50%;
+  bottom: auto;
+  left: calc(100% + 5px);
+  right: auto;
+  transform: translateY(-50%);
 }
 
 .preference-altitude-handle::before {
@@ -182,9 +300,9 @@
 
 .preference-compass-track {
   position: absolute;
-  right: 24px;
+  right: 5.5556%;
   bottom: 10px;
-  left: 11.11%;
+  left: 11.1111%;
   height: 62px;
   margin: 0;
   pointer-events: none;
@@ -235,7 +353,7 @@
 
 .preference-blocked-handle {
   top: 33px;
-  width: 24px;
+  width: 32px;
   height: 26px;
   cursor: ew-resize;
   pointer-events: auto;
@@ -267,22 +385,77 @@
   transform: translateX(0);
 }
 
+.preference-track-handle[data-tooltip-align="start"] .preference-control-tooltip {
+  right: auto;
+  left: 0;
+}
+
+.preference-track-handle[data-tooltip-align="center"] .preference-control-tooltip {
+  right: auto;
+  left: 50%;
+  transform: translateX(-50%);
+}
+
+.preference-blocked-handle[data-bearing-handle$="-start"] {
+  transform: translateX(-75%);
+}
+
+.preference-blocked-handle[data-bearing-handle$="-start"]::before {
+  right: auto;
+  left: 24px;
+  border-radius: 0 5px 5px 0;
+}
+
+.preference-blocked-handle[data-bearing-handle$="-end"] {
+  transform: translateX(-25%);
+}
+
+.preference-blocked-handle[data-bearing-handle$="-end"]::before {
+  right: 24px;
+  left: auto;
+  border-radius: 5px 0 0 5px;
+}
+
+.preference-altitude-handle.is-rebounding-up::before {
+  animation: preference-altitude-rebound-up 0.34s ease-out;
+}
+
+.preference-altitude-handle.is-rebounding-down::before {
+  animation: preference-altitude-rebound-down 0.34s ease-out;
+}
+
 .preference-angular-fields.is-altitude-disabled .preference-altitude-fill,
 .preference-angular-fields.is-altitude-disabled .preference-altitude-handle,
+.preference-angular-fields.is-altitude-disabled .preference-altitude-axis-help,
 .preference-angular-fields.is-direction-disabled .preference-included-fill,
 .preference-angular-fields.is-direction-disabled .preference-blocked-fill,
 .preference-angular-fields.is-direction-disabled .preference-included-handle,
-.preference-angular-fields.is-direction-disabled .preference-blocked-handle {
+.preference-angular-fields.is-direction-disabled .preference-blocked-handle,
+.preference-angular-fields.is-direction-disabled .preference-bearing-axis-help {
   display: none;
 }
 
-.preference-angular-fields .preference-help {
-  margin: 8px 0 0;
-  text-align: left;
+@keyframes preference-altitude-rebound-up {
+  45% {
+    transform: translateY(-6px);
+  }
+}
+
+@keyframes preference-altitude-rebound-down {
+  45% {
+    transform: translateY(6px);
+  }
 }
 
 @media (max-width: 380px) {
   .preference-angular-fields {
     padding: 7px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .preference-altitude-handle.is-rebounding-up::before,
+  .preference-altitude-handle.is-rebounding-down::before {
+    animation: none;
   }
 }

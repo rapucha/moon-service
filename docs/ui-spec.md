@@ -104,7 +104,9 @@ The frontend module split is intended to keep future UI changes manageable:
 - `angularPreferenceControls.js`: altitude and azimuth preference
   coordination, normalization, and result-chart azimuth helpers;
 - `angularPreferencePreview.js`: schematic altitude and bearing sliders,
-  validation, fixed local Moon samples, and live exclusion shading;
+  fixed local Moon samples, and live exclusion shading;
+- `angularPreferenceRules.js`: nonlinear altitude mapping, bearing boundary
+  constraints, and merged schematic exclusion segments;
 - `angularPreferencePreview.css`: schematic axes, handle lanes, generic
   foreground, exclusion shading, and responsive presentation;
 - `moonAppearanceControls.js`: named-phase selection and the textured
@@ -129,9 +131,13 @@ The editor exposes these hard filters:
 
 - Moon altitude is one optional inclusive range edited with a vertical
   dual-handle slider over `[0°, 90°]` on the schematic Moon-pass selector.
+  The range remains at least `10°` wide.
   The bottom is `0°` and the top is `90°`. The display position is
   `(altitude / 90)^0.85`, which gives low altitudes mildly more room. Pointer
-  input uses the inverse mapping and request values remain degrees.
+  input uses the inverse mapping and request values remain degrees. An attempt
+  to close the last `10°` moves the marker briefly toward the other marker,
+  returns it to the valid boundary, and announces the limit. The invalid
+  overshoot is visual only.
 - Availability uses exactly one mode at a time. Local-clock mode accepts one or
   more windows in the searched location's timezone and explains that a window
   may cross midnight. Ambient-light mode accepts one or more of `Daylight`,
@@ -162,34 +168,55 @@ handles; there are no duplicate standalone tracks. The bearing axis runs from
 north at `0°` through east, south, and west to a repeated north label at
 `360°`. Short tick marks divide it every `15°`; longer ticks align only with
 the `90°` cardinal divisions. Its arrows mean increasing bearing, not Moon
-travel direction. Handle values remain in `[0°, 360°)`.
+travel direction. Handle values remain in `[0°, 360°)`. Short help appears at
+the altitude axis, bearing axis, and interactive handles instead of occupying
+a permanent paragraph below the schematic. The same facts are available to
+assistive technology through control descriptions.
 
 Each range handle is a directional boundary. Its inner edge marks the exact
-logical angle, while its visible body and pointer target extend away from the
-selected zone. Meeting handles share that edge and remain edge-to-edge with a
-visible seam instead of overlapping.
+logical angle and aligns with the fill and schematic exclusion edge. Green
+marker bodies extend outside the usable sector. Red marker bodies point into
+the blocked sector. Their hit areas include the visible marker and extend
+outside the blocked sector so narrow blocked sectors remain draggable.
+Adjacent exclusion rectangles merge before drawing so coincident green and
+red boundaries do not leave a dim hairline.
 
 The schematic uses a fixed illustrative arc, small textured Moon images, and
 the existing generic moving hills, trees, and buildings. It shows no time or
 ambient-light buckets and does not claim to describe the searched location's
 Moon path, skyline, terrain, or obstructions. Altitude and bearing changes dim
 the excluded sky and landscape regions behind the fixed arc. The Moon images
-and arc remain fully visible. This local preview does not model lunar-disk
-intersection and is not authoritative `azimuthMatchIntervals`.
+use a fixed upper-left-lit crescent and remain fully visible with the arc.
+This local preview does not model lunar-disk intersection and is not
+authoritative `azimuthMatchIntervals`.
 
 The altitude mapping applies to the handles, grid, fill, fixed arc, Moon
 samples, foreground height, and exclusion shading.
 
-Both compass sectors may cross north. Pointer, touch, and keyboard interaction
-keep the blocked boundaries inside the included boundaries. A boundary stops
-at its adjacent boundary and does not move another handle. Included-sector
-endpoints remain distinct. Blocked-sector endpoints may meet; then the browser
-draws no blocked fill or shading and omits `azimuthDegrees.excluded`. When an
-included-only stored value is loaded, the coincident blocked handles appear at
-the included sector's clockwise midpoint. That display position has no request
-meaning. Decorative Moon and landscape SVG content stays outside hit testing
-and the accessibility tree. Reduced motion stops the generic foreground drift
-without removing the schematic.
+Both compass sectors may cross north, but an individual red handle stops at
+the visible north endpoint and never appears at the other end of the axis.
+Pointer, touch, and keyboard interaction keep the blocked boundaries inside
+the included boundaries. Each of the two usable pieces beside the blocked
+sector is either `0°` or at least `10°` wide, and at least one piece remains
+usable. Opening a collapsed piece snaps it to `10°`. Closing a piece first
+stops at `10°`; continuing closes it to `0°`.
+
+When one usable piece is `0°` and a red handle closes the other from `10°`,
+that moving red handle snaps to its adjacent green handle. The other red
+handle moves inward by `10°`, transferring the usable piece to the other side.
+If that transfer would move the other red handle across north, both handles
+remain at the last valid `10°` state and a status message explains that the
+transfer cannot cross north.
+If a green handle tries to remove the only remaining piece, it stays at
+`10°`. Brief visible status messages explain minimum, snap, transfer, and
+north-stop results. Included-sector endpoints remain distinct. Blocked-sector
+endpoints may meet; then the browser draws no blocked fill or shading and
+omits `azimuthDegrees.excluded`. When an included-only stored value is loaded,
+the coincident blocked handles appear at the included sector's clockwise
+midpoint. That display position has no request meaning. Decorative Moon and
+landscape SVG content stays outside hit testing and the accessibility tree.
+Reduced motion stops the generic foreground drift and the elastic marker
+movement without removing status feedback or the schematic.
 
 The bright-limb dial explains the observer-oriented convention: `0°` points
 toward local zenith, `90°` points right toward increasing azimuth, and angles
