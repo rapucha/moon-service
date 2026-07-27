@@ -1,11 +1,12 @@
-import { clamp, normalizeDegrees } from "./format.js";
+import { clamp } from "./format.js";
 import { svgElement } from "./dom.js";
 import { moonPhaseImageDataUrl } from "./moonPhaseView.js";
 import { altitudeForegroundArtwork } from "./moonPathSilhouettes.js";
 import {
-  altitudeFromPosition, altitudePosition, bearingLimits, bearingValue,
-  copyAzimuth, excludedBearingSegments, MINIMUM_USABLE_DEGREES,
-  moveBearing, validAltitude
+  altitudeFromPosition, altitudePosition, ANGLE_EPSILON, angularZoneDescription,
+  bearingLimits, bearingValue, compassDirection, copyAltitude, copyAzimuth,
+  copyRange, excludedBearingSegments, MINIMUM_USABLE_DEGREES, moveBearing,
+  numberText, rectanglePath, validAltitude
 } from "./angularPreferenceRules.js";
 
 var DEFAULT_ALTITUDE = { minimum: 2, maximum: 15 };
@@ -34,6 +35,7 @@ export function createAngularPreferencePreview(form) {
   };
   var artwork = form.querySelector("#preference-angular-artwork");
   var editor = form.querySelector("#preference-angular-fields");
+  var zone = form.querySelector("[data-preference-zone]");
   var status = form.querySelector("#preference-angular-status");
   var altitude = copyAltitude(DEFAULT_ALTITUDE);
   var azimuth = copyAzimuth(DEFAULT_AZIMUTH);
@@ -65,6 +67,8 @@ export function createAngularPreferencePreview(form) {
   Object.entries(bearingHandles).forEach(function (entry) {
     wireBearingHandle(entry[0], entry[1]);
   });
+  zone.addEventListener("pointerenter", updateZoneTooltip);
+  zone.addEventListener("pointermove", updateZoneTooltip);
 
   return {
     render: function (state) {
@@ -162,6 +166,9 @@ export function createAngularPreferencePreview(form) {
   function setWrappedFill(kind, start, end) {
     var left = form.querySelector("[data-azimuth-fill='" + kind + "-left']");
     var right = form.querySelector("[data-azimuth-fill='" + kind + "-right']");
+    left.classList.toggle("is-handle-bridge",
+      kind === "included" && start < end
+      && Math.abs(end - start - MINIMUM_USABLE_DEGREES) <= ANGLE_EPSILON);
     if (start > end) {
       setFill(left, 0, end);
       setFill(right, start, 360 - start);
@@ -194,6 +201,14 @@ export function createAngularPreferencePreview(form) {
       "d", rectangles.map(rectanglePath).filter(Boolean).join(" "));
   }
 
+  function updateZoneTooltip(event) {
+    var bounds = zone.getBoundingClientRect();
+    var bearing = ((event.clientX - bounds.left) / bounds.width) * 360;
+    zone.querySelector(".preference-zone-tooltip").textContent = angularZoneDescription(
+      bearing, altitudeFromPosition(1 - ((event.clientY - bounds.top) / bounds.height)),
+      altitudeEnabled ? altitude : null, directionEnabled ? azimuth : null);
+  }
+
   function readAzimuth() {
     var value = { included: copyRange(azimuth.included) };
     if (azimuth.excluded.start !== azimuth.excluded.end) {
@@ -213,21 +228,22 @@ export function createAngularPreferencePreview(form) {
   }
 
   function announceBearingEffect(effect) {
+    if (effect === "closed") return announce("");
     var messages = {
       minimum: "A usable direction must remain at least 10° wide.",
       opened: "That usable direction opened to the 10° minimum.",
-      closed: "That usable direction snapped closed; the other side remains usable.",
       transferred: "The last 10° moved to the other side so one direction remains usable.",
       "transfer-seam": "The last 10° cannot transfer across north.",
       "block-removed": "The blocked sector closed, leaving the selected direction usable."
     };
-    announce(messages[effect]);
+    if (messages[effect]) announce(messages[effect]);
   }
 
   function announce(message) {
-    if (!message || status.textContent === message) return;
+    if (status.textContent === message) return;
     window.clearTimeout(statusTimer);
-    status.textContent = message;
+    status.textContent = message || "";
+    if (!message) return;
     statusTimer = window.setTimeout(function () {
       status.textContent = "";
     }, 3200);
@@ -237,7 +253,7 @@ export function createAngularPreferencePreview(form) {
 function buildArtwork(artwork) {
   var chartWidth = PREVIEW.right - PREVIEW.left;
   var chartHeight = PREVIEW.bottom - PREVIEW.top;
-  var moonImage = moonPhaseImageDataUrl(65, 42, 325, 0);
+  var moonImage = moonPhaseImageDataUrl(65, 42, 270, 0);
   var children = [
     gridArtwork(),
     altitudeForegroundArtwork(
@@ -408,22 +424,4 @@ function previewY(altitude) {
   return PREVIEW.bottom - altitudePosition(altitude) * (PREVIEW.bottom - PREVIEW.top);
 }
 
-function rectanglePath(rectangle) {
-  if (rectangle[0] >= rectangle[2] || rectangle[1] >= rectangle[3]) return "";
-  return "M" + rectangle[0] + " " + rectangle[1] + "H" + rectangle[2]
-    + "V" + rectangle[3] + "H" + rectangle[0] + "Z";
-}
-
-function copyAltitude(value) { return { minimum: value.minimum, maximum: value.maximum }; }
-
-function copyRange(value) { return { start: value.start, end: value.end }; }
-
 function controlError(message, focus) { return { error: message, focus: focus }; }
-
-export function compassDirection(value) {
-  var directions = ["N", "NNE", "NE", "ENE", "E", "ESE", "SE", "SSE",
-    "S", "SSW", "SW", "WSW", "W", "WNW", "NW", "NNW"];
-  return directions[Math.round(normalizeDegrees(value) / 22.5) % directions.length];
-}
-
-function numberText(value) { return String(Math.round(value * 1000) / 1000); }

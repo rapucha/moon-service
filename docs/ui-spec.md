@@ -168,10 +168,12 @@ handles; there are no duplicate standalone tracks. The bearing axis runs from
 north at `0°` through east, south, and west to a repeated north label at
 `360°`. Short tick marks divide it every `15°`; longer ticks align only with
 the `90°` cardinal divisions. Its arrows mean increasing bearing, not Moon
-travel direction. Handle values remain in `[0°, 360°)`. Short help appears at
-the altitude axis, bearing axis, and interactive handles instead of occupying
-a permanent paragraph below the schematic. The same facts are available to
-assistive technology through control descriptions.
+travel direction. Handle values remain in `[0°, 360°)`. The altitude axis is
+labeled directly, and the bearing arrow labels the horizontal axis. Handle help
+appears briefly, never more than one tooltip at a time, and disappears when a
+handle moves. Hovering the plot explains the configured included, excluded, or
+blocked range under the pointer. The same control facts are available to
+assistive technology through descriptions.
 
 Each range handle is a directional boundary. Its inner edge marks the exact
 logical angle and aligns with the fill and schematic exclusion edge. Green
@@ -179,14 +181,16 @@ marker bodies extend outside the usable sector. Red marker bodies point into
 the blocked sector. Their hit areas include the visible marker and extend
 outside the blocked sector so narrow blocked sectors remain draggable.
 Adjacent exclusion rectangles merge before drawing so coincident green and
-red boundaries do not leave a dim hairline.
+red boundaries do not leave a dim hairline. At the straight `10°` minimum, the
+included fill bridges the green marker bodies and their facing borders use the
+fill color, leaving no pale seam.
 
 The schematic uses a fixed illustrative arc, small textured Moon images, and
 the existing generic moving hills, trees, and buildings. It shows no time or
 ambient-light buckets and does not claim to describe the searched location's
 Moon path, skyline, terrain, or obstructions. Altitude and bearing changes dim
 the excluded sky and landscape regions behind the fixed arc. The Moon images
-use a fixed upper-left-lit crescent and remain fully visible with the arc.
+use a fixed left-lit crescent and remain fully visible with the arc.
 This local preview does not model lunar-disk intersection and is not
 authoritative `azimuthMatchIntervals`.
 
@@ -208,8 +212,9 @@ If that transfer would move the other red handle across north, both handles
 remain at the last valid `10°` state and a status message explains that the
 transfer cannot cross north.
 If a green handle tries to remove the only remaining piece, it stays at
-`10°`. Brief visible status messages explain minimum, snap, transfer, and
-north-stop results. Included-sector endpoints remain distinct. Blocked-sector
+`10°`. Brief visible status messages explain minimum, transfer, and north-stop
+results. Closing a usable piece does not show a redundant status message.
+Included-sector endpoints remain distinct. Blocked-sector
 endpoints may meet; then the browser draws no blocked fill or shading and
 omits `azimuthDegrees.excluded`. When an included-only stored value is loaded,
 the coincident blocked handles appear at the included sector's clockwise

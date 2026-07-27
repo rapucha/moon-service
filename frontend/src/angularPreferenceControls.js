@@ -1,16 +1,18 @@
 import { clamp, normalizeDegrees } from "./format.js";
 import {
-  compassDirection as previewCompassDirection,
-  createAngularPreferencePreview
-} from "./angularPreferencePreview.js";
+  ANGLE_EPSILON, compassDirection as previewCompassDirection, copyAzimuth,
+  validAltitude, validAzimuth
+} from "./angularPreferenceRules.js";
+import { createAngularPreferencePreview } from "./angularPreferencePreview.js";
 
-var EPSILON = 1.0e-9;
+var HANDLE_TOOLTIP_DURATION_MS = 1600;
 
 export function createAngularPreferenceControls(form) {
   var altitudeEnabled = form.querySelector("#preference-altitude-enabled");
   var directionEnabled = form.querySelector("#preference-direction-enabled");
   var editor = form.querySelector("#preference-angular-fields");
   var preview = createAngularPreferencePreview(form);
+  wireAngularTooltips(form);
 
   altitudeEnabled.addEventListener("change", syncEditors);
   directionEnabled.addEventListener("change", syncEditors);
@@ -36,6 +38,46 @@ export function createAngularPreferenceControls(form) {
   }
 }
 
+function wireAngularTooltips(form) {
+  var handles = form.querySelectorAll(
+    ".preference-angular-preview .preference-track-handle");
+  var zone = form.querySelector("[data-preference-zone]");
+  var active;
+  var timer;
+  handles.forEach(function (handle) {
+    handle.addEventListener("pointerenter", function () {
+      show(handle, true);
+    });
+    handle.addEventListener("pointerleave", hide);
+    handle.addEventListener("focus", function () {
+      if (handle.matches(":focus-visible")) show(handle, true);
+    });
+    handle.addEventListener("blur", hide);
+    handle.addEventListener("pointerdown", hide);
+    handle.addEventListener("keydown", function (event) {
+      if (["ArrowDown", "ArrowLeft", "ArrowUp", "ArrowRight", "Home", "End"]
+        .includes(event.key)) hide();
+    });
+  });
+  zone.addEventListener("pointerenter", function () {
+    show(zone, false);
+  });
+  zone.addEventListener("pointerleave", hide);
+
+  function show(owner, brief) {
+    hide();
+    active = owner;
+    active.classList.add("is-tooltip-visible");
+    if (brief) timer = window.setTimeout(hide, HANDLE_TOOLTIP_DURATION_MS);
+  }
+
+  function hide() {
+    window.clearTimeout(timer);
+    if (active) active.classList.remove("is-tooltip-visible");
+    active = null;
+  }
+}
+
 export function normalizeAngularPreferences(value) {
   var state = {};
   if (value.altitudeDegrees !== undefined) {
@@ -50,7 +92,8 @@ export function normalizeAngularPreferences(value) {
     var excluded = azimuth && azimuth.excluded;
     if (!objectValue(azimuth) || !validRange(azimuth.included)
         || (excluded !== undefined
-          && (!validRange(excluded) || !contained(azimuth.included, excluded)))) {
+          && (!validRange(excluded) || !contained(azimuth.included, excluded)))
+        || !validAzimuth(copyAzimuth(azimuth))) {
       return null;
     }
     state.azimuthDegrees = {
@@ -135,11 +178,6 @@ export function compassDirection(value) {
   return Number.isFinite(value) ? previewCompassDirection(value) : "";
 }
 
-function validAltitude(minimum, maximum) {
-  return finiteNumber(minimum) && finiteNumber(maximum)
-    && minimum >= 0 && maximum <= 90 && minimum <= maximum;
-}
-
 function validRange(value) {
   return objectValue(value) && validBearing(value.start) && validBearing(value.end)
     && value.start !== value.end;
@@ -152,7 +190,7 @@ function validBearing(value) {
 function contained(outer, inner) {
   return clockwiseDistance(outer.start, inner.start)
     + clockwiseDistance(inner.start, inner.end)
-    <= clockwiseDistance(outer.start, outer.end) + EPSILON;
+    <= clockwiseDistance(outer.start, outer.end) + ANGLE_EPSILON;
 }
 
 function clockwiseDistance(start, end) {

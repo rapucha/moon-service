@@ -86,30 +86,33 @@
   opacity: calc(var(--moon-path-foreground-opacity, 0.16) * 1.7);
 }
 
-.preference-axis-help {
+.preference-altitude-axis-label {
   position: absolute;
-  z-index: 8;
-  width: 24px;
-  min-width: 0;
-  height: 24px;
-  min-height: 0;
-  padding: 0;
-  border: 1px solid rgba(82, 101, 100, 0.65);
-  border-radius: 50%;
-  background: rgba(248, 250, 249, 0.94);
-  color: #455755;
-  font-size: 0.75rem;
-  font-weight: 800;
-  line-height: 1;
-  text-decoration: none;
-}
-
-.preference-altitude-axis-help {
-  top: 37%;
+  top: 34%;
   left: 3px;
+  z-index: 5;
+  color: #657273;
+  font-size: 0.52rem;
+  font-weight: 650;
+  line-height: 1;
+  pointer-events: none;
+  text-transform: uppercase;
+  transform: rotate(180deg);
+  writing-mode: vertical-rl;
 }
 
-.preference-control-tooltip {
+.preference-preview-zone {
+  position: absolute;
+  top: 11.54%;
+  right: 5.5556%;
+  bottom: 26.92%;
+  left: 11.1111%;
+  z-index: 4;
+  cursor: help;
+}
+
+.preference-control-tooltip,
+.preference-zone-tooltip {
   position: absolute;
   display: block;
   right: 0;
@@ -131,32 +134,21 @@
   transition: opacity 0.12s ease-in-out;
 }
 
-.preference-axis-help:hover .preference-control-tooltip,
-.preference-axis-help:focus .preference-control-tooltip,
-.preference-track-handle:hover .preference-control-tooltip,
-.preference-track-handle:focus .preference-control-tooltip {
-  display: block;
+.preference-track-handle.is-tooltip-visible .preference-control-tooltip,
+.preference-preview-zone.is-tooltip-visible .preference-zone-tooltip {
   opacity: 1;
 }
 
-.preference-altitude-axis-help .preference-control-tooltip {
-  top: calc(100% + 5px);
+.preference-preview-zone .preference-zone-tooltip {
+  top: 8px;
   bottom: auto;
-  left: 0;
-  right: auto;
+  width: min(210px, 82vw);
 }
 
-.preference-bearing-axis-help {
-  bottom: 2px;
-  left: 70%;
-  transform: translateX(-50%);
-}
-
-.preference-bearing-axis-help .preference-control-tooltip {
-  right: auto;
-  bottom: calc(100% + 5px);
-  left: 50%;
-  transform: translateX(-50%);
+.preference-angular-preview:has(
+  .preference-preview-zone.is-tooltip-visible
+) .preference-angular-status {
+  opacity: 0;
 }
 
 .preference-angular-status {
@@ -329,6 +321,12 @@
   box-shadow: 0 0 10px rgba(33, 111, 104, 0.2);
 }
 
+.preference-included-fill.is-handle-bridge {
+  top: -27px;
+  height: 44px;
+  border-radius: 0;
+}
+
 .preference-blocked-fill {
   z-index: 2;
   top: 14px;
@@ -349,6 +347,14 @@
   top: 2px;
   bottom: -14px;
   width: 8px;
+}
+
+.preference-included-handle[data-bearing-handle$="-start"]::before {
+  border-right-color: var(--accent);
+}
+
+.preference-included-handle[data-bearing-handle$="-end"]::before {
+  border-left-color: var(--accent);
 }
 
 .preference-blocked-handle {
@@ -426,12 +432,10 @@
 
 .preference-angular-fields.is-altitude-disabled .preference-altitude-fill,
 .preference-angular-fields.is-altitude-disabled .preference-altitude-handle,
-.preference-angular-fields.is-altitude-disabled .preference-altitude-axis-help,
 .preference-angular-fields.is-direction-disabled .preference-included-fill,
 .preference-angular-fields.is-direction-disabled .preference-blocked-fill,
 .preference-angular-fields.is-direction-disabled .preference-included-handle,
-.preference-angular-fields.is-direction-disabled .preference-blocked-handle,
-.preference-angular-fields.is-direction-disabled .preference-bearing-axis-help {
+.preference-angular-fields.is-direction-disabled .preference-blocked-handle {
   display: none;
 }
 

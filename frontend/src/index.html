@@ -118,22 +118,12 @@
                       preserveAspectRatio="xMidYMid meet"
                       aria-hidden="true"
                       focusable="false"></svg>
-                    <button type="button"
-                      class="preference-axis-help preference-altitude-axis-help"
-                      aria-label="About the altitude axis"
-                      aria-describedby="preference-altitude-axis-description">?
-                      <span class="preference-control-tooltip" aria-hidden="true">
-                        Altitude is 0° at the bottom and 90° at the top.
-                      </span>
-                    </button>
-                    <button type="button"
-                      class="preference-axis-help preference-bearing-axis-help"
-                      aria-label="About the bearing axis"
-                      aria-describedby="preference-bearing-axis-description">?
-                      <span class="preference-control-tooltip" aria-hidden="true">
-                        Bearing increases from N through E, S, W, and back to N.
-                      </span>
-                    </button>
+                    <span class="preference-altitude-axis-label"
+                      aria-hidden="true">Altitude</span>
+                    <div class="preference-preview-zone"
+                      data-preference-zone aria-hidden="true">
+                      <span class="preference-zone-tooltip"></span>
+                    </div>
                     <p id="preference-angular-status" class="preference-angular-status"
                       role="status" aria-live="polite" aria-atomic="true"></p>
                     <div id="preference-altitude-track" class="preference-altitude-track">
