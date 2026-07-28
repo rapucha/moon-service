@@ -6,9 +6,11 @@ import {
   createMoonAppearanceControls,
   normalizeMoonAppearancePreferences
 } from "./moonAppearanceControls.js";
+import { formatDateTime } from "./format.js";
 
 var STORAGE_KEY = "moonService.opportunityPreferences.v1";
 var VERSION = 1;
+var UTC_INSTANT_PATTERN = /^(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2})(?:\.(\d{1,9}))?Z$/;
 var MAX_WINDOWS = 8;
 var CLOCK_PATTERN = /^(?:[01]\d|2[0-3]):[0-5]\d$/;
 var LIGHT_BUCKETS = ["daylight", "golden_hour", "civil_twilight", "nautical_twilight", "night"];
@@ -24,6 +26,8 @@ export function createOpportunityPreferences(options) {
   var addWindow = form.querySelector("#preference-add-window");
   var lightEditor = form.querySelector("#preference-light-editor");
   var formStatus = form.querySelector("#preference-form-status");
+  var emptyNotice = resultRegion.querySelector("#preference-empty-notice");
+  var emptyNoticeText = emptyNotice.textContent.trim();
   var rowTemplate = /** @type {HTMLTemplateElement} */ (document.querySelector("#preference-clock-row-template"));
   var angularControls = createAngularPreferenceControls(form);
   var appearanceControls = createMoonAppearanceControls(form);
@@ -212,8 +216,11 @@ export function createOpportunityPreferences(options) {
       response && response.ignoredPreferenceFieldCount > 0
       ? ignoredText(response)
       : "");
-    resultRegion.querySelector("#preference-empty-notice").hidden = !(response && response.emptyReason
-      && response.emptyReason.code === "no_opportunities_match_preferences");
+    var filteredEmpty = response && response.emptyReason
+      && response.emptyReason.code === "no_opportunities_match_preferences";
+    setNotice(emptyNotice, filteredEmpty
+      ? emptyNoticeText + availabilityText(response)
+      : "");
     var total = activeFilterCount(state);
     details.querySelector("#preference-count").textContent =
       total === 0 ? "None active" : total + " active";
@@ -337,6 +344,48 @@ function normalizeTime(value) {
 function setNotice(node, text) {
   node.textContent = text;
   node.hidden = !text;
+}
+
+function availabilityText(payload) {
+  var availability = payload.phaseOrientationAvailability;
+  var location = payload.location;
+  if (!objectValue(availability) || !objectValue(location)
+      || !Number.isInteger(availability.lookAheadDays) || availability.lookAheadDays <= 0
+      || typeof location.timezone !== "string" || !validTimezone(location.timezone)) {
+    return "";
+  }
+  var disclaimer = " This long-range check uses Moon geometry only."
+    + " It does not include weather or your other hard preferences.";
+  if (availability.status === "next_match" && validInstant(availability.nextMatchAt)) {
+    return " Next astronomical match for the selected phase and orientation: "
+      + formatDateTime(availability.nextMatchAt, location.timezone, location.countryCode)
+      + " " + location.timezone + "." + disclaimer;
+  }
+  if (availability.status === "not_found" && availability.nextMatchAt === undefined
+      && typeof location.displayName === "string" && location.displayName.trim()) {
+    return " The astronomical calculation found no match for the selected phase and orientation near "
+      + location.displayName + " during the next " + availability.lookAheadDays + " days."
+      + disclaimer;
+  }
+  return "";
+}
+
+function validInstant(value) {
+  var match = typeof value === "string" ? UTC_INSTANT_PATTERN.exec(value) : null;
+  if (!match) return false;
+  var parsed = new Date(value);
+  var milliseconds = (match[2] || "").padEnd(3, "0").slice(0, 3);
+  return Number.isFinite(parsed.getTime())
+    && parsed.toISOString() === match[1] + "." + milliseconds + "Z";
+}
+
+function validTimezone(value) {
+  try {
+    new Intl.DateTimeFormat("en", { timeZone: value }).format();
+    return true;
+  } catch (error) {
+    return false;
+  }
 }
 
 function ignoredText(payload) {

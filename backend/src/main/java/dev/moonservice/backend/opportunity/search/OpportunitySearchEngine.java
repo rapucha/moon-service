@@ -1,6 +1,7 @@
 package dev.moonservice.backend.opportunity.search;
 
 import dev.moonservice.backend.location.ResolvedLocation;
+import dev.moonservice.scoringprototype.ephemeris.PhaseOrientationAvailability;
 import dev.moonservice.scoringprototype.input.OpportunityPreferences;
 
 import java.time.Instant;
@@ -31,7 +32,8 @@ public interface OpportunitySearchEngine {
             Map<String, Object> normalizedActiveFilters,
             int excludedSampleCount,
             boolean preferencesRemovedAllLiveCandidates,
-            Map<String, List<AzimuthMatchInterval>> azimuthMatchIntervals
+            Map<String, List<AzimuthMatchInterval>> azimuthMatchIntervals,
+            PhaseOrientationAvailability.Result phaseOrientationAvailability
     ) {
         public PreferenceSearchResult {
             Objects.requireNonNull(response, "response");

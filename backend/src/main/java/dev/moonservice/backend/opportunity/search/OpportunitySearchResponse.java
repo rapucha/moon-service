@@ -1,6 +1,7 @@
 package dev.moonservice.backend.opportunity.search;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
+import dev.moonservice.scoringprototype.ephemeris.PhaseOrientationAvailability;
 
 import java.util.List;
 import java.util.Map;
@@ -24,7 +25,8 @@ public record OpportunitySearchResponse(
         List<String> ignoredPreferenceFields,
         Integer ignoredPreferenceFieldCount,
         Integer additionalIgnoredPreferenceFieldCount,
-        EmptyReason emptyReason
+        EmptyReason emptyReason,
+        PhaseOrientationAvailabilityDetails phaseOrientationAvailability
 ) implements OpportunityResponse {
     public OpportunitySearchResponse(
             String status,
@@ -42,7 +44,7 @@ public record OpportunitySearchResponse(
         this(
                 status, generatedAt, location, forecastHorizonDays, startsAt, endsAt,
                 candidateWindowsEvaluated, maxMoonAltitudeDegrees, opportunities, rejected, messages,
-                null, null, null, null, null, null, null);
+                null, null, null, null, null, null, null, null);
     }
 
     public static OpportunitySearchResponse withPreferences(
@@ -66,6 +68,10 @@ public record OpportunitySearchResponse(
                 : new EmptyReason(
                         "no_opportunities_match_preferences",
                         "No opportunity matched the active preferences.");
+        PhaseOrientationAvailabilityDetails availability =
+                emptyReason == null || result.phaseOrientationAvailability() == null
+                        ? null
+                        : availability(result.phaseOrientationAvailability());
         return new OpportunitySearchResponse(
                 response.status(),
                 response.generatedAt(),
@@ -84,7 +90,18 @@ public record OpportunitySearchResponse(
                 List.copyOf(ignoredPreferenceFields),
                 ignoredPreferenceFieldCount,
                 Math.max(0, ignoredPreferenceFieldCount - ignoredPreferenceFields.size()),
-                emptyReason);
+                emptyReason,
+                availability);
+    }
+
+    private static PhaseOrientationAvailabilityDetails availability(
+            PhaseOrientationAvailability.Result result
+    ) {
+        String nextMatchAt = result.nextMatchAt() == null ? null : result.nextMatchAt().toString();
+        return new PhaseOrientationAvailabilityDetails(
+                nextMatchAt == null ? "not_found" : "next_match",
+                result.lookAheadDays(),
+                nextMatchAt);
     }
 
     public record Location(
@@ -161,6 +178,14 @@ public record OpportunitySearchResponse(
     }
 
     public record EmptyReason(String code, String text) {
+    }
+
+    @JsonInclude(JsonInclude.Include.NON_NULL)
+    public record PhaseOrientationAvailabilityDetails(
+            String status,
+            int lookAheadDays,
+            String nextMatchAt
+    ) {
     }
 
     public record MoonPassPath(

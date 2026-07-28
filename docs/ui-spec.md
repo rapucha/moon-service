@@ -286,6 +286,24 @@ preference summary:
 - If active filters remove every candidate, the empty message says that the
   preferences caused the result. It does not describe this state as an
   astronomy, location, or weather failure.
+- When that response contains a valid `phaseOrientationAvailability` with
+  `status: "next_match"`, the browser appends the next astronomical match for
+  the selected phase and orientation. It formats `nextMatchAt` in the resolved
+  location's timezone and includes the year and explicit IANA timezone label.
+- With valid `status: "not_found"`, the browser says that the bounded
+  astronomical calculation found no phase-and-orientation match near the safe
+  resolved location display name during the returned positive
+  `lookAheadDays`.
+- Both availability messages say that the long-range check uses Moon geometry
+  only and excludes weather and the user's other hard preferences. They do not
+  claim that the selected appearance cannot be seen.
+- An omitted, unknown, or malformed availability object leaves only the
+  existing filtered-empty message. The browser does not invent a 200-day
+  result or run its own availability calculation.
+- The browser writes the complete message as text into
+  `#preference-empty-notice` in the existing polite live region. Response and
+  location strings are never interpreted as HTML, and the empty result and
+  diagnostic are announced together.
 - If the server ignored fields, the warning reports them as text, never as
   HTML.
 - If stored state is malformed or uses an unsupported version, the browser

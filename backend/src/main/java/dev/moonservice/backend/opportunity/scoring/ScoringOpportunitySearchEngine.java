@@ -11,8 +11,11 @@ import dev.moonservice.backend.weather.WeatherForecast;
 import dev.moonservice.backend.weather.WeatherForecastProvider;
 import dev.moonservice.scoringprototype.PreviewEvaluator;
 import dev.moonservice.scoringprototype.UsageException;
+import dev.moonservice.scoringprototype.ephemeris.EphemerisSampler;
+import dev.moonservice.scoringprototype.ephemeris.PhaseOrientationAvailability;
 import dev.moonservice.scoringprototype.fixture.Location;
 import dev.moonservice.scoringprototype.input.OpportunityPreferences;
+import dev.moonservice.scoringprototype.input.OpportunityPreferences.DegreeRange;
 import dev.moonservice.scoringprototype.input.PrototypeConfig;
 import dev.moonservice.scoringprototype.output.ResponseFormatter;
 import dev.moonservice.scoringprototype.service.OpportunityService;
@@ -32,6 +35,9 @@ import java.util.Objects;
 
 public class ScoringOpportunitySearchEngine implements OpportunitySearchEngine {
     private static final ObjectMapper MAPPER = new ObjectMapper();
+    private static final EphemerisSampler EPHEMERIS = new EphemerisSampler();
+    private static final PhaseOrientationAvailability AVAILABILITY =
+            new PhaseOrientationAvailability();
 
     private final PreviewEvaluator previewEvaluator;
     private final OpportunityService opportunityService;
@@ -96,13 +102,17 @@ public class ScoringOpportunitySearchEngine implements OpportunitySearchEngine {
                     window -> forecast.weatherAt(window.suggested().instant()).toWeatherFixture(),
                     preferences,
                     notBefore);
+            OpportunitySearchResponse response =
+                    toBackendResponse(responseFormatter.format(evaluation.result()));
             return new PreferenceSearchResult(
-                    toBackendResponse(responseFormatter.format(evaluation.result())),
+                    response,
                     evaluation.appliedPreferenceVersion(),
                     evaluation.normalizedActiveFilters(),
                     evaluation.excludedSampleCount(),
                     evaluation.preferencesRemovedAllLiveCandidates(),
-                    toBackendAzimuthMatchIntervals(evaluation.azimuthMatchIntervals()));
+                    toBackendAzimuthMatchIntervals(evaluation.azimuthMatchIntervals()),
+                    phaseOrientationAvailability(
+                            config, notBefore, preferences, evaluation, response));
         } catch (UsageException ex) {
             throw new IllegalStateException("Resolved opportunity scoring request was invalid.", ex);
         }
@@ -153,6 +163,30 @@ public class ScoringOpportunitySearchEngine implements OpportunitySearchEngine {
                 location.elevationMeters(),
                 location.zoneId().getId(),
                 location.countryCode());
+    }
+
+    private static PhaseOrientationAvailability.Result phaseOrientationAvailability(
+            PrototypeConfig config,
+            Instant notBefore,
+            OpportunityPreferences preferences,
+            OpportunityService.PreferenceEvaluation evaluation,
+            OpportunitySearchResponse response
+    ) {
+        List<DegreeRange> ranges = preferences.brightLimbOrientationDegrees();
+        if (preferences.namedPhases() == null
+                || ranges == null
+                || ranges.size() != 1
+                || evaluation.normalizedActiveFilters().isEmpty()
+                || evaluation.excludedSampleCount() == 0
+                || !evaluation.preferencesRemovedAllLiveCandidates()
+                || !response.opportunities().isEmpty()) {
+            return null;
+        }
+        return AVAILABILITY.find(
+                notBefore,
+                preferences.namedPhases(),
+                ranges.getFirst(),
+                instant -> EPHEMERIS.sampleAt(config.location(), instant));
     }
 
     private static Map<String, List<AzimuthMatchInterval>> toBackendAzimuthMatchIntervals(

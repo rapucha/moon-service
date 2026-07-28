@@ -434,6 +434,48 @@ This state is not an astronomy, geocoding, or weather-provider failure. A
 preference response keeps the existing scores and raw Moon, Sun,
 ambient-light, weather, and forecast-confidence facts.
 
+For a qualifying filtered-empty response, the server also returns this
+ephemeris-only diagnostic:
+
+```json
+{
+  "phaseOrientationAvailability": {
+    "status": "next_match",
+    "lookAheadDays": 200,
+    "nextMatchAt": "2026-10-08T18:22:00Z"
+  }
+}
+```
+
+`lookAheadDays` is `200`. `status: "next_match"` includes `nextMatchAt`, the
+earliest matching instant found by the calculation. `status: "not_found"`
+omits `nextMatchAt` and means that the bounded calculation found no match.
+
+| Successful preference result | `phaseOrientationAvailability` |
+| --- | --- |
+| Filtered-empty reason, active `namedPhases`, and exactly one normalized bright-limb range | Present |
+| One or more opportunities, or no filtered-empty reason | Omitted |
+| No active named phase or no active bright-limb range | Omitted |
+| Two through eight valid bright-limb ranges | Omitted |
+
+Multiple bright-limb ranges remain valid in the version 1 request contract.
+The diagnostic supports the browser's one-target result and does not narrow a
+valid multi-range request.
+
+The calculation starts at the server instant captured for the request and
+examines the interval through exactly 200 days later, including both
+endpoints. It uses the existing five-minute ephemeris sampling and crossing
+refinement. A match requires the Moon to be above the modelled horizon, to
+match any selected named phase, and to match the single normalized
+bright-limb range. A match at the initial instant or at the 200-day boundary
+is eligible.
+
+This calculation applies only Moon geometry, the modelled horizon, selected
+phases, and the single orientation range. It ignores altitude, azimuth,
+availability, scoring, result limits, weather, and every other hard
+preference. It does not extend the ordinary opportunity or weather horizon and
+does not make a long-range weather or provider request.
+
 When `preferences` is absent, the response omits all preference-only metadata,
 including ignored-field fields and azimuth masks, so the current GET and
 preference-free response contract remain unchanged.
