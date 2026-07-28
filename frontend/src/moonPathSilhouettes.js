@@ -73,7 +73,8 @@ var SILHOUETTE_SYMBOLS_BY_ID = MOON_PATH_SILHOUETTE_SYMBOLS.reduce(function inde
 validateSilhouetteLayerConfig();
 var ACTIVE_SILHOUETTE_SYMBOLS = activeSilhouetteSymbols();
 
-export function altitudeForegroundArtwork(left, top, bottom, chartWidth, mode, firstTime, ceiling, chartHeight) {
+export function altitudeForegroundArtwork(
+  left, top, bottom, chartWidth, mode, firstTime, ceiling, chartHeight, altitudeScale) {
   var idSuffix = mode + "-" + Math.abs(Math.round(firstTime)).toString(36);
   var clipId = "moon-path-foreground-clip-" + idSuffix;
   var symbolIds = foregroundSymbolIds(idSuffix);
@@ -85,7 +86,7 @@ export function altitudeForegroundArtwork(left, top, bottom, chartWidth, mode, f
   });
   var sequenceWidth = SILHOUETTE_SEQUENCE_WIDTH;
   var repetitions = Math.ceil(chartWidth / sequenceWidth) + 2;
-  var scale = foregroundAngleScale(ceiling, chartHeight);
+  var scale = altitudeScale || foregroundAngleScale(ceiling, chartHeight);
 
   return [
     svgElement("defs", {},

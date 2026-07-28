@@ -37,11 +37,19 @@ test("edits, persists, removes, and resets the accepted controls", async ({ page
   await expect(page.locator("#preference-count")).toHaveText("None active");
   await expect(page.getByLabel("Limit Moon altitude")).not.toBeChecked();
   await expect(page.getByLabel("Limit Moon direction")).not.toBeChecked();
+  await expect(page.getByLabel("Limit Moon altitude")).not.toHaveAttribute("aria-expanded");
+  await expect(page.getByLabel("Limit Moon direction")).not.toHaveAttribute("aria-expanded");
   await expect(page.getByLabel("Limit illuminated-edge direction")).not.toBeChecked();
   await expect(page.locator("[data-named-phase]:checked")).toHaveCount(0);
   await expect(page.locator("#active-preference-summary")).toHaveCount(0);
 
   await page.getByLabel("Limit Moon altitude").check();
+  await expect(page.locator("#preference-angular-fields")).toBeVisible();
+  await expect(page.locator("#preference-angular-fields input[type=number]")).toHaveCount(0);
+  await expect(page.locator(".preference-angular-readouts")).toHaveCount(0);
+  await expect(page.getByRole("slider", {
+    name: "Included compass sector start"
+  })).not.toBeVisible();
   const altitudeMinimum = page.getByRole("slider", { name: "Minimum Moon altitude" });
   const altitudeMaximum = page.getByRole("slider", { name: "Maximum Moon altitude" });
   await expect(altitudeMinimum).toHaveAttribute("aria-orientation", "vertical");
@@ -52,6 +60,8 @@ test("edits, persists, removes, and resets the accepted controls", async ({ page
   expect(maximumBox).not.toBeNull();
   expect(Math.abs(minimumBox.x - maximumBox.x)).toBeLessThanOrEqual(1);
   expect(minimumBox.y).toBeGreaterThan(maximumBox.y);
+  const altitudePercent = await altitudeMaximum.evaluate(handle => parseFloat(handle.style.bottom));
+  expect(altitudePercent).toBeCloseTo(Math.pow(15 / 90, 0.85) * 100, 4);
   await altitudeMinimum.focus();
   await page.keyboard.press("ArrowUp");
   await expect(altitudeMinimum).toHaveAttribute("aria-valuenow", "3");
@@ -68,20 +78,16 @@ test("edits, persists, removes, and resets the accepted controls", async ({ page
   ]) {
     await expect(page.getByRole("slider", { name })).toHaveAttribute("aria-orientation", "horizontal");
   }
-  await expect(page.locator("#preference-included-output")).toHaveText("330° through 30°");
-  await expect(page.locator("#preference-excluded-output")).toHaveText("350° through 10°");
   const includedStartHandle = page.getByRole("slider", {
     name: "Included compass sector start"
   });
   await includedStartHandle.focus();
   await page.keyboard.press("ArrowLeft");
   await expect(includedStartHandle).toHaveAttribute("aria-valuenow", "329");
-  await expect(page.getByLabel("Included compass sector start in degrees")).toHaveValue("329");
   const blockedStartHandle = page.getByRole("slider", { name: "Blocked view start" });
   await blockedStartHandle.focus();
   await page.keyboard.press("ArrowLeft");
   await expect(blockedStartHandle).toHaveAttribute("aria-valuenow", "349");
-  await expect(page.getByLabel("Blocked view start in degrees")).toHaveValue("349");
 
   for (const phase of PHASES) {
     await page.getByLabel(phase[0], { exact: true }).check();
@@ -138,8 +144,8 @@ test("edits, persists, removes, and resets the accepted controls", async ({ page
   await waitForCallCount(calls, 2);
   await openPreferences(page);
   await expect(page.getByLabel("Limit Moon direction")).toBeChecked();
-  await expect(page.getByLabel("Included compass sector start in degrees")).toHaveValue("329");
-  await expect(page.getByLabel("Blocked view start in degrees")).toHaveValue("349");
+  await expect(includedStartHandle).toHaveAttribute("aria-valuenow", "329");
+  await expect(blockedStartHandle).toHaveAttribute("aria-valuenow", "349");
   await expect(page.locator("[data-named-phase]:checked")).toHaveCount(8);
   await expect(limbHandle).toHaveAttribute("aria-valuenow", "0");
 
@@ -162,59 +168,96 @@ test("edits, persists, removes, and resets the accepted controls", async ({ page
   await expect(focusTarget).toBeFocused();
 });
 
-test("rejects invalid manual compass sectors without sending a request", async ({ page }) => {
+test("snaps, transfers, and preserves usable compass sectors", async ({ page }) => {
+  await preloadState(page, { version: 1, azimuthDegrees: DIRECTION });
   const calls = await captureApiCalls(page);
   await page.goto("/search?q=Prague");
   await waitForCallCount(calls, 1);
   calls.length = 0;
   await openPreferences(page);
-  await page.getByLabel("Limit Moon direction").check();
-  const status = page.locator("#preference-form-status");
   const apply = page.getByRole("button", { name: "Use these limits" });
-  const includedStart = page.locator("#preference-included-start");
-  const includedEnd = page.locator("#preference-included-end");
-  const blockedStart = page.locator("#preference-excluded-start");
+  const includedStart = page.getByRole("slider", { name: "Included compass sector start" });
+  const includedEnd = page.getByRole("slider", { name: "Included compass sector end" });
+  const blockedStart = page.getByRole("slider", { name: "Blocked view start" });
+  const blockedEnd = page.getByRole("slider", { name: "Blocked view end" });
 
-  await includedStart.fill("");
+  await focusAndPress(page, blockedStart, ["Shift+ArrowLeft", "ArrowLeft"]);
+  await expect(blockedStart).toHaveAttribute("aria-valuenow", "330");
+  await focusAndPress(page, blockedEnd, ["Shift+ArrowRight", "ArrowRight"]);
+  await expect(blockedStart).toHaveAttribute("aria-valuenow", "340");
+  await expect(blockedEnd).toHaveAttribute("aria-valuenow", "30");
+
+  await focusAndPress(page, blockedStart, ["ArrowLeft"]);
+  await expect(blockedStart).toHaveAttribute("aria-valuenow", "330");
+  await expect(blockedEnd).toHaveAttribute("aria-valuenow", "20");
+  await focusAndPress(page, blockedStart, ["ArrowRight"]);
+  await expect(blockedStart).toHaveAttribute("aria-valuenow", "340");
+
+  await focusAndPress(page, includedStart, ["ArrowRight"]);
+  await expect(includedStart).toHaveAttribute("aria-valuenow", "340");
+  await focusAndPress(page, includedEnd, ["ArrowLeft"]);
+  await expect(includedEnd).toHaveAttribute("aria-valuenow", "30");
+
   await apply.click();
-  await expect(status).toContainText("Use compass bearings");
-  await expect(includedStart).toBeFocused();
-  expect(calls).toHaveLength(0);
-
-  await includedStart.fill("10");
-  await includedEnd.fill("10");
-  await apply.click();
-  await expect(status).toHaveText("The included compass-sector endpoints must differ.");
-  await expect(includedEnd).toBeFocused();
-  expect(calls).toHaveLength(0);
-
-  await includedStart.fill("330");
-  await includedEnd.fill("30");
-  await blockedStart.fill("40");
-  await apply.click();
-  await expect(status).toHaveText("Keep the blocked view inside the included compass sector.");
-  await expect(blockedStart).toBeFocused();
-  expect(calls).toHaveLength(0);
-
-  await blockedStart.fill("350");
-  await includedStart.fill("360");
-  await apply.click();
-  await expect(status).toContainText("Use compass bearings");
-  await expect(includedStart).toBeFocused();
-  expect(calls).toHaveLength(0);
-
-  await page.getByRole("button", { name: "Reset all preferences" }).click();
   await waitForCallCount(calls, 1);
-  await expect(status).toHaveText("");
-  await expect(includedStart).toHaveValue("330");
+  expect(calls[0].body.preferences.azimuthDegrees).toEqual({
+    included: { start: 340, end: 30 },
+    excluded: { start: 340, end: 20 }
+  });
+
+  await preloadState(page, {
+    version: 1, azimuthDegrees: { included: { start: 40, end: 30 } }
+  });
+  await page.reload();
+  await waitForCallCount(calls, 2);
+  await openPreferences(page);
+  await expect(blockedStart).toHaveAttribute("aria-valuenow", "215");
+  await focusAndPress(page, includedStart, ["ArrowLeft"]);
+  await apply.click();
+  await waitForCallCount(calls, 3);
+  expect(calls[2].body).toBeNull();
 });
 
-test("keeps the lower altitude handle accessible at an upper overlap", async ({
+test("stops red bearing handles at the visible north endpoints", async ({
   page
 }, testInfo) => {
   await preloadState(page, {
     version: 1,
-    altitudeDegrees: { minimum: 89, maximum: 89 }
+    azimuthDegrees: { excluded: { start: 330, end: 10 } }
+  });
+  const calls = await captureApiCalls(page);
+  await page.goto("/search?q=Prague");
+  await waitForCallCount(calls, 1);
+  await openPreferences(page);
+  const trackBox = await page.locator("#preference-compass-track").boundingBox();
+  const includedStart = page.getByRole("slider", { name: "Included compass sector start" });
+  const blockedStart = page.getByRole("slider", { name: "Blocked view start" });
+  const blockedEnd = page.getByRole("slider", { name: "Blocked view end" });
+  await focusAndPress(page, blockedStart, ["Shift+ArrowRight", "ArrowRight"]);
+  await focusAndPress(page, includedStart, ["ArrowRight"]);
+  await expect(includedStart).toHaveAttribute("aria-valuenow", "330");
+  const drag = testInfo.project.name === "mobile" ? dragTouchHandle : dragMouseHandle;
+  await drag(page, blockedStart, trackBox.width * 2);
+  await focusAndPress(page, blockedStart, ["ArrowRight"]);
+  await expect(blockedStart).toHaveAttribute("aria-valuenow", "359");
+
+  await drag(page, blockedEnd, -trackBox.width * 2);
+  await focusAndPress(page, blockedEnd, ["ArrowLeft"]);
+  await expect(blockedEnd).toHaveAttribute("aria-valuenow", "0");
+  expect(await page.locator("[data-preview-exclusion]").evaluate(path =>
+    (path.getAttribute("d").match(/M/g) || []).length)).toBe(1);
+  await page.getByRole("button", { name: "Use these limits" }).click();
+  await waitForCallCount(calls, 2);
+  expect(calls[1].body.preferences.azimuthDegrees)
+    .toEqual({ excluded: { start: 359, end: 0 } });
+});
+
+test("keeps the last 10 altitude degrees elastic without changing logical state", async ({
+  page
+}, testInfo) => {
+  await preloadState(page, {
+    version: 1,
+    altitudeDegrees: { minimum: 2, maximum: 15 }
   });
   const calls = await captureApiCalls(page);
   await page.goto("/search?q=Prague");
@@ -223,78 +266,223 @@ test("keeps the lower altitude handle accessible at an upper overlap", async ({
 
   const minimum = page.getByRole("slider", { name: "Minimum Moon altitude" });
   const maximum = page.getByRole("slider", { name: "Maximum Moon altitude" });
-  const track = page.locator("#preference-altitude-track");
-  await minimum.scrollIntoViewIfNeeded();
-  const minimumBox = await minimum.boundingBox();
-  const trackBox = await track.boundingBox();
-  expect(minimumBox).not.toBeNull();
-  expect(trackBox).not.toBeNull();
-  await expect(minimum).toHaveAttribute("aria-valuenow", "89");
-  await expect(maximum).toHaveAttribute("aria-valuenow", "89");
-
-  const start = {
-    x: minimumBox.x + minimumBox.width / 2,
-    y: minimumBox.y + minimumBox.height / 2
-  };
-  const lowerHandleIsTarget = await page.evaluate(position => {
-    return Boolean(document.elementFromPoint(position.x, position.y)
-      ?.closest("[data-altitude-minimum]"));
-  }, start);
-  expect(lowerHandleIsTarget).toBe(true);
-
-  if (testInfo.project.name === "mobile") {
-    await minimum.evaluate(element => {
-      element.addEventListener("pointerdown", function () {
-        element.setAttribute("data-test-pointer-hit", "true");
-      }, { once: true });
+  await focusAndPress(page, maximum, ["Shift+ArrowDown"]);
+  await expect(maximum).toHaveAttribute("aria-valuenow", "12");
+  await minimum.evaluate(element => {
+    const observer = new MutationObserver(() => {
+      if (element.classList.contains("is-rebounding-up")) {
+        element.setAttribute("data-test-rebound-seen", "true");
+        observer.disconnect();
+      }
     });
-    await page.touchscreen.tap(start.x, start.y);
-    await expect(minimum).toHaveAttribute("data-test-pointer-hit", "true");
-    await expect(minimum).toHaveAttribute("aria-valuenow", "89");
-  } else {
-    const end = {
-      x: trackBox.x + trackBox.width / 2,
-      y: trackBox.y + trackBox.height / 9
-    };
-    await page.mouse.move(start.x, start.y);
-    await page.mouse.down();
-    await page.mouse.move(end.x, end.y);
-    await page.mouse.up();
-    await expect(minimum).toHaveAttribute("aria-valuenow", "80");
-  }
+    observer.observe(element, { attributeFilter: ["class"] });
+  });
+  await focusAndPress(page, minimum, ["ArrowUp"]);
+  await expect(minimum).toHaveAttribute("aria-valuenow", "2");
+  await expect(minimum).toHaveAttribute("data-test-rebound-seen", "true");
 
-  await expect(maximum).toHaveAttribute("aria-valuenow", "89");
+  const drag = testInfo.project.name === "mobile" ? dragTouchHandle : dragMouseHandle;
+  await drag(page, minimum, 0, -30);
+  await expect(minimum).toHaveAttribute("aria-valuenow", "2");
+  await expect(maximum).toHaveAttribute("aria-valuenow", "12");
+});
+
+test("aligns boundaries, removes the green seam, and mirrors red markers", async ({
+  page
+}, testInfo) => {
+  await preloadState(page, {
+    version: 1,
+    altitudeDegrees: { minimum: 0.274, maximum: 10.274 },
+    azimuthDegrees: {
+      included: { start: 54.002, end: 64.002 }
+    }
+  });
+  const calls = await captureApiCalls(page);
+  await page.goto("/search?q=Prague");
+  await waitForCallCount(calls, 1);
+  await openPreferences(page);
+
+  const start = page.getByRole("slider", { name: "Included compass sector start" });
+  const end = page.getByRole("slider", { name: "Included compass sector end" });
+  const blockedStart = page.getByRole("slider", { name: "Blocked view start" });
+  const blockedEnd = page.getByRole("slider", { name: "Blocked view end" });
+  const altitudeMinimum = page.getByRole("slider", { name: "Minimum Moon altitude" });
+  const previewBox = await page.locator(".preference-angular-preview").boundingBox();
+  expect(previewBox).not.toBeNull();
+  for (const handle of [start, end, blockedStart, blockedEnd]) {
+    const box = await handle.boundingBox();
+    expect(box).not.toBeNull();
+    expect(box.x).toBeGreaterThanOrEqual(previewBox.x);
+    expect(box.x + box.width).toBeLessThanOrEqual(previewBox.x + previewBox.width + 0.5);
+  }
+  await verifyPointerTargets(page, [
+    [altitudeMinimum, "[data-altitude-minimum]"],
+    [start, "[data-bearing-handle='included-start']"],
+    [end, "[data-bearing-handle='included-end']"]
+  ], testInfo.project.name === "mobile");
+  const fill = page.locator("[data-azimuth-fill='included-left']");
+  expect(await fill.evaluate(element =>
+    getComputedStyle(element, "::before").backgroundColor)).toBe("rgb(33, 111, 104)");
+  expect(await start.evaluate(element =>
+    getComputedStyle(element, "::before").width)).toBe("7px");
+  expect(await blockedStart.evaluate(element =>
+    getComputedStyle(element, "::before").width)).toBe("7px");
+  expect(await page.locator(".preference-included-handle").evaluateAll(handles =>
+    handles.map(handle => getComputedStyle(handle, "::before").opacity)))
+    .toEqual(["0", "0"]);
+
+  const edges = await page.evaluate(() => {
+    const rectangle = selector => document.querySelector(selector).getBoundingClientRect();
+    const svg = rectangle("#preference-angular-artwork");
+    const start = rectangle("[data-bearing-handle='included-start']");
+    const end = rectangle("[data-bearing-handle='included-end']");
+    const fill = rectangle("[data-azimuth-fill='included-left']");
+    const svgX = bearing => svg.left + (40 + bearing / 360 * 300) / 360 * svg.width;
+    return {
+      start: [start.right, fill.left, svgX(54.002)],
+      end: [end.left, fill.right, svgX(64.002)]
+    };
+  });
+  for (const aligned of [edges.start, edges.end]) {
+    expect(Math.max(...aligned) - Math.min(...aligned)).toBeLessThanOrEqual(1);
+  }
+  await expect(page.locator("[data-azimuth-fill='included-left']"))
+    .toHaveClass(/is-handle-bridge/);
+  expect(await page.locator("[data-preview-exclusion]").evaluate(path =>
+    (path.getAttribute("d").match(/M/g) || []).length)).toBe(4);
+  expect(await blockedStart.evaluate(element =>
+    getComputedStyle(element, "::before").left)).toBe("24px");
+  expect(await blockedEnd.evaluate(element =>
+    getComputedStyle(element, "::before").right)).toBe("24px");
+});
+
+test("uses the schematic sliders to explain and preview angular limits", async ({
+  page
+}, testInfo) => {
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  const calls = await captureApiCalls(page);
+  await page.goto("/search?q=Prague");
+  await waitForCallCount(calls, 1);
+  await openPreferences(page);
+  await page.getByLabel("Limit Moon altitude").check();
+  await page.getByLabel("Limit Moon direction").check();
+
+  const preview = page.locator(".preference-angular-preview");
+  await expect(preview).toBeVisible();
+  await expect(page.locator("#preference-angular-artwork")).toHaveAttribute("aria-hidden", "true");
+  await expect(page.locator(".preference-preview-moon")).toHaveCount(13);
+  expect(await page.evaluate(async () => {
+    const module = await import(window.location.origin + "/moonPhaseView.js");
+    const expected = module.moonPhaseImageDataUrl(65, 42, 270, 0);
+    return Array.from(document.querySelectorAll(".preference-preview-moon"))
+      .every(image => image.getAttribute("href") === expected);
+  })).toBe(true);
+  expect(await page.locator("[data-moon-path-artwork='true']").count()).toBeGreaterThan(0);
+  await expect(preview).not.toContainText(/time|daylight|twilight|night/i);
+  await expect(page.locator(".moon-path-foreground").first()).toHaveCSS("animation-name", "none");
+  await expect(page.locator("#preference-angular-artwork")).toHaveCSS("pointer-events", "none");
+  await expect(page.locator(".preference-altitude-base")).toHaveCSS("width", "4px");
+  await expect(page.locator(".preference-compass-base")).toHaveCSS("height", "4px");
+  const bearingTicks = page.locator(".preference-preview-bearing-tick");
+  await expect(bearingTicks).toHaveCount(25);
+  const cardinalTicks = page.locator(".preference-preview-bearing-tick.is-cardinal");
+  await expect(cardinalTicks).toHaveCount(5);
+  expect(await cardinalTicks.evaluateAll(ticks => ticks.map(tick => Number(tick.getAttribute("x1")))))
+    .toEqual([40, 115, 190, 265, 340]);
+
+  const altitudeMinimum = page.getByRole("slider", { name: "Minimum Moon altitude" });
+  const altitudeMaximum = page.getByRole("slider", { name: "Maximum Moon altitude" });
+  await expect(page.locator(".preference-axis-help")).toHaveCount(0);
+  await expect(page.locator(".preference-altitude-axis-label")).toHaveText("Altitude");
+  await expect(page.locator(".preference-preview-bearing-direction"))
+    .toHaveText("bearing increases →");
+  await expect(altitudeMinimum).toHaveAttribute(
+    "aria-describedby", /preference-handle-instructions preference-altitude-minimum-description/);
+
+  const zone = page.locator("[data-preference-zone]");
+  const zoneTooltip = zone.locator(".preference-zone-tooltip");
+  const zoneBox = await zone.boundingBox();
+  expect(zoneBox).not.toBeNull();
+  const hoverZone = async (bearing, altitude) => zone.hover({ position: {
+    x: zoneBox.width * bearing / 360,
+    y: zoneBox.height * (1 - Math.pow(altitude / 90, 0.85))
+  } });
+  await hoverZone(340, 8);
+  await expect(zoneTooltip)
+    .toHaveText("Azimuth 330°–350° and altitude 2°–15° are included.");
+  await hoverZone(355, 8);
+  await expect(zoneTooltip).toHaveText("Azimuth 350°–10° is blocked.");
+  await hoverZone(340, 30);
+  await expect(zoneTooltip).toHaveText("Altitude 15°–90° is excluded.");
+
+  await expect(zone).toHaveClass(/is-tooltip-visible/);
+  await expect(zone).not.toHaveClass(/is-tooltip-visible/, { timeout: 2500 });
+  await hoverZone(340, 8);
+  await altitudeMinimum.hover();
+  await expect(zone).not.toHaveClass(/is-tooltip-visible/);
+  await expect(page.locator(".preference-control-tooltip")).toHaveCount(0);
+  await altitudeMinimum.focus();
+  await page.keyboard.press("Home");
+  await altitudeMaximum.focus();
+  await page.keyboard.press("End");
+
+  const handleHelp = page.locator(".preference-handle-help");
+  const helpToggle = handleHelp.getByRole("button", { name: "? Handle help" });
+  const previewBox = await preview.boundingBox();
+  await expect(helpToggle).toHaveAttribute("aria-expanded", "false");
+  await helpToggle.click();
+  await expect(handleHelp.locator(".preference-handle-help-content"))
+    .toContainText(/green handles define usable direction, and red\s+handles define blocked direction/);
+  const helpBox = await handleHelp.boundingBox();
+  expect(helpBox?.y).toBeGreaterThanOrEqual(previewBox.y + previewBox.height);
+
+  const exclusion = page.locator("[data-preview-exclusion]");
+  const beforeBlockedChange = await exclusion.getAttribute("d");
+  expect(beforeBlockedChange).toBeTruthy();
+
+  const blockedStart = page.getByRole("slider", { name: "Blocked view start" });
+  await blockedStart.focus();
+  await page.keyboard.press("Shift+ArrowLeft");
+  await expect(blockedStart).toHaveAttribute("aria-valuenow", "340");
+  expect(await exclusion.getAttribute("d")).not.toBe(beforeBlockedChange);
+
+  const formBox = await page.locator("#preference-form").boundingBox();
+  expect(previewBox).not.toBeNull();
+  expect(formBox).not.toBeNull();
+  expect(previewBox.x).toBeGreaterThanOrEqual(formBox.x);
+  expect(previewBox.x + previewBox.width).toBeLessThanOrEqual(
+    formBox.x + formBox.width + 1
+  );
+  const viewport = page.viewportSize();
+  expect(previewBox.x + previewBox.width).toBeLessThanOrEqual(viewport.width);
+  if (testInfo.project.name === "mobile") {
+    expect(previewBox.width).toBeLessThanOrEqual(350);
+  }
 });
 
 const invalidStoredStates = [
-  {
-    name: "a missing blocked sector",
-    state: { version: 1, azimuthDegrees: { included: { start: 330, end: 30 } } }
-  },
-  {
-    name: "duplicate named phases",
-    state: { version: 1, namedPhases: ["full_moon", "full_moon"] }
-  },
-  {
-    name: "an unknown named phase",
-    state: { version: 1, namedPhases: ["blue_moon"] }
-  },
-  {
-    name: "a bright-limb range with the wrong tolerance",
-    state: { version: 1, brightLimbOrientationDegrees: [{ start: 10, end: 40 }] }
-  }
+  { name: "duplicate named phases",
+    state: { version: 1, namedPhases: ["full_moon", "full_moon"] } },
+  { name: "an unknown named phase",
+    state: { version: 1, namedPhases: ["blue_moon"] } },
+  { name: "a bright-limb range with the wrong tolerance",
+    state: { version: 1, brightLimbOrientationDegrees: [{ start: 10, end: 40 }] } },
+  { name: "an altitude range under 10°",
+    state: { version: 1, altitudeDegrees: { minimum: 2, maximum: 11 } } },
+  { name: "equal included azimuth endpoints",
+    state: { version: 1, azimuthDegrees: { included: { start: 40, end: 40 } } } },
+  { name: "a usable azimuth split under 10°",
+    state: { version: 1, azimuthDegrees: { included: { start: 40, end: 140 },
+      excluded: { start: 45, end: 135 } } } }
 ];
 
 for (const invalid of invalidStoredStates) {
   test("discards stored preferences with " + invalid.name, async ({ page }) => {
     await preloadState(page, invalid.state);
-    const calls = await captureApiCalls(page);
     await page.goto("/search?q=Prague");
-    await waitForCallCount(calls, 1);
-    expect(calls[0].method).toBe("GET");
-    expect(await storedPreferences(page)).toBeNull();
     await expect(page.locator("#preference-storage-notice"))
       .toContainText("Saved preferences were discarded");
+    expect(await storedPreferences(page)).toBeNull();
   });
 }
 
@@ -325,6 +513,80 @@ test("dims only the complement of the authoritative full-pass azimuth mask", asy
   await expect(masks.nth(2)).toHaveAttribute("data-start-at", "2026-07-04T07:00:00.000Z");
   await expect(masks.nth(2)).toHaveAttribute("data-end-at", "2026-07-04T07:25:00.000Z");
 });
+
+async function pressKeys(page, keys) {
+  for (const key of keys) {
+    await page.keyboard.press(key);
+  }
+}
+
+async function focusAndPress(page, locator, keys) {
+  await locator.focus();
+  await pressKeys(page, keys);
+}
+
+async function verifyPointerTargets(page, entries, useTouch) {
+  for (const [locator, selector, markerEdge] of entries) {
+    await locator.scrollIntoViewIfNeeded();
+    const box = await locator.boundingBox();
+    expect(box).not.toBeNull();
+    const center = {
+      x: markerEdge === "left" ? box.x + 4
+        : (markerEdge === "right" ? box.x + box.width - 4 : box.x + box.width / 2),
+      y: box.y + box.height / 2
+    };
+    expect(await page.evaluate(({ point, target }) => {
+      return Boolean(document.elementFromPoint(point.x, point.y)?.closest(target));
+    }, { point: center, target: selector })).toBe(true);
+    await locator.evaluate(element => {
+      element.addEventListener("pointerdown", function () {
+        element.setAttribute("data-test-pointer-hit", "true");
+      }, { once: true });
+    });
+    if (useTouch) {
+      await page.touchscreen.tap(center.x, center.y);
+    } else {
+      await page.mouse.click(center.x, center.y);
+    }
+    await expect(locator).toHaveAttribute("data-test-pointer-hit", "true");
+  }
+}
+
+async function dragMouseHandle(page, locator, deltaX, deltaY = 0) {
+  await locator.scrollIntoViewIfNeeded();
+  const box = await locator.boundingBox();
+  expect(box).not.toBeNull();
+  const x = box.x + box.width / 2;
+  const y = box.y + box.height / 2;
+  await page.mouse.move(x, y);
+  await page.mouse.down();
+  await page.mouse.move(x + deltaX, y + deltaY);
+  await page.mouse.up();
+}
+
+async function dragTouchHandle(page, locator, deltaX, deltaY = 0) {
+  await locator.scrollIntoViewIfNeeded();
+  const box = await locator.boundingBox();
+  expect(box).not.toBeNull();
+  const x = box.x + box.width / 2;
+  const y = box.y + box.height / 2;
+  const session = await page.context().newCDPSession(page);
+  try {
+    await session.send("Input.dispatchTouchEvent", {
+      type: "touchStart",
+      touchPoints: [{ x: x, y: y, id: 1, radiusX: 1, radiusY: 1, force: 1 }]
+    });
+    await session.send("Input.dispatchTouchEvent", {
+      type: "touchMove",
+      touchPoints: [{
+        x: x + deltaX, y: y + deltaY, id: 1, radiusX: 1, radiusY: 1, force: 1
+      }]
+    });
+    await session.send("Input.dispatchTouchEvent", { type: "touchEnd", touchPoints: [] });
+  } finally {
+    await session.detach();
+  }
+}
 
 async function captureApiCalls(page, responseForCall = successfulResponse) {
   const calls = [];
@@ -366,7 +628,7 @@ async function waitForCallCount(calls, count) {
 async function openPreferences(page) {
   const details = page.locator("#opportunity-preferences");
   if (!await details.evaluate(node => /** @type {HTMLDetailsElement} */ (node).open)) {
-    await details.locator("summary").click();
+    await details.locator(":scope > summary").click();
   }
 }
 

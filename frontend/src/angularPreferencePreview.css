@@ -1,0 +1,436 @@
+.preference-angular-group {
+  padding-top: 0;
+  border: 0;
+}
+
+.preference-angular-toggles {
+  display: grid;
+  gap: 12px;
+}
+
+.preference-angular-fields {
+  min-width: 0;
+  margin-top: 12px;
+  padding: 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface-subtle);
+}
+
+.preference-angular-preview {
+  position: relative;
+  width: 100%;
+  min-width: 0;
+  aspect-ratio: 360 / 260;
+  overflow: hidden;
+  border: 1px solid rgba(83, 105, 102, 0.3);
+  border-radius: 7px;
+  background: linear-gradient(#e8f2f3 0%, #f5f0e3 72%, #e1e7df 100%);
+}
+
+#preference-angular-artwork {
+  display: block;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  user-select: none;
+}
+
+.preference-preview-grid line {
+  stroke: rgba(76, 96, 96, 0.2);
+  stroke-width: 1;
+  stroke-dasharray: 2 4;
+}
+
+.preference-preview-grid .preference-preview-bearing-tick {
+  stroke: rgba(76, 96, 96, 0.55);
+  stroke-dasharray: none;
+}
+
+.preference-preview-grid .preference-preview-bearing-tick.is-cardinal {
+  stroke: #526564;
+  stroke-width: 1.5;
+}
+
+.preference-preview-grid text {
+  fill: #5e6b6c;
+  font-size: 9px;
+  font-weight: 720;
+  paint-order: stroke;
+  stroke: rgba(245, 249, 247, 0.9);
+  stroke-width: 2.5px;
+}
+
+.preference-preview-grid .preference-preview-bearing-direction {
+  fill: #657273;
+  font-size: 8px;
+  font-weight: 650;
+}
+
+.preference-preview-segment {
+  stroke: #3d8179;
+  stroke-width: 2.5;
+  stroke-linecap: round;
+}
+
+.preference-preview-moon {
+  filter: drop-shadow(0 1px 2px rgba(18, 30, 33, 0.3));
+}
+
+.preference-preview-exclusion {
+  fill: rgba(70, 82, 82, 0.25);
+  pointer-events: none;
+}
+
+.preference-angular-preview .moon-path-foreground {
+  opacity: calc(var(--moon-path-foreground-opacity, 0.16) * 1.7);
+}
+
+.preference-altitude-axis-label {
+  position: absolute;
+  top: 34%;
+  left: 3px;
+  z-index: 5;
+  color: #657273;
+  font-size: 0.52rem;
+  font-weight: 650;
+  line-height: 1;
+  pointer-events: none;
+  text-transform: uppercase;
+  transform: rotate(180deg);
+  writing-mode: vertical-rl;
+}
+
+.preference-preview-zone {
+  position: absolute;
+  top: 11.54%;
+  right: 5.5556%;
+  bottom: 26.92%;
+  left: 11.1111%;
+  z-index: 4;
+  cursor: help;
+}
+
+.preference-zone-tooltip {
+  position: absolute;
+  display: block;
+  right: 0;
+  bottom: calc(100% + 8px);
+  z-index: 30;
+  width: min(180px, 70vw);
+  padding: 8px 10px;
+  border: 1px solid var(--line-strong);
+  border-radius: 6px;
+  background: var(--ink);
+  box-shadow: var(--shadow);
+  color: #fff;
+  font-size: 0.74rem;
+  font-weight: 640;
+  line-height: 1.35;
+  opacity: 0;
+  pointer-events: none;
+  text-align: left;
+  transition: opacity 0.12s ease-in-out;
+}
+
+.preference-preview-zone.is-tooltip-visible .preference-zone-tooltip {
+  opacity: 1;
+}
+
+.preference-preview-zone .preference-zone-tooltip {
+  top: 8px;
+  bottom: auto;
+  width: min(210px, 82vw);
+}
+
+.preference-handle-help {
+  margin-top: 7px;
+  color: var(--muted);
+  font-size: 0.78rem;
+}
+
+.preference-handle-help > button {
+  min-height: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--accent-strong);
+  font-weight: 760;
+}
+
+.preference-handle-help-content {
+  margin-top: 7px;
+  padding: 8px 10px;
+  border-left: 3px solid var(--line-strong);
+}
+
+.preference-handle-help-content p {
+  margin: 5px 0 0;
+}
+
+.preference-altitude-track {
+  position: absolute;
+  z-index: 6;
+  top: 11.54%;
+  bottom: 26.92%;
+  left: 11.11%;
+  width: 36px;
+  height: auto;
+  margin: 0;
+  transform: translateX(-50%);
+  pointer-events: none;
+  touch-action: none;
+}
+
+.preference-altitude-base,
+.preference-altitude-fill {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 50%;
+  width: 4px;
+  border-radius: 999px;
+  transform: translateX(-50%);
+}
+
+.preference-altitude-base {
+  background: #81918e;
+}
+
+.preference-altitude-fill {
+  top: auto;
+  height: 0;
+  background: var(--accent);
+  box-shadow: 0 0 9px rgba(33, 111, 104, 0.28);
+}
+
+.preference-track-handle {
+  z-index: 5;
+  min-width: 0;
+  min-height: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+  touch-action: none;
+}
+
+.preference-track-handle::before {
+  position: absolute;
+  content: "";
+  border: 1px solid var(--surface);
+  border-radius: 5px;
+  background: var(--accent);
+  box-shadow: 0 2px 5px rgba(20, 31, 34, 0.32);
+  pointer-events: none;
+}
+
+.preference-track-handle > span {
+  display: none;
+}
+
+.preference-altitude-handle {
+  z-index: 6;
+  left: 50%;
+  width: 32px;
+  height: 28px;
+  cursor: ns-resize;
+  pointer-events: auto;
+}
+
+.preference-altitude-handle::before {
+  right: 2px;
+  left: 2px;
+  height: 4px;
+}
+
+.preference-altitude-handle[data-altitude-minimum] {
+  transform: translate(-50%, 100%);
+}
+
+.preference-altitude-handle[data-altitude-minimum]::before {
+  top: 0;
+  border-radius: 0 0 5px 5px;
+}
+
+.preference-altitude-handle[data-altitude-maximum] {
+  transform: translateX(-50%);
+}
+
+.preference-altitude-handle[data-altitude-maximum]::before {
+  bottom: 0;
+  border-radius: 5px 5px 0 0;
+}
+
+.preference-compass-track {
+  position: absolute;
+  right: 5.5556%;
+  bottom: 10px;
+  left: 11.1111%;
+  height: 62px;
+  margin: 0;
+  pointer-events: none;
+  touch-action: none;
+}
+
+.preference-compass-base,
+.preference-included-fill,
+.preference-blocked-fill {
+  position: absolute;
+  top: 13px;
+  height: 4px;
+  border-radius: 999px;
+}
+
+.preference-compass-base {
+  right: 0;
+  left: 0;
+  background: #81918e;
+}
+
+.preference-included-fill {
+  background: var(--accent);
+  box-shadow: 0 0 10px rgba(33, 111, 104, 0.2);
+}
+
+.preference-included-fill.is-handle-bridge {
+  top: -27px;
+  height: 44px;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.preference-included-fill.is-handle-bridge::before {
+  position: absolute;
+  inset: 0 -7px;
+  content: "";
+  border: 1px solid var(--surface);
+  border-radius: 5px;
+  background: var(--accent);
+  box-shadow: 0 2px 5px rgba(20, 31, 34, 0.32);
+  pointer-events: none;
+}
+
+.preference-blocked-fill {
+  z-index: 2;
+  top: 14px;
+  height: 2px;
+  background: #a76870;
+  box-shadow: 0 0 8px rgba(167, 104, 112, 0.22);
+}
+
+.preference-included-handle {
+  top: -29px;
+  width: 24px;
+  height: 28px;
+  cursor: ew-resize;
+  pointer-events: auto;
+}
+
+.preference-included-handle::before {
+  top: 2px;
+  bottom: -14px;
+  width: 7px;
+}
+
+.preference-compass-track:has(.preference-included-fill.is-handle-bridge)
+  .preference-included-handle::before {
+  opacity: 0;
+}
+
+.preference-blocked-handle {
+  top: 33px;
+  width: 32px;
+  height: 26px;
+  cursor: ew-resize;
+  pointer-events: auto;
+}
+
+.preference-blocked-handle::before {
+  top: 2px;
+  bottom: 2px;
+  width: 7px;
+  border-color: #74464d;
+  background: #c68f96;
+}
+
+.preference-track-handle[data-bearing-handle$="-start"] {
+  transform: translateX(-100%);
+}
+
+.preference-track-handle[data-bearing-handle$="-start"]::before {
+  right: 0;
+  border-radius: 5px 0 0 5px;
+}
+
+.preference-track-handle[data-bearing-handle$="-end"]::before {
+  left: 0;
+  border-radius: 0 5px 5px 0;
+}
+
+.preference-track-handle[data-bearing-handle$="-end"] {
+  transform: translateX(0);
+}
+
+.preference-blocked-handle[data-bearing-handle$="-start"] {
+  transform: translateX(-75%);
+}
+
+.preference-blocked-handle[data-bearing-handle$="-start"]::before {
+  right: auto;
+  left: 24px;
+  border-radius: 0 5px 5px 0;
+}
+
+.preference-blocked-handle[data-bearing-handle$="-end"] {
+  transform: translateX(-25%);
+}
+
+.preference-blocked-handle[data-bearing-handle$="-end"]::before {
+  right: 24px;
+  left: auto;
+  border-radius: 5px 0 0 5px;
+}
+
+.preference-altitude-handle.is-rebounding-up::before {
+  animation: preference-altitude-rebound-up 0.34s ease-out;
+}
+
+.preference-altitude-handle.is-rebounding-down::before {
+  animation: preference-altitude-rebound-down 0.34s ease-out;
+}
+
+.preference-angular-fields.is-altitude-disabled .preference-altitude-fill,
+.preference-angular-fields.is-altitude-disabled .preference-altitude-handle,
+.preference-angular-fields.is-direction-disabled .preference-included-fill,
+.preference-angular-fields.is-direction-disabled .preference-blocked-fill,
+.preference-angular-fields.is-direction-disabled .preference-included-handle,
+.preference-angular-fields.is-direction-disabled .preference-blocked-handle {
+  display: none;
+}
+
+@keyframes preference-altitude-rebound-up {
+  45% {
+    transform: translateY(-6px);
+  }
+}
+
+@keyframes preference-altitude-rebound-down {
+  45% {
+    transform: translateY(6px);
+  }
+}
+
+@media (max-width: 380px) {
+  .preference-angular-fields {
+    padding: 7px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .preference-altitude-handle.is-rebounding-up::before,
+  .preference-altitude-handle.is-rebounding-down::before {
+    animation: none;
+  }
+}
