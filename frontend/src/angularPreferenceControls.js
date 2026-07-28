@@ -5,6 +5,9 @@ import {
 } from "./angularPreferenceRules.js";
 import { createAngularPreferencePreview } from "./angularPreferencePreview.js";
 
+var ZONE_TOOLTIP_DWELL_MILLISECONDS = 600;
+var ZONE_TOOLTIP_VISIBLE_MILLISECONDS = 1500;
+
 export function createAngularPreferenceControls(form) {
   var altitudeEnabled = form.querySelector("#preference-altitude-enabled");
   var directionEnabled = form.querySelector("#preference-direction-enabled");
@@ -39,21 +42,26 @@ export function createAngularPreferenceControls(form) {
 
 function wireAngularZoneTooltip(form) {
   var zone = form.querySelector("[data-preference-zone]");
-  var timer;
-  function show() {
-    window.clearTimeout(timer);
-    zone.classList.add("is-tooltip-visible");
-    timer = window.setTimeout(function () {
-      zone.classList.remove("is-tooltip-visible");
-    }, 1500);
+  var dwellTimer;
+  var dismissalTimer;
+  function waitToShow(event) {
+    hide();
+    if (event.pointerType === "touch") return;
+    dwellTimer = window.setTimeout(function () {
+      zone.classList.add("is-tooltip-visible");
+      dismissalTimer = window.setTimeout(hide, ZONE_TOOLTIP_VISIBLE_MILLISECONDS);
+    }, ZONE_TOOLTIP_DWELL_MILLISECONDS);
   }
   function hide() {
-    window.clearTimeout(timer);
+    window.clearTimeout(dwellTimer);
+    window.clearTimeout(dismissalTimer);
     zone.classList.remove("is-tooltip-visible");
   }
-  zone.addEventListener("pointerenter", show);
-  zone.addEventListener("pointermove", show);
+  zone.addEventListener("pointerenter", waitToShow);
+  zone.addEventListener("pointermove", waitToShow);
   zone.addEventListener("pointerleave", hide);
+  zone.addEventListener("pointerdown", hide);
+  zone.addEventListener("pointercancel", hide);
 }
 
 function wireAngularHandleHelp(form) {

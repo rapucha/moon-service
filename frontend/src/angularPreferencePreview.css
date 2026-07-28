@@ -61,12 +61,6 @@
   stroke-width: 2.5px;
 }
 
-.preference-preview-grid .preference-preview-bearing-direction {
-  fill: #657273;
-  font-size: 8px;
-  font-weight: 650;
-}
-
 .preference-preview-segment {
   stroke: #3d8179;
   stroke-width: 2.5;
@@ -86,19 +80,28 @@
   opacity: calc(var(--moon-path-foreground-opacity, 0.16) * 1.7);
 }
 
-.preference-altitude-axis-label {
+.preference-altitude-axis-label,
+.preference-bearing-axis-label {
   position: absolute;
-  top: 34%;
-  left: 3px;
   z-index: 5;
   color: #657273;
-  font-size: 0.52rem;
+  font-family: inherit;
+  font-size: 0.55rem;
   font-weight: 650;
   line-height: 1;
   pointer-events: none;
-  text-transform: uppercase;
-  transform: rotate(180deg);
-  writing-mode: vertical-rl;
+}
+
+.preference-altitude-axis-label {
+  top: 3.5%;
+  left: 3px;
+}
+
+.preference-bearing-axis-label {
+  bottom: 7%;
+  left: 50%;
+  transform: translateX(-50%);
+  white-space: nowrap;
 }
 
 .preference-preview-zone {
@@ -108,7 +111,6 @@
   bottom: 26.92%;
   left: 11.1111%;
   z-index: 4;
-  cursor: help;
 }
 
 .preference-zone-tooltip {
