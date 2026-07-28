@@ -225,7 +225,8 @@ test("shows the first selected phase without cycling in reduced motion", async (
   await expectMainPhase(page, preview, 315, 35);
 
   await page.emulateMedia({ reducedMotion: "reduce" });
-  await expectMainPhase(page, preview, 135, 35);
+  await expect.poll(() => canvasDataUrl(preview))
+    .toBe(await expectedMainPhaseDataUrl(page, 135, 35));
   await page.clock.runFor(CYCLE_MILLISECONDS * 3);
   await expectMainPhase(page, preview, 135, 35);
   await expect(handle).toHaveAttribute("aria-valuenow", "35");
