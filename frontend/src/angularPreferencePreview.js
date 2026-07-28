@@ -313,13 +313,7 @@ function gridArtwork() {
         y: 255,
         textAnchor: index === 0 ? "start" : (index === compass.length - 1 ? "end" : "middle")
       }, point.label);
-    }),
-    svgElement("text", {
-      className: "preference-preview-bearing-direction",
-      x: 190,
-      y: 245,
-      textAnchor: "middle"
-    }, "bearing increases →"));
+    }));
 }
 
 function wireHandle(

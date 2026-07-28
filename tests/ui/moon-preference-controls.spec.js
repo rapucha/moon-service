@@ -395,7 +395,7 @@ test("uses the schematic sliders to explain and preview angular limits", async (
   await expect(page.locator(".preference-axis-help")).toHaveCount(0);
   await expect(page.locator(".preference-altitude-axis-label")).toHaveText("Altitude");
   await expect(page.locator(".preference-preview-bearing-direction"))
-    .toHaveText("bearing increases →");
+    .toHaveText("Bearing increases →");
   await expect(altitudeMinimum).toHaveAttribute(
     "aria-describedby", /preference-handle-instructions preference-altitude-minimum-description/);
 

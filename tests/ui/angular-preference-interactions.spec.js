@@ -101,6 +101,39 @@ test("draws the schematic Moon pass as one parabola", async ({ page }) => {
   expect(secondDifferences[0]).toBeGreaterThan(0);
 });
 
+test("keeps the axis titles uniform and clear of degree ticks", async ({ page }) => {
+  await openAngularControls(page, true);
+  const maximum = page.getByRole("slider", { name: "Maximum Moon altitude" });
+  await maximum.press("Shift+ArrowUp");
+  for (let step = 0; step < 5; step += 1) await maximum.press("ArrowUp");
+  await expect(maximum).toHaveAttribute("aria-valuenow", "30");
+
+  const titles = page.locator(
+    ".preference-altitude-axis-label, .preference-bearing-axis-label"
+  );
+  const styles = await titles.evaluateAll(elements => elements.map(element => {
+    var style = getComputedStyle(element);
+    return { family: style.fontFamily, size: style.fontSize, weight: style.fontWeight };
+  }));
+  expect(styles[0]).toEqual(styles[1]);
+  expect(parseFloat(styles[0].size)).toBeGreaterThan(8);
+
+  const geometry = await page.evaluate(() => {
+    var title = document.querySelector(".preference-altitude-axis-label").getBoundingClientRect();
+    var ticks = Array.from(document.querySelectorAll(".preference-preview-grid text"))
+      .filter(element => element.textContent.endsWith("°"));
+    var titleOverlap = ticks.some(element => {
+        var tick = element.getBoundingClientRect();
+        return title.left < tick.right && title.right > tick.left
+          && title.top < tick.bottom && title.bottom > tick.top;
+      });
+    var thirty = ticks.find(element => element.textContent === "30°").getBoundingClientRect();
+    var handle = document.querySelector("[data-altitude-maximum]").getBoundingClientRect();
+    return { titleOverlap: titleOverlap, tickUnderHandle: thirty.right > handle.left };
+  });
+  expect(geometry).toEqual({ titleOverlap: false, tickUnderHandle: false });
+});
+
 for (const snapCase of SNAP_CASES) {
   test("keeps the " + snapCase.name + " handle closed through pointer tremor", async ({
     page
