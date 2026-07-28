@@ -15,18 +15,8 @@ const EDITED_DIRECTION = {
   included: { start: 329, end: 30 },
   excluded: { start: 349, end: 10 }
 };
-const PHASES = [
-  ["New", "new_moon"],
-  ["Waxing crescent", "waxing_crescent"],
-  ["First quarter", "first_quarter"],
-  ["Waxing gibbous", "waxing_gibbous"],
-  ["Full", "full_moon"],
-  ["Waning gibbous", "waning_gibbous"],
-  ["Last quarter", "last_quarter"],
-  ["Waning crescent", "waning_crescent"]
-];
-
 test("edits, persists, removes, and resets the accepted controls", async ({ page }, testInfo) => {
+  await page.emulateMedia({ reducedMotion: "reduce" });
   const calls = await captureApiCalls(page);
   await page.goto("/search?q=Prague");
   await waitForCallCount(calls, 1);
@@ -40,7 +30,7 @@ test("edits, persists, removes, and resets the accepted controls", async ({ page
   await expect(page.getByLabel("Limit Moon altitude")).not.toHaveAttribute("aria-expanded");
   await expect(page.getByLabel("Limit Moon direction")).not.toHaveAttribute("aria-expanded");
   await expect(page.getByLabel("Limit illuminated-edge direction")).not.toBeChecked();
-  await expect(page.locator("[data-named-phase]:checked")).toHaveCount(0);
+  await expect(page.locator("[data-named-phase]:checked")).toHaveCount(8);
   await expect(page.locator("#active-preference-summary")).toHaveCount(0);
 
   await page.getByLabel("Limit Moon altitude").check();
@@ -89,13 +79,12 @@ test("edits, persists, removes, and resets the accepted controls", async ({ page
   await page.keyboard.press("ArrowLeft");
   await expect(blockedStartHandle).toHaveAttribute("aria-valuenow", "349");
 
-  for (const phase of PHASES) {
-    await page.getByLabel(phase[0], { exact: true }).check();
-  }
+  await expect(page.locator("[data-named-phase]:checked")).toHaveCount(8);
   await page.getByLabel("Ambient light").check();
   await page.getByLabel("Civil twilight").uncheck();
   await page.getByLabel("Night").check();
   await page.getByLabel("Limit illuminated-edge direction").check();
+  await page.getByLabel("New", { exact: true }).uncheck();
   const limbHandle = page.getByRole("slider", { name: "Bright-limb target orientation" });
   await expect(limbHandle).toHaveAttribute("aria-describedby", "preference-limb-instructions");
   const limbCanvas = page.locator("#preference-limb-moon");
@@ -122,6 +111,7 @@ test("edits, persists, removes, and resets the accepted controls", async ({ page
     "aria-valuetext",
     "0 degrees clockwise from zenith, toward zenith"
   );
+  await page.getByLabel("New", { exact: true }).check();
 
   await page.getByRole("button", { name: "Use these limits" }).click();
   await waitForCallCount(calls, 1);
@@ -133,11 +123,10 @@ test("edits, persists, removes, and resets the accepted controls", async ({ page
       altitudeDegrees: { minimum: 3, maximum: 15 },
       azimuthDegrees: EDITED_DIRECTION,
       time: { mode: "light_bucket", buckets: ["night"] },
-      namedPhases: PHASES.map(phase => phase[1]),
       brightLimbOrientationDegrees: [{ start: 350, end: 10 }]
     }
   });
-  await expect(page.locator("#preference-count")).toHaveText("5 active");
+  await expect(page.locator("#preference-count")).toHaveText("4 active");
   expect(await storedPreferences(page)).toEqual(calls[0].body.preferences);
 
   await page.reload();
@@ -153,8 +142,8 @@ test("edits, persists, removes, and resets the accepted controls", async ({ page
   await page.getByRole("button", { name: "Use these limits" }).click();
   await waitForCallCount(calls, 3);
   expect(calls[2].body.preferences.azimuthDegrees).toBeUndefined();
-  expect(calls[2].body.preferences.namedPhases).toEqual(PHASES.map(phase => phase[1]));
-  await expect(page.locator("#preference-count")).toHaveText("4 active");
+  expect(calls[2].body.preferences.namedPhases).toBeUndefined();
+  await expect(page.locator("#preference-count")).toHaveText("3 active");
 
   await openPreferences(page);
   await page.getByRole("button", { name: "Reset all preferences" }).click();
