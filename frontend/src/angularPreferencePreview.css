@@ -111,7 +111,6 @@
   cursor: help;
 }
 
-.preference-control-tooltip,
 .preference-zone-tooltip {
   position: absolute;
   display: block;
@@ -134,7 +133,6 @@
   transition: opacity 0.12s ease-in-out;
 }
 
-.preference-track-handle.is-tooltip-visible .preference-control-tooltip,
 .preference-preview-zone.is-tooltip-visible .preference-zone-tooltip {
   opacity: 1;
 }
@@ -172,6 +170,31 @@
 
 .preference-angular-status:empty {
   opacity: 0;
+}
+
+.preference-handle-help {
+  margin-top: 7px;
+  color: var(--muted);
+  font-size: 0.78rem;
+}
+
+.preference-handle-help > button {
+  min-height: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--accent-strong);
+  font-weight: 760;
+}
+
+.preference-handle-help-content {
+  margin-top: 7px;
+  padding: 8px 10px;
+  border-left: 3px solid var(--line-strong);
+}
+
+.preference-handle-help-content p {
+  margin: 5px 0 0;
 }
 
 .preference-altitude-track {
@@ -235,20 +258,6 @@
   display: none;
 }
 
-.preference-track-handle > .preference-control-tooltip {
-  display: block;
-  top: auto;
-  right: 0;
-  bottom: calc(100% + 8px);
-  left: auto;
-  color: #fff;
-  font-size: 0.74rem;
-  font-weight: 640;
-  font-variant-numeric: normal;
-  white-space: normal;
-  transform: none;
-}
-
 .preference-altitude-handle {
   z-index: 6;
   left: 50%;
@@ -256,14 +265,6 @@
   height: 28px;
   cursor: ns-resize;
   pointer-events: auto;
-}
-
-.preference-altitude-handle .preference-control-tooltip {
-  top: 50%;
-  bottom: auto;
-  left: calc(100% + 5px);
-  right: auto;
-  transform: translateY(-50%);
 }
 
 .preference-altitude-handle::before {
@@ -325,6 +326,19 @@
   top: -27px;
   height: 44px;
   border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.preference-included-fill.is-handle-bridge::before {
+  position: absolute;
+  inset: 0 -7px;
+  content: "";
+  border: 1px solid var(--surface);
+  border-radius: 5px;
+  background: var(--accent);
+  box-shadow: 0 2px 5px rgba(20, 31, 34, 0.32);
+  pointer-events: none;
 }
 
 .preference-blocked-fill {
@@ -346,15 +360,12 @@
 .preference-included-handle::before {
   top: 2px;
   bottom: -14px;
-  width: 8px;
+  width: 7px;
 }
 
-.preference-included-handle[data-bearing-handle$="-start"]::before {
-  border-right-color: var(--accent);
-}
-
-.preference-included-handle[data-bearing-handle$="-end"]::before {
-  border-left-color: var(--accent);
+.preference-compass-track:has(.preference-included-fill.is-handle-bridge)
+  .preference-included-handle::before {
+  opacity: 0;
 }
 
 .preference-blocked-handle {
@@ -368,7 +379,7 @@
 .preference-blocked-handle::before {
   top: 2px;
   bottom: 2px;
-  width: 8px;
+  width: 7px;
   border-color: #74464d;
   background: #c68f96;
 }
@@ -389,17 +400,6 @@
 
 .preference-track-handle[data-bearing-handle$="-end"] {
   transform: translateX(0);
-}
-
-.preference-track-handle[data-tooltip-align="start"] .preference-control-tooltip {
-  right: auto;
-  left: 0;
-}
-
-.preference-track-handle[data-tooltip-align="center"] .preference-control-tooltip {
-  right: auto;
-  left: 50%;
-  transform: translateX(-50%);
 }
 
 .preference-blocked-handle[data-bearing-handle$="-start"] {

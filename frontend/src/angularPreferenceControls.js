@@ -5,14 +5,13 @@ import {
 } from "./angularPreferenceRules.js";
 import { createAngularPreferencePreview } from "./angularPreferencePreview.js";
 
-var HANDLE_TOOLTIP_DURATION_MS = 1600;
-
 export function createAngularPreferenceControls(form) {
   var altitudeEnabled = form.querySelector("#preference-altitude-enabled");
   var directionEnabled = form.querySelector("#preference-direction-enabled");
   var editor = form.querySelector("#preference-angular-fields");
   var preview = createAngularPreferencePreview(form);
-  wireAngularTooltips(form);
+  wireAngularZoneTooltip(form);
+  wireAngularHandleHelp(form);
 
   altitudeEnabled.addEventListener("change", syncEditors);
   directionEnabled.addEventListener("change", syncEditors);
@@ -38,44 +37,24 @@ export function createAngularPreferenceControls(form) {
   }
 }
 
-function wireAngularTooltips(form) {
-  var handles = form.querySelectorAll(
-    ".preference-angular-preview .preference-track-handle");
+function wireAngularZoneTooltip(form) {
   var zone = form.querySelector("[data-preference-zone]");
-  var active;
-  var timer;
-  handles.forEach(function (handle) {
-    handle.addEventListener("pointerenter", function () {
-      show(handle, true);
-    });
-    handle.addEventListener("pointerleave", hide);
-    handle.addEventListener("focus", function () {
-      if (handle.matches(":focus-visible")) show(handle, true);
-    });
-    handle.addEventListener("blur", hide);
-    handle.addEventListener("pointerdown", hide);
-    handle.addEventListener("keydown", function (event) {
-      if (["ArrowDown", "ArrowLeft", "ArrowUp", "ArrowRight", "Home", "End"]
-        .includes(event.key)) hide();
-    });
-  });
   zone.addEventListener("pointerenter", function () {
-    show(zone, false);
+    zone.classList.add("is-tooltip-visible");
   });
-  zone.addEventListener("pointerleave", hide);
+  zone.addEventListener("pointerleave", function () {
+    zone.classList.remove("is-tooltip-visible");
+  });
+}
 
-  function show(owner, brief) {
-    hide();
-    active = owner;
-    active.classList.add("is-tooltip-visible");
-    if (brief) timer = window.setTimeout(hide, HANDLE_TOOLTIP_DURATION_MS);
-  }
-
-  function hide() {
-    window.clearTimeout(timer);
-    if (active) active.classList.remove("is-tooltip-visible");
-    active = null;
-  }
+function wireAngularHandleHelp(form) {
+  var toggle = form.querySelector("[aria-controls='preference-handle-help-content']");
+  var content = form.querySelector("#preference-handle-help-content");
+  toggle.addEventListener("click", function () {
+    var expanded = toggle.getAttribute("aria-expanded") !== "true";
+    toggle.setAttribute("aria-expanded", String(expanded));
+    content.hidden = !expanded;
+  });
 }
 
 export function normalizeAngularPreferences(value) {

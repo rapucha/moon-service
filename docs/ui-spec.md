@@ -169,21 +169,21 @@ north at `0°` through east, south, and west to a repeated north label at
 `360°`. Short tick marks divide it every `15°`; longer ticks align only with
 the `90°` cardinal divisions. Its arrows mean increasing bearing, not Moon
 travel direction. Handle values remain in `[0°, 360°)`. The altitude axis is
-labeled directly, and the bearing arrow labels the horizontal axis. Handle help
-appears briefly, never more than one tooltip at a time, and disappears when a
-handle moves. Hovering the plot explains the configured included, excluded, or
-blocked range under the pointer. The same control facts are available to
-assistive technology through descriptions.
+labeled directly, and the bearing arrow labels the horizontal axis. The collapsed
+`? Handle help` disclosure below the schematic explains dragging, keyboard steps,
+minimum ranges, marker colors, and usable-sector transfer. Hovering the plot explains
+the configured included, excluded, or blocked range under the pointer. Handles do not open
+tooltips. Assistive technology gets the same facts through descriptions.
 
 Each range handle is a directional boundary. Its inner edge marks the exact
 logical angle and aligns with the fill and schematic exclusion edge. Green
 marker bodies extend outside the usable sector. Red marker bodies point into
 the blocked sector. Their hit areas include the visible marker and extend
 outside the blocked sector so narrow blocked sectors remain draggable.
-Adjacent exclusion rectangles merge before drawing so coincident green and
-red boundaries do not leave a dim hairline. At the straight `10°` minimum, the
-included fill bridges the green marker bodies and their facing borders use the
-fill color, leaving no pale seam.
+Adjacent exclusion rectangles merge before drawing so coincident green and red
+boundaries do not leave a dim hairline. At the straight `10°` minimum, one
+opaque composite shape replaces both green marker bodies and the fill between
+them. It has one outer border and shadow, with no internal edge or gridline.
 
 The schematic uses a fixed illustrative arc, small textured Moon images, and
 the existing generic moving hills, trees, and buildings. It shows no time or

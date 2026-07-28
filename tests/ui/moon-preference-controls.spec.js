@@ -326,17 +326,16 @@ test("aligns boundaries, removes the green seam, and mirrors red markers", async
     [start, "[data-bearing-handle='included-start']"],
     [end, "[data-bearing-handle='included-end']"]
   ], testInfo.project.name === "mobile");
-  const inwardBorders = await page.evaluate(() => {
-    const startStyle = getComputedStyle(document.querySelector(
-      "[data-bearing-handle='included-start']"), "::before");
-    const endStyle = getComputedStyle(document.querySelector(
-      "[data-bearing-handle='included-end']"), "::before");
-    return [
-      [startStyle.borderRightColor, startStyle.backgroundColor],
-      [endStyle.borderLeftColor, endStyle.backgroundColor]
-    ];
-  });
-  expect(inwardBorders.every(colors => colors[0] === colors[1])).toBe(true);
+  const fill = page.locator("[data-azimuth-fill='included-left']");
+  expect(await fill.evaluate(element =>
+    getComputedStyle(element, "::before").backgroundColor)).toBe("rgb(33, 111, 104)");
+  expect(await start.evaluate(element =>
+    getComputedStyle(element, "::before").width)).toBe("7px");
+  expect(await blockedStart.evaluate(element =>
+    getComputedStyle(element, "::before").width)).toBe("7px");
+  expect(await page.locator(".preference-included-handle").evaluateAll(handles =>
+    handles.map(handle => getComputedStyle(handle, "::before").opacity)))
+    .toEqual(["0", "0"]);
 
   const edges = await page.evaluate(() => {
     const rectangle = selector => document.querySelector(selector).getBoundingClientRect();
@@ -422,34 +421,35 @@ test("uses the schematic sliders to explain and preview angular limits", async (
   await hoverZone(340, 30);
   await expect(zoneTooltip).toHaveText("Altitude 15°–90° is excluded.");
 
-  const visibleTooltips = page.locator(
-    ".preference-angular-preview .is-tooltip-visible");
+  await expect(zone).toHaveClass(/is-tooltip-visible/);
   await altitudeMinimum.hover();
-  await expect(visibleTooltips).toHaveCount(1);
-  await page.waitForTimeout(1700);
-  await expect(visibleTooltips).toHaveCount(0);
-  await altitudeMinimum.hover();
-  await altitudeMinimum.click();
-  await expect(visibleTooltips).toHaveCount(0);
+  await expect(zone).not.toHaveClass(/is-tooltip-visible/);
+  await expect(page.locator(".preference-control-tooltip")).toHaveCount(0);
+  await altitudeMinimum.focus();
   await page.keyboard.press("Home");
   await altitudeMaximum.focus();
   await page.keyboard.press("End");
+
+  const handleHelp = page.locator(".preference-handle-help");
+  const helpToggle = handleHelp.getByRole("button", { name: "? Handle help" });
+  const previewBox = await preview.boundingBox();
+  await expect(helpToggle).toHaveAttribute("aria-expanded", "false");
+  await helpToggle.click();
+  await expect(handleHelp.locator(".preference-handle-help-content"))
+    .toContainText(/green handles define usable direction, and red\s+handles define blocked direction/);
+  const helpBox = await handleHelp.boundingBox();
+  expect(helpBox?.y).toBeGreaterThanOrEqual(previewBox.y + previewBox.height);
 
   const exclusion = page.locator("[data-preview-exclusion]");
   const beforeBlockedChange = await exclusion.getAttribute("d");
   expect(beforeBlockedChange).toBeTruthy();
 
   const blockedStart = page.getByRole("slider", { name: "Blocked view start" });
-  await blockedStart.hover();
-  await expect(visibleTooltips).toHaveCount(1);
-  await expect(altitudeMinimum).not.toHaveClass(/is-tooltip-visible/);
   await blockedStart.focus();
   await page.keyboard.press("Shift+ArrowLeft");
-  await expect(visibleTooltips).toHaveCount(0);
   await expect(blockedStart).toHaveAttribute("aria-valuenow", "340");
   expect(await exclusion.getAttribute("d")).not.toBe(beforeBlockedChange);
 
-  const previewBox = await preview.boundingBox();
   const formBox = await page.locator("#preference-form").boundingBox();
   expect(previewBox).not.toBeNull();
   expect(formBox).not.toBeNull();
@@ -630,7 +630,7 @@ async function waitForCallCount(calls, count) {
 async function openPreferences(page) {
   const details = page.locator("#opportunity-preferences");
   if (!await details.evaluate(node => /** @type {HTMLDetailsElement} */ (node).open)) {
-    await details.locator("summary").click();
+    await details.locator(":scope > summary").click();
   }
 }
 

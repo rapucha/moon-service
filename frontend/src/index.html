@@ -139,10 +139,6 @@
                         aria-valuemax="15"
                         aria-valuenow="2"
                         data-altitude-minimum><span aria-hidden="true">2°</span>
-                        <span class="preference-control-tooltip" aria-hidden="true">
-                          Drag this edge. Arrow keys move 1°; Shift plus an arrow moves 10°.
-                          Altitude keeps at least 10° visible.
-                        </span>
                       </button>
                       <button
                         type="button"
@@ -154,10 +150,6 @@
                         aria-valuemax="90"
                         aria-valuenow="15"
                         data-altitude-maximum><span aria-hidden="true">15°</span>
-                        <span class="preference-control-tooltip" aria-hidden="true">
-                          Drag this edge. Arrow keys move 1°; Shift plus an arrow moves 10°.
-                          Altitude keeps at least 10° visible.
-                        </span>
                       </button>
                     </div>
                     <div id="preference-compass-track" class="preference-compass-track">
@@ -171,37 +163,38 @@
                         role="slider" aria-label="Included compass sector start"
                         aria-describedby="preference-direction-help preference-bearing-axis-description preference-handle-instructions preference-bearing-minimum-description"
                         data-bearing-handle="included-start"><span aria-hidden="true">330°</span>
-                        <span class="preference-control-tooltip" aria-hidden="true">
-                          Drag this usable-sector edge. Usable pieces are closed or at least 10° wide.
-                        </span>
                       </button>
                       <button type="button"
                         class="preference-track-handle preference-included-handle"
                         role="slider" aria-label="Included compass sector end"
                         aria-describedby="preference-direction-help preference-bearing-axis-description preference-handle-instructions preference-bearing-minimum-description"
                         data-bearing-handle="included-end"><span aria-hidden="true">30°</span>
-                        <span class="preference-control-tooltip" aria-hidden="true">
-                          Drag this usable-sector edge. Usable pieces are closed or at least 10° wide.
-                        </span>
                       </button>
                       <button type="button"
                         class="preference-track-handle preference-blocked-handle"
                         role="slider" aria-label="Blocked view start"
                         aria-describedby="preference-direction-help preference-bearing-axis-description preference-handle-instructions preference-bearing-minimum-description"
                         data-bearing-handle="excluded-start"><span aria-hidden="true">350°</span>
-                        <span class="preference-control-tooltip" aria-hidden="true">
-                          Drag this blocked edge. The last usable 10° transfers to the other side.
-                        </span>
                       </button>
                       <button type="button"
                         class="preference-track-handle preference-blocked-handle"
                         role="slider" aria-label="Blocked view end"
                         aria-describedby="preference-direction-help preference-bearing-axis-description preference-handle-instructions preference-bearing-minimum-description"
                         data-bearing-handle="excluded-end"><span aria-hidden="true">10°</span>
-                        <span class="preference-control-tooltip" aria-hidden="true">
-                          Drag this blocked edge. The last usable 10° transfers to the other side.
-                        </span>
                       </button>
+                    </div>
+                  </div>
+                  <div class="preference-handle-help">
+                    <button type="button" aria-expanded="false"
+                      aria-controls="preference-handle-help-content">? Handle help</button>
+                    <div id="preference-handle-help-content"
+                      class="preference-handle-help-content" hidden>
+                      <p>Drag a handle. Arrow keys move 1°; Shift plus an arrow moves 10°.</p>
+                      <p><strong>Altitude:</strong> the visible range stays at least 10° wide.</p>
+                      <p><strong>Direction:</strong> green handles define usable direction, and red
+                        handles define blocked direction. Each usable piece is 0° or at least
+                        10° wide, and at least one remains usable. Closing the only remaining 10°
+                        piece transfers it to the other side.</p>
                     </div>
                   </div>
                   <div class="visually-hidden">
