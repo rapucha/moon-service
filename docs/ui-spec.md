@@ -111,6 +111,8 @@ The frontend module split is intended to keep future UI changes manageable:
   foreground, exclusion shading, and responsive presentation;
 - `moonAppearanceControls.js`: named-phase selection and the textured
   bright-limb dial;
+- `moonAppearancePreview.css`: textured phase-thumbnail sizing and responsive
+  layout;
 - `moonPreferenceControls.css`: shared preference-control base, named-phase,
   and Moon-dial presentation;
 - `responseView.js`: response states and result rendering;
@@ -153,8 +155,11 @@ The editor exposes these hard filters:
   Disabling direction filtering also omits `azimuthDegrees`.
 - Named phase uses eight checkboxes for `new_moon`, `waxing_crescent`,
   `first_quarter`, `waxing_gibbous`, `full_moon`, `waning_gibbous`,
-  `last_quarter`, and `waning_crescent`. Any selected phase may match. An empty
-  selection omits `namedPhases`.
+  `last_quarter`, and `waning_crescent`. Any selected phase may match. An
+  absent value and all eight selected both mean unrestricted, and the editor
+  shows all eight boxes selected in either state. At least one box must remain
+  selected. A proper subset is canonicalized in the listed order, persisted,
+  and sent as `namedPhases`. Stored all-eight state normalizes to omission.
 - Bright-limb orientation is optional and has one target on a circular,
   single-handle dial. It has no editable numeric range inputs. The browser
   applies a fixed ±10° tolerance and sends exactly one normalized range in
@@ -243,6 +248,16 @@ The texture stays north-up while the illumination rotates. The illustrative
 crescent is thicker than the earlier mockup but remains below quarter phase,
 and the disk has a neutral or dark rim rather than a bright circumference.
 `northPoleTiltDegrees` is not a preference.
+
+The eight phase checkboxes have `aria-hidden` textured thumbnails at phase
+angles `0°`, `45°`, `90°`, `135°`, `180°`, `225°`, `270°`, and `315°` in
+canonical phase order. While bright-limb orientation is enabled and the
+preference editor is visible and open, its preview cycles through exactly the
+selected phases at the fixed target orientation. It uses at most one timer and
+stops when any enabling condition no longer holds. A hidden document or
+`prefers-reduced-motion` stops the cycle; reduced motion shows the first
+canonical selected phase. This animation is presentational. It does not alter
+preference state, request fields, or the fixed ±10° tolerance.
 
 When named phase and bright-limb orientation are both active, a sample must
 match any selected named phase and the single bright-limb interval. A sample
