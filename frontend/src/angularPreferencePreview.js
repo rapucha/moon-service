@@ -36,12 +36,10 @@ export function createAngularPreferencePreview(form) {
   var artwork = form.querySelector("#preference-angular-artwork");
   var editor = form.querySelector("#preference-angular-fields");
   var zone = form.querySelector("[data-preference-zone]");
-  var status = form.querySelector("#preference-angular-status");
   var altitude = copyAltitude(DEFAULT_ALTITUDE);
   var azimuth = copyAzimuth(DEFAULT_AZIMUTH);
   var altitudeEnabled = false;
   var directionEnabled = false;
-  var statusTimer;
 
   buildArtwork(artwork);
   wireAltitudeHandle(altitudeMinimumHandle, function () {
@@ -94,7 +92,8 @@ export function createAngularPreferencePreview(form) {
         state.altitudeDegrees = copyAltitude(altitude);
       }
       if (directionEnabled) {
-        state.azimuthDegrees = readAzimuth();
+        var azimuthValue = readAzimuth();
+        if (azimuthValue) state.azimuthDegrees = azimuthValue;
       }
       return { state: state };
     }
@@ -120,12 +119,6 @@ export function createAngularPreferencePreview(form) {
       var moved = moveBearing(azimuth, key, value, interaction.direction);
       azimuth = moved.azimuth;
       sync();
-      if (key.startsWith("excluded") && interaction.limited
-          && (interaction.attempted < 0 || interaction.attempted > 359)) {
-        announce("Blocked-view handles stop at north.");
-      } else {
-        announceBearingEffect(moved.effect);
-      }
     }, function (event, bounds) {
       return Math.round(((event.clientX - bounds.left) / bounds.width) * 360);
     }, function () {
@@ -166,10 +159,14 @@ export function createAngularPreferencePreview(form) {
   function setWrappedFill(kind, start, end) {
     var left = form.querySelector("[data-azimuth-fill='" + kind + "-left']");
     var right = form.querySelector("[data-azimuth-fill='" + kind + "-right']");
+    var fullCompass = kind === "included" && Math.abs(start - end) <= ANGLE_EPSILON;
     left.classList.toggle("is-handle-bridge",
       kind === "included" && start < end
       && Math.abs(end - start - MINIMUM_USABLE_DEGREES) <= ANGLE_EPSILON);
-    if (start > end) {
+    if (fullCompass) {
+      setFill(left, 0, 360);
+      setFill(right, 0, 0);
+    } else if (start > end) {
       setFill(left, 0, end);
       setFill(right, start, 360 - start);
     } else {
@@ -210,11 +207,14 @@ export function createAngularPreferencePreview(form) {
   }
 
   function readAzimuth() {
-    var value = { included: copyRange(azimuth.included) };
+    var value = {};
+    if (Math.abs(azimuth.included.start - azimuth.included.end) > ANGLE_EPSILON) {
+      value.included = copyRange(azimuth.included);
+    }
     if (azimuth.excluded.start !== azimuth.excluded.end) {
       value.excluded = copyRange(azimuth.excluded);
     }
-    return value;
+    return Object.keys(value).length ? value : null;
   }
 
   function altitudeRebound(handle, direction) {
@@ -224,29 +224,6 @@ export function createAngularPreferencePreview(form) {
     window.setTimeout(function () {
       handle.classList.remove(className);
     }, 360);
-    announce("Altitude keeps at least 10° visible.");
-  }
-
-  function announceBearingEffect(effect) {
-    if (effect === "closed") return announce("");
-    var messages = {
-      minimum: "A usable direction must remain at least 10° wide.",
-      opened: "That usable direction opened to the 10° minimum.",
-      transferred: "The last 10° moved to the other side so one direction remains usable.",
-      "transfer-seam": "The last 10° cannot transfer across north.",
-      "block-removed": "The blocked sector closed, leaving the selected direction usable."
-    };
-    if (messages[effect]) announce(messages[effect]);
-  }
-
-  function announce(message) {
-    if (status.textContent === message) return;
-    window.clearTimeout(statusTimer);
-    status.textContent = message || "";
-    if (!message) return;
-    statusTimer = window.setTimeout(function () {
-      status.textContent = "";
-    }, 3200);
   }
 }
 

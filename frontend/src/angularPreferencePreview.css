@@ -143,35 +143,6 @@
   width: min(210px, 82vw);
 }
 
-.preference-angular-preview:has(
-  .preference-preview-zone.is-tooltip-visible
-) .preference-angular-status {
-  opacity: 0;
-}
-
-.preference-angular-status {
-  position: absolute;
-  top: 8px;
-  right: 8px;
-  z-index: 9;
-  width: min(235px, 72%);
-  margin: 0;
-  padding: 7px 9px;
-  border: 1px solid rgba(60, 80, 78, 0.45);
-  border-radius: 6px;
-  background: rgba(248, 250, 249, 0.96);
-  box-shadow: 0 3px 10px rgba(20, 31, 34, 0.2);
-  color: #344644;
-  font-size: 0.74rem;
-  font-weight: 680;
-  line-height: 1.3;
-  pointer-events: none;
-}
-
-.preference-angular-status:empty {
-  opacity: 0;
-}
-
 .preference-handle-help {
   margin-top: 7px;
   color: var(--muted);

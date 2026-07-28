@@ -39,12 +39,21 @@ export function createAngularPreferenceControls(form) {
 
 function wireAngularZoneTooltip(form) {
   var zone = form.querySelector("[data-preference-zone]");
-  zone.addEventListener("pointerenter", function () {
+  var timer;
+  function show() {
+    window.clearTimeout(timer);
     zone.classList.add("is-tooltip-visible");
-  });
-  zone.addEventListener("pointerleave", function () {
+    timer = window.setTimeout(function () {
+      zone.classList.remove("is-tooltip-visible");
+    }, 1500);
+  }
+  function hide() {
+    window.clearTimeout(timer);
     zone.classList.remove("is-tooltip-visible");
-  });
+  }
+  zone.addEventListener("pointerenter", show);
+  zone.addEventListener("pointermove", show);
+  zone.addEventListener("pointerleave", hide);
 }
 
 function wireAngularHandleHelp(form) {
@@ -68,16 +77,19 @@ export function normalizeAngularPreferences(value) {
   }
   if (value.azimuthDegrees !== undefined) {
     var azimuth = value.azimuthDegrees;
+    var included = azimuth && azimuth.included;
     var excluded = azimuth && azimuth.excluded;
-    if (!objectValue(azimuth) || !validRange(azimuth.included)
-        || (excluded !== undefined
-          && (!validRange(excluded) || !contained(azimuth.included, excluded)))
+    if (!objectValue(azimuth)
+        || (included === undefined && excluded === undefined)
+        || (included !== undefined && !validRange(included))
+        || (excluded !== undefined && !validRange(excluded))
+        || (included !== undefined && excluded !== undefined
+          && !contained(included, excluded))
         || !validAzimuth(copyAzimuth(azimuth))) {
       return null;
     }
-    state.azimuthDegrees = {
-      included: copyRange(azimuth.included)
-    };
+    state.azimuthDegrees = {};
+    if (included !== undefined) state.azimuthDegrees.included = copyRange(included);
     if (excluded !== undefined) state.azimuthDegrees.excluded = copyRange(excluded);
   }
   return state;

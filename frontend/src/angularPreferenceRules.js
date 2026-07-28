@@ -22,18 +22,23 @@ export function copyAltitude(value) {
 }
 
 export function copyAzimuth(value) {
-  var midpoint = normalizeDegrees(value.included.start
-    + clockwiseDistance(value.included.start, value.included.end) / 2);
+  var included = value.included || {
+    start: value.excluded.start,
+    end: value.excluded.start
+  };
+  var midpoint = normalizeDegrees(included.start
+    + clockwiseDistance(included.start, included.end) / 2);
   var excluded = value.excluded || { start: midpoint, end: midpoint };
   return {
-    included: copyRange(value.included),
+    included: copyRange(included),
     excluded: copyRange(excluded)
   };
 }
 
 export function excludedBearingSegments(included, excluded) {
-  return mergeSegments(bearingSegments(included, true).concat(
-    bearingSegments(excluded, false)));
+  var outsideIncluded = sameBearing(included.start, included.end)
+    ? [] : bearingSegments(included, true);
+  return mergeSegments(outsideIncluded.concat(bearingSegments(excluded, false)));
 }
 
 export function angularZoneDescription(bearing, altitude, altitudeRange, azimuth) {
@@ -43,7 +48,8 @@ export function angularZoneDescription(bearing, altitude, altitudeRange, azimuth
   } else if (altitudeRange && altitude > altitudeRange.maximum) {
     reasons.push("Altitude " + degreeRange(altitudeRange.maximum, 90) + " is excluded.");
   }
-  if (azimuth && !bearingInRange(azimuth.included, bearing)) {
+  if (azimuth && !fullCompass(azimuth)
+      && !bearingInRange(azimuth.included, bearing)) {
     reasons.push("Azimuth " + degreeRange(
       azimuth.included.end, azimuth.included.start) + " is excluded.");
   } else if (azimuth && !sameBearing(azimuth.excluded.start, azimuth.excluded.end)
@@ -53,7 +59,8 @@ export function angularZoneDescription(bearing, altitude, altitudeRange, azimuth
   }
   if (reasons.length) return reasons.join(" ");
   var included = [];
-  if (azimuth) {
+  if (azimuth && (!fullCompass(azimuth)
+      || !sameBearing(azimuth.excluded.start, azimuth.excluded.end))) {
     var usableBearingRange = includedBearingRange(azimuth, bearing);
     included.push("azimuth " + degreeRange(
       usableBearingRange.start, usableBearingRange.end));
@@ -75,21 +82,23 @@ export function bearingValue(azimuth, key) {
 
 export function bearingLimits(azimuth, key) {
   var neighbors = {
-    includedStart: ["includedEnd", "excludedStart", 1, 0],
+    includedStart: ["includedEnd", "excludedStart", 0, 0],
     excludedStart: ["includedStart", "excludedEnd", 0, 0],
     excludedEnd: ["excludedStart", "includedEnd", 0, 0],
-    includedEnd: ["excludedEnd", "includedStart", 0, 1]
+    includedEnd: ["excludedEnd", "includedStart", 0, 0]
   }[key];
   var current = bearingValue(azimuth, key);
   var minimum = current
     - clockwiseDistance(bearingValue(azimuth, neighbors[0]), current) + neighbors[2];
   var maximum = current
     + clockwiseDistance(current, bearingValue(azimuth, neighbors[1])) - neighbors[3];
-  if (key === "includedStart"
+  var hasObstruction = !sameBearing(
+    azimuth.excluded.start, azimuth.excluded.end);
+  if (hasObstruction && key === "includedStart"
       && azimuth.excluded.start === azimuth.included.end) {
     maximum = Math.max(current, maximum - 1);
   }
-  if (key === "includedEnd"
+  if (hasObstruction && key === "includedEnd"
       && azimuth.excluded.end === azimuth.included.start) {
     minimum = Math.min(current, minimum + 1);
   }
@@ -109,6 +118,9 @@ export function moveBearing(azimuth, key, requested, direction) {
   var original = cloneAzimuth(azimuth);
   var candidate = cloneAzimuth(azimuth);
   setBearing(candidate, key, requested);
+  if (!isBlockedHandle(key)) {
+    settleIncludedComplement(original, candidate, key, direction);
+  }
   if (sameBearing(candidate.excluded.start, candidate.excluded.end)) {
     if (!validAzimuth(candidate)) return unchanged(original, "minimum");
     return changed(candidate, sameBearing(
@@ -130,6 +142,9 @@ export function moveBearing(azimuth, key, requested, direction) {
       : MINIMUM_USABLE_DEGREES;
     if (closing && sameBearing(oldGap, 0)) target = 0;
     setAdjacentGap(candidate, key, target);
+    if (!isBlockedHandle(key)) {
+      settleIncludedComplement(original, candidate, key, direction);
+    }
     gap = usableGaps(candidate)[side];
     otherGap = usableGaps(candidate)[oppositeSide(side)];
     if (closing && sameBearing(gap, 0) && sameBearing(otherGap, 0)) {
@@ -194,7 +209,8 @@ function setBearing(azimuth, key, value) {
 }
 
 export function validAzimuth(azimuth) {
-  var includedWidth = clockwiseDistance(azimuth.included.start, azimuth.included.end);
+  var includedWidth = fullCompass(azimuth)
+    ? 360 : clockwiseDistance(azimuth.included.start, azimuth.included.end);
   var startGap = clockwiseDistance(azimuth.included.start, azimuth.excluded.start);
   var blockedWidth = clockwiseDistance(azimuth.excluded.start, azimuth.excluded.end);
   var endGap = clockwiseDistance(azimuth.excluded.end, azimuth.included.end);
@@ -246,6 +262,12 @@ function bearingInRange(range, bearing) {
 }
 
 function includedBearingRange(azimuth, bearing) {
+  if (fullCompass(azimuth)) {
+    return {
+      start: azimuth.excluded.end,
+      end: azimuth.excluded.start
+    };
+  }
   if (sameBearing(azimuth.excluded.start, azimuth.excluded.end)) {
     return azimuth.included;
   }
@@ -301,6 +323,36 @@ function cloneAzimuth(value) {
     included: { start: value.included.start, end: value.included.end },
     excluded: { start: value.excluded.start, end: value.excluded.end }
   };
+}
+
+function settleIncludedComplement(original, candidate, key, direction) {
+  if (fullCompass(candidate)) return;
+  var includedWidth = clockwiseDistance(
+    candidate.included.start, candidate.included.end);
+  if (includedWidth <= 360 - MINIMUM_USABLE_DEGREES + ANGLE_EPSILON) return;
+  var originalIsFull = fullCompass(original);
+  var originalWidth = originalIsFull ? 360 : clockwiseDistance(
+    original.included.start, original.included.end);
+  var closing = !originalIsFull && (direction === 0
+    ? includedWidth > originalWidth
+    : direction === (key === "includedStart" ? -1 : 1));
+  if (closing) {
+    if (key === "includedStart") {
+      candidate.included.start = candidate.included.end;
+    } else {
+      candidate.included.end = candidate.included.start;
+    }
+  } else if (key === "includedStart") {
+    candidate.included.start = normalizeDegrees(
+      candidate.included.end + MINIMUM_USABLE_DEGREES);
+  } else {
+    candidate.included.end = normalizeDegrees(
+      candidate.included.start - MINIMUM_USABLE_DEGREES);
+  }
+}
+
+function fullCompass(azimuth) {
+  return sameBearing(azimuth.included.start, azimuth.included.end);
 }
 
 export function copyRange(value) {

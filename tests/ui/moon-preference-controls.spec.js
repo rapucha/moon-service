@@ -180,29 +180,23 @@ test("snaps, transfers, and preserves usable compass sectors", async ({ page }) 
   const includedEnd = page.getByRole("slider", { name: "Included compass sector end" });
   const blockedStart = page.getByRole("slider", { name: "Blocked view start" });
   const blockedEnd = page.getByRole("slider", { name: "Blocked view end" });
-  const status = page.locator("#preference-angular-status");
 
   await focusAndPress(page, blockedStart, ["Shift+ArrowLeft", "ArrowLeft"]);
   await expect(blockedStart).toHaveAttribute("aria-valuenow", "330");
-  await expect(status).toBeEmpty();
   await focusAndPress(page, blockedEnd, ["Shift+ArrowRight", "ArrowRight"]);
   await expect(blockedStart).toHaveAttribute("aria-valuenow", "340");
   await expect(blockedEnd).toHaveAttribute("aria-valuenow", "30");
-  await expect(status).toContainText("moved to the other side");
 
   await focusAndPress(page, blockedStart, ["ArrowLeft"]);
   await expect(blockedStart).toHaveAttribute("aria-valuenow", "330");
   await expect(blockedEnd).toHaveAttribute("aria-valuenow", "20");
   await focusAndPress(page, blockedStart, ["ArrowRight"]);
   await expect(blockedStart).toHaveAttribute("aria-valuenow", "340");
-  await expect(status).toContainText("opened to the 10° minimum");
 
   await focusAndPress(page, includedStart, ["ArrowRight"]);
   await expect(includedStart).toHaveAttribute("aria-valuenow", "340");
-  await expect(status).toBeEmpty();
   await focusAndPress(page, includedEnd, ["ArrowLeft"]);
   await expect(includedEnd).toHaveAttribute("aria-valuenow", "30");
-  await expect(status).toContainText("must remain at least 10°");
 
   await apply.click();
   await waitForCallCount(calls, 1);
@@ -212,20 +206,16 @@ test("snaps, transfers, and preserves usable compass sectors", async ({ page }) 
   });
 
   await preloadState(page, {
-    version: 1, azimuthDegrees: { included: { start: 40, end: 140 } }
+    version: 1, azimuthDegrees: { included: { start: 40, end: 30 } }
   });
   await page.reload();
   await waitForCallCount(calls, 2);
   await openPreferences(page);
-  for (const handle of [blockedStart, blockedEnd]) {
-    await expect(handle).toHaveAttribute("aria-valuenow", "90");
-  }
+  await expect(blockedStart).toHaveAttribute("aria-valuenow", "215");
+  await focusAndPress(page, includedStart, ["ArrowLeft"]);
   await apply.click();
   await waitForCallCount(calls, 3);
-  expect(calls[2].body.preferences.azimuthDegrees).toEqual({
-    included: { start: 40, end: 140 }
-  });
-  expect(await storedPreferences(page)).toEqual(calls[2].body.preferences);
+  expect(calls[2].body).toBeNull();
 });
 
 test("stops red bearing handles at the visible north endpoints", async ({
@@ -233,27 +223,33 @@ test("stops red bearing handles at the visible north endpoints", async ({
 }, testInfo) => {
   await preloadState(page, {
     version: 1,
-    azimuthDegrees: DIRECTION
+    azimuthDegrees: { excluded: { start: 330, end: 10 } }
   });
   const calls = await captureApiCalls(page);
   await page.goto("/search?q=Prague");
   await waitForCallCount(calls, 1);
   await openPreferences(page);
   const trackBox = await page.locator("#preference-compass-track").boundingBox();
-  expect(trackBox).not.toBeNull();
+  const includedStart = page.getByRole("slider", { name: "Included compass sector start" });
   const blockedStart = page.getByRole("slider", { name: "Blocked view start" });
   const blockedEnd = page.getByRole("slider", { name: "Blocked view end" });
+  await focusAndPress(page, blockedStart, ["Shift+ArrowRight", "ArrowRight"]);
+  await focusAndPress(page, includedStart, ["ArrowRight"]);
+  await expect(includedStart).toHaveAttribute("aria-valuenow", "330");
   const drag = testInfo.project.name === "mobile" ? dragTouchHandle : dragMouseHandle;
   await drag(page, blockedStart, trackBox.width * 2);
-  await expect(blockedStart).toHaveAttribute("aria-valuenow", "359");
   await focusAndPress(page, blockedStart, ["ArrowRight"]);
   await expect(blockedStart).toHaveAttribute("aria-valuenow", "359");
-  await expect(page.locator("#preference-angular-status")).toContainText("stop at north");
 
   await drag(page, blockedEnd, -trackBox.width * 2);
-  await expect(blockedEnd).toHaveAttribute("aria-valuenow", "0");
   await focusAndPress(page, blockedEnd, ["ArrowLeft"]);
   await expect(blockedEnd).toHaveAttribute("aria-valuenow", "0");
+  expect(await page.locator("[data-preview-exclusion]").evaluate(path =>
+    (path.getAttribute("d").match(/M/g) || []).length)).toBe(1);
+  await page.getByRole("button", { name: "Use these limits" }).click();
+  await waitForCallCount(calls, 2);
+  expect(calls[1].body.preferences.azimuthDegrees)
+    .toEqual({ excluded: { start: 359, end: 0 } });
 });
 
 test("keeps the last 10 altitude degrees elastic without changing logical state", async ({
@@ -284,8 +280,6 @@ test("keeps the last 10 altitude degrees elastic without changing logical state"
   await focusAndPress(page, minimum, ["ArrowUp"]);
   await expect(minimum).toHaveAttribute("aria-valuenow", "2");
   await expect(minimum).toHaveAttribute("data-test-rebound-seen", "true");
-  await expect(page.locator("#preference-angular-status"))
-    .toContainText("keeps at least 10° visible");
 
   const drag = testInfo.project.name === "mobile" ? dragTouchHandle : dragMouseHandle;
   await drag(page, minimum, 0, -30);
@@ -422,6 +416,8 @@ test("uses the schematic sliders to explain and preview angular limits", async (
   await expect(zoneTooltip).toHaveText("Altitude 15°–90° is excluded.");
 
   await expect(zone).toHaveClass(/is-tooltip-visible/);
+  await expect(zone).not.toHaveClass(/is-tooltip-visible/, { timeout: 2500 });
+  await hoverZone(340, 8);
   await altitudeMinimum.hover();
   await expect(zone).not.toHaveClass(/is-tooltip-visible/);
   await expect(page.locator(".preference-control-tooltip")).toHaveCount(0);
@@ -473,6 +469,8 @@ const invalidStoredStates = [
     state: { version: 1, brightLimbOrientationDegrees: [{ start: 10, end: 40 }] } },
   { name: "an altitude range under 10°",
     state: { version: 1, altitudeDegrees: { minimum: 2, maximum: 11 } } },
+  { name: "equal included azimuth endpoints",
+    state: { version: 1, azimuthDegrees: { included: { start: 40, end: 40 } } } },
   { name: "a usable azimuth split under 10°",
     state: { version: 1, azimuthDegrees: { included: { start: 40, end: 140 },
       excluded: { start: 45, end: 135 } } } }
