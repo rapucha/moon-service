@@ -118,7 +118,7 @@ test("keeps the axis titles uniform and clear of degree ticks", async ({ page })
   expect(styles[0]).toEqual(styles[1]);
   expect(parseFloat(styles[0].size)).toBeGreaterThan(8);
 
-  const geometry = await page.evaluate(() => {
+  const readGeometry = () => page.evaluate(() => {
     var title = document.querySelector(".preference-altitude-axis-label").getBoundingClientRect();
     var ticks = Array.from(document.querySelectorAll(".preference-preview-grid text"))
       .filter(element => element.textContent.endsWith("°"));
@@ -129,9 +129,25 @@ test("keeps the axis titles uniform and clear of degree ticks", async ({ page })
       });
     var thirty = ticks.find(element => element.textContent === "30°").getBoundingClientRect();
     var handle = document.querySelector("[data-altitude-maximum]").getBoundingClientRect();
-    return { titleOverlap: titleOverlap, tickUnderHandle: thirty.right > handle.left };
+    var bearingTitle = document.querySelector(".preference-bearing-axis-label")
+      .getBoundingClientRect();
+    var south = Array.from(document.querySelectorAll(".preference-preview-grid text"))
+      .find(element => element.textContent === "S").getBoundingClientRect();
+    return {
+      bearingGap: south.top - bearingTitle.bottom,
+      titleOverlap: titleOverlap,
+      tickUnderHandle: thirty.right > handle.left
+    };
   });
-  expect(geometry).toEqual({ titleOverlap: false, tickUnderHandle: false });
+  const expectClearGeometry = async () => {
+    var geometry = await readGeometry();
+    expect(geometry.bearingGap).toBeGreaterThanOrEqual(3);
+    expect(geometry.titleOverlap).toBe(false);
+    expect(geometry.tickUnderHandle).toBe(false);
+  };
+  await expectClearGeometry();
+  await page.setViewportSize({ width: 850, height: 900 });
+  await expectClearGeometry();
 });
 
 for (const snapCase of SNAP_CASES) {
