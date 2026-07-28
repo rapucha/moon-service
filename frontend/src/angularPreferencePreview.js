@@ -1,4 +1,4 @@
-import { clamp } from "./format.js";
+import { clamp, normalizeDegrees } from "./format.js";
 import { svgElement } from "./dom.js";
 import { moonPhaseImageDataUrl } from "./moonPhaseView.js";
 import { altitudeForegroundArtwork } from "./moonPathSilhouettes.js";
@@ -11,16 +11,17 @@ import {
 
 var DEFAULT_ALTITUDE = { minimum: 2, maximum: 15 };
 var DEFAULT_AZIMUTH = { included: { start: 330, end: 30 }, excluded: { start: 350, end: 10 } };
+var BEARING_SNAP_RELEASE_DEGREES = 16;
 var PREVIEW = { left: 40, right: 340, top: 30, bottom: 190 };
-var SAMPLES = [
-  { bearing: 0, altitude: 8 }, { bearing: 30, altitude: 16 },
-  { bearing: 60, altitude: 28 }, { bearing: 90, altitude: 42 },
-  { bearing: 120, altitude: 56 }, { bearing: 150, altitude: 68 },
-  { bearing: 180, altitude: 76 }, { bearing: 210, altitude: 68 },
-  { bearing: 240, altitude: 56 }, { bearing: 270, altitude: 42 },
-  { bearing: 300, altitude: 28 }, { bearing: 330, altitude: 16 },
-  { bearing: 360, altitude: 8 }
-];
+var PASS_LOW_POSITION = altitudePosition(8);
+var PASS_HIGH_POSITION = altitudePosition(76);
+var SAMPLES = Array.from({ length: 13 }, function (_unused, index) {
+  var bearing = index * 30;
+  var progress = bearing / 360;
+  var position = PASS_LOW_POSITION
+    + 4 * (PASS_HIGH_POSITION - PASS_LOW_POSITION) * progress * (1 - progress);
+  return { bearing: bearing, altitude: altitudeFromPosition(position) };
+});
 
 export function createAngularPreferencePreview(form) {
   var altitudeTrack = form.querySelector("#preference-altitude-track");
@@ -116,6 +117,11 @@ export function createAngularPreferencePreview(form) {
     wireHandle(handle, compassTrack, "horizontal", function () {
       return bearingValue(azimuth, key);
     }, function (value, interaction) {
+      var currentGap = adjacentBearingGap(azimuth, key, bearingValue(azimuth, key));
+      if (interaction.pointer && currentGap <= ANGLE_EPSILON
+          && adjacentBearingGap(azimuth, key, value) < BEARING_SNAP_RELEASE_DEGREES) {
+        return;
+      }
       var moved = moveBearing(azimuth, key, value, interaction.direction);
       azimuth = moved.azimuth;
       sync();
@@ -240,15 +246,10 @@ function buildArtwork(artwork) {
       className: "preference-preview-exclusion",
       "data-preview-exclusion": "true"
     }),
-    SAMPLES.slice(0, -1).map(function (sample, index) {
-      var next = SAMPLES[index + 1];
-      return svgElement("line", {
-        className: "preference-preview-segment",
-        x1: previewX(sample.bearing),
-        y1: previewY(sample.altitude),
-        x2: previewX(next.bearing),
-        y2: previewY(next.altitude)
-      });
+    svgElement("path", {
+      className: "preference-preview-segment",
+      d: moonPassPath(),
+      fill: "none"
     }),
     SAMPLES.map(function (sample) {
       return svgElement("image", {
@@ -262,6 +263,17 @@ function buildArtwork(artwork) {
     })
   ];
   artwork.replaceChildren(...children.flat());
+}
+
+function moonPassPath() {
+  var start = SAMPLES[0];
+  var peak = SAMPLES[6];
+  var end = SAMPLES[12];
+  var startY = previewY(start.altitude);
+  var controlY = 2 * previewY(peak.altitude) - startY;
+  return "M" + previewX(start.bearing) + " " + startY
+    + " Q" + previewX(peak.bearing) + " " + controlY
+    + " " + previewX(end.bearing) + " " + previewY(end.altitude);
 }
 
 function gridArtwork() {
@@ -356,16 +368,17 @@ function wireHandle(
     var attempted = pointerResult ? pointerResult(rawValue) : rawValue;
     var direction = Math.sign(attempted - previousPointerValue);
     previousPointerValue = attempted;
-    updateWithin(attempted, range, direction);
+    updateWithin(attempted, range, direction, true);
   }
-  function updateWithin(attempted, bounds, direction) {
+  function updateWithin(attempted, bounds, direction, pointer) {
     var constrained = clamp(attempted, bounds.minimum, bounds.maximum);
     update(constrained, {
       attempted: attempted,
       direction: direction,
       limited: constrained !== attempted,
       minimum: bounds.minimum,
-      maximum: bounds.maximum
+      maximum: bounds.maximum,
+      pointer: Boolean(pointer)
     });
   }
   function clearPointer() {
@@ -385,6 +398,13 @@ function setHorizontalHandle(handle, value) {
   handle.dataset.tooltipAlign = value <= 110 ? "start" : (value < 250 ? "center" : "end");
   setSliderValue(handle, value, 0, 359,
     numberText(value) + " degrees, " + compassDirection(value));
+}
+
+function adjacentBearingGap(azimuth, key, value) {
+  if (key === "includedStart") return normalizeDegrees(azimuth.excluded.start - value);
+  if (key === "excludedStart") return normalizeDegrees(value - azimuth.included.start);
+  if (key === "excludedEnd") return normalizeDegrees(azimuth.included.end - value);
+  return normalizeDegrees(value - azimuth.excluded.end);
 }
 
 function setSliderValue(handle, value, minimum, maximum, text) {
