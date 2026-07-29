@@ -471,7 +471,7 @@ class OpportunitySearchFunctionalTest {
         JsonNode response = productPostOk("""
                 {"q":"Prague","preferences":{"version":1,
                   "azimuthDegrees":{"included":{"start":10,"end":350}},
-                  "time":{"mode":"local_clock","windows":[{"start":"00:00","end":"04:00"}]}}}
+                  "time":{"mode":"local_clock","window":{"start":"00:00","end":"04:00"}}}}
                 """);
         Map<String, JsonNode> masksByPass = new HashMap<>();
         boolean repeatedPass = false;
@@ -519,8 +519,7 @@ class OpportunitySearchFunctionalTest {
         JsonNode response = productPostOk("""
                 {"q":"Prague","preferences":{"version":1,
                   "altitudeDegrees":{"minimum":0,"maximum":90,"alt/tilde~":7},
-                  "time":{"mode":"local_clock","windows":[
-                    {"start":"00:00","end":"23:59","win/~":"private-marker"}]},
+                  "time":{"mode":"local_clock","window":{"start":"00:00","end":"23:59"},"windows":[{"win/~":"private-marker"}]},
                   "private-marker":{"child":"private-marker"},%s}}
                 """.formatted(extras));
 
@@ -528,7 +527,7 @@ class OpportunitySearchFunctionalTest {
         assertEquals(20, response.path("ignoredPreferenceFields").size());
         assertEquals(4, response.path("additionalIgnoredPreferenceFieldCount").intValue());
         assertEquals("/altitudeDegrees/alt~1tilde~0", response.at("/ignoredPreferenceFields/0").asString());
-        assertEquals("/time/windows/0/win~1~0", response.at("/ignoredPreferenceFields/1").asString());
+        assertEquals("/time/windows", response.at("/ignoredPreferenceFields/1").asString());
         assertEquals("/private-marker", response.at("/ignoredPreferenceFields/2").asString());
         assertTrue(output.getOut().contains(
                 "ignored_preference_fields preferenceVersion=1 count=24 truncated=true"));
@@ -590,20 +589,21 @@ class OpportunitySearchFunctionalTest {
 
     @ParameterizedTest
     @CsvSource(delimiter = '|', textBlock = """
-            [] | Opportunity search request must be a JSON object.
-            {} | locationId is required in the opportunity search request.
-            {"locationId": "prague-cz"} | start is required in the opportunity search request.
-            {"locationId": "prague-cz", "start": "2026-06-29"} | forecastHorizonDays is required in the opportunity search request.
-            {"locationId": "prague-cz", "start": "2026-06-29", "forecastHorizonDays": 7} | maxMoonAltitudeDegrees is required in the opportunity search request.
-            {"locationId": "prague-cz", "start": "2026-06-29", "forecastHorizonDays": 7, "maxMoonAltitudeDegrees": 12} | limit is required in the opportunity search request.
-            {"locationId": ""} | locationId must be a non-empty string in the opportunity search request.
-            {"locationId": "prague-cz", "start": "not-a-date", "forecastHorizonDays": 7, "maxMoonAltitudeDegrees": 12, "limit": 5} | Invalid --start value: not-a-date
-            {"locationId": "prague-cz", "start": "2026-06-29", "forecastHorizonDays": 0, "maxMoonAltitudeDegrees": 12, "limit": 5} | forecastHorizonDays must be between 1 and 30.
-            {"locationId": "prague-cz", "start": "2026-06-29", "forecastHorizonDays": 7, "maxMoonAltitudeDegrees": 12, "limit": 0} | limit must be between 1 and 100.
-            {"locationId": "prague-cz", "start": "2026-06-29", "forecastHorizonDays": 7, "maxMoonAltitudeDegrees": 91, "limit": 5} | maxMoonAltitudeDegrees must be between 0.0 and 90.0.
+            /api/opportunities/search | [] | Opportunity search request must be a JSON object.
+            /api/opportunities/search | {} | locationId is required in the opportunity search request.
+            /api/opportunities/search | {"locationId": "prague-cz"} | start is required in the opportunity search request.
+            /api/opportunities/search | {"locationId": "prague-cz", "start": "2026-06-29"} | forecastHorizonDays is required in the opportunity search request.
+            /api/opportunities/search | {"locationId": "prague-cz", "start": "2026-06-29", "forecastHorizonDays": 7} | maxMoonAltitudeDegrees is required in the opportunity search request.
+            /api/opportunities/search | {"locationId": "prague-cz", "start": "2026-06-29", "forecastHorizonDays": 7, "maxMoonAltitudeDegrees": 12} | limit is required in the opportunity search request.
+            /api/opportunities/search | {"locationId": ""} | locationId must be a non-empty string in the opportunity search request.
+            /api/opportunities/search | {"locationId": "prague-cz", "start": "not-a-date", "forecastHorizonDays": 7, "maxMoonAltitudeDegrees": 12, "limit": 5} | Invalid --start value: not-a-date
+            /api/opportunities/search | {"locationId": "prague-cz", "start": "2026-06-29", "forecastHorizonDays": 0, "maxMoonAltitudeDegrees": 12, "limit": 5} | forecastHorizonDays must be between 1 and 30.
+            /api/opportunities/search | {"locationId": "prague-cz", "start": "2026-06-29", "forecastHorizonDays": 7, "maxMoonAltitudeDegrees": 12, "limit": 0} | limit must be between 1 and 100.
+            /api/opportunities/search | {"locationId": "prague-cz", "start": "2026-06-29", "forecastHorizonDays": 7, "maxMoonAltitudeDegrees": 91, "limit": 5} | maxMoonAltitudeDegrees must be between 0.0 and 90.0.
+            /api/opportunities | {"q":"Prague","preferences":{"version":1,"time":{"mode":"local_clock","windows":[{"start":"00:00","end":"04:00"}]}}} | Invalid opportunity preferences: local_clock mode requires a window and no light buckets.
             """)
-    void mapsInvalidRequestBodiesToInvalidRequest(String body, String message) {
-        webTestClient.post().uri("/api/opportunities/search")
+    void mapsInvalidRequestBodiesToInvalidRequest(String uri, String body, String message) {
+        webTestClient.post().uri(uri)
                 .contentType(MediaType.APPLICATION_JSON)
                 .bodyValue(body)
                 .exchange()

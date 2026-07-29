@@ -99,7 +99,7 @@ The typed model supports:
 - one inclusive `altitudeDegrees` range;
 - one optional included azimuth sector and one optional excluded obstruction
   sector;
-- either local-clock windows or ambient-light buckets;
+- either one local-clock window or ambient-light buckets;
 - one or more named Moon phases; and
 - one or more inclusive `brightLimbOrientationDegrees` ranges.
 
@@ -111,8 +111,8 @@ The named phases use the existing phase-angle ranges:
 `new_moon`, `waxing_crescent`, `first_quarter`, `waxing_gibbous`, `full_moon`,
 `waning_gibbous`, `last_quarter`, and `waning_crescent`.
 
-Local-clock windows use the resolved location's timezone, not the browser
-timezone. Their start is inclusive and their end is exclusive. A later start
+The local-clock window uses the resolved location's timezone, not the browser
+timezone. Its start is inclusive and its end is exclusive. A later start
 crosses midnight. A daylight-saving gap contains no matching instant; both
 instants in an overlap match when their local clock value is allowed.
 Ambient-light mode instead uses `daylight`, `golden_hour`, `civil_twilight`,

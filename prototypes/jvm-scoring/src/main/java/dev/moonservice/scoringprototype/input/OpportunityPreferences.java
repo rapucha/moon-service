@@ -157,32 +157,25 @@ public record OpportunityPreferences(
 
     public record TimePreference(
             TimeMode mode,
-            List<LocalClockWindow> localClockWindows,
+            LocalClockWindow localClockWindow,
             Set<AmbientLight> lightBuckets
     ) {
         public TimePreference {
             if (mode == null) {
                 throw invalid("time mode is required.");
             }
-            if (localClockWindows != null && localClockWindows.stream().anyMatch(Objects::isNull)) {
-                throw invalid("local clock windows must not contain null.");
-            }
             if (lightBuckets != null && lightBuckets.stream().anyMatch(Objects::isNull)) {
                 throw invalid("light buckets must not contain null.");
             }
-            localClockWindows = List.copyOf(localClockWindows == null ? List.of() : localClockWindows);
             lightBuckets = lightBuckets == null || lightBuckets.isEmpty()
                     ? Set.of()
                     : Collections.unmodifiableSet(EnumSet.copyOf(lightBuckets));
             if (mode == TimeMode.LOCAL_CLOCK) {
-                if (localClockWindows.isEmpty() || !lightBuckets.isEmpty()) {
-                    throw invalid("local_clock mode requires windows and no light buckets.");
+                if (localClockWindow == null || !lightBuckets.isEmpty()) {
+                    throw invalid("local_clock mode requires a window and no light buckets.");
                 }
-                if (localClockWindows.size() > MAX_RANGES) {
-                    throw invalid("local_clock mode allows at most eight windows.");
-                }
-            } else if (lightBuckets.isEmpty() || !localClockWindows.isEmpty()) {
-                throw invalid("light_bucket mode requires buckets and no clock windows.");
+            } else if (lightBuckets.isEmpty() || localClockWindow != null) {
+                throw invalid("light_bucket mode requires buckets and no clock window.");
             }
         }
 
@@ -190,7 +183,7 @@ public record OpportunityPreferences(
             Map<String, Object> value = new LinkedHashMap<>();
             value.put("mode", mode.wireValue());
             if (mode == TimeMode.LOCAL_CLOCK) {
-                value.put("windows", localClockWindows.stream().map(LocalClockWindow::normalized).toList());
+                value.put("window", localClockWindow.normalized());
             } else {
                 value.put("buckets", lightBuckets.stream().map(AmbientLight::wireValue).toList());
             }

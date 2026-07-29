@@ -28,16 +28,10 @@ const CLOCK_PREFERENCES = {
   ...ALTITUDE_PREFERENCES,
   time: {
     mode: "local_clock",
-    windows: [
-      {
-        start: "22:30",
-        end: "02:15"
-      },
-      {
-        start: "04:30",
-        end: "07:15"
-      }
-    ]
+    window: {
+      start: "22:30",
+      end: "02:15"
+    }
   }
 };
 
@@ -136,33 +130,33 @@ test("keeps focus in an invalid clock field without requesting", async ({ page }
 
   const status = page.locator("#preference-form-status");
   const apply = page.getByRole("button", { name: "Use these limits" });
-  await page.getByLabel("Local clock windows").check();
-  const start = page.getByLabel("Local clock window 1 start");
+  await page.getByRole("radio", { name: "Local clock window" }).check();
+  const start = page.getByLabel("Local clock window start");
   await start.fill("22:30");
-  await page.getByLabel("Local clock window 1 end").fill("22:30");
+  await page.getByLabel("Local clock window end").fill("22:30");
   await apply.click();
 
   await expect(status).toHaveText(
-    "Each clock window needs different start and end times in HH:mm format."
+    "The clock window needs different start and end times in HH:mm format."
   );
   await expect(start).toBeFocused();
   expect(calls).toHaveLength(0);
 });
 
-test("uses explicit 24-hour text fields for local clock windows", async ({ page }) => {
+test("uses one fixed pair of 24-hour fields for the local clock window", async ({ page }) => {
   await page.goto("/search?q=Prague");
   await openPreferences(page);
-  await page.getByLabel("Local clock windows").check();
+  await page.getByRole("radio", { name: "Local clock window" }).check();
 
-  const start = page.getByLabel("Local clock window 1 start");
-  const end = page.getByLabel("Local clock window 1 end");
+  const start = page.getByLabel("Local clock window start");
   await expect(start).toHaveAttribute("type", "text");
-  await expect(end).toHaveAttribute("type", "text");
   await expect(start).toHaveAttribute("placeholder", "HH:mm");
+  await expect(page.locator(".preference-clock-row")).toHaveCount(1);
+  await expect(page.getByRole("button", { name: /window/i })).toHaveCount(0);
   await expect(page.locator("#preference-clock-help")).toContainText("24-hour HH:mm");
 });
 
-test("posts restored altitude and two cross-midnight clock windows", async ({ page }) => {
+test("posts, stores, and restores altitude and one cross-midnight clock window", async ({ page }) => {
   await recordFetchOptions(page);
   await page.goto("/about");
   await page.evaluate(({ key, value }) => {
@@ -179,12 +173,9 @@ test("posts restored altitude and two cross-midnight clock windows", async ({ pa
     .toHaveAttribute("aria-valuenow", "3.14");
   await expect(page.getByRole("slider", { name: "Maximum Moon altitude" }))
     .toHaveAttribute("aria-valuenow", "18");
-  await page.getByLabel("Local clock windows").check();
-  await page.getByLabel("Local clock window 1 start").fill("22:30");
-  await page.getByLabel("Local clock window 1 end").fill("02:15");
-  await page.getByRole("button", { name: "Add another window" }).click();
-  await page.getByLabel("Local clock window 2 start").fill("04:30");
-  await page.getByLabel("Local clock window 2 end").fill("07:15");
+  await page.getByRole("radio", { name: "Local clock window" }).check();
+  await page.getByLabel("Local clock window start").fill("22:30");
+  await page.getByLabel("Local clock window end").fill("02:15");
   await page.getByRole("button", { name: "Use these limits" }).click();
 
   await waitForCallCount(calls, 1);
@@ -204,7 +195,7 @@ test("posts restored altitude and two cross-midnight clock windows", async ({ pa
   await expect(page).toHaveURL("/search?q=Prague");
   await expect(page.locator("#preference-count")).toHaveText("2 active");
   await expect(page.locator("#preference-timezone-note"))
-    .toHaveText("Clock windows use Europe/Prague.");
+    .toHaveText("Clock window uses Europe/Prague.");
   expect(await storedPreferences(page)).toEqual(CLOCK_PREFERENCES);
 
   await page.reload();
@@ -220,11 +211,9 @@ test("posts restored altitude and two cross-midnight clock windows", async ({ pa
     .toHaveAttribute("aria-valuenow", "3.14");
   await expect(page.getByRole("slider", { name: "Maximum Moon altitude" }))
     .toHaveAttribute("aria-valuenow", "18");
-  await expect(page.getByLabel("Local clock windows")).toBeChecked();
-  await expect(page.getByLabel("Local clock window 1 start")).toHaveValue("22:30");
-  await expect(page.getByLabel("Local clock window 1 end")).toHaveValue("02:15");
-  await expect(page.getByLabel("Local clock window 2 start")).toHaveValue("04:30");
-  await expect(page.getByLabel("Local clock window 2 end")).toHaveValue("07:15");
+  await expect(page.getByRole("radio", { name: "Local clock window" })).toBeChecked();
+  await expect(page.getByLabel("Local clock window start")).toHaveValue("22:30");
+  await expect(page.getByLabel("Local clock window end")).toHaveValue("02:15");
 });
 
 test("switches, removes the time-and-light group in its control, and resets", async ({ page }, testInfo) => {
@@ -297,12 +286,10 @@ test("normalizes supported version-one storage before sending or saving it", asy
     time: {
       ...CLOCK_PREFERENCES.time,
       futureTimeRule: "location_local",
-      windows: CLOCK_PREFERENCES.time.windows.map(function (window, index) {
-        return {
-          ...window,
-          futureWindowRule: index + 1
-        };
-      })
+      window: {
+        ...CLOCK_PREFERENCES.time.window,
+        futureWindowRule: true
+      }
     },
     future: {
       nested: true
@@ -344,6 +331,19 @@ const discardedStorageCases = [
       time: {
         mode: "light_bucket",
         buckets: []
+      }
+    })
+  },
+  {
+    name: "the former plural clock-window shape",
+    raw: JSON.stringify({
+      version: 1,
+      time: {
+        mode: "local_clock",
+        windows: [{
+          start: "22:30",
+          end: "02:15"
+        }]
       }
     })
   }

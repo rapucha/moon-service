@@ -217,7 +217,7 @@
                   </label>
                   <label class="preference-choice">
                     <input type="radio" name="preference-time-mode" value="local_clock">
-                    <span>Local clock windows</span>
+                    <span>Local clock window</span>
                   </label>
                   <label class="preference-choice">
                     <input type="radio" name="preference-time-mode" value="light_bucket">
@@ -226,10 +226,18 @@
                 </div>
 
                 <div id="preference-clock-editor" class="preference-time-editor">
-                  <div id="preference-clock-rows" class="preference-clock-rows"></div>
-                  <button id="preference-add-window" type="button" class="text-button preference-add-window">
-                    Add another window
-                  </button>
+                  <div class="preference-clock-rows">
+                    <div class="preference-clock-row">
+                      <label>
+                        <span>From</span>
+                        <input type="text" data-clock-start maxlength="5" placeholder="HH:mm" autocomplete="off" spellcheck="false" aria-label="Local clock window start" aria-describedby="preference-clock-help">
+                      </label>
+                      <label>
+                        <span>Until</span>
+                        <input type="text" data-clock-end maxlength="5" placeholder="HH:mm" autocomplete="off" spellcheck="false" aria-label="Local clock window end" aria-describedby="preference-clock-help">
+                      </label>
+                    </div>
+                  </div>
                   <p id="preference-clock-help" class="preference-help">Uses 24-hour HH:mm in the searched location’s timezone. An end before the start crosses midnight.</p>
                 </div>
 
@@ -377,22 +385,6 @@
       </section>
     </div>
   </main>
-
-  <template id="preference-clock-row-template">
-    <div class="preference-clock-row">
-      <label>
-        <span>From</span>
-        <input type="text" data-clock-start maxlength="5" placeholder="HH:mm" autocomplete="off" spellcheck="false" aria-label="Local clock window start" aria-describedby="preference-clock-help">
-      </label>
-      <label>
-        <span>Until</span>
-        <input type="text" data-clock-end maxlength="5" placeholder="HH:mm" autocomplete="off" spellcheck="false" aria-label="Local clock window end" aria-describedby="preference-clock-help">
-      </label>
-      <button type="button" class="text-button preference-remove-window" aria-label="Remove local clock window">
-        Remove
-      </button>
-    </div>
-  </template>
 
   <script type="module" src="/app.js"></script>
 </body>

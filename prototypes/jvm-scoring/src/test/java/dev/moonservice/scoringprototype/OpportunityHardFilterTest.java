@@ -49,14 +49,17 @@ class OpportunityHardFilterTest {
                 new AltitudeRange(0.0, 90.0),
                 new AzimuthPreference(new DegreeRange(350.0, 20.0), new DegreeRange(355.0, 5.0)),
                 new TimePreference(TimeMode.LOCAL_CLOCK,
-                        List.of(new LocalClockWindow(LocalTime.of(23, 0), LocalTime.of(1, 0))), Set.of()),
+                        new LocalClockWindow(LocalTime.of(23, 0), LocalTime.of(1, 0)), Set.of()),
                 Set.of(NamedPhase.FULL_MOON),
                 List.of(new DegreeRange(330.0, 20.0)));
 
         assertTrue(preferences.active());
         assertEquals(Set.of("altitudeDegrees", "azimuthDegrees", "time", "namedPhases",
                 "brightLimbOrientationDegrees"), preferences.normalizedFilters().keySet());
-        assertEquals("local_clock", ((Map<?, ?>) preferences.normalizedFilters().get("time")).get("mode"));
+        assertEquals(Map.of(
+                        "mode", "local_clock",
+                        "window", Map.of("start", "23:00", "end", "01:00")),
+                preferences.normalizedFilters().get("time"));
         assertFalse(OpportunityPreferences.none().active());
 
         assertThrows(UsageException.class, () -> new OpportunityPreferences(2, null, null, null, null, null));
@@ -67,9 +70,14 @@ class OpportunityHardFilterTest {
         assertThrows(UsageException.class,
                 () -> new AzimuthPreference(new DegreeRange(20.0, 40.0), new DegreeRange(35.0, 50.0)));
         assertThrows(UsageException.class, () -> new LocalClockWindow(null, LocalTime.NOON));
-        assertThrows(UsageException.class, () -> new TimePreference(null, List.of(), Set.of()));
+        assertThrows(UsageException.class, () -> new TimePreference(null, null, Set.of()));
+        assertThrows(UsageException.class,
+                () -> new TimePreference(TimeMode.LOCAL_CLOCK, null, Set.of()));
         assertThrows(UsageException.class, () -> new TimePreference(
-                TimeMode.LOCAL_CLOCK, List.of(new LocalClockWindow(LocalTime.NOON, LocalTime.MIDNIGHT)),
+                TimeMode.LOCAL_CLOCK, new LocalClockWindow(LocalTime.NOON, LocalTime.MIDNIGHT),
+                Set.of(AmbientLight.NIGHT)));
+        assertThrows(UsageException.class, () -> new TimePreference(
+                TimeMode.LIGHT_BUCKET, new LocalClockWindow(LocalTime.NOON, LocalTime.MIDNIGHT),
                 Set.of(AmbientLight.NIGHT)));
         assertThrows(UsageException.class,
                 () -> new OpportunityPreferences(1, null, null, null, Set.of(), null));
@@ -124,23 +132,19 @@ class OpportunityHardFilterTest {
     }
 
     @Test
-    void oneCompleteWindowCanProduceSeveralUsefulIntervals() {
+    void oneClockWindowClipsACompleteWindow() {
         Function<Instant, MoonSample> samples = constantSamples(5.0, 100.0, 180.0, -8.0, 200.0);
         MoonWindow complete = window(BASE, BASE.plus(Duration.ofHours(4)), samples);
-        OpportunityPreferences preferences = clock(
-                new LocalClockWindow(LocalTime.of(22, 32), LocalTime.of(22, 47)),
-                new LocalClockWindow(LocalTime.of(0, 3), LocalTime.of(0, 18)));
+        OpportunityPreferences preferences =
+                clock(new LocalClockWindow(LocalTime.of(22, 32), LocalTime.of(22, 47)));
 
         OpportunityHardFilter.Result result = filter(
                 List.of(complete), samples, preferences, BASE, 0.25);
 
-        assertEquals(2, result.windows().size());
+        assertEquals(1, result.windows().size());
         assertNear(BASE.plus(Duration.ofMinutes(32)), result.windows().get(0).startsAt());
         assertNear(BASE.plus(Duration.ofMinutes(47)), result.windows().get(0).endsAt());
-        assertNear(BASE.plus(Duration.ofMinutes(123)), result.windows().get(1).startsAt());
-        assertNear(BASE.plus(Duration.ofMinutes(138)), result.windows().get(1).endsAt());
         assertEquals(complete.passId(), result.windows().get(0).passId());
-        assertEquals(complete.passId(), result.windows().get(1).passId());
     }
 
     @Test
@@ -487,7 +491,7 @@ class OpportunityHardFilterTest {
                 null,
                 new AzimuthPreference(new DegreeRange(10.0, 350.0), null),
                 new TimePreference(TimeMode.LOCAL_CLOCK,
-                        List.of(new LocalClockWindow(LocalTime.MIDNIGHT, LocalTime.of(4, 0))), Set.of()),
+                        new LocalClockWindow(LocalTime.MIDNIGHT, LocalTime.of(4, 0)), Set.of()),
                 null,
                 null);
         OpportunityService service = new OpportunityService();
@@ -572,14 +576,14 @@ class OpportunityHardFilterTest {
                 1, null, new AzimuthPreference(included, excluded), null, null, null);
     }
 
-    private static OpportunityPreferences clock(LocalClockWindow... windows) {
+    private static OpportunityPreferences clock(LocalClockWindow window) {
         return new OpportunityPreferences(1, null, null,
-                new TimePreference(TimeMode.LOCAL_CLOCK, List.of(windows), Set.of()), null, null);
+                new TimePreference(TimeMode.LOCAL_CLOCK, window, Set.of()), null, null);
     }
 
     private static OpportunityPreferences light(AmbientLight... buckets) {
         return new OpportunityPreferences(1, null, null,
-                new TimePreference(TimeMode.LIGHT_BUCKET, List.of(), EnumSet.copyOf(List.of(buckets))),
+                new TimePreference(TimeMode.LIGHT_BUCKET, null, EnumSet.copyOf(List.of(buckets))),
                 null, null);
     }
 

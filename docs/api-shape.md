@@ -291,12 +291,12 @@ filter is optional:
   invalid. With only `excluded`, the full compass is implicitly included. When
   both are present, the directed excluded sector must be contained in the
   directed included sector.
-- `time` selects exactly one mode. `local_clock` mode requires `windows` and no
-  `buckets`. Each window contains `start` and `end` in 24-hour `HH:mm` format,
-  starts inclusively, and ends exclusively. A later start crosses midnight;
-  equal endpoints are invalid. The route allows one to eight windows and uses
-  the resolved location's timezone. `light_bucket` mode instead requires
-  `buckets` and no `windows`.
+- `time` selects exactly one mode. `local_clock` mode requires one `window` and
+  no `buckets`. The window contains `start` and `end` in 24-hour `HH:mm`
+  format, starts inclusively, and ends exclusively. A later start crosses
+  midnight; equal endpoints are invalid. The route uses the resolved
+  location's timezone. `light_bucket` mode instead requires `buckets` and no
+  `window`.
 - Ambient-light bucket values are `daylight`, `golden_hour`,
   `civil_twilight`, `nautical_twilight`, and `night`.
 - `namedPhases` contains one or more of `new_moon`, `waxing_crescent`,
@@ -346,8 +346,11 @@ members remain invalid.
 
 The response describes ignored members with deterministic JSON Pointer paths
 rooted at the preferences value. Paths use RFC 6901 escaping. For example, an
-unknown member in the first known clock window has path
-`/time/windows/0/unknown`.
+unknown member in the known clock window has path `/time/window/unknown`.
+
+`windows` is not an alias for `window`. A plural-only `local_clock` value is
+invalid because the required `window` is missing. When a valid `window` is
+present, `windows` is an unknown preference member with path `/time/windows`.
 
 The server walks known object members in input order and known arrays by
 ascending index, depth first. When a member itself is unknown, the server

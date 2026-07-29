@@ -40,14 +40,12 @@ class PreferenceImpactAnalysisTest {
     private static final PreferenceImpactAnalysis ANALYSIS = new PreferenceImpactAnalysis();
 
     @Test
-    void countsAFilteredSourceOnceWhenClockWindowsSplitIt() {
+    void countsAFilteredSourceOnceWithAClockPreference() {
         OpportunityPreferences preferences = new OpportunityPreferences(
                 1, null, null,
                 new TimePreference(
                         TimeMode.LOCAL_CLOCK,
-                        List.of(
-                                new LocalClockWindow(LocalTime.MIDNIGHT, LocalTime.of(1, 0)),
-                                new LocalClockWindow(LocalTime.of(2, 0), LocalTime.of(3, 0))),
+                        new LocalClockWindow(LocalTime.MIDNIGHT, LocalTime.of(1, 0)),
                         Set.of()),
                 null, null);
 
@@ -68,7 +66,7 @@ class PreferenceImpactAnalysisTest {
                 new AzimuthPreference(new DegreeRange(200.0, 210.0), null),
                 new TimePreference(
                         TimeMode.LOCAL_CLOCK,
-                        List.of(new LocalClockWindow(LocalTime.MIDNIGHT, LocalTime.of(1, 0))),
+                        new LocalClockWindow(LocalTime.MIDNIGHT, LocalTime.of(1, 0)),
                         Set.of()),
                 Set.of(NamedPhase.NEW_MOON),
                 List.of(new DegreeRange(337.5, 22.5)));

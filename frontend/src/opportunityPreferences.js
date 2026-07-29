@@ -9,7 +9,6 @@ import {
 
 var STORAGE_KEY = "moonService.opportunityPreferences.v1";
 var VERSION = 1;
-var MAX_WINDOWS = 8;
 var CLOCK_PATTERN = /^(?:[01]\d|2[0-3]):[0-5]\d$/;
 var LIGHT_BUCKETS = ["daylight", "golden_hour", "civil_twilight", "nautical_twilight", "night"];
 var MEMORY_ONLY_NOTICE = "Preference storage is unavailable. Changes last only on this page; previously saved preferences may return after reload.";
@@ -20,11 +19,10 @@ export function createOpportunityPreferences(options) {
   var resultRegion = options.resultRegion;
   var narrowLayout = options.narrowLayout;
   var clockEditor = form.querySelector("#preference-clock-editor");
-  var clockRows = form.querySelector("#preference-clock-rows");
-  var addWindow = form.querySelector("#preference-add-window");
+  var clockStart = /** @type {HTMLInputElement} */ (form.querySelector("[data-clock-start]"));
+  var clockEnd = /** @type {HTMLInputElement} */ (form.querySelector("[data-clock-end]"));
   var lightEditor = form.querySelector("#preference-light-editor");
   var formStatus = form.querySelector("#preference-form-status");
-  var rowTemplate = /** @type {HTMLTemplateElement} */ (document.querySelector("#preference-clock-row-template"));
   var angularControls = createAngularPreferenceControls(form);
   var appearanceControls = createMoonAppearanceControls(form);
   var storage = getStorage();
@@ -37,13 +35,6 @@ export function createOpportunityPreferences(options) {
   renderResult();
 
   form.addEventListener("change", syncTimeEditors);
-  addWindow.addEventListener("click", function () {
-    if (clockRows.children.length < MAX_WINDOWS) {
-      appendClockRow({ start: "18:00", end: "23:00" });
-      updateClockButtons();
-      /** @type {HTMLInputElement} */ (clockRows.lastElementChild.querySelector("[data-clock-start]")).focus();
-    }
-  });
   form.addEventListener("submit", applyForm);
   details.querySelector("#preference-reset").addEventListener("click", resetAll);
 
@@ -151,17 +142,16 @@ export function createOpportunityPreferences(options) {
     appearanceControls.render(state);
     var mode = state.time ? state.time.mode : "none";
     form.querySelector("[name='preference-time-mode'][value='" + mode + "']").checked = true;
-    clockRows.replaceChildren();
-    var windows = mode === "local_clock"
-      ? state.time.windows
-      : [{ start: "18:00", end: "23:00" }];
-    windows.forEach(appendClockRow);
+    var window = mode === "local_clock"
+      ? state.time.window
+      : { start: "18:00", end: "23:00" };
+    clockStart.value = window.start;
+    clockEnd.value = window.end;
     var selected = mode === "light_bucket" ? state.time.buckets : ["golden_hour"];
     lightEditor.querySelectorAll("input").forEach(function (input) {
       input.checked = selected.includes(input.value);
     });
     syncTimeEditors();
-    updateClockButtons();
   }
 
   function syncTimeEditors() {
@@ -170,40 +160,13 @@ export function createOpportunityPreferences(options) {
     lightEditor.hidden = mode !== "light_bucket";
   }
 
-  function appendClockRow(window) {
-    var row = /** @type {HTMLElement} */ (rowTemplate.content.firstElementChild.cloneNode(true));
-    /** @type {HTMLInputElement} */ (row.querySelector("[data-clock-start]")).value = window.start;
-    /** @type {HTMLInputElement} */ (row.querySelector("[data-clock-end]")).value = window.end;
-    row.querySelector(".preference-remove-window").addEventListener("click", function () {
-      row.remove();
-      updateClockButtons();
-      addWindow.focus();
-    });
-    clockRows.append(row);
-  }
-
-  function updateClockButtons() {
-    var rows = clockRows.querySelectorAll(".preference-clock-row");
-    rows.forEach(function (row, index) {
-      var number = String(index + 1);
-      row.querySelector("[data-clock-start]")
-        .setAttribute("aria-label", "Local clock window " + number + " start");
-      row.querySelector("[data-clock-end]")
-        .setAttribute("aria-label", "Local clock window " + number + " end");
-      var remove = row.querySelector(".preference-remove-window");
-      remove.hidden = rows.length === 1;
-      remove.setAttribute("aria-label", "Remove local clock window " + number);
-    });
-    addWindow.disabled = rows.length >= MAX_WINDOWS;
-  }
-
   function renderResult() {
     setNotice(resultRegion.querySelector("#preference-storage-notice"), storageNotice);
     var timezoneNote = details.querySelector("#preference-timezone-note");
     timezoneNote.hidden = state.time?.mode !== "local_clock";
     timezoneNote.textContent = typeof response?.location?.timezone === "string"
-      ? "Clock windows use " + response.location.timezone + "."
-      : "Clock windows use the searched location’s timezone.";
+      ? "Clock window uses " + response.location.timezone + "."
+      : "Clock window uses the searched location’s timezone.";
     setNotice(resultRegion.querySelector("#preference-ignored-notice"),
       response && response.ignoredPreferenceFieldCount > 0
       ? ignoredText(response)
@@ -248,20 +211,17 @@ function readForm(form, angularControls, appearanceControls) {
 
   var mode = form.querySelector("[name='preference-time-mode']:checked").value;
   if (mode === "local_clock") {
-    var windows = Array.from(form.querySelectorAll(".preference-clock-row")).map(function (row) {
-      return {
-        start: row.querySelector("[data-clock-start]").value,
-        end: row.querySelector("[data-clock-end]").value
-      };
-    });
-    var invalid = windows.findIndex(function (window) {
-      return !validClockWindow(window);
-    });
-    if (invalid >= 0) {
-      return formError("Each clock window needs different start and end times in HH:mm format.",
-        form.querySelectorAll("[data-clock-start]")[invalid]);
+    var clockStart = /** @type {HTMLInputElement} */ (form.querySelector("[data-clock-start]"));
+    var clockEnd = /** @type {HTMLInputElement} */ (form.querySelector("[data-clock-end]"));
+    var window = {
+      start: clockStart.value,
+      end: clockEnd.value
+    };
+    if (!validClockWindow(window)) {
+      return formError("The clock window needs different start and end times in HH:mm format.",
+        clockStart);
     }
-    next.time = { mode: mode, windows: windows };
+    next.time = { mode: mode, window: window };
   } else if (mode === "light_bucket") {
     var buckets = Array.from(form.querySelectorAll("#preference-light-editor input:checked"))
       .map(function (input) { return input.value; });
@@ -306,12 +266,10 @@ function normalizeTime(value) {
   if (!objectValue(value)) {
     return null;
   }
-  if (value.mode === "local_clock" && Array.isArray(value.windows)
-      && value.windows.length >= 1 && value.windows.length <= MAX_WINDOWS
-      && value.windows.every(validClockWindow)) {
+  if (value.mode === "local_clock" && validClockWindow(value.window)) {
     return {
       mode: value.mode,
-      windows: value.windows.map(window => ({ start: window.start, end: window.end }))
+      window: { start: value.window.start, end: value.window.end }
     };
   }
   if (value.mode === "light_bucket" && Array.isArray(value.buckets)

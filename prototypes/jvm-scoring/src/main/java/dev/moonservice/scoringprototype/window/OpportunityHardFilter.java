@@ -6,6 +6,7 @@ import dev.moonservice.scoringprototype.input.OpportunityPreferences;
 import dev.moonservice.scoringprototype.input.OpportunityPreferences.AmbientLight;
 import dev.moonservice.scoringprototype.input.OpportunityPreferences.AzimuthPreference;
 import dev.moonservice.scoringprototype.input.OpportunityPreferences.DegreeRange;
+import dev.moonservice.scoringprototype.input.OpportunityPreferences.LocalClockWindow;
 import dev.moonservice.scoringprototype.input.OpportunityPreferences.NamedPhase;
 import dev.moonservice.scoringprototype.input.OpportunityPreferences.TimeMode;
 import dev.moonservice.scoringprototype.scoring.ScoringModel;
@@ -173,12 +174,11 @@ public final class OpportunityHardFilter {
                     .anyMatch(bucket::equals);
         }
         LocalTime local = sample.instant().atZone(location.zoneId()).toLocalTime();
-        return preferences.time().localClockWindows().stream().anyMatch(window -> {
-            if (window.start().isBefore(window.end())) {
-                return !local.isBefore(window.start()) && local.isBefore(window.end());
-            }
-            return !local.isBefore(window.start()) || local.isBefore(window.end());
-        });
+        LocalClockWindow window = preferences.time().localClockWindow();
+        if (window.start().isBefore(window.end())) {
+            return !local.isBefore(window.start()) && local.isBefore(window.end());
+        }
+        return !local.isBefore(window.start()) || local.isBefore(window.end());
     }
 
     static boolean diskMatchesAzimuth(MoonSample sample, double radiusDegrees, AzimuthPreference preference) {
