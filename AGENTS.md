@@ -154,12 +154,15 @@ lookup, opportunity results, RSS/Atom feeds, and `.ics` export.
   worktree on an available loopback port. Check readiness and one representative
   user path. Report the branch, port, and direct clickable URL; do not ask the
   user to switch branches.
-- Keep the preview running until verification finishes, then stop it. Bind to
-  `127.0.0.1` unless the user explicitly needs broader access. Report startup
-  blockers instead of omitting the preview link.
+- For one-off verification outside the local feedback phase, keep the preview
+  running until verification finishes, then stop it. During local feedback,
+  use the lifecycle below. Bind to `127.0.0.1` unless the user explicitly needs
+  broader access. Report startup blockers instead of omitting the preview link.
 
-### Separate previews from durable work
+### Separate temporary previews from durable work
 
+- This section governs temporary format previews. The local feedback phase
+  below governs review of already-authorized durable work.
 - When a visual or document format is not settled, distinguish a temporary
   preview from durable work.
 - Within a task the user already approved, the user's affirmative format choice
@@ -174,13 +177,58 @@ lookup, opportunity results, RSS/Atom feeds, and `.ics` export.
   durable result, or must explicitly request it after accepting the preview.
 - Once durable work is authorized, apply every normal issue, branch, review,
   generated-output, push, and pull-request rule.
-- Do not add another preview pause when the user already requested durable work
-  and the visual choice is settled.
+- Do not add another temporary format-choice pause when the user already
+  requested durable work and the visual choice is settled. This does not waive
+  the local feedback phase before publication.
+
+### Review implementations locally before publication
+
+Use this phase after durable work is authorized, the implementation plan is
+recorded, and any required issue-design and implementation-scope reviews are
+complete. It changes publication timing only. Every gate and trigger under
+**Review Workflow** remains in force.
+
+- Create the issue-numbered branch locally from the current default branch
+  before implementation. Keep it unpushed during feedback and do not create a
+  pull request by default.
+- Implement only the approved result and run focused local validation for each
+  feedback revision.
+- Host the current unmerged worktree on an available `127.0.0.1` port. The
+  hosted state may be staged or unstaged.
+- Use the most direct review surface: the application route for runtime or UI
+  work, or an installed-tool static or raw-file view for documentation and
+  other non-runtime work.
+- Keep review hosting ephemeral. Do not install or add a dependency, manifest,
+  workflow, service, or tracked preview generator for it.
+- Report the branch, revision and staged or unstaged state, port, and direct
+  clickable URL. Check readiness and one representative path. Keep the hosted
+  version current and running until the owner accepts it, requests publication,
+  ends the review, or a session boundary requires a handover. Restore a current
+  review surface before resumed feedback work.
+- Treat the hosted version and IDE diff as the owner's review version. If a
+  trustworthy loopback surface cannot start, report the blocker and do not
+  create the pull request unless the owner explicitly says to proceed without
+  it.
+- Apply feedback locally while it stays inside the accepted result and scope.
+  Use the existing stop and re-review triggers when scope changes. Do not run
+  final staged implementation review or mandatory publication review after
+  each ordinary local feedback revision.
+- Publish only after the owner accepts the current review version or explicitly
+  requests publication. Silence, preview readiness, completed implementation,
+  and passing tests are not acceptance. A later implementation change requires
+  another local review and acceptance.
+- The owner may explicitly waive the phase or its acceptance pause for one
+  named task. Do not infer the waiver or carry it to another task.
+- After acceptance or an explicit publication instruction, stage the complete
+  candidate and follow the existing implementation-review,
+  sensitive-information, push, pull-request, CI, and human-review rules. No
+  local-feedback step waives a gate.
 
 ### Use Git and GitHub consistently
 
 - For issue-backed work, name the branch with the issue number. Prefer
-  `issue-<number>-short-topic`. Link the branch from the issue.
+  `issue-<number>-short-topic`. Link the branch from the issue when it is first
+  published; do not push it only to create that link.
 - Deliver issue-backed implementation through a pull request. Do not merge the
   implementation branch directly.
 - Every pull request must mention the issues it addresses. A completed
