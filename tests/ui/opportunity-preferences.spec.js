@@ -484,6 +484,7 @@ test("renders server preference metadata as safe text without changing the share
   await preloadState(page, ALL_PREFERENCES);
   const calls = await captureApiCalls(page, call => successfulResponse(call, {
     ...EMPTY_PREFERENCE_RESULT,
+    forecastHorizonDays: 13,
     normalizedActiveFilters,
     ignoredPreferenceFields: [unsafePath],
     ignoredPreferenceFieldCount: 3,
@@ -506,7 +507,7 @@ test("renders server preference metadata as safe text without changing the share
   const noMatch = page.locator("details.status-panel.warning");
   const impactDetails = noMatch.locator(".preference-impact");
   await expect(noMatch).toHaveJSProperty("open", false);
-  await expect(noMatch.locator("summary")).toContainText("No match — No ranked windows");
+  await expect(noMatch.locator("summary")).toContainText("No match — No opportunities found in the next 13 days");
   await noMatch.locator("summary").click();
   await expect(impactDetails).toContainText("Without preferences: 1 opportunity.");
   const rows = impactDetails.locator(".detail-grid > div");
@@ -515,12 +516,10 @@ test("renders server preference metadata as safe text without changing the share
     /Moon altitude\s*1 opportunity · 0 fewer\s*Next theoretical match/,
     /Moon direction\s*0 opportunities · 1 fewer · Largest reduction/,
     /Time & light\s*0 opportunities · 1 fewer · Largest reduction/,
-    /Named Moon phase\s*1 opportunity · 0 fewer\s*No theoretical match/,
+    /Moon shape\s*1 opportunity · 0 fewer\s*No theoretical match/,
     /Bright-limb orientation\s*1 opportunity · 0 fewer\s*No theoretical match/
   ]);
-  await expect(impactDetails).toContainText(
-    "Each preference is evaluated by itself with the others off."
-  );
+  await expect(impactDetails).toContainText("Each preference is evaluated by itself with the others off.");
   await expect(page.locator("#preference-ignored-notice")).toContainText(
     "The server ignored 3 unsupported preference fields."
   );
@@ -532,8 +531,8 @@ test("renders server preference metadata as safe text without changing the share
   await expect(page.locator("#active-preference-summary")).toHaveCount(0);
   await expect(page.locator("#preference-count")).toHaveText("5 active");
   await expect(page.locator("#preference-timezone-note")).toBeHidden();
-  await expect(noMatch.locator(":scope > summary .tooltip"))
-    .toHaveAttribute("title", "No candidate window matched this search.");
+  await expect(noMatch.locator(":scope > summary .tooltip")).toHaveAttribute("title", "No candidate window matched this search.");
+  await expect(page.locator(".summary-grid, .preference-impact .tooltip")).toHaveCount(0);
   await expect(page.getByRole("link", { name: "Open share link" }))
     .toHaveAttribute("href", "/search?q=Prague");
   const currentUrl = new URL(page.url());
@@ -567,7 +566,7 @@ test("documents local preference storage, request use, and location-only sharing
 
   const privacy = page.locator("#privacy-and-providers");
   await expect(privacy).toContainText(
-    "Moon altitude, availability, included and blocked compass sectors, selected named phases, and bright-limb orientation preferences are stored in this browser."
+    "Moon altitude, availability, included and blocked compass sectors, selected Moon shapes, and bright-limb orientation preferences are stored in this browser."
   );
   await expect(privacy).toContainText(
     "Each search with active preferences sends them to the Moon Service server for that search only."

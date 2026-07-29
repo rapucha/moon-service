@@ -161,11 +161,11 @@ function passRecommendations(entries, timezone, countryCode) {
   var className = "pass-choices" + (entries.length === 1 ? " is-single" : "");
   return element("section", { className: className, ariaLabel: "Recommendations in this Moon pass" },
     entries.map(function (entry, index) {
-      return passRecommendation(entry, index === 0, entries.length === 1, timezone, countryCode);
+      return passRecommendation(entry, index === 0, timezone, countryCode);
     }));
 }
 
-function passRecommendation(entry, isBest, isSingleRecommendation, timezone, countryCode) {
+function passRecommendation(entry, isBest, timezone, countryCode) {
   var opportunity = entry.opportunity;
   var rawRank = entry.index + 1;
   var moon = opportunity.moon || {};
@@ -187,7 +187,7 @@ function passRecommendation(entry, isBest, isSingleRecommendation, timezone, cou
       metricFact("Light bucket", lightBucketBadge(sun.lightBucket)),
       metricFact("Sun altitude", degrees(sun.altitudeDegrees)),
       metricFact("Sky", weather.summary || readableToken(weather.segmentKind) || "Forecast unavailable"),
-      isSingleRecommendation ? null : metricSpacer()),
+      metricFact("Moon phase", typeof moon.phaseName === "string" ? readableToken(moon.phaseName) : "")),
     exposureBalance.text
       ? element("dl", { className: "pass-photo-hint" },
         element("dt", {}, "Photo hint"),
@@ -204,10 +204,6 @@ function passRecommendation(entry, isBest, isSingleRecommendation, timezone, cou
 
 function candidateRankText(rank, score) {
   return "Rank " + rank + " · " + (Number.isFinite(score) ? "score " + score : "score unavailable");
-}
-
-function metricSpacer() {
-  return element("div", { className: "pass-metric is-spacer", "aria-hidden": "true" });
 }
 
 function passSummaryText(count) {

@@ -251,50 +251,35 @@
               </fieldset>
 
               <fieldset class="preference-group preference-phase-group">
-                <legend>Named Moon phase</legend>
+                <legend>Moon shape</legend>
                 <p id="preference-phase-help" class="preference-help preference-help-unindented">
-                  Choose one or more. Select all eight for no phase limit; at least one must remain.
+                  Waxing and waning phases share a shape; results keep the exact phase name. Select all five for no shape limit; at least one must remain.
                 </p>
                 <div class="preference-phase-grid">
                   <label>
-                    <input type="checkbox" data-named-phase value="new_moon" aria-describedby="preference-phase-help">
+                    <input type="checkbox" data-moon-shape value="new" aria-describedby="preference-phase-help">
                     <canvas data-phase-thumbnail width="40" height="40" aria-hidden="true"></canvas>
                     <span>New</span>
                   </label>
                   <label>
-                    <input type="checkbox" data-named-phase value="waxing_crescent" aria-describedby="preference-phase-help">
+                    <input type="checkbox" data-moon-shape value="crescent" aria-describedby="preference-phase-help">
                     <canvas data-phase-thumbnail width="40" height="40" aria-hidden="true"></canvas>
-                    <span>Waxing crescent</span>
+                    <span>Crescent</span>
                   </label>
                   <label>
-                    <input type="checkbox" data-named-phase value="first_quarter" aria-describedby="preference-phase-help">
+                    <input type="checkbox" data-moon-shape value="half" aria-describedby="preference-phase-help">
                     <canvas data-phase-thumbnail width="40" height="40" aria-hidden="true"></canvas>
-                    <span>First quarter</span>
+                    <span>Half</span>
                   </label>
                   <label>
-                    <input type="checkbox" data-named-phase value="waxing_gibbous" aria-describedby="preference-phase-help">
+                    <input type="checkbox" data-moon-shape value="gibbous" aria-describedby="preference-phase-help">
                     <canvas data-phase-thumbnail width="40" height="40" aria-hidden="true"></canvas>
-                    <span>Waxing gibbous</span>
+                    <span>Gibbous</span>
                   </label>
                   <label>
-                    <input type="checkbox" data-named-phase value="full_moon" aria-describedby="preference-phase-help">
+                    <input type="checkbox" data-moon-shape value="full" aria-describedby="preference-phase-help">
                     <canvas data-phase-thumbnail width="40" height="40" aria-hidden="true"></canvas>
                     <span>Full</span>
-                  </label>
-                  <label>
-                    <input type="checkbox" data-named-phase value="waning_gibbous" aria-describedby="preference-phase-help">
-                    <canvas data-phase-thumbnail width="40" height="40" aria-hidden="true"></canvas>
-                    <span>Waning gibbous</span>
-                  </label>
-                  <label>
-                    <input type="checkbox" data-named-phase value="last_quarter" aria-describedby="preference-phase-help">
-                    <canvas data-phase-thumbnail width="40" height="40" aria-hidden="true"></canvas>
-                    <span>Last quarter</span>
-                  </label>
-                  <label>
-                    <input type="checkbox" data-named-phase value="waning_crescent" aria-describedby="preference-phase-help">
-                    <canvas data-phase-thumbnail width="40" height="40" aria-hidden="true"></canvas>
-                    <span>Waning crescent</span>
                   </label>
                 </div>
               </fieldset>

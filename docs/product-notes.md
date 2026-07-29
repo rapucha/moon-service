@@ -161,13 +161,18 @@ The browser may keep version 1 opportunity preferences in `localStorage` under
 `moonService.opportunityPreferences.v1`. It may store an optional
 `altitudeDegrees` range; one `time` availability mode using one local-clock window
 or ambient-light buckets; an enabled `azimuthDegrees` preference containing an
-included sector, a blocked sector, or both; any nonempty selection of
-`namedPhases`; and one
+included sector, a blocked sector, or both; a `namedPhases` value that is an
+exact union of the browser's New, Crescent, Half, Gibbous, and Full Moon-shape
+groups; and one
 `brightLimbOrientationDegrees` range.
 
 Local-clock state stores `time.window`. Stored state that uses the former
 plural `time.windows` shape is unsupported and follows the normal discard
 behavior; it is not migrated.
+
+Stored `namedPhases` that are not an exact union of complete Moon-shape groups
+are unsupported and follow the same whole-state discard behavior. The browser
+does not migrate, broaden, or narrow an asymmetric exact-phase selection.
 
 Direction filtering is one preference. Joined green handles include the full
 compass. In that state, the browser stores and sends only a selected blocked

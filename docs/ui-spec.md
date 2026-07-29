@@ -109,11 +109,11 @@ The frontend module split is intended to keep future UI changes manageable:
   constraints, and merged schematic exclusion segments;
 - `angularPreferencePreview.css`: schematic axes, handle lanes, generic
   foreground, exclusion shading, and responsive presentation;
-- `moonAppearanceControls.js`: named-phase selection and the textured
+- `moonAppearanceControls.js`: Moon-shape selection and the textured
   bright-limb dial;
-- `moonAppearancePreview.css`: textured phase-thumbnail sizing and responsive
+- `moonAppearancePreview.css`: textured shape-thumbnail sizing and responsive
   layout;
-- `moonPreferenceControls.css`: shared preference-control base, named-phase,
+- `moonPreferenceControls.css`: shared preference-control base, Moon-shape,
   and Moon-dial presentation;
 - `responseView.js`: response states and result rendering;
 - `opportunityCard.js`: opportunity card layout;
@@ -154,13 +154,16 @@ The editor exposes these hard filters:
   green endpoints are also joined, the request omits `azimuthDegrees`. With
   distinct green endpoints, it sends the included sector without `excluded`.
   Disabling direction filtering also omits `azimuthDegrees`.
-- Named phase uses eight checkboxes for `new_moon`, `waxing_crescent`,
-  `first_quarter`, `waxing_gibbous`, `full_moon`, `waning_gibbous`,
-  `last_quarter`, and `waning_crescent`. Any selected phase may match. An
-  absent value and all eight selected both mean unrestricted, and the editor
-  shows all eight boxes selected in either state. At least one box must remain
-  selected. A proper subset is canonicalized in the listed order, persisted,
-  and sent as `namedPhases`. Stored all-eight state normalizes to omission.
+- Moon shape uses five checkboxes: `New`, `Crescent`, `Half`, `Gibbous`, and
+  `Full`. `New` expands to `new_moon`; `Crescent` expands to
+  `waxing_crescent` and `waning_crescent`; `Half` expands to `first_quarter`
+  and `last_quarter`; `Gibbous` expands to `waxing_gibbous` and
+  `waning_gibbous`; and `Full` expands to `full_moon`. The union is persisted
+  and sent as `namedPhases` in canonical exact-phase order: `new_moon`,
+  `waxing_crescent`, `first_quarter`, `waxing_gibbous`, `full_moon`,
+  `waning_gibbous`, `last_quarter`, and `waning_crescent`. An absent value and
+  all five shapes selected both mean unrestricted, and the editor shows all
+  five selected in either state. At least one shape must remain selected.
 - Bright-limb orientation is optional and has one target on a circular,
   single-handle dial. It has no editable numeric range inputs. The browser
   starts a new target at `270°` (`Left`) and
@@ -254,20 +257,21 @@ crescent is thicker than the earlier mockup but remains below quarter phase,
 and the disk has a neutral or dark rim rather than a bright circumference.
 `northPoleTiltDegrees` is not a preference.
 
-The eight phase checkboxes have `aria-hidden` textured thumbnails at phase
-angles `0°`, `45°`, `90°`, `135°`, `180°`, `225°`, `270°`, and `315°` in
-canonical phase order. While bright-limb orientation is enabled and the
-preference editor is visible and open, its preview cycles through exactly the
-selected phases at the fixed target orientation. It uses at most one timer and
-stops when any enabling condition no longer holds. A hidden document or
-`prefers-reduced-motion` stops the cycle; reduced motion shows the first
-canonical selected phase. This animation is presentational. It does not alter
-preference state, request fields, or the fixed `45°` interval width.
+The five Moon-shape checkboxes have `aria-hidden` textured thumbnails at phase
+angles `0°`, `45°`, `90°`, `135°`, and `180°`. Every thumbnail uses the fixed
+`270°` (`Left`) bright-limb direction. While bright-limb orientation is enabled
+and the preference editor is visible and open, its preview cycles through each
+selected shape exactly once before repeating, at the chosen target orientation.
+It uses at most one timer and stops when any enabling condition no longer
+holds. A hidden document or `prefers-reduced-motion` stops the cycle; reduced
+motion shows the first selected shape in control order. This animation is
+presentational. It does not alter preference state, request fields, or the
+fixed `45°` interval width.
 
-When named phase and bright-limb orientation are both active, a sample must
-match any selected named phase and the single bright-limb interval. A sample
-with no reported bright-limb orientation does not match an active orientation
-preference.
+When Moon shape and bright-limb orientation are both active, a sample must
+match any exact named phase expanded from the selected shapes and the single
+bright-limb interval. A sample with no reported bright-limb orientation does
+not match an active orientation preference.
 
 These controls remove candidates that fall outside the limits. They do not
 adjust scores or change the order of candidates that remain. With no active
@@ -289,8 +293,9 @@ Result-specific messages remain near the results without recreating an active
 preference summary:
 
 - If active filters remove every candidate, a closed native `No match`
-  disclosure says that the preferences caused the result. It does not describe
-  this state as an astronomy, location, or weather failure.
+  disclosure says that no opportunities were found in the response's forecast
+  horizon. Its body says that the preferences caused the result; it does not
+  describe this state as an astronomy, location, or weather failure.
 - A valid `preferenceImpact` reports the distinct live opportunities available
   with no preferences before ranking and the result limit inside that
   disclosure. A definition-list row for every active filter reports the count
@@ -301,7 +306,8 @@ preference summary:
   says that the other preferences are off for each row. A next match is
   formatted in the resolved location's timezone with the year and explicit
   IANA timezone label. A `not_found` row names the returned positive
-  `lookAheadDays`.
+  `lookAheadDays`. The `namedPhases` impact row is labeled `Moon shape`. Filter
+  names in these rows are plain text without term tooltips.
 - The browser shows preference impact only for an empty opportunity result. An
   omitted, unknown, or malformed impact object leaves the impact rows absent
   while retaining the ordinary no-match reason. The browser does not invent
@@ -322,7 +328,14 @@ under `moonService.opportunityPreferences.v1`. Version 1 storage retains only
 the supported `altitudeDegrees`, `time`, `azimuthDegrees`, `namedPhases`, and
 `brightLimbOrientationDegrees` fields. Local-clock state stores one
 `time.window` object. The former plural `time.windows` shape is unsupported and
-is discarded rather than migrated. A bright-limb target is stored as an array
+is discarded rather than migrated. The privacy explanation calls this choice
+`selected Moon shapes`; request and storage retain the exact `namedPhases`
+contract. The browser restores `namedPhases` only when it is an exact union of
+the five Moon-shape groups. An asymmetric subset such as
+`waxing_crescent` without `waning_crescent` is unsupported, so the browser
+discards the whole stored preference object through the existing notice. It
+does not migrate or broaden that selection. An exact all-phase union
+normalizes to omission. A bright-limb target is stored as an array
 containing exactly one normalized `{start, end}` range; the browser derives and
 snaps the dial midpoint when restoring it. An exact `20°`-wide range written by
 the earlier version 1 control migrates to the nearest current axis and the
@@ -344,6 +357,9 @@ interactions. `app.js` coordinates the lookup flow with the preference module.
 `api.js` remains responsible for the existing default request, and
 `responseView.js` remains responsible for ordinary opportunity statuses,
 including the structured preference impact inside an empty result.
+The resolved-result header retains the location, ranked Moon-pass and candidate
+counts, and sharing controls. It does not add a secondary metadata grid for the
+fixed forecast horizon, evaluated-window count, timezone, or lookup method.
 
 Every preference input has a visible label. Related choices use `fieldset` and
 `legend`, and reset uses a real button. Every handle supports an equivalent
@@ -390,8 +406,9 @@ The card should include:
 - `.ics` action when available.
 
 Cards should avoid hiding the main decision behind decoration. The primary
-information is the opportunity itself: time, Moon position, light, weather, and
-reasoning.
+information is time, Moon position, light, weather, and reasoning. Each
+recommendation shows the exact readable `phaseName`, including its waxing or
+waning distinction instead of reducing it to the grouped shape.
 
 Cards currently carry more information than a first-scan view needs. Future UI
 passes should keep the main opportunity card compact, especially on mobile, and
