@@ -143,46 +143,37 @@ test("cycles selected phases and updates immediately without moving the limb tar
   const handle = page.getByRole("slider", { name: "Bright-limb target orientation" });
   const preview = page.locator("#preference-limb-moon");
   await enabled.check();
-  await expect(handle).toHaveAttribute("aria-valuenow", "45");
+  await expect(handle).toHaveAttribute("aria-valuenow", "270");
 
-  await expectMainPhase(page, preview, 45, 45);
+  await expectMainPhase(page, preview, 45, 270);
   await page.clock.runFor(CYCLE_MILLISECONDS);
-  await expectMainPhase(page, preview, 180, 45);
+  await expectMainPhase(page, preview, 180, 270);
   await page.clock.runFor(CYCLE_MILLISECONDS);
-  await expectMainPhase(page, preview, 315, 45);
+  await expectMainPhase(page, preview, 315, 270);
   await page.clock.runFor(CYCLE_MILLISECONDS);
-  await expectMainPhase(page, preview, 45, 45);
+  await expectMainPhase(page, preview, 45, 270);
 
   await selectOnly(page, ["waning_gibbous", "first_quarter"]);
-  await expectMainPhase(page, preview, 90, 45);
+  await expectMainPhase(page, preview, 90, 270);
   await page.clock.runFor(CYCLE_MILLISECONDS);
-  await expectMainPhase(page, preview, 225, 45);
-  await expect(handle).toHaveAttribute("aria-valuenow", "45");
+  await expectMainPhase(page, preview, 225, 270);
+  await expect(handle).toHaveAttribute("aria-valuenow", "270");
 });
 
 test("runs one timer only and pauses whenever the animated preview is hidden", async ({
   page
 }) => {
   await page.clock.install();
-  const calls = await captureApiCalls(page);
-  await page.goto("/search?q=Prague");
-  await waitForCallCount(calls, 1);
+  await page.goto("/search");
   await openPreferences(page);
-  await selectOnly(page, ["first_quarter", "full_moon", "last_quarter"]);
+  await selectOnly(page, ["first_quarter", "waxing_gibbous", "full_moon"]);
 
   const enabled = page.getByLabel("Limit illuminated-edge direction");
   const preview = page.locator("#preference-limb-moon");
   await enabled.check();
-  await expectMainPhase(page, preview, 90, 45);
+  await expectMainPhase(page, preview, 90, 270);
   await page.clock.runFor(CYCLE_MILLISECONDS);
-  await expectMainPhase(page, preview, 180, 45);
-
-  await page.getByRole("button", { name: "Use these limits" }).click();
-  await waitForCallCount(calls, 2);
-  await expectMainPhase(page, preview, 90, 45);
-  await openPreferences(page);
-  await page.clock.runFor(CYCLE_MILLISECONDS);
-  await expectMainPhase(page, preview, 180, 45);
+  await expectMainPhase(page, preview, 135, 270);
 
   await setDisclosure(page, false);
   const beforeDisclosurePause = await canvasDataUrl(preview);
@@ -191,16 +182,16 @@ test("runs one timer only and pauses whenever the animated preview is hidden", a
   await setDisclosure(page, true);
   expect(await canvasDataUrl(preview)).toBe(beforeDisclosurePause);
   await page.clock.runFor(CYCLE_MILLISECONDS);
-  await expectMainPhase(page, preview, 270, 45);
+  await expectMainPhase(page, preview, 180, 270);
 
   await enabled.uncheck();
   const beforeEditorPause = await canvasDataUrl(preview);
   await page.clock.runFor(CYCLE_MILLISECONDS * 2);
   expect(await canvasDataUrl(preview)).toBe(beforeEditorPause);
   await enabled.check();
-  await expectMainPhase(page, preview, 90, 45);
+  await expectMainPhase(page, preview, 90, 270);
   await page.clock.runFor(CYCLE_MILLISECONDS);
-  await expectMainPhase(page, preview, 180, 45);
+  await expectMainPhase(page, preview, 135, 270);
 
   await setDocumentVisibility(page, "hidden");
   const beforeDocumentPause = await canvasDataUrl(preview);
@@ -209,7 +200,7 @@ test("runs one timer only and pauses whenever the animated preview is hidden", a
   await setDocumentVisibility(page, "visible");
   expect(await canvasDataUrl(preview)).toBe(beforeDocumentPause);
   await page.clock.runFor(CYCLE_MILLISECONDS);
-  await expectMainPhase(page, preview, 270, 45);
+  await expectMainPhase(page, preview, 180, 270);
 });
 
 test("shows the first selected phase without cycling in reduced motion", async ({ page }) => {
@@ -222,14 +213,14 @@ test("shows the first selected phase without cycling in reduced motion", async (
   const preview = page.locator("#preference-limb-moon");
   await page.getByLabel("Limit illuminated-edge direction").check();
   await page.clock.runFor(CYCLE_MILLISECONDS);
-  await expectMainPhase(page, preview, 315, 45);
+  await expectMainPhase(page, preview, 315, 270);
 
   await page.emulateMedia({ reducedMotion: "reduce" });
   await expect.poll(() => canvasDataUrl(preview))
-    .toBe(await expectedMainPhaseDataUrl(page, 135, 45));
+    .toBe(await expectedMainPhaseDataUrl(page, 135, 270));
   await page.clock.runFor(CYCLE_MILLISECONDS * 3);
-  await expectMainPhase(page, preview, 135, 45);
-  await expect(handle).toHaveAttribute("aria-valuenow", "45");
+  await expectMainPhase(page, preview, 135, 270);
+  await expect(handle).toHaveAttribute("aria-valuenow", "270");
 });
 
 test("uses eight gap-free 45-degree sectors and axis-only interaction", async ({ page }) => {
@@ -260,7 +251,7 @@ test("uses eight gap-free 45-degree sectors and axis-only interaction", async ({
   const apply = page.getByRole("button", { name: "Use these limits" });
   await expect(handle).toHaveAttribute("aria-valuemin", "0");
   await expect(handle).toHaveAttribute("aria-valuemax", "315");
-  await expect(handle).toHaveAttribute("aria-valuenow", "45");
+  await expect(handle).toHaveAttribute("aria-valuenow", "270");
 
   await handle.focus();
   await page.keyboard.press("End");

@@ -23,7 +23,7 @@ var LIMB_ORIENTATION_WIDTH_DEGREES = 45;
 var LIMB_ORIENTATION_HALF_WIDTH_DEGREES = LIMB_ORIENTATION_WIDTH_DEGREES / 2;
 // Deployed localStorage v1 values used one exact 20-degree sector.
 var LEGACY_LIMB_ORIENTATION_WIDTH_DEGREES = 20;
-var DEFAULT_LIMB_ORIENTATION_DEGREES = 45;
+var DEFAULT_LIMB_ORIENTATION_DEGREES = 270;
 var RANGE_EPSILON = 1.0e-6;
 
 export function createMoonAppearanceControls(form) {

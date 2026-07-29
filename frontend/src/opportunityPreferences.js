@@ -6,22 +6,13 @@ import {
   createMoonAppearanceControls,
   normalizeMoonAppearancePreferences
 } from "./moonAppearanceControls.js";
-import { formatDateTime } from "./format.js";
 
 var STORAGE_KEY = "moonService.opportunityPreferences.v1";
 var VERSION = 1;
-var UTC_INSTANT_PATTERN = /^(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2})(?:\.(\d{1,9}))?Z$/;
 var MAX_WINDOWS = 8;
 var CLOCK_PATTERN = /^(?:[01]\d|2[0-3]):[0-5]\d$/;
 var LIGHT_BUCKETS = ["daylight", "golden_hour", "civil_twilight", "nautical_twilight", "night"];
 var MEMORY_ONLY_NOTICE = "Preference storage is unavailable. Changes last only on this page; previously saved preferences may return after reload.";
-var IMPACT_LABELS = {
-  altitudeDegrees: "Moon altitude",
-  azimuthDegrees: "Moon direction",
-  time: "Availability",
-  namedPhases: "Named Moon phase",
-  brightLimbOrientationDegrees: "Bright-limb orientation"
-};
 
 export function createOpportunityPreferences(options) {
   var details = options.details;
@@ -33,8 +24,6 @@ export function createOpportunityPreferences(options) {
   var addWindow = form.querySelector("#preference-add-window");
   var lightEditor = form.querySelector("#preference-light-editor");
   var formStatus = form.querySelector("#preference-form-status");
-  var emptyNotice = resultRegion.querySelector("#preference-empty-notice");
-  var emptyNoticeText = emptyNotice.textContent.trim();
   var rowTemplate = /** @type {HTMLTemplateElement} */ (document.querySelector("#preference-clock-row-template"));
   var angularControls = createAngularPreferenceControls(form);
   var appearanceControls = createMoonAppearanceControls(form);
@@ -167,7 +156,7 @@ export function createOpportunityPreferences(options) {
       ? state.time.windows
       : [{ start: "18:00", end: "23:00" }];
     windows.forEach(appendClockRow);
-    var selected = mode === "light_bucket" ? state.time.buckets : ["civil_twilight"];
+    var selected = mode === "light_bucket" ? state.time.buckets : ["golden_hour"];
     lightEditor.querySelectorAll("input").forEach(function (input) {
       input.checked = selected.includes(input.value);
     });
@@ -215,15 +204,10 @@ export function createOpportunityPreferences(options) {
     timezoneNote.textContent = typeof response?.location?.timezone === "string"
       ? "Clock windows use " + response.location.timezone + "."
       : "Clock windows use the searched location’s timezone.";
-    setNotice(resultRegion.querySelector("#preference-excluded-notice"),
-      response ? impactText(response, activeFilters(state)) : "");
     setNotice(resultRegion.querySelector("#preference-ignored-notice"),
       response && response.ignoredPreferenceFieldCount > 0
       ? ignoredText(response)
       : "");
-    var filteredEmpty = response && response.emptyReason
-      && response.emptyReason.code === "no_opportunities_match_preferences";
-    setNotice(emptyNotice, filteredEmpty ? emptyNoticeText : "");
     var total = activeFilterCount(state);
     details.querySelector("#preference-count").textContent =
       total === 0 ? "None active" : total + " active";
@@ -243,7 +227,7 @@ export function createOpportunityPreferences(options) {
     state = next;
     response = null;
     persist();
-    renderForm();
+    if (!closeDisclosure) renderForm();
     renderResult();
     if (closeDisclosure && narrowLayout.matches) {
       details.open = false;
@@ -349,58 +333,6 @@ function setNotice(node, text) {
   node.hidden = !text;
 }
 
-function impactText(payload, expectedFilters) {
-  var { preferenceImpact: impact, location } = payload;
-  if (!objectValue(impact)
-      || !Number.isInteger(impact.unfilteredOpportunityCount)
-      || impact.unfilteredOpportunityCount < 0 || !Array.isArray(impact.filters)
-      || impact.filters.length !== expectedFilters.length
-      || typeof location?.timezone !== "string") {
-    return "";
-  }
-  var rows = impact.filters.map(function (item, index) {
-    var label = IMPACT_LABELS[item?.filter];
-    var count = item?.matchingOpportunityCount;
-    var next = theoreticalMatchText(item, location);
-    if (!label || item.filter !== expectedFilters[index]
-        || !Number.isInteger(count) || count < 0
-        || count > impact.unfilteredOpportunityCount || !next) {
-      return null;
-    }
-    return { label: label, count: count, reduction: impact.unfilteredOpportunityCount - count, next: next };
-  });
-  if (rows.includes(null)) return "";
-  var greatest = Math.max(0, ...rows.map(row => row.reduction));
-  return "Without preferences: " + impact.unfilteredOpportunityCount
-    + (impact.unfilteredOpportunityCount === 1 ? " opportunity. " : " opportunities. ")
-    + rows.map(function (row) {
-      var largest = greatest > 0 && row.reduction === greatest ? "; largest reduction" : "";
-      return row.label + " alone: " + row.count
-        + (row.count === 1 ? " opportunity (" : " opportunities (")
-        + row.reduction + " fewer" + largest + "). " + row.next;
-    }).join(" ")
-    + " Each preference is evaluated by itself with the others off.";
-}
-
-function theoreticalMatchText(item, location) {
-  if (!objectValue(item) || !Number.isInteger(item.lookAheadDays) || item.lookAheadDays <= 0) return "";
-  if (item.status === "next_match" && validInstant(item.nextMatchAt)) {
-    return "Next theoretical match without weather: "
-      + formatDateTime(item.nextMatchAt, location.timezone, location.countryCode)
-      + " " + location.timezone + ".";
-  }
-  return item.status === "not_found" && item.nextMatchAt === undefined
-    ? "No theoretical match without weather in the next " + item.lookAheadDays + " days."
-    : "";
-}
-
-function validInstant(value) {
-  var parsed = typeof value === "string" && UTC_INSTANT_PATTERN.test(value)
-    ? new Date(value) : null;
-  return parsed !== null && Number.isFinite(parsed.getTime())
-    && parsed.toISOString().slice(0, 19) === value.slice(0, 19);
-}
-
 function ignoredText(payload) {
   var count = payload.ignoredPreferenceFieldCount;
   var noun = count === 1 ? "field." : "fields.";
@@ -415,11 +347,13 @@ function ignoredText(payload) {
 
 function emptyState() { return { version: VERSION }; }
 
-function activeFilters(value) {
-  return Object.keys(IMPACT_LABELS).filter(filter => Boolean(value[filter]));
+function activeFilterCount(value) {
+  return Number(Boolean(value.altitudeDegrees))
+    + Number(Boolean(value.azimuthDegrees))
+    + Number(Boolean(value.time))
+    + Number(Boolean(value.namedPhases))
+    + Number(Boolean(value.brightLimbOrientationDegrees));
 }
-
-function activeFilterCount(value) { return activeFilters(value).length; }
 
 function validClockWindow(window) {
   return objectValue(window) && typeof window.start === "string" && typeof window.end === "string"
