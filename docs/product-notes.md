@@ -172,12 +172,15 @@ green handles, it stores and sends the included sector and any selected blocked
 sector inside it. The named phases are alternatives: a sample may match any
 selected phase.
 
-The browser's bright-limb control has one target and a fixed tolerance, initially
-±10°. It stores and sends that target as an array containing exactly one
-normalized `{start, end}` range under `brightLimbOrientationDegrees`, including
-when the range crosses `0°`. The browser derives the dial target from that
-range when it restores stored state. It does not store a separate target field
-or a user-configurable tolerance.
+The browser's bright-limb control has one target snapped to axes `45°` apart
+and a fixed total interval width of `45°`. It stores and sends that target as
+an array containing exactly one inclusive normalized `{start, end}` range under
+`brightLimbOrientationDegrees`, including when the range crosses `0°`.
+Neighboring target sectors share their boundary and together cover the full
+circle. The browser derives and snaps the dial target when it restores stored
+state. Version 1 ranges written with the earlier `20°` width migrate to the
+nearest current axis and width. It does not store a separate target field or a
+user-configurable tolerance.
 
 For each search with active preferences, the browser sends these values to the
 Moon Service server in the existing product POST body. The server uses them as

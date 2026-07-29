@@ -53,6 +53,13 @@ const AMBIENT_PREFERENCES = {
   }
 };
 
+const ALL_PREFERENCES = {
+  ...AMBIENT_PREFERENCES,
+  azimuthDegrees: { included: { start: 330, end: 30 } },
+  namedPhases: ["full_moon"],
+  brightLimbOrientationDegrees: [{ start: 337.5, end: 22.5 }]
+};
+
 /**
  * @typedef {{
  *   method: string,
@@ -463,10 +470,10 @@ test("keeps preferences in page memory when browser storage blocks writes", asyn
 
 test("renders server preference metadata as safe text without changing the share URL", async ({ page }) => {
   const unsafePath = "/future<img src=x onerror=\"window.preferenceInjectionRan=1\">";
-  await preloadState(page, ALTITUDE_PREFERENCES);
+  await preloadState(page, ALL_PREFERENCES);
   const calls = await captureApiCalls(page, call => successfulResponse(call, {
     appliedPreferenceVersion: 1,
-    normalizedActiveFilters: ALTITUDE_PREFERENCES,
+    normalizedActiveFilters: ALL_PREFERENCES,
     excludedSampleCount: 1,
     ignoredPreferenceFields: [unsafePath],
     ignoredPreferenceFieldCount: 3,
@@ -475,14 +482,32 @@ test("renders server preference metadata as safe text without changing the share
     emptyReason: {
       code: "no_opportunities_match_preferences",
       text: "No opportunities match the active preferences."
+    },
+    preferenceImpact: {
+      unfilteredOpportunityCount: 1,
+      filters: [
+        impact("altitudeDegrees", 1, "2026-08-01T03:15:00Z"),
+        impact("azimuthDegrees", 0),
+        impact("time", 0),
+        impact("namedPhases", 1),
+        impact("brightLimbOrientationDegrees", 1)
+      ]
     }
   }));
 
   await page.goto("/search?q=Prague");
   await waitForCallCount(calls, 1);
 
-  await expect(page.locator("#preference-excluded-notice"))
-    .toHaveText("Candidate samples excluded before ranking: 1.");
+  const impactNotice = page.locator("#preference-excluded-notice");
+  await expect(impactNotice).toContainText("Without preferences: 1 opportunity.");
+  await expect(impactNotice).toContainText("Moon altitude alone: 1 opportunity (0 fewer).");
+  await expect(impactNotice).toContainText("Moon direction alone: 0 opportunities (1 fewer; largest reduction).");
+  await expect(impactNotice).toContainText("Availability alone: 0 opportunities (1 fewer; largest reduction).");
+  await expect(impactNotice).toContainText("Named Moon phase alone: 1 opportunity (0 fewer).");
+  await expect(impactNotice).toContainText("Bright-limb orientation alone: 1 opportunity (0 fewer).");
+  await expect(impactNotice).toContainText("Next theoretical match without weather:");
+  await expect(impactNotice).toContainText("Each preference is evaluated by itself with the others off.");
+  await expect(impactNotice).not.toContainText("Candidate samples");
   await expect(page.locator("#preference-ignored-notice")).toContainText(
     "The server ignored 3 unsupported preference fields."
   );
@@ -497,7 +522,7 @@ test("renders server preference metadata as safe text without changing the share
     .toBeUndefined();
 
   await expect(page.locator("#active-preference-summary")).toHaveCount(0);
-  await expect(page.locator("#preference-count")).toHaveText("1 active");
+  await expect(page.locator("#preference-count")).toHaveText("5 active");
   await expect(page.locator("#preference-timezone-note")).toBeHidden();
   await expect(page.locator(".status-panel.warning .tooltip"))
     .toHaveAttribute("title", "No candidate window matched this search.");
@@ -505,6 +530,37 @@ test("renders server preference metadata as safe text without changing the share
     .toHaveAttribute("href", "/search?q=Prague");
   const currentUrl = new URL(page.url());
   expect([...currentUrl.searchParams.entries()]).toEqual([["q", "Prague"]]);
+});
+
+test("hides a malformed preference-impact result", async ({ page }) => {
+  await preloadState(page, ALTITUDE_PREFERENCES);
+  const calls = await captureApiCalls(page, call => successfulResponse(call, {
+    preferenceImpact: {
+      unfilteredOpportunityCount: 1,
+      filters: [impact("altitudeDegrees", 1, "2026-02-30T00:00:00Z")]
+    }
+  }));
+
+  await page.goto("/search?q=Prague");
+  await waitForCallCount(calls, 1);
+  await expect(page.locator("#preference-excluded-notice")).toBeHidden();
+});
+
+test("hides duplicate preference-impact filters", async ({ page }) => {
+  await preloadState(page, { ...ALTITUDE_PREFERENCES, namedPhases: ["full_moon"] });
+  const calls = await captureApiCalls(page, call => successfulResponse(call, {
+    preferenceImpact: {
+      unfilteredOpportunityCount: 1,
+      filters: [
+        impact("altitudeDegrees", 1),
+        impact("altitudeDegrees", 1)
+      ]
+    }
+  }));
+
+  await page.goto("/search?q=Prague");
+  await waitForCallCount(calls, 1);
+  await expect(page.locator("#preference-excluded-notice")).toBeHidden();
 });
 
 test("documents local preference storage, request use, and location-only sharing", async ({ page }) => {
@@ -560,6 +616,12 @@ function successfulResponse(call, overrides = {}) {
     payload.additionalIgnoredPreferenceFieldCount = 0;
   }
   return Object.assign(payload, overrides);
+}
+
+function impact(filter, count, nextMatchAt) {
+  return nextMatchAt
+    ? { filter, matchingOpportunityCount: count, status: "next_match", lookAheadDays: 200, nextMatchAt }
+    : { filter, matchingOpportunityCount: count, status: "not_found", lookAheadDays: 200 };
 }
 
 async function waitForCallCount(calls, count) {

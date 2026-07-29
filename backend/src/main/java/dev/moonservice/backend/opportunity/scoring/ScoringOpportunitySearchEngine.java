@@ -12,15 +12,14 @@ import dev.moonservice.backend.weather.WeatherForecastProvider;
 import dev.moonservice.scoringprototype.PreviewEvaluator;
 import dev.moonservice.scoringprototype.UsageException;
 import dev.moonservice.scoringprototype.ephemeris.EphemerisSampler;
-import dev.moonservice.scoringprototype.ephemeris.PhaseOrientationAvailability;
 import dev.moonservice.scoringprototype.fixture.Location;
 import dev.moonservice.scoringprototype.input.OpportunityPreferences;
-import dev.moonservice.scoringprototype.input.OpportunityPreferences.DegreeRange;
 import dev.moonservice.scoringprototype.input.PrototypeConfig;
 import dev.moonservice.scoringprototype.output.ResponseFormatter;
 import dev.moonservice.scoringprototype.service.OpportunityService;
 import dev.moonservice.scoringprototype.service.PrototypeResult;
 import dev.moonservice.scoringprototype.window.OpportunityHardFilter;
+import dev.moonservice.scoringprototype.window.PreferenceImpactAnalysis;
 import tools.jackson.core.JacksonException;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
@@ -36,8 +35,8 @@ import java.util.Objects;
 public class ScoringOpportunitySearchEngine implements OpportunitySearchEngine {
     private static final ObjectMapper MAPPER = new ObjectMapper();
     private static final EphemerisSampler EPHEMERIS = new EphemerisSampler();
-    private static final PhaseOrientationAvailability AVAILABILITY =
-            new PhaseOrientationAvailability();
+    private static final PreferenceImpactAnalysis PREFERENCE_IMPACT =
+            new PreferenceImpactAnalysis();
 
     private final PreviewEvaluator previewEvaluator;
     private final OpportunityService opportunityService;
@@ -111,8 +110,7 @@ public class ScoringOpportunitySearchEngine implements OpportunitySearchEngine {
                     evaluation.excludedSampleCount(),
                     evaluation.preferencesRemovedAllLiveCandidates(),
                     toBackendAzimuthMatchIntervals(evaluation.azimuthMatchIntervals()),
-                    phaseOrientationAvailability(
-                            config, notBefore, preferences, evaluation, response));
+                    preferenceImpact(config, notBefore, preferences));
         } catch (UsageException ex) {
             throw new IllegalStateException("Resolved opportunity scoring request was invalid.", ex);
         }
@@ -165,28 +163,18 @@ public class ScoringOpportunitySearchEngine implements OpportunitySearchEngine {
                 location.countryCode());
     }
 
-    private static PhaseOrientationAvailability.Result phaseOrientationAvailability(
+    private static PreferenceImpactAnalysis.Result preferenceImpact(
             PrototypeConfig config,
             Instant notBefore,
-            OpportunityPreferences preferences,
-            OpportunityService.PreferenceEvaluation evaluation,
-            OpportunitySearchResponse response
+            OpportunityPreferences preferences
     ) {
-        List<DegreeRange> ranges = preferences.brightLimbOrientationDegrees();
-        if (preferences.namedPhases() == null
-                || ranges == null
-                || ranges.size() != 1
-                || evaluation.normalizedActiveFilters().isEmpty()
-                || evaluation.excludedSampleCount() == 0
-                || !evaluation.preferencesRemovedAllLiveCandidates()
-                || !response.opportunities().isEmpty()) {
-            return null;
-        }
-        return AVAILABILITY.find(
+        return preferences.active() ? PREFERENCE_IMPACT.analyze(
+                config,
                 notBefore,
-                preferences.namedPhases(),
-                ranges.getFirst(),
-                instant -> EPHEMERIS.sampleAt(config.location(), instant));
+                preferences,
+                instant -> EPHEMERIS.sampleAt(config.location(), instant),
+                instant -> EPHEMERIS.topocentricLunarAngularRadiusDegrees(
+                        config.location(), instant)) : null;
     }
 
     private static Map<String, List<AzimuthMatchInterval>> toBackendAzimuthMatchIntervals(

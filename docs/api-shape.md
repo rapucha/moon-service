@@ -434,47 +434,72 @@ This state is not an astronomy, geocoding, or weather-provider failure. A
 preference response keeps the existing scores and raw Moon, Sun,
 ambient-light, weather, and forecast-confidence facts.
 
-For a qualifying filtered-empty response, the server also returns this
-ephemeris-only diagnostic:
+Every successful preference search with at least one active supported filter
+also returns this diagnostic:
 
 ```json
 {
-  "phaseOrientationAvailability": {
-    "status": "next_match",
-    "lookAheadDays": 200,
-    "nextMatchAt": "2026-10-08T18:22:00Z"
+  "preferenceImpact": {
+    "unfilteredOpportunityCount": 12,
+    "filters": [
+      {
+        "filter": "altitudeDegrees",
+        "matchingOpportunityCount": 8,
+        "status": "next_match",
+        "lookAheadDays": 200,
+        "nextMatchAt": "2026-10-08T18:22:00Z"
+      },
+      {
+        "filter": "namedPhases",
+        "matchingOpportunityCount": 3,
+        "status": "not_found",
+        "lookAheadDays": 200
+      }
+    ]
   }
 }
 ```
 
+`unfilteredOpportunityCount` counts distinct live natural opportunity windows
+in the ordinary request horizon after the ordinary visibility rejection and
+before preference filters, ranking, and the global result limit. An expired
+window does not count.
+
+`filters` has exactly one row for each active supported top-level filter, in
+this order when present: `altitudeDegrees`, `azimuthDegrees`, `time`,
+`namedPhases`, and `brightLimbOrientationDegrees`. Each row evaluates that
+filter by itself against the same unfiltered source windows.
+`matchingOpportunityCount` counts a source window once when any interval from
+that window matches and passes the ordinary visibility rejection. A filter
+that splits one source window into several matching intervals cannot make its
+count exceed `unfilteredOpportunityCount`.
+
 `lookAheadDays` is `200`. `status: "next_match"` includes `nextMatchAt`, the
-earliest matching instant found by the calculation. `status: "not_found"`
-omits `nextMatchAt` and means that the bounded calculation found no match.
+earliest theoretical matching instant found for that filter alone.
+`status: "not_found"` omits `nextMatchAt` and means that the bounded
+calculation found no match.
 
-| Successful preference result | `phaseOrientationAvailability` |
+| Successful preference result | `preferenceImpact` |
 | --- | --- |
-| Filtered-empty reason, active `namedPhases`, and exactly one normalized bright-limb range | Present |
-| One or more opportunities, or no filtered-empty reason | Omitted |
-| No active named phase or no active bright-limb range | Omitted |
-| Two through eight valid bright-limb ranges | Omitted |
-
-Multiple bright-limb ranges remain valid in the version 1 request contract.
-The diagnostic supports the browser's one-target result and does not narrow a
-valid multi-range request.
+| One or more supported active filters | Present, including when opportunities are returned |
+| No active filter, or a preference-free GET | Omitted |
 
 The calculation starts at the server instant captured for the request and
 examines the interval through exactly 200 days later, including both
 endpoints. It uses the existing five-minute ephemeris sampling and crossing
-refinement. A match requires the Moon to be above the modelled horizon, to
-match any selected named phase, and to match the single normalized
-bright-limb range. A match at the initial instant or at the 200-day boundary
-is eligible.
+refinement. A theoretical match requires the Moon to be above the modelled
+horizon and to match the row's single active filter. The other preference
+filters are disabled. A match at the initial instant or at the 200-day
+boundary is eligible.
 
-This calculation applies only Moon geometry, the modelled horizon, selected
-phases, and the single orientation range. It ignores altitude, azimuth,
-availability, scoring, result limits, weather, and every other hard
-preference. It does not extend the ordinary opportunity or weather horizon and
-does not make a long-range weather or provider request.
+The diagnostic uses deterministic ephemeris, lunar-radius, location-timezone,
+and hard-filter calculations. It does not apply weather, scoring, result
+limits, or another preference to a row. It generates the ordinary-horizon
+baseline once, shares request-local astronomical values across the independent
+comparisons, and scans the long-range interval once for all rows. It does not
+extend the ordinary weather horizon or make another weather, geocoding, or
+other provider request. A complete enter-and-exit event between five-minute
+samples can be missed.
 
 When `preferences` is absent, the response omits all preference-only metadata,
 including ignored-field fields and azimuth masks, so the current GET and

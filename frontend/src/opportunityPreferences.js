@@ -15,6 +15,13 @@ var MAX_WINDOWS = 8;
 var CLOCK_PATTERN = /^(?:[01]\d|2[0-3]):[0-5]\d$/;
 var LIGHT_BUCKETS = ["daylight", "golden_hour", "civil_twilight", "nautical_twilight", "night"];
 var MEMORY_ONLY_NOTICE = "Preference storage is unavailable. Changes last only on this page; previously saved preferences may return after reload.";
+var IMPACT_LABELS = {
+  altitudeDegrees: "Moon altitude",
+  azimuthDegrees: "Moon direction",
+  time: "Availability",
+  namedPhases: "Named Moon phase",
+  brightLimbOrientationDegrees: "Bright-limb orientation"
+};
 
 export function createOpportunityPreferences(options) {
   var details = options.details;
@@ -58,7 +65,7 @@ export function createOpportunityPreferences(options) {
   };
 
   function requestFor(request, signal) {
-    if (!active(state)) {
+    if (activeFilterCount(state) === 0) {
       return null;
     }
     var body = { preferences: state };
@@ -120,7 +127,7 @@ export function createOpportunityPreferences(options) {
       return;
     }
     withStorage(function (current) {
-      if (active(state)) {
+      if (activeFilterCount(state) > 0) {
         current.setItem(STORAGE_KEY, JSON.stringify(state));
       } else {
         current.removeItem(STORAGE_KEY);
@@ -209,18 +216,14 @@ export function createOpportunityPreferences(options) {
       ? "Clock windows use " + response.location.timezone + "."
       : "Clock windows use the searched location’s timezone.";
     setNotice(resultRegion.querySelector("#preference-excluded-notice"),
-      response && Number.isFinite(response.excludedSampleCount)
-      ? "Candidate samples excluded before ranking: " + response.excludedSampleCount + "."
-      : "");
+      response ? impactText(response, activeFilters(state)) : "");
     setNotice(resultRegion.querySelector("#preference-ignored-notice"),
       response && response.ignoredPreferenceFieldCount > 0
       ? ignoredText(response)
       : "");
     var filteredEmpty = response && response.emptyReason
       && response.emptyReason.code === "no_opportunities_match_preferences";
-    setNotice(emptyNotice, filteredEmpty
-      ? emptyNoticeText + availabilityText(response)
-      : "");
+    setNotice(emptyNotice, filteredEmpty ? emptyNoticeText : "");
     var total = activeFilterCount(state);
     details.querySelector("#preference-count").textContent =
       total === 0 ? "None active" : total + " active";
@@ -346,46 +349,56 @@ function setNotice(node, text) {
   node.hidden = !text;
 }
 
-function availabilityText(payload) {
-  var availability = payload.phaseOrientationAvailability;
-  var location = payload.location;
-  if (!objectValue(availability) || !objectValue(location)
-      || !Number.isInteger(availability.lookAheadDays) || availability.lookAheadDays <= 0
-      || typeof location.timezone !== "string" || !validTimezone(location.timezone)) {
+function impactText(payload, expectedFilters) {
+  var { preferenceImpact: impact, location } = payload;
+  if (!objectValue(impact)
+      || !Number.isInteger(impact.unfilteredOpportunityCount)
+      || impact.unfilteredOpportunityCount < 0 || !Array.isArray(impact.filters)
+      || impact.filters.length !== expectedFilters.length
+      || typeof location?.timezone !== "string") {
     return "";
   }
-  var disclaimer = " This long-range check uses Moon geometry only."
-    + " It does not include weather or your other hard preferences.";
-  if (availability.status === "next_match" && validInstant(availability.nextMatchAt)) {
-    return " Next astronomical match for the selected phase and orientation: "
-      + formatDateTime(availability.nextMatchAt, location.timezone, location.countryCode)
-      + " " + location.timezone + "." + disclaimer;
+  var rows = impact.filters.map(function (item, index) {
+    var label = IMPACT_LABELS[item?.filter];
+    var count = item?.matchingOpportunityCount;
+    var next = theoreticalMatchText(item, location);
+    if (!label || item.filter !== expectedFilters[index]
+        || !Number.isInteger(count) || count < 0
+        || count > impact.unfilteredOpportunityCount || !next) {
+      return null;
+    }
+    return { label: label, count: count, reduction: impact.unfilteredOpportunityCount - count, next: next };
+  });
+  if (rows.includes(null)) return "";
+  var greatest = Math.max(0, ...rows.map(row => row.reduction));
+  return "Without preferences: " + impact.unfilteredOpportunityCount
+    + (impact.unfilteredOpportunityCount === 1 ? " opportunity. " : " opportunities. ")
+    + rows.map(function (row) {
+      var largest = greatest > 0 && row.reduction === greatest ? "; largest reduction" : "";
+      return row.label + " alone: " + row.count
+        + (row.count === 1 ? " opportunity (" : " opportunities (")
+        + row.reduction + " fewer" + largest + "). " + row.next;
+    }).join(" ")
+    + " Each preference is evaluated by itself with the others off.";
+}
+
+function theoreticalMatchText(item, location) {
+  if (!objectValue(item) || !Number.isInteger(item.lookAheadDays) || item.lookAheadDays <= 0) return "";
+  if (item.status === "next_match" && validInstant(item.nextMatchAt)) {
+    return "Next theoretical match without weather: "
+      + formatDateTime(item.nextMatchAt, location.timezone, location.countryCode)
+      + " " + location.timezone + ".";
   }
-  if (availability.status === "not_found" && availability.nextMatchAt === undefined
-      && typeof location.displayName === "string" && location.displayName.trim()) {
-    return " The astronomical calculation found no match for the selected phase and orientation near "
-      + location.displayName + " during the next " + availability.lookAheadDays + " days."
-      + disclaimer;
-  }
-  return "";
+  return item.status === "not_found" && item.nextMatchAt === undefined
+    ? "No theoretical match without weather in the next " + item.lookAheadDays + " days."
+    : "";
 }
 
 function validInstant(value) {
-  var match = typeof value === "string" ? UTC_INSTANT_PATTERN.exec(value) : null;
-  if (!match) return false;
-  var parsed = new Date(value);
-  var milliseconds = (match[2] || "").padEnd(3, "0").slice(0, 3);
-  return Number.isFinite(parsed.getTime())
-    && parsed.toISOString() === match[1] + "." + milliseconds + "Z";
-}
-
-function validTimezone(value) {
-  try {
-    new Intl.DateTimeFormat("en", { timeZone: value }).format();
-    return true;
-  } catch (error) {
-    return false;
-  }
+  var parsed = typeof value === "string" && UTC_INSTANT_PATTERN.test(value)
+    ? new Date(value) : null;
+  return parsed !== null && Number.isFinite(parsed.getTime())
+    && parsed.toISOString().slice(0, 19) === value.slice(0, 19);
 }
 
 function ignoredText(payload) {
@@ -402,17 +415,11 @@ function ignoredText(payload) {
 
 function emptyState() { return { version: VERSION }; }
 
-function active(value) {
-  return activeFilterCount(value) > 0;
+function activeFilters(value) {
+  return Object.keys(IMPACT_LABELS).filter(filter => Boolean(value[filter]));
 }
 
-function activeFilterCount(value) {
-  return Number(Boolean(value.altitudeDegrees))
-    + Number(Boolean(value.azimuthDegrees))
-    + Number(Boolean(value.time))
-    + Number(Boolean(value.namedPhases))
-    + Number(Boolean(value.brightLimbOrientationDegrees));
-}
+function activeFilterCount(value) { return activeFilters(value).length; }
 
 function validClockWindow(window) {
   return objectValue(window) && typeof window.start === "string" && typeof window.end === "string"

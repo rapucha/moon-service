@@ -128,7 +128,7 @@ public final class OpportunityHardFilter {
         return new Result(retained, excluded.size(), masks);
     }
 
-    private static boolean matchesAll(
+    static boolean matchesAll(
             Location location,
             MoonSample sample,
             LunarRadiusProvider radii,

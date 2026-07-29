@@ -1,7 +1,7 @@
 package dev.moonservice.backend.opportunity.search;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
-import dev.moonservice.scoringprototype.ephemeris.PhaseOrientationAvailability;
+import dev.moonservice.scoringprototype.window.PreferenceImpactAnalysis;
 
 import java.util.List;
 import java.util.Map;
@@ -26,7 +26,7 @@ public record OpportunitySearchResponse(
         Integer ignoredPreferenceFieldCount,
         Integer additionalIgnoredPreferenceFieldCount,
         EmptyReason emptyReason,
-        PhaseOrientationAvailabilityDetails phaseOrientationAvailability
+        PreferenceImpactDetails preferenceImpact
 ) implements OpportunityResponse {
     public OpportunitySearchResponse(
             String status,
@@ -68,10 +68,8 @@ public record OpportunitySearchResponse(
                 : new EmptyReason(
                         "no_opportunities_match_preferences",
                         "No opportunity matched the active preferences.");
-        PhaseOrientationAvailabilityDetails availability =
-                emptyReason == null || result.phaseOrientationAvailability() == null
-                        ? null
-                        : availability(result.phaseOrientationAvailability());
+        PreferenceImpactDetails preferenceImpact =
+                result.preferenceImpact() == null ? null : preferenceImpact(result.preferenceImpact());
         return new OpportunitySearchResponse(
                 response.status(),
                 response.generatedAt(),
@@ -91,17 +89,24 @@ public record OpportunitySearchResponse(
                 ignoredPreferenceFieldCount,
                 Math.max(0, ignoredPreferenceFieldCount - ignoredPreferenceFields.size()),
                 emptyReason,
-                availability);
+                preferenceImpact);
     }
 
-    private static PhaseOrientationAvailabilityDetails availability(
-            PhaseOrientationAvailability.Result result
+    private static PreferenceImpactDetails preferenceImpact(
+            PreferenceImpactAnalysis.Result result
     ) {
-        String nextMatchAt = result.nextMatchAt() == null ? null : result.nextMatchAt().toString();
-        return new PhaseOrientationAvailabilityDetails(
-                nextMatchAt == null ? "not_found" : "next_match",
-                result.lookAheadDays(),
-                nextMatchAt);
+        return new PreferenceImpactDetails(
+                result.unfilteredOpportunityCount(),
+                result.filters().stream().map(impact -> {
+                    String nextMatchAt =
+                            impact.nextMatchAt() == null ? null : impact.nextMatchAt().toString();
+                    return new PreferenceFilterImpactDetails(
+                            impact.filter(),
+                            impact.matchingOpportunityCount(),
+                            nextMatchAt == null ? "not_found" : "next_match",
+                            impact.lookAheadDays(),
+                            nextMatchAt);
+                }).toList());
     }
 
     public record Location(
@@ -181,7 +186,16 @@ public record OpportunitySearchResponse(
     }
 
     @JsonInclude(JsonInclude.Include.NON_NULL)
-    public record PhaseOrientationAvailabilityDetails(
+    public record PreferenceImpactDetails(
+            int unfilteredOpportunityCount,
+            List<PreferenceFilterImpactDetails> filters
+    ) {
+    }
+
+    @JsonInclude(JsonInclude.Include.NON_NULL)
+    public record PreferenceFilterImpactDetails(
+            String filter,
+            int matchingOpportunityCount,
             String status,
             int lookAheadDays,
             String nextMatchAt

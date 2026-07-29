@@ -101,10 +101,9 @@ test("edits, persists, removes, and resets the accepted controls", async ({ page
   );
   expect(canvasAfter).not.toBe(canvasBefore);
   const pointerTarget = Number(await limbHandle.getAttribute("aria-valuenow"));
-  expect(pointerTarget).toBeGreaterThanOrEqual(89);
-  expect(pointerTarget).toBeLessThanOrEqual(91);
+  expect(pointerTarget).toBe(90);
   await page.keyboard.press("ArrowRight");
-  await expect(limbHandle).toHaveAttribute("aria-valuenow", String(pointerTarget + 1));
+  await expect(limbHandle).toHaveAttribute("aria-valuenow", "135");
   await page.keyboard.press("Home");
   await expect(limbHandle).toHaveAttribute("aria-valuenow", "0");
   await expect(limbHandle).toHaveAttribute(
@@ -123,7 +122,7 @@ test("edits, persists, removes, and resets the accepted controls", async ({ page
       altitudeDegrees: { minimum: 3, maximum: 15 },
       azimuthDegrees: EDITED_DIRECTION,
       time: { mode: "light_bucket", buckets: ["night"] },
-      brightLimbOrientationDegrees: [{ start: 350, end: 10 }]
+      brightLimbOrientationDegrees: [{ start: 337.5, end: 22.5 }]
     }
   });
   await expect(page.locator("#preference-count")).toHaveText("4 active");
