@@ -75,7 +75,7 @@ const EMPTY_PREFERENCE_RESULT = {
  * }} ApiCall
  */
 
-test("uses GET by default and keeps the hard-limit disclosure responsive", async ({ page }, testInfo) => {
+test("uses GET by default and keeps the limits disclosure responsive", async ({ page }, testInfo) => {
   const calls = await captureApiCalls(page);
 
   await page.goto("/search?q=Prague");
@@ -94,7 +94,7 @@ test("uses GET by default and keeps the hard-limit disclosure responsive", async
   const isMobile = testInfo.project.name === "mobile";
 
   await expect(details).toHaveJSProperty("open", !isMobile);
-  await expect(page.locator("#preference-count")).toHaveText("None active");
+  await expect(summary).toContainText(/Limits\s*None active/);
 
   if (isMobile) {
     await expect(summary).toBeVisible();
@@ -227,7 +227,7 @@ test("posts restored altitude and two cross-midnight clock windows", async ({ pa
   await expect(page.getByLabel("Local clock window 2 end")).toHaveValue("07:15");
 });
 
-test("switches, removes the availability group in its control, and resets", async ({ page }, testInfo) => {
+test("switches, removes the time-and-light group in its control, and resets", async ({ page }, testInfo) => {
   await preloadState(page, CLOCK_PREFERENCES);
   const calls = await captureApiCalls(page);
 
@@ -514,7 +514,7 @@ test("renders server preference metadata as safe text without changing the share
   await expect(rows).toContainText([
     /Moon altitude\s*1 opportunity · 0 fewer\s*Next theoretical match/,
     /Moon direction\s*0 opportunities · 1 fewer · Largest reduction/,
-    /Availability\s*0 opportunities · 1 fewer · Largest reduction/,
+    /Time & light\s*0 opportunities · 1 fewer · Largest reduction/,
     /Named Moon phase\s*1 opportunity · 0 fewer\s*No theoretical match/,
     /Bright-limb orientation\s*1 opportunity · 0 fewer\s*No theoretical match/
   ]);

@@ -8,7 +8,7 @@ var UTC_INSTANT_PATTERN = /^(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2})(?:\.(\d{1,9}))
 var IMPACT_FILTERS = [
   { key: "altitudeDegrees", label: "Moon altitude" },
   { key: "azimuthDegrees", label: "Moon direction" },
-  { key: "time", label: "Availability" },
+  { key: "time", label: "Time & light" },
   { key: "namedPhases", label: "Named Moon phase" },
   { key: "brightLimbOrientationDegrees", label: "Bright-limb orientation" }
 ];

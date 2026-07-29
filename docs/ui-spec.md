@@ -123,11 +123,11 @@ The frontend module split is intended to keep future UI changes manageable:
 
 ## Opportunity Preferences
 
-The accepted option A places the preference editor in the existing desktop
-sidebar. On mobile, the same editor uses a compact native `details` disclosure
-with a clear summary label. Active state and `Reset all preferences` remain
-inside this editor. The results region does not repeat them in an active-limit
-summary or removable filter chips.
+The accepted option A places the preference editor, labeled `Limits`, in the
+existing desktop sidebar. On mobile, the same editor uses a compact native
+`details` disclosure with the same summary label. Active state and
+`Reset all preferences` remain inside this editor. The results region does not
+repeat them in an active-limit summary or removable filter chips.
 
 The editor exposes these hard filters:
 
@@ -139,7 +139,7 @@ The editor exposes these hard filters:
   input uses the inverse mapping and request values remain degrees. An attempt
   to close the last `10°` moves the marker briefly toward the other marker,
   then returns it to the valid boundary. The invalid overshoot is visual only.
-- Availability uses exactly one mode at a time. Local-clock mode accepts one or
+- `Time & light` uses exactly one mode at a time. Local-clock mode accepts one or
   more windows in the searched location's timezone and explains that a window
   may cross midnight. Ambient-light mode accepts one or more of `Daylight`,
   `Golden hour`, `Civil twilight`, `Nautical twilight`, and `Night`. Switching
@@ -280,7 +280,7 @@ changing the others. Reset removes every active filter and removes the stored
 preference object when browser storage accepts the removal. If removal fails,
 the current page uses reset state in memory and reports the storage failure.
 The location-timezone and location-only share explanations stay with the
-relevant controls in Preferences. When preferences are active, the share
+relevant controls in `Limits`. When preferences are active, the share
 explanation says that the link still contains only the location and that a
 receiving browser applies its own saved preferences, if any.
 
