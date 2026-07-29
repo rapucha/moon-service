@@ -81,7 +81,7 @@ test("edits, persists, removes, and resets the accepted controls", async ({ page
 
   await expect(page.locator("[data-named-phase]:checked")).toHaveCount(8);
   await page.getByLabel("Ambient light").check();
-  await page.getByLabel("Civil twilight").uncheck();
+  await page.getByLabel("Golden hour").uncheck();
   await page.getByLabel("Night").check();
   await page.getByLabel("Limit illuminated-edge direction").check();
   await page.getByLabel("New", { exact: true }).uncheck();
@@ -101,10 +101,9 @@ test("edits, persists, removes, and resets the accepted controls", async ({ page
   );
   expect(canvasAfter).not.toBe(canvasBefore);
   const pointerTarget = Number(await limbHandle.getAttribute("aria-valuenow"));
-  expect(pointerTarget).toBeGreaterThanOrEqual(89);
-  expect(pointerTarget).toBeLessThanOrEqual(91);
+  expect(pointerTarget).toBe(90);
   await page.keyboard.press("ArrowRight");
-  await expect(limbHandle).toHaveAttribute("aria-valuenow", String(pointerTarget + 1));
+  await expect(limbHandle).toHaveAttribute("aria-valuenow", "135");
   await page.keyboard.press("Home");
   await expect(limbHandle).toHaveAttribute("aria-valuenow", "0");
   await expect(limbHandle).toHaveAttribute(
@@ -123,7 +122,7 @@ test("edits, persists, removes, and resets the accepted controls", async ({ page
       altitudeDegrees: { minimum: 3, maximum: 15 },
       azimuthDegrees: EDITED_DIRECTION,
       time: { mode: "light_bucket", buckets: ["night"] },
-      brightLimbOrientationDegrees: [{ start: 350, end: 10 }]
+      brightLimbOrientationDegrees: [{ start: 337.5, end: 22.5 }]
     }
   });
   await expect(page.locator("#preference-count")).toHaveText("4 active");
@@ -138,14 +137,26 @@ test("edits, persists, removes, and resets the accepted controls", async ({ page
   await expect(page.locator("[data-named-phase]:checked")).toHaveCount(8);
   await expect(limbHandle).toHaveAttribute("aria-valuenow", "0");
 
+  await page.getByLabel("Limit Moon altitude").uncheck();
   await page.getByLabel("Limit Moon direction").uncheck();
+  await page.getByLabel("No time limit").check();
+  await page.getByLabel("Limit illuminated-edge direction").uncheck();
   await page.getByRole("button", { name: "Use these limits" }).click();
   await waitForCallCount(calls, 3);
-  expect(calls[2].body.preferences.azimuthDegrees).toBeUndefined();
-  expect(calls[2].body.preferences.namedPhases).toBeUndefined();
-  await expect(page.locator("#preference-count")).toHaveText("3 active");
+  expect(calls[2].method).toBe("GET");
+  expect(calls[2].body).toBeNull();
+  await expect(page.locator("#preference-count")).toHaveText("None active");
 
   await openPreferences(page);
+  await page.getByLabel("Limit Moon altitude").check();
+  await page.getByLabel("Limit Moon direction").check();
+  await page.getByLabel("Ambient light").check();
+  await page.getByLabel("Limit illuminated-edge direction").check();
+  await expect(altitudeMinimum).toHaveAttribute("aria-valuenow", "3");
+  await expect(includedStartHandle).toHaveAttribute("aria-valuenow", "329");
+  await expect(blockedStartHandle).toHaveAttribute("aria-valuenow", "349");
+  await expect(page.getByLabel("Night")).toBeChecked();
+  await expect(limbHandle).toHaveAttribute("aria-valuenow", "0");
   await page.getByRole("button", { name: "Reset all preferences" }).click();
   await waitForCallCount(calls, 4);
   expect(calls[3].method).toBe("GET");

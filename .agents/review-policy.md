@@ -88,15 +88,22 @@ available file-count room, or general approval of the pull request.
 The request and the recorded active issue or pull-request exception supply
 authority for the repair; do not create a separate guardrail issue.
 
-Record each exact concern or ordinary-file gate crossing excepted, every added
-guardrail path, the resulting concern and ordinary-file counts, and the causal
-rationale. Preserving the observed failure and its guardrail correction in one
-review is an allowed rationale even when the Markdown repair could be separated.
+A repair qualifies for the concern-count exclusion only when it directly
+corrects a demonstrated failure or misbehavior in an existing guardrail that
+surfaced during the active work. Do not count a qualifying repair as a concern
+or subsystem under **Ordinary Work**. Its changed paths remain ordinary files.
+Count other guardrail work normally.
 
-The exception covers only concern and ordinary-file gate crossings attributable
-to the recorded guardrail paths. It does not authorize unrelated policy work or
-waive any other gate, dependency rule, documentation review, implementation
-review, or publication review.
+Record the observed failure, every changed guardrail path, the resulting
+concern count after this exclusion, the resulting ordinary-file count, every
+ordinary-file gate crossing excepted, and the causal rationale. Preserving the
+observed failure and its correction in one review is an allowed rationale even
+when the Markdown repair could be separated.
+
+The exception covers only ordinary-file gate crossings attributable to the
+recorded guardrail paths. It does not authorize unrelated policy work or waive
+any other gate, dependency rule, documentation review, implementation review,
+or publication review.
 
 ## Ordinary Work
 
@@ -128,6 +135,10 @@ Record the total added plus deleted lines in ordinary files. This churn is
 informational. It has no numeric limit and does not block a pull request, force
 a split, or trigger another scope review.
 
+For this measure, exclude only payload-only lines that qualify under
+[Encoded-Binary Payloads](#encoded-binary-payloads). Record those lines as
+generated textual churn instead.
+
 ## Code-File Size
 
 Each changed code file has this resulting code-line hard limit:
@@ -145,6 +156,8 @@ after comment-only content is removed.
 - Block comments and documentation-only docstrings do not count. A docstring or
   string used as runtime data counts.
 - Every nonblank source line in a multiline runtime string counts.
+- A payload-only line that qualifies under
+  [Encoded-Binary Payloads](#encoded-binary-payloads) does not count.
 - Shebangs, YAML configuration, and commands in workflow `run:` blocks count.
 - Executed embedded code counts. An ordinary string literal counts once as its
   host-language line.
@@ -226,6 +239,35 @@ Each output class has its own hard limits:
 
 Vendored output is forbidden without explicit issue authority. The limits above
 apply only after that decision.
+
+### Encoded-Binary Payloads
+
+An actual binary file has no textual line count. Apply its output class's file
+and resulting-size measures.
+
+A text-encoded block inside an ordinary file qualifies as generated binary
+payload only when all of these conditions hold:
+
+- a tracked deterministic command reproduces it byte for byte from tracked
+  inputs;
+- it decodes to one non-executable binary asset, not source code,
+  configuration, a schema, fixture content, template text, or prose; and
+- clear boundaries identify payload-only lines that contain only encoded
+  bytes, whitespace, and host-language punctuation needed to delimit or join
+  the encoded segments.
+
+The containing mixed file remains ordinary. Each logical payload consumes one
+file from the Generated maximum. Count its added plus deleted payload-only
+lines as generated textual churn, and apply the aggregate resulting-size limit
+to its encoded bytes as stored in the host file. Also record its decoded byte
+count. Exclude only those payload-only lines from ordinary churn and code-line
+counts. Count every other line in the containing file normally, including
+declarations, metadata, boundary markers, decoder or generator logic, and
+authored runtime strings.
+
+Generated executable logic never qualifies. Neither do encoded source code,
+configuration, schemas, fixtures, templates, prose, or manually maintained
+byte or character arrays.
 
 A tracked deterministic command must reproduce generated output byte for byte
 from tracked inputs. Plans and pull requests record the output paths,

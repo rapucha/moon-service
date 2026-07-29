@@ -13,7 +13,17 @@ var PHASES = [
 ];
 var PHASE_ANGLES = [0, 45, 90, 135, 180, 225, 270, 315];
 var PHASE_CYCLE_MILLISECONDS = 1400;
-var TARGET_TOLERANCE = 10;
+var FULL_CIRCLE_DEGREES = 360;
+// Keep the step a divisor of 360 so every exposed axis belongs to a complete set.
+var LIMB_ORIENTATION_STEP_DEGREES = 45;
+// Equal step and width cover the whole circle without gaps. The backend DegreeRange
+// filter includes both endpoints, so adjacent choices share one endpoint. The UI
+// still sends only the single sector selected by the user.
+var LIMB_ORIENTATION_WIDTH_DEGREES = 45;
+var LIMB_ORIENTATION_HALF_WIDTH_DEGREES = LIMB_ORIENTATION_WIDTH_DEGREES / 2;
+// Deployed localStorage v1 values used one exact 20-degree sector.
+var LEGACY_LIMB_ORIENTATION_WIDTH_DEGREES = 20;
+var DEFAULT_LIMB_ORIENTATION_DEGREES = 270;
 var RANGE_EPSILON = 1.0e-6;
 
 export function createMoonAppearanceControls(form) {
@@ -25,10 +35,11 @@ export function createMoonAppearanceControls(form) {
   var limbEditor = form.querySelector("#preference-limb-fields");
   var limbDial = form.querySelector("#preference-limb-dial");
   var limbHandle = form.querySelector("#preference-limb-handle");
+  var toleranceRing = form.querySelector(".preference-tolerance-ring");
   var limbOutput = form.querySelector("#preference-limb-output");
   var limbMoon = form.querySelector("#preference-limb-moon");
   var reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
-  var target = 35;
+  var target = DEFAULT_LIMB_ORIENTATION_DEGREES;
   var phaseIndex = 0;
   /** @type {number|null} */
   var phaseTimer = null;
@@ -50,16 +61,17 @@ export function createMoonAppearanceControls(form) {
   document.addEventListener("visibilitychange", syncAnimation);
   reducedMotion.addEventListener("change", syncAnimation);
   limbHandle.addEventListener("keydown", function (event) {
-    var step = event.shiftKey ? 10 : 1;
     if (event.key === "ArrowLeft" || event.key === "ArrowDown") {
       event.preventDefault();
-      setTarget(target - step);
+      setTarget(target - LIMB_ORIENTATION_STEP_DEGREES);
     } else if (event.key === "ArrowRight" || event.key === "ArrowUp") {
       event.preventDefault();
-      setTarget(target + step);
+      setTarget(target + LIMB_ORIENTATION_STEP_DEGREES);
     } else if (event.key === "Home" || event.key === "End") {
       event.preventDefault();
-      setTarget(event.key === "Home" ? 0 : 359);
+      setTarget(event.key === "Home"
+        ? 0
+        : FULL_CIRCLE_DEGREES - LIMB_ORIENTATION_STEP_DEGREES);
     }
   });
   limbHandle.addEventListener("pointerdown", function (event) {
@@ -88,7 +100,7 @@ export function createMoonAppearanceControls(form) {
       limbEnabled.checked = Boolean(state.brightLimbOrientationDegrees);
       target = limbEnabled.checked
         ? targetForRange(state.brightLimbOrientationDegrees[0])
-        : 35;
+        : DEFAULT_LIMB_ORIENTATION_DEGREES;
       syncEditor();
       syncDial();
       syncAnimation();
@@ -129,12 +141,19 @@ export function createMoonAppearanceControls(form) {
   }
 
   function setTarget(value) {
-    target = normalizeDegrees(Math.round(value));
+    target = snapTarget(value);
     syncDial();
   }
 
   function syncDial() {
     limbDial.style.setProperty("--preference-limb-angle", target + "deg");
+    toleranceRing.style.background = "conic-gradient(from "
+      + normalizedNumber(target - LIMB_ORIENTATION_HALF_WIDTH_DEGREES)
+      + "deg, #d9ad55 0deg " + LIMB_ORIENTATION_WIDTH_DEGREES
+      + "deg, transparent " + LIMB_ORIENTATION_WIDTH_DEGREES + "deg 360deg)";
+    limbHandle.setAttribute("aria-valuemin", "0");
+    limbHandle.setAttribute("aria-valuemax",
+      String(FULL_CIRCLE_DEGREES - LIMB_ORIENTATION_STEP_DEGREES));
     limbHandle.setAttribute("aria-valuenow", String(target));
     limbHandle.setAttribute(
       "aria-valuetext",
@@ -224,21 +243,34 @@ export function normalizeMoonAppearancePreferences(value) {
 }
 
 function validTargetRange(value) {
-  return objectValue(value) && validBearing(value.start) && validBearing(value.end)
-    && value.start !== value.end
-    && Math.abs(clockwiseDistance(value.start, value.end) - TARGET_TOLERANCE * 2)
-      <= RANGE_EPSILON;
+  if (!objectValue(value) || !validBearing(value.start) || !validBearing(value.end)
+      || value.start === value.end) {
+    return false;
+  }
+  var width = clockwiseDistance(value.start, value.end);
+  return matchesWidth(width, LIMB_ORIENTATION_WIDTH_DEGREES)
+    || matchesWidth(width, LEGACY_LIMB_ORIENTATION_WIDTH_DEGREES);
 }
 
 function rangeForTarget(value) {
   return {
-    start: normalizedNumber(value - TARGET_TOLERANCE),
-    end: normalizedNumber(value + TARGET_TOLERANCE)
+    start: normalizedNumber(value - LIMB_ORIENTATION_HALF_WIDTH_DEGREES),
+    end: normalizedNumber(value + LIMB_ORIENTATION_HALF_WIDTH_DEGREES)
   };
 }
 
 function targetForRange(value) {
-  return normalizedNumber(value.start + TARGET_TOLERANCE);
+  var midpoint = value.start + clockwiseDistance(value.start, value.end) / 2;
+  return snapTarget(midpoint);
+}
+
+function snapTarget(value) {
+  var axis = Math.floor(normalizeDegrees(value) / LIMB_ORIENTATION_STEP_DEGREES + 0.5);
+  return normalizedNumber(axis * LIMB_ORIENTATION_STEP_DEGREES);
+}
+
+function matchesWidth(actual, expected) {
+  return Math.abs(actual - expected) <= RANGE_EPSILON;
 }
 
 function clockwiseDistance(start, end) {

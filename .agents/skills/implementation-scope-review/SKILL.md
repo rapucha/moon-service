@@ -73,9 +73,9 @@ answer:
 - For each proposed merge, validation, rollout, or activation gate, the
   required actor, permission, artifact, target, and availability point.
 - When the plan invokes the in-place guardrail-repair exception, `rapucha`'s
-  exact request, the observed failure, each added guardrail path, the exact
-  concern or ordinary-file gate crossings excepted, resulting concern and
-  ordinary-file counts, and causal rationale.
+  exact request, the observed failure, each changed guardrail path, the
+  resulting concern count after the exclusion, the exact ordinary-file gate
+  crossings excepted, the resulting ordinary-file count, and causal rationale.
 
 ## Review Method
 
@@ -149,11 +149,11 @@ answer:
    gates exist, use coherence, reviewability, independent safety, and rollback
    boundaries as heuristics and make the lack of hard gates visible.
    When the plan invokes the in-place guardrail-repair exception, verify its
-   complete record against `.agents/review-policy.md`. Apply it only to concern
-   and ordinary-file crossings attributable to the named guardrail paths.
-   Preserving the observed failure and correction in one review remains a valid
-   rationale even when the Markdown repair is separable. Apply every other gate
-   and review normally.
+   complete record against `.agents/review-policy.md`. Exclude a qualifying
+   repair from the concern count. Apply the exception only to ordinary-file
+   crossings attributable to the named guardrail paths. Preserving the observed
+   failure and correction in one review remains a valid rationale even when the
+   Markdown repair is separable. Apply every other gate and review normally.
 10. Map every acceptance criterion to one proposed PR. Identify dependencies and
    merge order. Simulate the pre-merge, merge, post-merge validation,
    activation, and next-PR transitions. At each gate, prove the required actor,
@@ -166,12 +166,12 @@ answer:
 12. Return exactly one verdict: `single_pr`, `split_required`, or `revise`.
 
 Default to `split_required` when any hard repository gate is crossed. A complete
-in-place guardrail-repair record permits only the concern and ordinary-file
-crossings attributable to its named guardrail paths. Documentation review
-thresholds are not hard gates. Recommend any other single-PR exception only for
-a concrete inseparability or safety rationale. Require the exact exceeded gate,
-measured values, rationale, and explicit owner approval to be recorded through
-the project's normal workflow.
+in-place guardrail-repair record excludes a qualifying repair from the concern
+count and permits only the ordinary-file crossings attributable to its named
+guardrail paths. Documentation review thresholds are not hard gates. Recommend
+any other single-PR exception only for a concrete inseparability or safety
+rationale. Require the exact exceeded gate, measured values, rationale, and
+explicit owner approval to be recorded through the project's normal workflow.
 
 Return `revise` when the proposed design has not established proportionality,
 requires an unapproved custom protocol client, converts a hypothetical threat
@@ -216,7 +216,7 @@ Gate assessment:
 - Hard-gate crossings: <list or none>
 - Review triggers: <list or none>
 - Near-limit file review: <not triggered, or trigger, path necessity, smallest coherent alternative, and findings>
-- In-place guardrail repair: <not used, or explicit request; observed failure; paths; exact excepted gates; resulting concern/file counts; causal rationale>
+- In-place guardrail repair: <not used, or explicit request; observed failure; paths; concern count after exclusion; exact excepted ordinary-file gates; resulting file count; causal rationale>
 
 Scope-authority assessment:
 - <unrequested work, abstraction/YAGNI, incidental finding, dependency, or none>
@@ -285,9 +285,9 @@ or overload, configuration option, provider slot, toggle, and extension point.
 Review a required interface seam separately from any default or fallback body.
 Return revise when the evidence is absent; acceptance criteria alone do not
 supply it. If the plan invokes the in-place guardrail-repair exception, verify
-`rapucha`'s explicit request and the complete exception record. Apply it only
-to the named guardrail paths' concern and ordinary-file crossings. Apply every
-other gate.
+`rapucha`'s explicit request and the complete exception record. Exclude a
+qualifying repair from the concern count. Apply the exception only to the named
+guardrail paths' ordinary-file crossings. Apply every other gate.
 Apply the near-limit file review from `.agents/review-policy.md` when it
 triggers. Require each path to support the accepted outcome through a current
 responsibility and compare the plan with the smallest coherent implementation.

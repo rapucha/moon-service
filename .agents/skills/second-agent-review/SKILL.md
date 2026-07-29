@@ -72,9 +72,9 @@ Prefer these inputs:
   required by `.agents/review-policy.md`. Identify a required interface seam
   separately from any default or fallback body.
 - For an in-place guardrail repair, `rapucha`'s exact request, the observed
-  failure, every added guardrail path, the exact concern or ordinary-file gate
-  crossings excepted, resulting concern and ordinary-file counts, and causal
-  rationale.
+  failure, every changed guardrail path, the resulting concern count after the
+  exclusion, the exact ordinary-file gate crossings excepted, the resulting
+  ordinary-file count, and causal rationale.
 - Expected paths, other paths that might be needed and why, the expected
   file-count range, actual paths and count, and any meaningful difference.
   Include informational churn; code-line base counts, results, and deltas;
@@ -131,8 +131,9 @@ Check scope before implementation quality:
    each unsupported completed mechanism as a finding.
 5. When the diff includes an in-place guardrail repair, verify the complete
    exception record and `rapucha`'s explicit request. Confirm that the exception
-   covers only concern and ordinary-file crossings attributable to the named
-   guardrail paths. Apply every other gate and review normally.
+   excludes a qualifying repair from the concern count and covers only
+   ordinary-file crossings attributable to the named guardrail paths. Apply
+   every other gate and review normally.
 6. Look for unrequested refactors, incidental fixes, opportunistic cleanup,
    unrelated tests/docs, and abstractions without the required production-use
    evidence.

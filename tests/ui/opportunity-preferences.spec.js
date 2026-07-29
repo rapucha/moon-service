@@ -53,6 +53,20 @@ const AMBIENT_PREFERENCES = {
   }
 };
 
+const ALL_PREFERENCES = {
+  ...AMBIENT_PREFERENCES,
+  azimuthDegrees: { included: { start: 330, end: 30 } },
+  namedPhases: ["full_moon"],
+  brightLimbOrientationDegrees: [{ start: 337.5, end: 22.5 }]
+};
+const EMPTY_PREFERENCE_RESULT = {
+  opportunities: [],
+  emptyReason: {
+    code: "no_opportunities_match_preferences",
+    text: "No opportunities match the active preferences."
+  }
+};
+
 /**
  * @typedef {{
  *   method: string,
@@ -61,7 +75,7 @@ const AMBIENT_PREFERENCES = {
  * }} ApiCall
  */
 
-test("uses GET by default and keeps the hard-limit disclosure responsive", async ({ page }, testInfo) => {
+test("uses GET by default and keeps the limits disclosure responsive", async ({ page }, testInfo) => {
   const calls = await captureApiCalls(page);
 
   await page.goto("/search?q=Prague");
@@ -80,7 +94,7 @@ test("uses GET by default and keeps the hard-limit disclosure responsive", async
   const isMobile = testInfo.project.name === "mobile";
 
   await expect(details).toHaveJSProperty("open", !isMobile);
-  await expect(page.locator("#preference-count")).toHaveText("None active");
+  await expect(summary).toContainText(/Limits\s*None active/);
 
   if (isMobile) {
     await expect(summary).toBeVisible();
@@ -213,7 +227,7 @@ test("posts restored altitude and two cross-midnight clock windows", async ({ pa
   await expect(page.getByLabel("Local clock window 2 end")).toHaveValue("07:15");
 });
 
-test("switches, removes the availability group in its control, and resets", async ({ page }, testInfo) => {
+test("switches, removes the time-and-light group in its control, and resets", async ({ page }, testInfo) => {
   await preloadState(page, CLOCK_PREFERENCES);
   const calls = await captureApiCalls(page);
 
@@ -223,10 +237,8 @@ test("switches, removes the availability group in its control, and resets", asyn
   await openPreferences(page);
 
   await page.getByLabel("Ambient light").check();
-  await page.getByLabel("Daylight").uncheck();
-  await page.getByLabel("Golden hour").check();
+  await expect(page.getByLabel("Golden hour")).toBeChecked();
   await page.getByLabel("Civil twilight").check();
-  await page.getByLabel("Nautical twilight").uncheck();
   await page.getByLabel("Night").check();
   await page.getByRole("button", { name: "Use these limits" }).click();
 
@@ -253,6 +265,10 @@ test("switches, removes the availability group in its control, and resets", asyn
   expect(await storedPreferences(page)).toEqual(ALTITUDE_PREFERENCES);
 
   await openPreferences(page);
+  await page.getByLabel("Ambient light").check();
+  expect(await page.locator("#preference-light-editor input:checked")
+    .evaluateAll(inputs => inputs.map(input => /** @type {HTMLInputElement} */ (input).value)))
+    .toEqual(["golden_hour", "civil_twilight", "night"]);
   await page.getByRole("button", { name: "Reset all preferences" }).click();
 
   await waitForCallCount(calls, 3);
@@ -463,49 +479,88 @@ test("keeps preferences in page memory when browser storage blocks writes", asyn
 
 test("renders server preference metadata as safe text without changing the share URL", async ({ page }) => {
   const unsafePath = "/future<img src=x onerror=\"window.preferenceInjectionRan=1\">";
-  await preloadState(page, ALTITUDE_PREFERENCES);
+  const normalizedActiveFilters = { ...ALL_PREFERENCES };
+  delete normalizedActiveFilters.version;
+  await preloadState(page, ALL_PREFERENCES);
   const calls = await captureApiCalls(page, call => successfulResponse(call, {
-    appliedPreferenceVersion: 1,
-    normalizedActiveFilters: ALTITUDE_PREFERENCES,
-    excludedSampleCount: 1,
+    ...EMPTY_PREFERENCE_RESULT,
+    normalizedActiveFilters,
     ignoredPreferenceFields: [unsafePath],
     ignoredPreferenceFieldCount: 3,
     additionalIgnoredPreferenceFieldCount: 2,
-    opportunities: [],
-    emptyReason: {
-      code: "no_opportunities_match_preferences",
-      text: "No opportunities match the active preferences."
+    preferenceImpact: {
+      unfilteredOpportunityCount: 1,
+      filters: [
+        impact("altitudeDegrees", 1, "2026-08-01T03:15:00Z"),
+        impact("azimuthDegrees", 0),
+        impact("time", 0),
+        impact("namedPhases", 1),
+        impact("brightLimbOrientationDegrees", 1)
+      ]
     }
   }));
 
   await page.goto("/search?q=Prague");
   await waitForCallCount(calls, 1);
 
-  await expect(page.locator("#preference-excluded-notice"))
-    .toHaveText("Candidate samples excluded before ranking: 1.");
+  const noMatch = page.locator("details.status-panel.warning");
+  const impactDetails = noMatch.locator(".preference-impact");
+  await expect(noMatch).toHaveJSProperty("open", false);
+  await expect(noMatch.locator("summary")).toContainText("No match — No ranked windows");
+  await noMatch.locator("summary").click();
+  await expect(impactDetails).toContainText("Without preferences: 1 opportunity.");
+  const rows = impactDetails.locator(".detail-grid > div");
+  await expect(rows).toHaveCount(5);
+  await expect(rows).toContainText([
+    /Moon altitude\s*1 opportunity · 0 fewer\s*Next theoretical match/,
+    /Moon direction\s*0 opportunities · 1 fewer · Largest reduction/,
+    /Time & light\s*0 opportunities · 1 fewer · Largest reduction/,
+    /Named Moon phase\s*1 opportunity · 0 fewer\s*No theoretical match/,
+    /Bright-limb orientation\s*1 opportunity · 0 fewer\s*No theoretical match/
+  ]);
+  await expect(impactDetails).toContainText(
+    "Each preference is evaluated by itself with the others off."
+  );
   await expect(page.locator("#preference-ignored-notice")).toContainText(
     "The server ignored 3 unsupported preference fields."
   );
   await expect(page.locator("#preference-ignored-notice")).toContainText(unsafePath);
   await expect(page.locator("#preference-ignored-notice"))
     .toContainText("2 more were not listed.");
-  await expect(page.locator("#preference-empty-notice")).toBeVisible();
-  await expect(page.locator("#preference-empty-notice"))
-    .toContainText("No opportunities match these hard limits.");
   await expect(page.locator("img[src='x']")).toHaveCount(0);
-  expect(await page.evaluate(() => Reflect.get(window, "preferenceInjectionRan")))
-    .toBeUndefined();
 
   await expect(page.locator("#active-preference-summary")).toHaveCount(0);
-  await expect(page.locator("#preference-count")).toHaveText("1 active");
+  await expect(page.locator("#preference-count")).toHaveText("5 active");
   await expect(page.locator("#preference-timezone-note")).toBeHidden();
-  await expect(page.locator(".status-panel.warning .tooltip"))
+  await expect(noMatch.locator(":scope > summary .tooltip"))
     .toHaveAttribute("title", "No candidate window matched this search.");
   await expect(page.getByRole("link", { name: "Open share link" }))
     .toHaveAttribute("href", "/search?q=Prague");
   const currentUrl = new URL(page.url());
   expect([...currentUrl.searchParams.entries()]).toEqual([["q", "Prague"]]);
 });
+
+for (const scenario of [
+  { name: "hides valid preference impact when an opportunity is found",
+    state: ALTITUDE_PREFERENCES, empty: false, filters: [impact("altitudeDegrees", 1)] },
+  { name: "hides a malformed empty-result preference impact",
+    state: ALTITUDE_PREFERENCES, empty: true,
+    filters: [impact("altitudeDegrees", 1, "2026-02-30T00:00:00Z")] },
+  { name: "hides duplicate empty-result preference-impact filters",
+    state: { ...ALTITUDE_PREFERENCES, namedPhases: ["full_moon"] }, empty: true,
+    filters: [impact("altitudeDegrees", 1), impact("altitudeDegrees", 1)] }
+]) {
+  test(scenario.name, async ({ page }) => {
+    await preloadState(page, scenario.state);
+    const calls = await captureApiCalls(page, call => successfulResponse(call, {
+      ...(scenario.empty ? EMPTY_PREFERENCE_RESULT : {}),
+      preferenceImpact: { unfilteredOpportunityCount: 1, filters: scenario.filters }
+    }));
+    await page.goto("/search?q=Prague");
+    await waitForCallCount(calls, 1);
+    await expect(page.locator(".preference-impact")).toHaveCount(0);
+  });
+}
 
 test("documents local preference storage, request use, and location-only sharing", async ({ page }) => {
   await page.goto("/about");
@@ -553,13 +608,20 @@ function successfulResponse(call, overrides = {}) {
   const payload = /** @type {any} */ (JSON.parse(JSON.stringify(sourceFixture)));
   if (call.body && call.body.preferences) {
     payload.appliedPreferenceVersion = 1;
-    payload.normalizedActiveFilters = call.body.preferences;
+    payload.normalizedActiveFilters = { ...call.body.preferences };
+    delete payload.normalizedActiveFilters.version;
     payload.excludedSampleCount = 0;
     payload.ignoredPreferenceFields = [];
     payload.ignoredPreferenceFieldCount = 0;
     payload.additionalIgnoredPreferenceFieldCount = 0;
   }
   return Object.assign(payload, overrides);
+}
+
+function impact(filter, count, nextMatchAt) {
+  return nextMatchAt
+    ? { filter, matchingOpportunityCount: count, status: "next_match", lookAheadDays: 200, nextMatchAt }
+    : { filter, matchingOpportunityCount: count, status: "not_found", lookAheadDays: 200 };
 }
 
 async function waitForCallCount(calls, count) {

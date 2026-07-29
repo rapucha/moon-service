@@ -4,6 +4,15 @@ import { candidateMeta, formatDateTime } from "./format.js";
 import { moonPassCard } from "./opportunityCard.js";
 import { fact } from "./terms.js";
 
+var UTC_INSTANT_PATTERN = /^(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2})(?:\.(\d{1,9}))?Z$/;
+var IMPACT_FILTERS = [
+  { key: "altitudeDegrees", label: "Moon altitude" },
+  { key: "azimuthDegrees", label: "Moon direction" },
+  { key: "time", label: "Time & light" },
+  { key: "namedPhases", label: "Named Moon phase" },
+  { key: "brightLimbOrientationDegrees", label: "Bright-limb orientation" }
+];
+
 export function createResponseView(results, callbacks) {
   callbacks = callbacks || {};
 
@@ -178,14 +187,16 @@ export function createResponseView(results, callbacks) {
     var reason = payload.emptyReason && payload.emptyReason.text
       ? payload.emptyReason.text
       : "No useful Moon window passed the current scoring threshold in this forecast period.";
-    return element("section", { className: "status-panel warning" },
-      element("p", {
-        className: "eyebrow tooltip",
-        title: "No candidate window matched this search.",
-        "data-tooltip": "No candidate window matched this search."
-      }, "No match"),
-      element("h3", {}, "No ranked windows"),
-      element("p", {}, reason));
+    return element("details", { className: "status-panel warning" },
+      element("summary", {},
+        element("span", {
+          className: "eyebrow tooltip",
+          title: "No candidate window matched this search.",
+          "data-tooltip": "No candidate window matched this search."
+        }, "No match"),
+        " — No ranked windows"),
+      element("p", {}, reason),
+      preferenceImpactDetails(payload));
   }
 
   function renderAmbiguous(payload, query) {
@@ -276,4 +287,89 @@ export function createResponseView(results, callbacks) {
     }
     results.replaceChildren.apply(results, children.filter(Boolean));
   }
+}
+
+function preferenceImpactDetails(payload) {
+  var normalized = payload.normalizedActiveFilters;
+  var impact = payload.preferenceImpact;
+  var location = payload.location;
+  if (!objectValue(normalized) || !objectValue(impact)
+      || typeof location?.timezone !== "string"
+      || !Number.isInteger(impact.unfilteredOpportunityCount)
+      || impact.unfilteredOpportunityCount < 0
+      || !Array.isArray(impact.filters)) {
+    return null;
+  }
+  var active = IMPACT_FILTERS.filter(function (filter) {
+    return Boolean(normalized[filter.key]);
+  });
+  if (active.length === 0 || Object.keys(normalized).length !== active.length
+      || impact.filters.length !== active.length) {
+    return null;
+  }
+  var rows = impact.filters.map(function (item, index) {
+    var filter = active[index];
+    var count = item?.matchingOpportunityCount;
+    var next = theoreticalMatchText(item, location);
+    if (!objectValue(item) || item.filter !== filter.key
+        || !Number.isInteger(count) || count < 0
+        || count > impact.unfilteredOpportunityCount || !next) {
+      return null;
+    }
+    return {
+      label: filter.label,
+      count: count,
+      reduction: impact.unfilteredOpportunityCount - count,
+      next: next
+    };
+  });
+  if (rows.includes(null)) {
+    return null;
+  }
+  var greatest = Math.max(0, ...rows.map(function (row) {
+    return row.reduction;
+  }));
+  var baseline = impact.unfilteredOpportunityCount;
+  return element("div", { className: "preference-impact" },
+    element("p", {}, "Without preferences: " + baseline
+      + (baseline === 1 ? " opportunity." : " opportunities.")),
+    element("dl", { className: "detail-grid" },
+      rows.map(function (row) {
+        var count = row.count + (row.count === 1 ? " opportunity" : " opportunities");
+        var largest = greatest > 0 && row.reduction === greatest
+          ? " · Largest reduction"
+          : "";
+        return fact(row.label, [
+          element("span", {}, count + " · " + row.reduction + " fewer" + largest),
+          element("br", {}),
+          element("span", {}, row.next)
+        ]);
+      })),
+    element("p", {}, "Each preference is evaluated by itself with the others off."));
+}
+
+function theoreticalMatchText(item, location) {
+  if (!objectValue(item) || !Number.isInteger(item.lookAheadDays) || item.lookAheadDays <= 0) {
+    return "";
+  }
+  if (item.status === "next_match" && validInstant(item.nextMatchAt)) {
+    return "Next theoretical match without weather: "
+      + formatDateTime(item.nextMatchAt, location.timezone, location.countryCode)
+      + " " + location.timezone + ".";
+  }
+  return item.status === "not_found" && item.nextMatchAt === undefined
+    ? "No theoretical match without weather in the next " + item.lookAheadDays + " days."
+    : "";
+}
+
+function validInstant(value) {
+  var parsed = typeof value === "string" && UTC_INSTANT_PATTERN.test(value)
+    ? new Date(value)
+    : null;
+  return parsed !== null && Number.isFinite(parsed.getTime())
+    && parsed.toISOString().slice(0, 19) === value.slice(0, 19);
+}
+
+function objectValue(value) {
+  return value !== null && typeof value === "object" && !Array.isArray(value);
 }

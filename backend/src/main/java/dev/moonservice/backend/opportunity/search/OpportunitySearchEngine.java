@@ -2,6 +2,7 @@ package dev.moonservice.backend.opportunity.search;
 
 import dev.moonservice.backend.location.ResolvedLocation;
 import dev.moonservice.scoringprototype.input.OpportunityPreferences;
+import dev.moonservice.scoringprototype.window.PreferenceImpactAnalysis;
 
 import java.time.Instant;
 import java.util.LinkedHashMap;
@@ -31,7 +32,8 @@ public interface OpportunitySearchEngine {
             Map<String, Object> normalizedActiveFilters,
             int excludedSampleCount,
             boolean preferencesRemovedAllLiveCandidates,
-            Map<String, List<AzimuthMatchInterval>> azimuthMatchIntervals
+            Map<String, List<AzimuthMatchInterval>> azimuthMatchIntervals,
+            PreferenceImpactAnalysis.Result preferenceImpact
     ) {
         public PreferenceSearchResult {
             Objects.requireNonNull(response, "response");

@@ -54,7 +54,7 @@ export function createOpportunityPreferences(options) {
   };
 
   function requestFor(request, signal) {
-    if (!active(state)) {
+    if (activeFilterCount(state) === 0) {
       return null;
     }
     var body = { preferences: state };
@@ -116,7 +116,7 @@ export function createOpportunityPreferences(options) {
       return;
     }
     withStorage(function (current) {
-      if (active(state)) {
+      if (activeFilterCount(state) > 0) {
         current.setItem(STORAGE_KEY, JSON.stringify(state));
       } else {
         current.removeItem(STORAGE_KEY);
@@ -156,7 +156,7 @@ export function createOpportunityPreferences(options) {
       ? state.time.windows
       : [{ start: "18:00", end: "23:00" }];
     windows.forEach(appendClockRow);
-    var selected = mode === "light_bucket" ? state.time.buckets : ["civil_twilight"];
+    var selected = mode === "light_bucket" ? state.time.buckets : ["golden_hour"];
     lightEditor.querySelectorAll("input").forEach(function (input) {
       input.checked = selected.includes(input.value);
     });
@@ -204,16 +204,10 @@ export function createOpportunityPreferences(options) {
     timezoneNote.textContent = typeof response?.location?.timezone === "string"
       ? "Clock windows use " + response.location.timezone + "."
       : "Clock windows use the searched location’s timezone.";
-    setNotice(resultRegion.querySelector("#preference-excluded-notice"),
-      response && Number.isFinite(response.excludedSampleCount)
-      ? "Candidate samples excluded before ranking: " + response.excludedSampleCount + "."
-      : "");
     setNotice(resultRegion.querySelector("#preference-ignored-notice"),
       response && response.ignoredPreferenceFieldCount > 0
       ? ignoredText(response)
       : "");
-    resultRegion.querySelector("#preference-empty-notice").hidden = !(response && response.emptyReason
-      && response.emptyReason.code === "no_opportunities_match_preferences");
     var total = activeFilterCount(state);
     details.querySelector("#preference-count").textContent =
       total === 0 ? "None active" : total + " active";
@@ -233,7 +227,7 @@ export function createOpportunityPreferences(options) {
     state = next;
     response = null;
     persist();
-    renderForm();
+    if (!closeDisclosure) renderForm();
     renderResult();
     if (closeDisclosure && narrowLayout.matches) {
       details.open = false;
@@ -352,10 +346,6 @@ function ignoredText(payload) {
 }
 
 function emptyState() { return { version: VERSION }; }
-
-function active(value) {
-  return activeFilterCount(value) > 0;
-}
 
 function activeFilterCount(value) {
   return Number(Boolean(value.altitudeDegrees))

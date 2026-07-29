@@ -143,46 +143,37 @@ test("cycles selected phases and updates immediately without moving the limb tar
   const handle = page.getByRole("slider", { name: "Bright-limb target orientation" });
   const preview = page.locator("#preference-limb-moon");
   await enabled.check();
-  await expect(handle).toHaveAttribute("aria-valuenow", "35");
+  await expect(handle).toHaveAttribute("aria-valuenow", "270");
 
-  await expectMainPhase(page, preview, 45, 35);
+  await expectMainPhase(page, preview, 45, 270);
   await page.clock.runFor(CYCLE_MILLISECONDS);
-  await expectMainPhase(page, preview, 180, 35);
+  await expectMainPhase(page, preview, 180, 270);
   await page.clock.runFor(CYCLE_MILLISECONDS);
-  await expectMainPhase(page, preview, 315, 35);
+  await expectMainPhase(page, preview, 315, 270);
   await page.clock.runFor(CYCLE_MILLISECONDS);
-  await expectMainPhase(page, preview, 45, 35);
+  await expectMainPhase(page, preview, 45, 270);
 
   await selectOnly(page, ["waning_gibbous", "first_quarter"]);
-  await expectMainPhase(page, preview, 90, 35);
+  await expectMainPhase(page, preview, 90, 270);
   await page.clock.runFor(CYCLE_MILLISECONDS);
-  await expectMainPhase(page, preview, 225, 35);
-  await expect(handle).toHaveAttribute("aria-valuenow", "35");
+  await expectMainPhase(page, preview, 225, 270);
+  await expect(handle).toHaveAttribute("aria-valuenow", "270");
 });
 
 test("runs one timer only and pauses whenever the animated preview is hidden", async ({
   page
 }) => {
   await page.clock.install();
-  const calls = await captureApiCalls(page);
-  await page.goto("/search?q=Prague");
-  await waitForCallCount(calls, 1);
+  await page.goto("/search");
   await openPreferences(page);
-  await selectOnly(page, ["first_quarter", "full_moon", "last_quarter"]);
+  await selectOnly(page, ["first_quarter", "waxing_gibbous", "full_moon"]);
 
   const enabled = page.getByLabel("Limit illuminated-edge direction");
   const preview = page.locator("#preference-limb-moon");
   await enabled.check();
-  await expectMainPhase(page, preview, 90, 35);
+  await expectMainPhase(page, preview, 90, 270);
   await page.clock.runFor(CYCLE_MILLISECONDS);
-  await expectMainPhase(page, preview, 180, 35);
-
-  await page.getByRole("button", { name: "Use these limits" }).click();
-  await waitForCallCount(calls, 2);
-  await expectMainPhase(page, preview, 90, 35);
-  await openPreferences(page);
-  await page.clock.runFor(CYCLE_MILLISECONDS);
-  await expectMainPhase(page, preview, 180, 35);
+  await expectMainPhase(page, preview, 135, 270);
 
   await setDisclosure(page, false);
   const beforeDisclosurePause = await canvasDataUrl(preview);
@@ -191,16 +182,16 @@ test("runs one timer only and pauses whenever the animated preview is hidden", a
   await setDisclosure(page, true);
   expect(await canvasDataUrl(preview)).toBe(beforeDisclosurePause);
   await page.clock.runFor(CYCLE_MILLISECONDS);
-  await expectMainPhase(page, preview, 270, 35);
+  await expectMainPhase(page, preview, 180, 270);
 
   await enabled.uncheck();
   const beforeEditorPause = await canvasDataUrl(preview);
   await page.clock.runFor(CYCLE_MILLISECONDS * 2);
   expect(await canvasDataUrl(preview)).toBe(beforeEditorPause);
   await enabled.check();
-  await expectMainPhase(page, preview, 90, 35);
+  await expectMainPhase(page, preview, 90, 270);
   await page.clock.runFor(CYCLE_MILLISECONDS);
-  await expectMainPhase(page, preview, 180, 35);
+  await expectMainPhase(page, preview, 135, 270);
 
   await setDocumentVisibility(page, "hidden");
   const beforeDocumentPause = await canvasDataUrl(preview);
@@ -209,7 +200,7 @@ test("runs one timer only and pauses whenever the animated preview is hidden", a
   await setDocumentVisibility(page, "visible");
   expect(await canvasDataUrl(preview)).toBe(beforeDocumentPause);
   await page.clock.runFor(CYCLE_MILLISECONDS);
-  await expectMainPhase(page, preview, 270, 35);
+  await expectMainPhase(page, preview, 180, 270);
 });
 
 test("shows the first selected phase without cycling in reduced motion", async ({ page }) => {
@@ -222,14 +213,109 @@ test("shows the first selected phase without cycling in reduced motion", async (
   const preview = page.locator("#preference-limb-moon");
   await page.getByLabel("Limit illuminated-edge direction").check();
   await page.clock.runFor(CYCLE_MILLISECONDS);
-  await expectMainPhase(page, preview, 315, 35);
+  await expectMainPhase(page, preview, 315, 270);
 
   await page.emulateMedia({ reducedMotion: "reduce" });
   await expect.poll(() => canvasDataUrl(preview))
-    .toBe(await expectedMainPhaseDataUrl(page, 135, 35));
+    .toBe(await expectedMainPhaseDataUrl(page, 135, 270));
   await page.clock.runFor(CYCLE_MILLISECONDS * 3);
-  await expectMainPhase(page, preview, 135, 35);
-  await expect(handle).toHaveAttribute("aria-valuenow", "35");
+  await expectMainPhase(page, preview, 135, 270);
+  await expect(handle).toHaveAttribute("aria-valuenow", "270");
+});
+
+test("uses eight gap-free 45-degree sectors and axis-only interaction", async ({ page }) => {
+  const sectors = [
+    { target: 0, range: { start: 337.5, end: 22.5 } },
+    { target: 45, range: { start: 22.5, end: 67.5 } },
+    { target: 90, range: { start: 67.5, end: 112.5 } },
+    { target: 135, range: { start: 112.5, end: 157.5 } },
+    { target: 180, range: { start: 157.5, end: 202.5 } },
+    { target: 225, range: { start: 202.5, end: 247.5 } },
+    { target: 270, range: { start: 247.5, end: 292.5 } },
+    { target: 315, range: { start: 292.5, end: 337.5 } }
+  ];
+  sectors.forEach((sector, index) => {
+    const width = (sector.range.end - sector.range.start + 360) % 360;
+    expect(width).toBe(45);
+    expect(sector.range.end).toBe(sectors[(index + 1) % sectors.length].range.start);
+  });
+
+  const calls = await captureApiCalls(page);
+  await page.goto("/search?q=Prague");
+  await waitForCallCount(calls, 1);
+  await openPreferences(page);
+  await page.getByLabel("Limit illuminated-edge direction").check();
+  const handle = page.getByRole("slider", { name: "Bright-limb target orientation" });
+  const dial = page.locator("#preference-limb-dial");
+  const ring = page.locator(".preference-tolerance-ring");
+  const apply = page.getByRole("button", { name: "Use these limits" });
+  await expect(handle).toHaveAttribute("aria-valuemin", "0");
+  await expect(handle).toHaveAttribute("aria-valuemax", "315");
+  await expect(handle).toHaveAttribute("aria-valuenow", "270");
+
+  await handle.focus();
+  await page.keyboard.press("End");
+  await expect(handle).toHaveAttribute("aria-valuenow", "315");
+  await page.keyboard.press("ArrowRight");
+  await expect(handle).toHaveAttribute("aria-valuenow", "0");
+  await page.keyboard.press("ArrowLeft");
+  await expect(handle).toHaveAttribute("aria-valuenow", "315");
+  await page.keyboard.press("Home");
+  await expect(handle).toHaveAttribute("aria-valuenow", "0");
+  await page.keyboard.press("ArrowDown");
+  await expect(handle).toHaveAttribute("aria-valuenow", "315");
+  await page.keyboard.press("ArrowUp");
+  await expect(handle).toHaveAttribute("aria-valuenow", "0");
+  await dial.evaluate(element => {
+    const bounds = element.getBoundingClientRect();
+    const radius = bounds.width / 3;
+    const angle = Math.PI / 8;
+    element.dispatchEvent(new PointerEvent("pointerdown", {
+      bubbles: true,
+      clientX: bounds.left + bounds.width / 2 + Math.sin(angle) * radius,
+      clientY: bounds.top + bounds.height / 2 - Math.cos(angle) * radius
+    }));
+  });
+  await expect(handle).toHaveAttribute("aria-valuenow", "45");
+  await page.keyboard.press("Home");
+  await expect(ring).toHaveAttribute(
+    "style", /conic-gradient\(from 337\.5deg, .+ 0deg, .+ 45deg, transparent 45deg, transparent 360deg\)/
+  );
+
+  for (const [index, sector] of sectors.entries()) {
+    await expect(handle).toHaveAttribute("aria-valuenow", String(sector.target));
+    await apply.click();
+    await waitForCallCount(calls, index + 2);
+    const preferences = calls[index + 1].body.preferences;
+    expect(preferences.brightLimbOrientationDegrees).toEqual([sector.range]);
+    expect(await storedPreferences(page)).toEqual(preferences);
+    if (index < sectors.length - 1) {
+      await openPreferences(page);
+      await handle.focus();
+      await page.keyboard.press("ArrowRight");
+    }
+  }
+});
+
+test("migrates the deployed 20-degree limb sector to the canonical width", async ({ page }) => {
+  await preloadState(page, {
+    version: 1,
+    brightLimbOrientationDegrees: [{ start: 25, end: 45 }]
+  });
+  const calls = await captureApiCalls(page);
+  await page.goto("/search?q=Prague");
+  await waitForCallCount(calls, 1);
+
+  const canonical = {
+    version: 1,
+    brightLimbOrientationDegrees: [{ start: 22.5, end: 67.5 }]
+  };
+  expect(calls[0].body.preferences).toEqual(canonical);
+  expect(await storedPreferences(page)).toEqual(canonical);
+  await openPreferences(page);
+  const handle = page.getByRole("slider", { name: "Bright-limb target orientation" });
+  await expect(handle).toHaveAttribute("aria-valuemax", "315");
+  await expect(handle).toHaveAttribute("aria-valuenow", "45");
 });
 
 test("keeps the phase choices responsive and keyboard accessible", async ({

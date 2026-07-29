@@ -123,11 +123,11 @@ The frontend module split is intended to keep future UI changes manageable:
 
 ## Opportunity Preferences
 
-The accepted option A places the preference editor in the existing desktop
-sidebar. On mobile, the same editor uses a compact native `details` disclosure
-with a clear summary label. Active state and `Reset all preferences` remain
-inside this editor. The results region does not repeat them in an active-limit
-summary or removable filter chips.
+The accepted option A places the preference editor, labeled `Limits`, in the
+existing desktop sidebar. On mobile, the same editor uses a compact native
+`details` disclosure with the same summary label. Active state and
+`Reset all preferences` remain inside this editor. The results region does not
+repeat them in an active-limit summary or removable filter chips.
 
 The editor exposes these hard filters:
 
@@ -139,11 +139,12 @@ The editor exposes these hard filters:
   input uses the inverse mapping and request values remain degrees. An attempt
   to close the last `10°` moves the marker briefly toward the other marker,
   then returns it to the valid boundary. The invalid overshoot is visual only.
-- Availability uses exactly one mode at a time. Local-clock mode accepts one or
+- `Time & light` uses exactly one mode at a time. Local-clock mode accepts one or
   more windows in the searched location's timezone and explains that a window
   may cross midnight. Ambient-light mode accepts one or more of `Daylight`,
   `Golden hour`, `Civil twilight`, `Nautical twilight`, and `Night`. Switching
-  modes removes the other mode from active state.
+  modes removes the other mode from active state. `Golden hour` is the initial
+  ambient-light choice.
 - Moon direction is optional as a whole. When enabled, the schematic's shared
   compass axis contains distinct fills and handle pairs for an included sector
   and a blocked sector contained inside it. It has no visible numeric bearing
@@ -162,8 +163,11 @@ The editor exposes these hard filters:
   and sent as `namedPhases`. Stored all-eight state normalizes to omission.
 - Bright-limb orientation is optional and has one target on a circular,
   single-handle dial. It has no editable numeric range inputs. The browser
-  applies a fixed ±10° tolerance and sends exactly one normalized range in
-  `brightLimbOrientationDegrees`; the range may cross `0°`.
+  starts a new target at `270°` (`Left`) and
+  snaps the target to `0°`, `45°`, `90°`, `135°`, `180°`, `225°`, `270°`, or
+  `315°` and sends exactly one inclusive `45°`-wide normalized range in
+  `brightLimbOrientationDegrees`; the range may cross `0°`. Neighboring
+  possible ranges share one endpoint and cover the complete circle.
 
 Local-clock preference inputs use 24-hour `HH:mm` text fields. They do not use
 browser-localized native time controls.
@@ -257,7 +261,7 @@ selected phases at the fixed target orientation. It uses at most one timer and
 stops when any enabling condition no longer holds. A hidden document or
 `prefers-reduced-motion` stops the cycle; reduced motion shows the first
 canonical selected phase. This animation is presentational. It does not alter
-preference state, request fields, or the fixed ±10° tolerance.
+preference state, request fields, or the fixed `45°` interval width.
 
 When named phase and bright-limb orientation are both active, a sample must
 match any selected named phase and the single bright-limb interval. A sample
@@ -276,24 +280,40 @@ changing the others. Reset removes every active filter and removes the stored
 preference object when browser storage accepts the removal. If removal fails,
 the current page uses reset state in memory and reports the storage failure.
 The location-timezone and location-only share explanations stay with the
-relevant controls in Preferences. When preferences are active, the share
+relevant controls in `Limits`. When preferences are active, the share
 explanation says that the link still contains only the location and that a
 receiving browser applies its own saved preferences, if any.
 
 Result-specific messages remain near the results without recreating an active
 preference summary:
 
-- If active filters remove every candidate, the empty message says that the
-  preferences caused the result. It does not describe this state as an
-  astronomy, location, or weather failure.
+- If active filters remove every candidate, a closed native `No match`
+  disclosure says that the preferences caused the result. It does not describe
+  this state as an astronomy, location, or weather failure.
+- A valid `preferenceImpact` reports the distinct live opportunities available
+  with no preferences before ranking and the result limit inside that
+  disclosure. A definition-list row for every active filter reports the count
+  when that filter acts alone, the reduction from the shared baseline, and its
+  next bounded theoretical match without weather. It marks every filter tied
+  for the largest positive reduction.
+- Filter rows are independent, not cumulative or combinatorial. The browser
+  says that the other preferences are off for each row. A next match is
+  formatted in the resolved location's timezone with the year and explicit
+  IANA timezone label. A `not_found` row names the returned positive
+  `lookAheadDays`.
+- The browser shows preference impact only for an empty opportunity result. An
+  omitted, unknown, or malformed impact object leaves the impact rows absent
+  while retaining the ordinary no-match reason. The browser does not invent
+  counts, run another search, or calculate its own long-range match.
+- The result view constructs the disclosure and each row as text-only DOM.
+  Response and location strings are never interpreted as HTML.
 - If the server ignored fields, the warning reports them as text, never as
   HTML.
 - If stored state is malformed or uses an unsupported version, the browser
   discards it and says that the saved preferences could not be used.
 - If browser storage is unavailable, the browser says that preferences will
   last only for the current page while search continues.
-- The excluded-count message reports the total number of candidate samples
-  excluded by the server.
+- The browser does not expose the server's internal excluded-sample count.
 
 The browser keeps one versioned preference state for the editor, request,
 storage, reset behavior, and result explanations. It stores supported state
@@ -301,17 +321,26 @@ under `moonService.opportunityPreferences.v1`. Version 1 storage retains only
 the supported `altitudeDegrees`, `time`, `azimuthDegrees`, `namedPhases`, and
 `brightLimbOrientationDegrees` fields. A bright-limb target is stored as an
 array containing exactly one normalized `{start, end}` range; the browser
-derives the dial midpoint when restoring it. The browser discards malformed or
+derives and snaps the dial midpoint when restoring it. An exact `20°`-wide
+range written by the earlier version 1 control migrates to the nearest current
+axis and the current `45°` width. The browser discards other malformed or
 unsupported stored state rather than sending it. If `localStorage` is blocked
 or unavailable, it keeps the state in page memory and lets search continue.
+Applying the form retains valid values from a disabled altitude, direction,
+availability, or bright-limb editor on the current page so re-enabling that
+control restores the user's draft. Disabled values remain absent from the
+request and version 1 storage; a reload restores only active stored state.
+Reset clears both active preferences and these page-memory drafts.
 
 `opportunityPreferences.js` owns this state, its normalization and storage, the
-editor coordination, preference request options, and result notices.
+editor coordination, preference request options, and storage or ignored-field
+notices.
 `angularPreferenceControls.js` coordinates `angularPreferencePreview.js`;
 the preview module and `moonAppearanceControls.js` own their focused editor
 interactions. `app.js` coordinates the lookup flow with the preference module.
 `api.js` remains responsible for the existing default request, and
-`responseView.js` remains responsible for ordinary opportunity statuses.
+`responseView.js` remains responsible for ordinary opportunity statuses,
+including the structured preference impact inside an empty result.
 
 Every preference input has a visible label. Related choices use `fieldset` and
 `legend`, and reset uses a real button. Every handle supports an equivalent
@@ -327,9 +356,11 @@ blocked-sector endpoints are valid and omit the blocked sector. Before sending,
 the browser rejects any remaining nonnumeric, non-finite, out-of-range,
 duplicate-phase, or unknown-phase value.
 Validation identifies the affected control in text and moves focus to it.
-Storage, ignored-field, excluded-count, and filtered-empty changes are
-announced to screen readers without depending on color. Removing a preference
-or resetting all preferences leaves focus on a logical surviving control.
+Storage and ignored-field changes are announced to screen readers without
+depending on color. An empty result announces its `No match` summary;
+preference-impact rows become available after the user expands the disclosure.
+Removing a preference or resetting all preferences leaves focus on a logical
+surviving control.
 
 When azimuth filtering is active, the Moon-pass chart dims only the portions
 outside the authoritative `moonPass.azimuthMatchIntervals`. It must not infer
