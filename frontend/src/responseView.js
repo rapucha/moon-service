@@ -9,7 +9,7 @@ var IMPACT_FILTERS = [
   { key: "altitudeDegrees", label: "Moon altitude" },
   { key: "azimuthDegrees", label: "Moon direction" },
   { key: "time", label: "Time & light" },
-  { key: "namedPhases", label: "Named Moon phase" },
+  { key: "namedPhases", label: "Moon shape" },
   { key: "brightLimbOrientationDegrees", label: "Bright-limb orientation" }
 ];
 
@@ -158,10 +158,6 @@ export function createResponseView(results, callbacks) {
     var location = payload.location || {};
     var sharePath = sharePathFor(request);
     var shareUrl = window.location.origin + sharePath;
-    var forecastText = payload.forecastHorizonDays ? payload.forecastHorizonDays + "-day forecast" : "Forecast window";
-    var evaluatedText = Number.isFinite(payload.candidateWindowsEvaluated)
-      ? payload.candidateWindowsEvaluated + " windows evaluated"
-      : "Top-ranked forecast candidates";
     var passText = passCount === 1 ? "1 ranked Moon pass" : passCount + " ranked Moon passes";
     var candidateText = candidateCount === 1 ? "1 candidate window" : candidateCount + " candidate windows";
 
@@ -174,19 +170,15 @@ export function createResponseView(results, callbacks) {
         element("div", { className: "share-tools" },
           element("button", { type: "button", className: "copy-button", "data-share-url": shareUrl }, "Copy link"),
           element("a", { href: sharePath }, "Open share link"))
-      ),
-      element("dl", { className: "summary-grid" },
-        fact("Forecast", forecastText),
-        fact("Evaluated", evaluatedText),
-        fact("Timezone", location.timezone || "Unavailable"),
-        fact("Lookup", request.locationId ? "Selected location" : "Search query"))
-    );
+      ));
   }
 
   function emptyOpportunities(payload) {
     var reason = payload.emptyReason && payload.emptyReason.text
       ? payload.emptyReason.text
       : "No useful Moon window passed the current scoring threshold in this forecast period.";
+    var horizon = payload.forecastHorizonDays
+      + (payload.forecastHorizonDays === 1 ? " day" : " days");
     return element("details", { className: "status-panel warning" },
       element("summary", {},
         element("span", {
@@ -194,7 +186,7 @@ export function createResponseView(results, callbacks) {
           title: "No candidate window matched this search.",
           "data-tooltip": "No candidate window matched this search."
         }, "No match"),
-        " — No ranked windows"),
+        " — No opportunities found in the next " + horizon),
       element("p", {}, reason),
       preferenceImpactDetails(payload));
   }
@@ -339,11 +331,13 @@ function preferenceImpactDetails(payload) {
         var largest = greatest > 0 && row.reduction === greatest
           ? " · Largest reduction"
           : "";
-        return fact(row.label, [
-          element("span", {}, count + " · " + row.reduction + " fewer" + largest),
-          element("br", {}),
-          element("span", {}, row.next)
-        ]);
+        return element("div", {},
+          element("dt", {}, row.label),
+          element("dd", {}, [
+            element("span", {}, count + " · " + row.reduction + " fewer" + largest),
+            element("br", {}),
+            element("span", {}, row.next)
+          ]));
       })),
     element("p", {}, "Each preference is evaluated by itself with the others off."));
 }

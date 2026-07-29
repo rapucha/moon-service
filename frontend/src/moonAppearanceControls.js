@@ -11,7 +11,15 @@ var PHASES = [
   "last_quarter",
   "waning_crescent"
 ];
-var PHASE_ANGLES = [0, 45, 90, 135, 180, 225, 270, 315];
+var SHAPES = ["new", "crescent", "half", "gibbous", "full"];
+var SHAPE_PHASES = {
+  new: ["new_moon"],
+  crescent: ["waxing_crescent", "waning_crescent"],
+  half: ["first_quarter", "last_quarter"],
+  gibbous: ["waxing_gibbous", "waning_gibbous"],
+  full: ["full_moon"]
+};
+var SHAPE_ANGLES = [0, 45, 90, 135, 180];
 var PHASE_CYCLE_MILLISECONDS = 1400;
 var FULL_CIRCLE_DEGREES = 360;
 // Keep the step a divisor of 360 so every exposed axis belongs to a complete set.
@@ -27,7 +35,7 @@ var DEFAULT_LIMB_ORIENTATION_DEGREES = 270;
 var RANGE_EPSILON = 1.0e-6;
 
 export function createMoonAppearanceControls(form) {
-  var phaseInputs = Array.from(form.querySelectorAll("[data-named-phase]"));
+  var shapeInputs = Array.from(form.querySelectorAll("[data-moon-shape]"));
   var preferenceDetails = /** @type {HTMLDetailsElement} */ (
     form.closest("#opportunity-preferences")
   );
@@ -40,19 +48,19 @@ export function createMoonAppearanceControls(form) {
   var limbMoon = form.querySelector("#preference-limb-moon");
   var reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
   var target = DEFAULT_LIMB_ORIENTATION_DEGREES;
-  var phaseIndex = 0;
+  var shapeIndex = 0;
   /** @type {number|null} */
-  var phaseTimer = null;
+  var shapeTimer = null;
 
-  phaseInputs.forEach(function (input) {
+  shapeInputs.forEach(function (input) {
     var thumbnail = /** @type {HTMLCanvasElement} */ (
       input.closest("label").querySelector("[data-phase-thumbnail]")
     );
-    drawMoonPhase(thumbnail, phaseAngle(input.value));
-    input.addEventListener("change", phaseSelectionChanged);
+    drawMoonPhase(thumbnail, shapeAngle(input.value), DEFAULT_LIMB_ORIENTATION_DEGREES, 0);
+    input.addEventListener("change", shapeSelectionChanged);
   });
   limbEnabled.addEventListener("change", function () {
-    phaseIndex = 0;
+    shapeIndex = 0;
     syncEditor();
     syncDial();
     syncAnimation();
@@ -93,10 +101,12 @@ export function createMoonAppearanceControls(form) {
   return {
     render: function (state) {
       var phases = Array.isArray(state.namedPhases) ? state.namedPhases : PHASES;
-      phaseInputs.forEach(function (input) {
-        input.checked = phases.includes(input.value);
+      shapeInputs.forEach(function (input) {
+        input.checked = SHAPE_PHASES[input.value].every(function (phase) {
+          return phases.includes(phase);
+        });
       });
-      phaseIndex = 0;
+      shapeIndex = 0;
       limbEnabled.checked = Boolean(state.brightLimbOrientationDegrees);
       target = limbEnabled.checked
         ? targetForRange(state.brightLimbOrientationDegrees[0])
@@ -107,9 +117,9 @@ export function createMoonAppearanceControls(form) {
     },
     read: function () {
       var state = {};
-      var selected = selectedPhases();
-      if (selected.length < PHASES.length) {
-        state.namedPhases = selected;
+      var selected = selectedShapes();
+      if (selected.length < SHAPES.length) {
+        state.namedPhases = phasesForShapes(selected);
       }
       if (limbEnabled.checked) {
         state.brightLimbOrientationDegrees = [rangeForTarget(target)];
@@ -123,12 +133,12 @@ export function createMoonAppearanceControls(form) {
     limbEnabled.setAttribute("aria-expanded", String(limbEnabled.checked));
   }
 
-  function phaseSelectionChanged(event) {
+  function shapeSelectionChanged(event) {
     var input = /** @type {HTMLInputElement} */ (event.currentTarget);
-    if (selectedPhases().length === 0) {
+    if (selectedShapes().length === 0) {
       input.checked = true;
     }
-    phaseIndex = 0;
+    shapeIndex = 0;
     syncDial();
     syncAnimation();
   }
@@ -163,11 +173,11 @@ export function createMoonAppearanceControls(form) {
   }
 
   function drawLimbMoon() {
-    var phases = selectedPhases();
-    if (phaseIndex >= phases.length) {
-      phaseIndex = 0;
+    var shapes = selectedShapes();
+    if (shapeIndex >= shapes.length) {
+      shapeIndex = 0;
     }
-    drawMoonPhase(limbMoon, phaseAngle(phases[phaseIndex]), target, 0);
+    drawMoonPhase(limbMoon, shapeAngle(shapes[shapeIndex]), target, 0);
     var context = limbMoon.getContext("2d");
     context.beginPath();
     context.arc(limbMoon.width / 2, limbMoon.height / 2, limbMoon.width * 0.43,
@@ -180,33 +190,33 @@ export function createMoonAppearanceControls(form) {
   function syncAnimation() {
     stopAnimation();
     if (reducedMotion.matches) {
-      phaseIndex = 0;
+      shapeIndex = 0;
       drawLimbMoon();
       return;
     }
     if (!shouldAnimate()) {
       return;
     }
-    phaseTimer = window.setInterval(function () {
-      phaseIndex = (phaseIndex + 1) % selectedPhases().length;
+    shapeTimer = window.setInterval(function () {
+      shapeIndex = (shapeIndex + 1) % selectedShapes().length;
       drawLimbMoon();
     }, PHASE_CYCLE_MILLISECONDS);
   }
 
   function stopAnimation() {
-    if (phaseTimer !== null) {
-      window.clearInterval(phaseTimer);
-      phaseTimer = null;
+    if (shapeTimer !== null) {
+      window.clearInterval(shapeTimer);
+      shapeTimer = null;
     }
   }
 
   function shouldAnimate() {
     return limbEnabled.checked && !limbEditor.hidden && preferenceDetails.open
-      && document.visibilityState === "visible" && selectedPhases().length > 1;
+      && document.visibilityState === "visible" && selectedShapes().length > 1;
   }
 
-  function selectedPhases() {
-    return phaseInputs.filter(function (input) {
+  function selectedShapes() {
+    return shapeInputs.filter(function (input) {
       return input.checked;
     }).map(function (input) {
       return input.value;
@@ -228,6 +238,14 @@ export function normalizeMoonAppearancePreferences(value) {
     var selected = PHASES.filter(function (phase) {
       return value.namedPhases.includes(phase);
     });
+    var shapes = SHAPES.filter(function (shape) {
+      return SHAPE_PHASES[shape].every(function (phase) {
+        return selected.includes(phase);
+      });
+    });
+    if (phasesForShapes(shapes).length !== selected.length) {
+      return null;
+    }
     if (selected.length < PHASES.length) {
       state.namedPhases = selected;
     }
@@ -290,8 +308,16 @@ function objectValue(value) {
   return value !== null && typeof value === "object" && !Array.isArray(value);
 }
 
-function phaseAngle(phase) {
-  return PHASE_ANGLES[PHASES.indexOf(phase)];
+function phasesForShapes(shapes) {
+  return PHASES.filter(function (phase) {
+    return shapes.some(function (shape) {
+      return SHAPE_PHASES[shape].includes(phase);
+    });
+  });
+}
+
+function shapeAngle(shape) {
+  return SHAPE_ANGLES[SHAPES.indexOf(shape)];
 }
 
 function directionName(value) {

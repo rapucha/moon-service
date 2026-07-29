@@ -30,7 +30,7 @@ test("edits, persists, removes, and resets the accepted controls", async ({ page
   await expect(page.getByLabel("Limit Moon altitude")).not.toHaveAttribute("aria-expanded");
   await expect(page.getByLabel("Limit Moon direction")).not.toHaveAttribute("aria-expanded");
   await expect(page.getByLabel("Limit illuminated-edge direction")).not.toBeChecked();
-  await expect(page.locator("[data-named-phase]:checked")).toHaveCount(8);
+  await expect(page.locator("[data-moon-shape]:checked")).toHaveCount(5);
   await expect(page.locator("#active-preference-summary")).toHaveCount(0);
 
   await page.getByLabel("Limit Moon altitude").check();
@@ -79,7 +79,7 @@ test("edits, persists, removes, and resets the accepted controls", async ({ page
   await page.keyboard.press("ArrowLeft");
   await expect(blockedStartHandle).toHaveAttribute("aria-valuenow", "349");
 
-  await expect(page.locator("[data-named-phase]:checked")).toHaveCount(8);
+  await expect(page.locator("[data-moon-shape]:checked")).toHaveCount(5);
   await page.getByLabel("Ambient light").check();
   await page.getByLabel("Golden hour").uncheck();
   await page.getByLabel("Night").check();
@@ -134,7 +134,7 @@ test("edits, persists, removes, and resets the accepted controls", async ({ page
   await expect(page.getByLabel("Limit Moon direction")).toBeChecked();
   await expect(includedStartHandle).toHaveAttribute("aria-valuenow", "329");
   await expect(blockedStartHandle).toHaveAttribute("aria-valuenow", "349");
-  await expect(page.locator("[data-named-phase]:checked")).toHaveCount(8);
+  await expect(page.locator("[data-moon-shape]:checked")).toHaveCount(5);
   await expect(limbHandle).toHaveAttribute("aria-valuenow", "0");
 
   await page.getByLabel("Limit Moon altitude").uncheck();
@@ -461,6 +461,8 @@ test("uses the schematic sliders to explain and preview angular limits", async (
 });
 
 const invalidStoredStates = [
+  { name: "an asymmetric old phase subset",
+    state: { version: 1, namedPhases: ["waxing_crescent"] } },
   { name: "duplicate named phases",
     state: { version: 1, namedPhases: ["full_moon", "full_moon"] } },
   { name: "an unknown named phase",

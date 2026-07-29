@@ -3,30 +3,32 @@ import { readFileSync } from "node:fs";
 
 const STORAGE_KEY = "moonService.opportunityPreferences.v1";
 const CYCLE_MILLISECONDS = 1400;
-const PHASES = [
-  { label: "New", value: "new_moon", angle: 0 },
-  { label: "Waxing crescent", value: "waxing_crescent", angle: 45 },
-  { label: "First quarter", value: "first_quarter", angle: 90 },
-  { label: "Waxing gibbous", value: "waxing_gibbous", angle: 135 },
-  { label: "Full", value: "full_moon", angle: 180 },
-  { label: "Waning gibbous", value: "waning_gibbous", angle: 225 },
-  { label: "Last quarter", value: "last_quarter", angle: 270 },
-  { label: "Waning crescent", value: "waning_crescent", angle: 315 }
+const SHAPES = [
+  { label: "New", value: "new", angle: 0 },
+  { label: "Crescent", value: "crescent", angle: 45 },
+  { label: "Half", value: "half", angle: 90 },
+  { label: "Gibbous", value: "gibbous", angle: 135 },
+  { label: "Full", value: "full", angle: 180 }
+];
+const CANONICAL_PHASES = [
+  "new_moon", "waxing_crescent", "first_quarter", "waxing_gibbous",
+  "full_moon", "waning_gibbous", "last_quarter", "waning_crescent"
 ];
 const sourceFixture = /** @type {any} */ (JSON.parse(readFileSync(
   new URL("./fixtures/moon-pass-response.json", import.meta.url),
   "utf8"
 )));
 
-test("treats all phases as unrestricted and persists proper subsets canonically", async ({
+test("treats all shapes as unrestricted and expands proper subsets canonically", async ({
   page
 }) => {
   const calls = await captureApiCalls(page);
   await page.goto("/search?q=Prague");
   await waitForCallCount(calls, 1);
+  await expect(page.locator(".pass-choice-card").first()).toContainText("Waxing gibbous");
   await openPreferences(page);
 
-  await expect(page.locator("[data-named-phase]:checked")).toHaveCount(PHASES.length);
+  await expect(page.locator("[data-moon-shape]:checked")).toHaveCount(SHAPES.length);
   await expect(page.locator("#preference-count")).toHaveText("None active");
   await page.getByRole("button", { name: "Use these limits" }).click();
   await waitForCallCount(calls, 2);
@@ -34,8 +36,11 @@ test("treats all phases as unrestricted and persists proper subsets canonically"
   expect(await storedPreferences(page)).toBeNull();
 
   await openPreferences(page);
-  const interactionOrder = ["last_quarter", "full_moon", "first_quarter"];
-  const canonicalSubset = ["first_quarter", "full_moon", "last_quarter"];
+  const interactionOrder = ["full", "gibbous", "half", "crescent"];
+  const canonicalSubset = [
+    "waxing_crescent", "first_quarter", "waxing_gibbous", "full_moon",
+    "waning_gibbous", "last_quarter", "waning_crescent"
+  ];
   await selectOnly(page, interactionOrder);
   await page.getByRole("button", { name: "Use these limits" }).click();
   await waitForCallCount(calls, 3);
@@ -50,42 +55,42 @@ test("treats all phases as unrestricted and persists proper subsets canonically"
   await page.getByRole("button", { name: "Reset all preferences" }).click();
   await waitForCallCount(calls, 4);
   expect(calls[3]).toMatchObject({ method: "GET", body: null });
-  await expect(page.locator("[data-named-phase]:checked")).toHaveCount(PHASES.length);
+  await expect(page.locator("[data-moon-shape]:checked")).toHaveCount(SHAPES.length);
   await expect(page.locator("#preference-count")).toHaveText("None active");
   expect(await storedPreferences(page)).toBeNull();
 });
 
-test("keeps the final phase selected with persistent accessible guidance", async ({ page }) => {
+test("keeps the final shape selected with persistent accessible guidance", async ({ page }) => {
   await page.goto("/search");
   await openPreferences(page);
-  await selectOnly(page, ["full_moon"]);
+  await selectOnly(page, ["full"]);
 
   const full = page.getByLabel("Full", { exact: true });
   const help = page.locator("#preference-phase-help");
   await expect(help).toHaveText(
-    "Choose one or more. Select all eight for no phase limit; at least one must remain."
+    "Waxing and waning phases share a shape; results keep the exact phase name. Select all five for no shape limit; at least one must remain."
   );
-  expect(await page.locator("[data-named-phase]").evaluateAll(inputs =>
+  expect(await page.locator("[data-moon-shape]").evaluateAll(inputs =>
     inputs.every(input => input.getAttribute("aria-describedby") === "preference-phase-help")
   )).toBe(true);
   await full.focus();
   await page.keyboard.press("Space");
   await expect(full).toBeChecked();
   await expect(full).toBeFocused();
-  await expect(page.locator("[data-named-phase]:checked")).toHaveCount(1);
+  await expect(page.locator("[data-moon-shape]:checked")).toHaveCount(1);
   await expect(page.locator("#preference-form-status")).toBeEmpty();
 });
 
-test("restores a valid stored phase subset in canonical order", async ({ page }) => {
+test("restores supported stored shape unions in canonical order", async ({ page }) => {
   await preloadState(page, {
     version: 1,
-    namedPhases: ["waning_crescent", "new_moon", "full_moon"]
+    namedPhases: ["waning_crescent", "new_moon", "waxing_crescent"]
   });
   const calls = await captureApiCalls(page);
   await page.goto("/search?q=Prague");
   await waitForCallCount(calls, 1);
 
-  const canonicalSubset = ["new_moon", "full_moon", "waning_crescent"];
+  const canonicalSubset = ["new_moon", "waxing_crescent", "waning_crescent"];
   expect(calls[0].method).toBe("POST");
   expect(calls[0].body.preferences.namedPhases).toEqual(canonicalSubset);
   expect(await storedPreferences(page)).toEqual({
@@ -93,13 +98,29 @@ test("restores a valid stored phase subset in canonical order", async ({ page })
     namedPhases: canonicalSubset
   });
   await openPreferences(page);
-  expect(await checkedPhaseValues(page)).toEqual(canonicalSubset);
+  expect(await checkedShapeValues(page)).toEqual(["new", "crescent"]);
+});
+
+test("discards an asymmetric stored phase subset without broadening it", async ({ page }) => {
+  await preloadState(page, {
+    version: 1,
+    namedPhases: ["waxing_crescent"]
+  });
+  const calls = await captureApiCalls(page);
+  await page.goto("/search?q=Prague");
+  await waitForCallCount(calls, 1);
+
+  expect(calls[0]).toMatchObject({ method: "GET", body: null });
+  expect(await storedPreferences(page)).toBeNull();
+  await expect(page.locator("#preference-storage-notice")).toHaveText(
+    "Saved preferences were discarded because their format is not supported."
+  );
 });
 
 test("normalizes a stored all-phase list to unrestricted", async ({ page }) => {
   await preloadState(page, {
     version: 1,
-    namedPhases: PHASES.map(phase => phase.value).reverse()
+    namedPhases: CANONICAL_PHASES.slice().reverse()
   });
   const calls = await captureApiCalls(page);
   await page.goto("/search?q=Prague");
@@ -108,36 +129,36 @@ test("normalizes a stored all-phase list to unrestricted", async ({ page }) => {
   expect(calls[0]).toMatchObject({ method: "GET", body: null });
   expect(await storedPreferences(page)).toBeNull();
   await openPreferences(page);
-  await expect(page.locator("[data-named-phase]:checked")).toHaveCount(PHASES.length);
+  await expect(page.locator("[data-moon-shape]:checked")).toHaveCount(SHAPES.length);
   await expect(page.locator("#preference-count")).toHaveText("None active");
 });
 
-test("draws canonical decorative thumbnails for all eight phases", async ({ page }) => {
+test("draws fixed left-lit decorative thumbnails for all five shapes", async ({ page }) => {
   await page.goto("/search");
   await openPreferences(page);
 
-  const inputs = page.locator("[data-named-phase]");
+  const inputs = page.locator("[data-moon-shape]");
   const thumbnails = page.locator("[data-phase-thumbnail]");
-  await expect(inputs).toHaveCount(PHASES.length);
-  await expect(thumbnails).toHaveCount(PHASES.length);
+  await expect(inputs).toHaveCount(SHAPES.length);
+  await expect(thumbnails).toHaveCount(SHAPES.length);
   expect(await thumbnails.evaluateAll(canvases =>
     canvases.every(canvas => canvas.getAttribute("aria-hidden") === "true")
   )).toBe(true);
   expect(await inputs.evaluateAll(elements => elements.map(input =>
     /** @type {HTMLInputElement} */ (input).value
   )))
-    .toEqual(PHASES.map(phase => phase.value));
+    .toEqual(SHAPES.map(shape => shape.value));
   expect(await canvasDataUrls(thumbnails))
     .toEqual(await expectedThumbnailDataUrls(page));
 });
 
-test("cycles selected phases and updates immediately without moving the limb target", async ({
+test("cycles selected shapes once each without moving the limb target", async ({
   page
 }) => {
   await page.clock.install();
   await page.goto("/search");
   await openPreferences(page);
-  await selectOnly(page, ["waxing_crescent", "full_moon", "waning_crescent"]);
+  await selectOnly(page, ["crescent", "full"]);
 
   const enabled = page.getByLabel("Limit illuminated-edge direction");
   const handle = page.getByRole("slider", { name: "Bright-limb target orientation" });
@@ -149,14 +170,12 @@ test("cycles selected phases and updates immediately without moving the limb tar
   await page.clock.runFor(CYCLE_MILLISECONDS);
   await expectMainPhase(page, preview, 180, 270);
   await page.clock.runFor(CYCLE_MILLISECONDS);
-  await expectMainPhase(page, preview, 315, 270);
-  await page.clock.runFor(CYCLE_MILLISECONDS);
   await expectMainPhase(page, preview, 45, 270);
 
-  await selectOnly(page, ["waning_gibbous", "first_quarter"]);
+  await selectOnly(page, ["half", "gibbous"]);
   await expectMainPhase(page, preview, 90, 270);
   await page.clock.runFor(CYCLE_MILLISECONDS);
-  await expectMainPhase(page, preview, 225, 270);
+  await expectMainPhase(page, preview, 135, 270);
   await expect(handle).toHaveAttribute("aria-valuenow", "270");
 });
 
@@ -166,7 +185,7 @@ test("runs one timer only and pauses whenever the animated preview is hidden", a
   await page.clock.install();
   await page.goto("/search");
   await openPreferences(page);
-  await selectOnly(page, ["first_quarter", "waxing_gibbous", "full_moon"]);
+  await selectOnly(page, ["half", "gibbous", "full"]);
 
   const enabled = page.getByLabel("Limit illuminated-edge direction");
   const preview = page.locator("#preference-limb-moon");
@@ -203,23 +222,23 @@ test("runs one timer only and pauses whenever the animated preview is hidden", a
   await expectMainPhase(page, preview, 180, 270);
 });
 
-test("shows the first selected phase without cycling in reduced motion", async ({ page }) => {
+test("shows the first selected shape without cycling in reduced motion", async ({ page }) => {
   await page.clock.install();
   await page.goto("/search");
   await openPreferences(page);
-  await selectOnly(page, ["waxing_gibbous", "waning_crescent"]);
+  await selectOnly(page, ["crescent", "gibbous"]);
 
   const handle = page.getByRole("slider", { name: "Bright-limb target orientation" });
   const preview = page.locator("#preference-limb-moon");
   await page.getByLabel("Limit illuminated-edge direction").check();
   await page.clock.runFor(CYCLE_MILLISECONDS);
-  await expectMainPhase(page, preview, 315, 270);
+  await expectMainPhase(page, preview, 135, 270);
 
   await page.emulateMedia({ reducedMotion: "reduce" });
   await expect.poll(() => canvasDataUrl(preview))
-    .toBe(await expectedMainPhaseDataUrl(page, 135, 270));
+    .toBe(await expectedMainPhaseDataUrl(page, 45, 270));
   await page.clock.runFor(CYCLE_MILLISECONDS * 3);
-  await expectMainPhase(page, preview, 135, 270);
+  await expectMainPhase(page, preview, 45, 270);
   await expect(handle).toHaveAttribute("aria-valuenow", "270");
 });
 
@@ -318,7 +337,7 @@ test("migrates the deployed 20-degree limb sector to the canonical width", async
   await expect(handle).toHaveAttribute("aria-valuenow", "45");
 });
 
-test("keeps the phase choices responsive and keyboard accessible", async ({
+test("keeps the shape choices responsive and keyboard accessible", async ({
   page
 }, testInfo) => {
   if (testInfo.project.name === "mobile") {
@@ -395,21 +414,21 @@ async function openPreferences(page) {
 
 async function selectOnly(page, selected) {
   for (const value of selected) {
-    const input = page.locator(`[data-named-phase][value="${value}"]`);
+    const input = page.locator(`[data-moon-shape][value="${value}"]`);
     if (!await input.isChecked()) {
       await input.check();
     }
   }
-  for (const phase of PHASES) {
-    const input = page.locator(`[data-named-phase][value="${phase.value}"]`);
-    if (!selected.includes(phase.value) && await input.isChecked()) {
+  for (const shape of SHAPES) {
+    const input = page.locator(`[data-moon-shape][value="${shape.value}"]`);
+    if (!selected.includes(shape.value) && await input.isChecked()) {
       await input.uncheck();
     }
   }
 }
 
-async function checkedPhaseValues(page) {
-  return page.locator("[data-named-phase]:checked")
+async function checkedShapeValues(page) {
+  return page.locator("[data-moon-shape]:checked")
     .evaluateAll(inputs => inputs.map(input =>
       /** @type {HTMLInputElement} */ (input).value
     ));
@@ -441,17 +460,17 @@ async function canvasDataUrls(canvases) {
 }
 
 async function expectedThumbnailDataUrls(page) {
-  return page.evaluate(async phases => {
+  return page.evaluate(async shapes => {
     const modulePath = "/moonPhaseView.js";
     const { drawMoonPhase } = await import(modulePath);
-    return phases.map(phase => {
+    return shapes.map(shape => {
       const canvas = document.createElement("canvas");
       canvas.width = 40;
       canvas.height = 40;
-      drawMoonPhase(canvas, phase.angle);
+      drawMoonPhase(canvas, shape.angle, 270, 0);
       return canvas.toDataURL("image/png");
     });
-  }, PHASES);
+  }, SHAPES);
 }
 
 async function expectedMainPhaseDataUrl(page, angle, target) {
