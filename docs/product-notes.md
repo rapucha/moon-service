@@ -159,11 +159,15 @@ now.
 
 The browser may keep version 1 opportunity preferences in `localStorage` under
 `moonService.opportunityPreferences.v1`. It may store an optional
-`altitudeDegrees` range; one `time` availability mode using local-clock windows
+`altitudeDegrees` range; one `time` availability mode using one local-clock window
 or ambient-light buckets; an enabled `azimuthDegrees` preference containing an
 included sector, a blocked sector, or both; any nonempty selection of
 `namedPhases`; and one
 `brightLimbOrientationDegrees` range.
+
+Local-clock state stores `time.window`. Stored state that uses the former
+plural `time.windows` shape is unsupported and follows the normal discard
+behavior; it is not migrated.
 
 Direction filtering is one preference. Joined green handles include the full
 compass. In that state, the browser stores and sends only a selected blocked

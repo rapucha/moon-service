@@ -139,8 +139,8 @@ The editor exposes these hard filters:
   input uses the inverse mapping and request values remain degrees. An attempt
   to close the last `10°` moves the marker briefly toward the other marker,
   then returns it to the valid boundary. The invalid overshoot is visual only.
-- `Time & light` uses exactly one mode at a time. Local-clock mode accepts one or
-  more windows in the searched location's timezone and explains that a window
+- `Time & light` uses exactly one mode at a time. Local-clock mode accepts
+  exactly one window in the searched location's timezone and explains that it
   may cross midnight. Ambient-light mode accepts one or more of `Daylight`,
   `Golden hour`, `Civil twilight`, `Nautical twilight`, and `Night`. Switching
   modes removes the other mode from active state. `Golden hour` is the initial
@@ -169,8 +169,9 @@ The editor exposes these hard filters:
   `brightLimbOrientationDegrees`; the range may cross `0°`. Neighboring
   possible ranges share one endpoint and cover the complete circle.
 
-Local-clock preference inputs use 24-hour `HH:mm` text fields. They do not use
-browser-localized native time controls.
+The local-clock preference uses one `From` and `Until` pair of 24-hour `HH:mm`
+text fields. It has no add-window or remove-window control and does not use a
+browser-localized native time control.
 
 Altitude and direction use one responsive schematic selector. Its vertical
 altitude axis and horizontal absolute-bearing axis contain the real slider
@@ -319,13 +320,15 @@ The browser keeps one versioned preference state for the editor, request,
 storage, reset behavior, and result explanations. It stores supported state
 under `moonService.opportunityPreferences.v1`. Version 1 storage retains only
 the supported `altitudeDegrees`, `time`, `azimuthDegrees`, `namedPhases`, and
-`brightLimbOrientationDegrees` fields. A bright-limb target is stored as an
-array containing exactly one normalized `{start, end}` range; the browser
-derives and snaps the dial midpoint when restoring it. An exact `20°`-wide
-range written by the earlier version 1 control migrates to the nearest current
-axis and the current `45°` width. The browser discards other malformed or
-unsupported stored state rather than sending it. If `localStorage` is blocked
-or unavailable, it keeps the state in page memory and lets search continue.
+`brightLimbOrientationDegrees` fields. Local-clock state stores one
+`time.window` object. The former plural `time.windows` shape is unsupported and
+is discarded rather than migrated. A bright-limb target is stored as an array
+containing exactly one normalized `{start, end}` range; the browser derives and
+snaps the dial midpoint when restoring it. An exact `20°`-wide range written by
+the earlier version 1 control migrates to the nearest current axis and the
+current `45°` width. The browser discards other malformed or unsupported stored
+state rather than sending it. If `localStorage` is blocked or unavailable, it
+keeps the state in page memory and lets search continue.
 Applying the form retains valid values from a disabled altitude, direction,
 availability, or bright-limb editor on the current page so re-enabling that
 control restores the user's draft. Disabled values remain absent from the

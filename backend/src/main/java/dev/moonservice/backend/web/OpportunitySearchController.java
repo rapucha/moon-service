@@ -199,22 +199,18 @@ class OpportunitySearchController {
             case "light_bucket" -> TimeMode.LIGHT_BUCKET;
             default -> throw invalid("preferences.time.mode is invalid.");
         };
-        return new TimePreference(mode, clockWindows(node), lightBuckets(node));
+        return new TimePreference(mode, clockWindow(node), lightBuckets(node));
     }
 
-    private static List<LocalClockWindow> clockWindows(JsonNode time) {
-        JsonNode values = optionalArray(time, "windows");
-        if (values == null) {
+    private static LocalClockWindow clockWindow(JsonNode time) {
+        JsonNode value = time.get("window");
+        if (value == null) {
             return null;
         }
-        List<LocalClockWindow> result = new ArrayList<>();
-        for (JsonNode value : values) {
-            JsonNode window = requireObject(value, "preferences.time.windows item");
-            result.add(new LocalClockWindow(
-                    clockTime(requiredText(window, "start")),
-                    clockTime(requiredText(window, "end"))));
-        }
-        return result;
+        JsonNode window = requireObject(value, "preferences.time.window");
+        return new LocalClockWindow(
+                clockTime(requiredText(window, "start")),
+                clockTime(requiredText(window, "end")));
     }
 
     private static LocalTime clockTime(String value) {
@@ -421,9 +417,8 @@ class OpportunitySearchController {
         CLOCK_WINDOW(Map.of("start", SCALAR, "end", SCALAR), null),
         SCALAR_ARRAY(null, SCALAR),
         RANGE_ARRAY(null, RANGE),
-        CLOCK_WINDOW_ARRAY(null, CLOCK_WINDOW),
         AZIMUTH(Map.of("included", RANGE, "excluded", RANGE), null),
-        TIME(Map.of("mode", SCALAR, "windows", CLOCK_WINDOW_ARRAY, "buckets", SCALAR_ARRAY), null),
+        TIME(Map.of("mode", SCALAR, "window", CLOCK_WINDOW, "buckets", SCALAR_ARRAY), null),
         PREFERENCES(Map.of(
                 "version", SCALAR,
                 "altitudeDegrees", ALTITUDE,
