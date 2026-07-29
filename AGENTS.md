@@ -354,10 +354,12 @@ or new dependency.
   ordinary files, resulting code size, generated output, vendored output, or
   lock files.
 - General approval of an issue or pull request is not an exception.
-- Apply the **In-Place Guardrail Repair** exception in
-  [`.agents/review-policy.md`](.agents/review-policy.md) only to the recorded
-  concern and ordinary-file crossings caused by the named guardrail paths. Do
-  not infer it from a reviewer finding or use it to waive another gate.
+- Apply the **In-Place Guardrail Repair** rule in
+  [`.agents/review-policy.md`](.agents/review-policy.md) only to a recorded
+  repair that meets its failure or misbehavior conditions. Exclude that repair
+  from the concern count, and apply its exception only to ordinary-file
+  crossings caused by the named guardrail paths. Do not infer it from a
+  reviewer finding or use it to waive another gate.
 - For any other single-pull-request exception, record the exact gate, measured
   values, and the reason a split is unsafe or inseparable on the issue. Obtain
   explicit owner approval.
