@@ -162,8 +162,8 @@ The browser may keep version 1 opportunity preferences in `localStorage` under
 `altitudeDegrees` range; one `time` availability mode using one local-clock window
 or ambient-light buckets; an enabled `azimuthDegrees` preference containing an
 included sector, a blocked sector, or both; a `namedPhases` value that is an
-exact union of the browser's New, Crescent, Half, Gibbous, and Full Moon-shape
-groups; and one
+exact union of the browser's New / very thin, Crescent, Half, Gibbous, and Full
+Moon-shape groups; and one
 `brightLimbOrientationDegrees` range.
 
 Local-clock state stores `time.window`. Stored state that uses the former
@@ -182,9 +182,16 @@ sector inside it. The named phases are alternatives: a sample may match any
 selected phase.
 
 The browser's bright-limb control has one target snapped to axes `45°` apart
-and a fixed total interval width of `45°`. It stores and sends that target as
-an array containing exactly one inclusive normalized `{start, end}` range under
-`brightLimbOrientationDegrees`, including when the range crosses `0°`.
+and a fixed total interval width of `45°`. When checked, it stores that target
+as an array containing exactly one inclusive normalized `{start, end}` range
+under `brightLimbOrientationDegrees`, including when the range crosses `0°`.
+While active, it sends the same range. When Full is the only selected
+Moon-shape group, the browser keeps the checked target in version 1 storage
+through Apply and reload, disables the control, hides its dial, and excludes
+the target from the active count and from ordinary and planning requests.
+Selecting a non-Full group reactivates the same snapped target. With Full and
+any non-Full group selected, the target remains active for the non-Full phases
+and Full samples cannot match it.
 Neighboring target sectors share their boundary and together cover the full
 circle. The browser derives and snaps the dial target when it restores stored
 state. Version 1 ranges written with the earlier `20°` width migrate to the

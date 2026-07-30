@@ -4,11 +4,11 @@ import { readFileSync } from "node:fs";
 const STORAGE_KEY = "moonService.opportunityPreferences.v1";
 const CYCLE_MILLISECONDS = 1400;
 const SHAPES = [
-  { label: "New", value: "new", angle: 0 },
-  { label: "Crescent", value: "crescent", angle: 45 },
-  { label: "Half", value: "half", angle: 90 },
-  { label: "Gibbous", value: "gibbous", angle: 135 },
-  { label: "Full", value: "full", angle: 180 }
+  { label: "New / very thin", value: "new", angle: 11.25, limbs: [90, 270] },
+  { label: "Crescent", value: "crescent", angle: 45, limbs: [90, 270] },
+  { label: "Half", value: "half", angle: 90, limbs: [90, 270] },
+  { label: "Gibbous", value: "gibbous", angle: 135, limbs: [90, 270] },
+  { label: "Full", value: "full", angle: 180, limbs: [90] }
 ];
 const CANONICAL_PHASES = [
   "new_moon", "waxing_crescent", "first_quarter", "waxing_gibbous",
@@ -29,6 +29,7 @@ test("treats all shapes as unrestricted and expands proper subsets canonically",
   await openPreferences(page);
 
   await expect(page.locator("[data-moon-shape]:checked")).toHaveCount(SHAPES.length);
+  await expect(page.locator("#preference-limb-applicability")).toBeHidden();
   await expect(page.locator("#preference-count")).toHaveText("None active");
   await page.getByRole("button", { name: "Use these limits" }).click();
   await waitForCallCount(calls, 2);
@@ -68,7 +69,7 @@ test("keeps the final shape selected with persistent accessible guidance", async
   const full = page.getByLabel("Full", { exact: true });
   const help = page.locator("#preference-phase-help");
   await expect(help).toHaveText(
-    "Waxing and waning phases share a shape; results keep the exact phase name. Select all five for no shape limit; at least one must remain."
+    "Waxing and waning phases share a shape; paired disks show either illuminated side symbolically. Results keep the exact phase name. Select all five for no shape limit; at least one must remain."
   );
   expect(await page.locator("[data-moon-shape]").evaluateAll(inputs =>
     inputs.every(input => input.getAttribute("aria-describedby") === "preference-phase-help")
@@ -79,6 +80,16 @@ test("keeps the final shape selected with persistent accessible guidance", async
   await expect(full).toBeFocused();
   await expect(page.locator("[data-moon-shape]:checked")).toHaveCount(1);
   await expect(page.locator("#preference-form-status")).toBeEmpty();
+  const enabled = page.getByLabel("Limit illuminated-edge direction");
+  const applicability = page.locator("#preference-limb-applicability");
+  await expect(enabled).not.toBeChecked();
+  await expect(enabled).toBeDisabled();
+  await expect(applicability).toHaveText(
+    "Full Moon has no useful bright-limb direction. Select a non-Full shape to set a target."
+  );
+  await page.getByLabel("Crescent", { exact: true }).check();
+  await expect(enabled).toBeEnabled();
+  await expect(applicability).toBeHidden();
 });
 
 test("restores supported stored shape unions in canonical order", async ({ page }) => {
@@ -133,23 +144,98 @@ test("normalizes a stored all-phase list to unrestricted", async ({ page }) => {
   await expect(page.locator("#preference-count")).toHaveText("None active");
 });
 
-test("draws fixed left-lit decorative thumbnails for all five shapes", async ({ page }) => {
+test("draws exact paired symbolic thumbnails for the grouped shapes", async ({ page }) => {
   await page.goto("/search");
   await openPreferences(page);
 
   const inputs = page.locator("[data-moon-shape]");
   const thumbnails = page.locator("[data-phase-thumbnail]");
+  const sides = page.locator("[data-phase-thumbnail-side]");
   await expect(inputs).toHaveCount(SHAPES.length);
   await expect(thumbnails).toHaveCount(SHAPES.length);
-  expect(await thumbnails.evaluateAll(canvases =>
-    canvases.every(canvas => canvas.getAttribute("aria-hidden") === "true")
+  await expect(sides).toHaveCount(9);
+  expect(await thumbnails.evaluateAll(groups =>
+    groups.every(group => group.getAttribute("aria-hidden") === "true")
   )).toBe(true);
   expect(await inputs.evaluateAll(elements => elements.map(input =>
     /** @type {HTMLInputElement} */ (input).value
   )))
     .toEqual(SHAPES.map(shape => shape.value));
-  expect(await canvasDataUrls(thumbnails))
+  expect(await canvasDataUrls(sides))
     .toEqual(await expectedThumbnailDataUrls(page));
+});
+
+test("keeps a Full-only limb target dormant and restores it for mixed shapes", async ({
+  page
+}) => {
+  const savedTarget = [{ start: 247.5, end: 292.5 }];
+  await preloadState(page, {
+    version: 1,
+    namedPhases: ["full_moon"],
+    brightLimbOrientationDegrees: savedTarget
+  });
+  const calls = await captureApiCalls(page);
+  await page.goto("/search?q=Prague");
+  await waitForCallCount(calls, 1);
+
+  expect(calls[0].body.preferences).toEqual({
+    version: 1,
+    namedPhases: ["full_moon"]
+  });
+  await expect(page.locator("#preference-count")).toHaveText("1 active");
+  await openPreferences(page);
+  const enabled = page.getByLabel("Limit illuminated-edge direction");
+  const editor = page.locator("#preference-limb-fields");
+  const applicability = page.locator("#preference-limb-applicability");
+  const handle = page.locator("#preference-limb-handle");
+  await expect(enabled).toBeChecked();
+  await expect(enabled).toBeDisabled();
+  await expect(page.locator("#preference-limb-help")).toBeHidden();
+  await expect(editor).toBeHidden();
+  await expect(applicability).toContainText("Full Moon has no useful bright-limb direction");
+  await expect(handle).toHaveAttribute("aria-valuenow", "270");
+  expect((await storedPreferences(page)).brightLimbOrientationDegrees).toEqual(savedTarget);
+
+  await page.locator('[data-moon-shape][value="crescent"]').check();
+  await expect(enabled).toBeEnabled();
+  await expect(editor).toBeVisible();
+  await expect(applicability).toContainText(
+    "This limit applies only to non-Full shapes; Full Moon cannot match it."
+  );
+  await expect(handle).toHaveAttribute("aria-valuenow", "270");
+  await page.getByRole("button", { name: "Use these limits" }).click();
+  await waitForCallCount(calls, 2);
+  expect(calls[1].body.preferences).toEqual({
+    version: 1,
+    namedPhases: ["waxing_crescent", "full_moon", "waning_crescent"],
+    brightLimbOrientationDegrees: savedTarget
+  });
+  await expect(page.locator("#preference-count")).toHaveText("2 active");
+
+  await openPreferences(page);
+  await page.locator('[data-moon-shape][value="crescent"]').uncheck();
+  await expect(enabled).toBeDisabled();
+  await expect(editor).toBeHidden();
+  await page.getByRole("button", { name: "Use these limits" }).click();
+  await waitForCallCount(calls, 3);
+  expect(calls[2].body.preferences).toEqual({
+    version: 1,
+    namedPhases: ["full_moon"]
+  });
+  expect(await storedPreferences(page)).toEqual({
+    version: 1,
+    namedPhases: ["full_moon"],
+    brightLimbOrientationDegrees: savedTarget
+  });
+
+  await page.reload();
+  await waitForCallCount(calls, 4);
+  expect(calls[3].body.preferences.brightLimbOrientationDegrees).toBeUndefined();
+  await expect(page.locator("#preference-count")).toHaveText("1 active");
+  await openPreferences(page);
+  await expect(enabled).toBeChecked();
+  await expect(enabled).toBeDisabled();
+  await expect(handle).toHaveAttribute("aria-valuenow", "270");
 });
 
 test("cycles selected shapes once each without moving the limb target", async ({
@@ -349,12 +435,15 @@ test("keeps the shape choices responsive and keyboard accessible", async ({
   const grid = page.locator(".preference-phase-grid");
   const labels = grid.locator("label");
   const expectedColumns = testInfo.project.name === "mobile" ? 1 : 2;
-  const expectedThumbnailSize = testInfo.project.name === "mobile" ? 28 : 32;
+  const expectedGroupWidth = testInfo.project.name === "mobile" ? 46 : 50;
+  const expectedSideSize = testInfo.project.name === "mobile" ? 22 : 24;
   expect(await grid.evaluate(element =>
     getComputedStyle(element).gridTemplateColumns.split(" ").length
   )).toBe(expectedColumns);
   await expect(page.locator("[data-phase-thumbnail]").first())
-    .toHaveCSS("width", expectedThumbnailSize + "px");
+    .toHaveCSS("width", expectedGroupWidth + "px");
+  await expect(page.locator("[data-phase-thumbnail-side]").first())
+    .toHaveCSS("width", expectedSideSize + "px");
   const containment = await labels.evaluateAll(elements => {
     const gridBox = elements[0].parentElement.getBoundingClientRect();
     return elements.every(element => {
@@ -366,7 +455,7 @@ test("keeps the shape choices responsive and keyboard accessible", async ({
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth))
     .toBe(true);
 
-  const newMoon = page.getByLabel("New", { exact: true });
+  const newMoon = page.getByLabel("New / very thin", { exact: true });
   await newMoon.focus();
   await page.keyboard.press("Space");
   await expect(newMoon).not.toBeChecked();
@@ -463,13 +552,13 @@ async function expectedThumbnailDataUrls(page) {
   return page.evaluate(async shapes => {
     const modulePath = "/moonPhaseView.js";
     const { drawMoonPhase } = await import(modulePath);
-    return shapes.map(shape => {
-      const canvas = document.createElement("canvas");
-      canvas.width = 40;
-      canvas.height = 40;
-      drawMoonPhase(canvas, shape.angle, 270, 0);
-      return canvas.toDataURL("image/png");
-    });
+    return shapes.flatMap(shape => shape.limbs.map(limb => {
+        const canvas = document.createElement("canvas");
+        canvas.width = 40;
+        canvas.height = 40;
+        drawMoonPhase(canvas, shape.angle, limb, 0);
+        return canvas.toDataURL("image/png");
+      }));
   }, SHAPES);
 }
 

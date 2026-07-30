@@ -8,13 +8,27 @@
 
 .preference-phase-grid [data-phase-thumbnail] {
   flex: 0 0 auto;
-  width: 32px;
-  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  width: 50px;
+  height: 24px;
+}
+
+.preference-phase-grid [data-phase-thumbnail-side] {
+  width: 24px;
+  height: 24px;
 }
 
 @media (max-width: 380px) {
   .preference-phase-grid [data-phase-thumbnail] {
-    width: 28px;
-    height: 28px;
+    width: 46px;
+    height: 22px;
+  }
+
+  .preference-phase-grid [data-phase-thumbnail-side] {
+    width: 22px;
+    height: 22px;
   }
 }

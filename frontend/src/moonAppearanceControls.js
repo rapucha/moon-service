@@ -20,6 +20,8 @@ var SHAPE_PHASES = {
   full: ["full_moon"]
 };
 var SHAPE_ANGLES = [0, 45, 90, 135, 180];
+var THUMBNAIL_PHASE_ANGLES = [11.25, 45, 90, 135, 180];
+var THUMBNAIL_LIMB_ANGLES = [90, 270];
 var PHASE_CYCLE_MILLISECONDS = 1400;
 var FULL_CIRCLE_DEGREES = 360;
 // Keep the step a divisor of 360 so every exposed axis belongs to a complete set.
@@ -46,6 +48,8 @@ export function createMoonAppearanceControls(form) {
   var toleranceRing = form.querySelector(".preference-tolerance-ring");
   var limbOutput = form.querySelector("#preference-limb-output");
   var limbMoon = form.querySelector("#preference-limb-moon");
+  var limbHelp = form.querySelector("#preference-limb-help");
+  var limbApplicability = form.querySelector("#preference-limb-applicability");
   var reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
   var target = DEFAULT_LIMB_ORIENTATION_DEGREES;
   var shapeIndex = 0;
@@ -53,10 +57,11 @@ export function createMoonAppearanceControls(form) {
   var shapeTimer = null;
 
   shapeInputs.forEach(function (input) {
-    var thumbnail = /** @type {HTMLCanvasElement} */ (
-      input.closest("label").querySelector("[data-phase-thumbnail]")
-    );
-    drawMoonPhase(thumbnail, shapeAngle(input.value), DEFAULT_LIMB_ORIENTATION_DEGREES, 0);
+    input.closest("label").querySelectorAll("[data-phase-thumbnail-side]")
+      .forEach(function (thumbnail, index) {
+        drawMoonPhase(thumbnail, thumbnailAngle(input.value),
+          THUMBNAIL_LIMB_ANGLES[index], 0);
+      });
     input.addEventListener("change", shapeSelectionChanged);
   });
   limbEnabled.addEventListener("change", function () {
@@ -129,8 +134,24 @@ export function createMoonAppearanceControls(form) {
   };
 
   function syncEditor() {
-    limbEditor.hidden = !limbEnabled.checked;
-    limbEnabled.setAttribute("aria-expanded", String(limbEnabled.checked));
+    var selected = selectedShapes();
+    var fullOnly = selected.length === 1 && selected[0] === "full";
+    var mixed = selected.includes("full") && selected.length > 1;
+    var expanded = limbEnabled.checked && !fullOnly;
+    var applicability = "";
+    limbEnabled.disabled = fullOnly;
+    limbEditor.hidden = !expanded;
+    limbHelp.hidden = fullOnly;
+    limbEnabled.setAttribute("aria-expanded", String(expanded));
+    if (fullOnly) {
+      applicability = limbEnabled.checked
+        ? "Full Moon has no useful bright-limb direction. Your saved target will return when you select a non-Full shape."
+        : "Full Moon has no useful bright-limb direction. Select a non-Full shape to set a target.";
+    } else if (mixed && limbEnabled.checked) {
+      applicability = "This limit applies only to non-Full shapes; Full Moon cannot match it.";
+    }
+    limbApplicability.textContent = applicability;
+    limbApplicability.hidden = !applicability;
   }
 
   function shapeSelectionChanged(event) {
@@ -139,6 +160,7 @@ export function createMoonAppearanceControls(form) {
       input.checked = true;
     }
     shapeIndex = 0;
+    syncEditor();
     syncDial();
     syncAnimation();
   }
@@ -318,6 +340,10 @@ function phasesForShapes(shapes) {
 
 function shapeAngle(shape) {
   return SHAPE_ANGLES[SHAPES.indexOf(shape)];
+}
+
+function thumbnailAngle(shape) {
+  return THUMBNAIL_PHASE_ANGLES[SHAPES.indexOf(shape)];
 }
 
 function directionName(value) {

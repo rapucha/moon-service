@@ -122,7 +122,13 @@ request cannot combine the two time modes.
 Bright-limb ranges use the observer-oriented clockwise convention:
 `0°` points toward local zenith and `90°` points right toward increasing
 azimuth. A sample with no `brightLimbTiltDegrees` does not match an active
-bright-limb filter. `northPoleTiltDegrees` is not a preference field.
+bright-limb filter. A sample in the existing `full_moon` bucket
+`[157.5°, 202.5°)` also does not match an active bright-limb filter, even if
+the sample contains a numeric tilt. This rule applies whether `full_moon` is
+the only selected named phase, one of several selected phases, or named phases
+are unrestricted. Without an active bright-limb filter, Full samples keep the
+existing named-phase behavior. `northPoleTiltDegrees` is not a preference
+field.
 
 ### Evaluation order
 

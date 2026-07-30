@@ -253,32 +253,32 @@
               <fieldset class="preference-group preference-phase-group">
                 <legend>Moon shape</legend>
                 <p id="preference-phase-help" class="preference-help preference-help-unindented">
-                  Waxing and waning phases share a shape; results keep the exact phase name. Select all five for no shape limit; at least one must remain.
+                  Waxing and waning phases share a shape; paired disks show either illuminated side symbolically. Results keep the exact phase name. Select all five for no shape limit; at least one must remain.
                 </p>
                 <div class="preference-phase-grid">
                   <label>
                     <input type="checkbox" data-moon-shape value="new" aria-describedby="preference-phase-help">
-                    <canvas data-phase-thumbnail width="40" height="40" aria-hidden="true"></canvas>
-                    <span>New</span>
+                    <span data-phase-thumbnail aria-hidden="true"><canvas data-phase-thumbnail-side width="40" height="40"></canvas><canvas data-phase-thumbnail-side width="40" height="40"></canvas></span>
+                    <span>New / very thin</span>
                   </label>
                   <label>
                     <input type="checkbox" data-moon-shape value="crescent" aria-describedby="preference-phase-help">
-                    <canvas data-phase-thumbnail width="40" height="40" aria-hidden="true"></canvas>
+                    <span data-phase-thumbnail aria-hidden="true"><canvas data-phase-thumbnail-side width="40" height="40"></canvas><canvas data-phase-thumbnail-side width="40" height="40"></canvas></span>
                     <span>Crescent</span>
                   </label>
                   <label>
                     <input type="checkbox" data-moon-shape value="half" aria-describedby="preference-phase-help">
-                    <canvas data-phase-thumbnail width="40" height="40" aria-hidden="true"></canvas>
+                    <span data-phase-thumbnail aria-hidden="true"><canvas data-phase-thumbnail-side width="40" height="40"></canvas><canvas data-phase-thumbnail-side width="40" height="40"></canvas></span>
                     <span>Half</span>
                   </label>
                   <label>
                     <input type="checkbox" data-moon-shape value="gibbous" aria-describedby="preference-phase-help">
-                    <canvas data-phase-thumbnail width="40" height="40" aria-hidden="true"></canvas>
+                    <span data-phase-thumbnail aria-hidden="true"><canvas data-phase-thumbnail-side width="40" height="40"></canvas><canvas data-phase-thumbnail-side width="40" height="40"></canvas></span>
                     <span>Gibbous</span>
                   </label>
                   <label>
                     <input type="checkbox" data-moon-shape value="full" aria-describedby="preference-phase-help">
-                    <canvas data-phase-thumbnail width="40" height="40" aria-hidden="true"></canvas>
+                    <span data-phase-thumbnail aria-hidden="true"><canvas data-phase-thumbnail-side width="40" height="40"></canvas></span>
                     <span>Full</span>
                   </label>
                 </div>
@@ -291,12 +291,14 @@
                     id="preference-limb-enabled"
                     type="checkbox"
                     aria-controls="preference-limb-fields"
+                    aria-describedby="preference-limb-help preference-limb-applicability"
                     aria-expanded="false">
                   <span>Limit illuminated-edge direction</span>
                 </label>
-                <p class="preference-help">
+                <p id="preference-limb-help" class="preference-help">
                   Drag one target around the Moon.
                 </p>
+                <p id="preference-limb-applicability" class="preference-help" hidden></p>
                 <div id="preference-limb-fields" class="preference-limb-editor" hidden>
                   <div
                     id="preference-limb-dial"

@@ -46,10 +46,11 @@ export function createOpportunityPreferences(options) {
   };
 
   function requestFor(request, signal) {
-    if (activeFilterCount(state) === 0) {
+    var active = activePreferences(state);
+    if (activeFilterCount(active) === 0) {
       return null;
     }
-    var body = { preferences: state };
+    var body = { preferences: active };
     var locationKey = request.locationId ? "locationId" : "q";
     body[locationKey] = request[locationKey];
     return {
@@ -65,7 +66,7 @@ export function createOpportunityPreferences(options) {
   }
 
   function planningRequestFor(locationId, signal) {
-    var snapshot = JSON.parse(JSON.stringify(state));
+    var snapshot = JSON.parse(JSON.stringify(activePreferences(state)));
     return {
       path: "/api/opportunities/planning",
       options: /** @type {RequestInit} */ ({
@@ -186,7 +187,7 @@ export function createOpportunityPreferences(options) {
       response && response.ignoredPreferenceFieldCount > 0
       ? ignoredText(response)
       : "");
-    var total = activeFilterCount(state);
+    var total = activeFilterCount(activePreferences(state));
     details.querySelector("#preference-count").textContent =
       total === 0 ? "None active" : total + " active";
   }
@@ -326,6 +327,14 @@ function activeFilterCount(value) {
     + Number(Boolean(value.time))
     + Number(Boolean(value.namedPhases))
     + Number(Boolean(value.brightLimbOrientationDegrees));
+}
+
+function activePreferences(value) {
+  var active = { ...value };
+  if (active.namedPhases?.length === 1 && active.namedPhases[0] === "full_moon") {
+    delete active.brightLimbOrientationDegrees;
+  }
+  return active;
 }
 
 function validClockWindow(window) {
