@@ -35,7 +35,7 @@ public final class HostedAlphaSurfaceFilter extends OncePerRequestFilter {
 
     private static final Set<String> APPROVED_PATHS = Set.of(
             "/", "/about", "/about.html", "/index.html", "/search",
-            "/admin/status", OPPORTUNITY_PATH, "/readyz",
+            "/admin/status", OPPORTUNITY_PATH, PLANNING_PATH, "/readyz",
             FEEDBACK_CAPABILITY_PATH, FEEDBACK_SUBMISSIONS_PATH,
             "/angularPreferenceControls.js", "/angularPreferencePreview.css",
             "/angularPreferencePreview.js", "/angularPreferenceRules.js",
@@ -46,7 +46,7 @@ public final class HostedAlphaSurfaceFilter extends OncePerRequestFilter {
             "/moonPathLightBands.js", "/moonPathSilhouetteSymbols.js", "/moonPathSilhouettes.js",
             "/moonPathView.js", "/moonPhaseView.js", "/moonTexture.js", "/opportunityCard.js",
             "/opportunityPreferences.css", "/opportunityPreferences.js",
-            "/recentSearches.js", "/responseView.js", "/scoreView.js"
+            "/planningView.js", "/recentSearches.js", "/responseView.js", "/scoreView.js"
     );
     private static final Set<String> FORWARDED_IDENTITY_HEADERS = Set.of(
             "cf-connecting-ip", "forwarded", "true-client-ip", "x-client-ip", "x-forwarded-for", "x-real-ip",
@@ -110,7 +110,7 @@ public final class HostedAlphaSurfaceFilter extends OncePerRequestFilter {
     }
 
     private static List<String> allowedMethods(String path) {
-        if (FEEDBACK_SUBMISSIONS_PATH.equals(path)) {
+        if (FEEDBACK_SUBMISSIONS_PATH.equals(path) || PLANNING_PATH.equals(path)) {
             return List.of("POST");
         }
         return OPPORTUNITY_PATH.equals(path)
@@ -120,7 +120,9 @@ public final class HostedAlphaSurfaceFilter extends OncePerRequestFilter {
 
     private static boolean allowsFramedBody(String method, String path) {
         return "POST".equals(method)
-                && (FEEDBACK_SUBMISSIONS_PATH.equals(path) || OPPORTUNITY_PATH.equals(path));
+                && (FEEDBACK_SUBMISSIONS_PATH.equals(path)
+                || OPPORTUNITY_PATH.equals(path)
+                || PLANNING_PATH.equals(path));
     }
 
     private static boolean isProductPost(String method, String path) {

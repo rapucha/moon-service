@@ -124,7 +124,7 @@ test("keeps ambiguous selection and unavailable-result flows", async ({ page }) 
   await expect(page.getByRole("link", { name: "Open share link" })).toBeVisible();
 
   await page.getByLabel("City or town").fill("Unavailable");
-  await page.getByRole("button", { name: "Find" }).click();
+  await page.getByRole("button", { name: "Find", exact: true }).click();
   await expect(page.getByRole("heading", { name: "Lookup temporarily unavailable" })).toBeVisible();
   await expect(page.locator("#result-provider-credit")).toBeHidden();
   await expect(page.locator("#result-obstruction-note")).toBeHidden();

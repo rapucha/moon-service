@@ -21,7 +21,7 @@ Open-Meteo URLs are provider dependencies, not Moon Service routes.
 | `GET /about` | Product/privacy information page | Web browser | Allowlisted; whole-site bound |
 | `GET /api/opportunities` | Location-to-opportunity product API | Browser `app.js` | Allowlisted; site and search bounds |
 | `POST /api/opportunities` | Request-scoped preference product API | Browser `app.js` through `opportunityPreferences.js` | Allowlisted POST; site and provider bounds |
-| `POST /api/opportunities/planning` | Weather-free next-date planning API | None yet; browser work is #233 | Hidden after site admission |
+| `POST /api/opportunities/planning` | Weather-free next-date planning API | Browser `app.js` through `opportunityPreferences.js` | Allowlisted POST; site and provider bounds |
 | `POST /api/opportunities/search` | Direct fixture/scoring prototype contract | None | Hidden after site admission |
 | `GET /api/calibration-feedback/v1/capability` | Public feedback feature/availability state | None yet | Allowlisted; exempt from hosted resource admission |
 | `POST /api/calibration-feedback/v1/submissions` | Bounded current-observation feedback write | None yet | Allowlisted POST; provider-bound resolution and feedback write bucket |
@@ -46,9 +46,9 @@ Open-Meteo URLs are provider dependencies, not Moon Service routes.
   and maximum allowed hosted capacity is 40, with a default and fastest allowed
   refill of one token per second; stricter settings are valid. An empty bucket
   returns `429` with a numeric `Retry-After` before the route's usual `200`,
-  `400`, `401`, `404`, `405`, or `503` behavior can be selected. `GET` and the
-  product POST return canonical `rate_limited` JSON; `HEAD` carries the same
-  status, headers, and would-be content length without a body.
+  `400`, `401`, `404`, `405`, or `503` behavior can be selected. `GET`, the product POST,
+  and the planning POST return canonical `rate_limited` JSON; both POST responses include
+  `Cache-Control: no-store`. `HEAD` carries the same status, headers, and would-be content length without a body.
 - Exact `GET`/`HEAD /api/opportunities` and `POST /api/opportunities` requests
   that pass the whole-site bound ask the shared non-web
   `HostedAlphaProviderAdmission` component to acquire a concurrent
@@ -57,7 +57,8 @@ Open-Meteo URLs are provider dependencies, not Moon Service routes.
   ten provider tokens, and a one-token-per-minute refill; stricter settings are
   valid. A refusal returns to `HostedAlphaResourceLimitFilter`, which maps it to
   `429`; an accepted permit is released when downstream handling finishes. The
-  same two resources wrap feedback location resolution as described below;
+  exact planning POST uses the same resources after whole-site admission. Those
+  resources also wrap feedback location resolution as described below;
   they do not apply to pages, static files, admin status, readiness, or the
   fixture POST route.
 - Whole-site bypasses are the bodyless `GET /readyz` whose connector reports a
@@ -72,13 +73,15 @@ Open-Meteo URLs are provider dependencies, not Moon Service routes.
   per complete hour. Resolver failure or provider-admission refusal consumes no
   feedback write token.
 - Hosted-alpha mode exposes only exact allowlisted paths. It allows bodyless
-  `GET` or `HEAD` on every approved path except feedback submissions. It also
-  allows `POST` with a body on the exact product-opportunity and feedback
-  submission paths, and passes each body to that route's 16,384-byte bound. It
-  adds the hosted security headers, returns empty `404` for hidden or unknown
-  paths, empty `405` with a path-specific `Allow` value for disallowed methods,
-  and empty `400` for a framed `GET` or `HEAD` body. These POST operations send
-  no permissive CORS headers, and `OPTIONS` does not provide preflight support.
+  `GET` or `HEAD` on every approved path except feedback submissions and the
+  planning route. It also allows `POST` with a body on the exact
+  product-opportunity, planning, and feedback submission paths, and passes each
+  body to that route's 16,384-byte bound. It adds the hosted security headers,
+  returns empty `404` for hidden or unknown path variants, empty `405` with a
+  path-specific `Allow` value for disallowed methods, and empty `400` for a
+  framed `GET` or `HEAD` body. The exact `/planningView.js` module allows only
+  bodyless `GET` and `HEAD`. These POST operations and the module send no
+  permissive CORS headers, and `OPTIONS` does not provide preflight support.
   Tomcat rejects `TRACE` before the application filter, so those application
   headers and empty-body guarantees do not apply to `TRACE`.
 - The web lookup is anonymous and creates no durable user profile or preference.
@@ -252,12 +255,13 @@ and [hosted-alpha functional tests](../backend/src/test/java/dev/moonservice/bac
 - **Purpose/lifecycle:** weather-free search for the earliest Moon window that
   matches all active version 1 hard preferences within one compiled planning
   horizon, initially 365 days.
-- **Why it exists:** later browser recovery can find one possible date beyond
+- **Why it exists:** explicit browser recovery can find one possible date beyond
   the ordinary seven-day weather horizon without representing long-range
   weather, score, confidence, or ranking facts.
-- **Production invocation:** none yet. Issue
-  [#233](https://github.com/rapucha/moon-service/issues/233) owns the future
-  browser caller and hosted-alpha exposure.
+- **Production invocation:** after an exact successful empty ordinary result
+  for a real location, explicit `app.js` activation calls through
+  `opportunityPreferences.js` with the canonical ID and complete current
+  page-memory version 1 preference snapshot; `planningView.js` renders it.
 - **Other callers:** application tests and explicit manual API clients.
 - **Request:** same-origin `application/json` with required canonical
   `locationId`, required `preferences`, and `preferences.version: 1`. It rejects
@@ -282,10 +286,16 @@ and [hosted-alpha functional tests](../backend/src/test/java/dev/moonservice/bac
   location-resolution cache may retain the normalized ID and may use geocoding
   on a miss; it never sends preferences to that provider.
 - **Exposure:** available on the ordinary listener. Hosted alpha applies
-  whole-site admission first and then hides this exact path as `404`; it cannot
-  reach the controller or a provider. Issue #233 owns any future exposure,
-  provider admission, bounded-body allowance, hosted `429`, and browser module.
+  whole-site admission and then shared provider admission before admitting the
+  exact framed `POST`. A refusal returns canonical no-store `429 rate_limited`
+  JSON with matching `Retry-After` and `retryAfterSeconds`, without a provider
+  call. The exact `/planningView.js` module allows bodyless `GET` and `HEAD`;
+  the shared security, method, body, path-variant, CORS, and preflight rules
+  above remain closed.
 - **References:** [controller](../backend/src/main/java/dev/moonservice/backend/web/MoonPlanningController.java),
+  [browser flow](../frontend/src/app.js),
+  [browser planning transport](../frontend/src/opportunityPreferences.js),
+  [planning renderer](../frontend/src/planningView.js),
   [response model](../backend/src/main/java/dev/moonservice/backend/opportunity/planning/MoonPlanningResponse.java),
   [API contract](api-shape.md#moon-planning-post).
 

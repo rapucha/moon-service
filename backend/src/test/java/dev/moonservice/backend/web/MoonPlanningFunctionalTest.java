@@ -22,7 +22,6 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
-import org.mockito.Mockito;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.context.TestConfiguration;
@@ -516,56 +515,5 @@ class MoonPlanningFunctionalTest {
                 202,
                 "Europe/Prague",
                 "CZ");
-    }
-}
-
-@SpringBootTest(
-        webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
-        properties = {
-                "moon.location.resolver=open-meteo",
-                "moon.weather.provider=open-meteo",
-                "moon.admin.token=0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
-                "moon.hosted-alpha.enabled=true",
-                "moon.build.revision=planning-hosted-hidden-test"
-        })
-@AutoConfigureWebTestClient
-@Tag("functional")
-class MoonPlanningHostedHiddenFunctionalTest {
-    @Autowired
-    private WebTestClient webTestClient;
-
-    @Autowired
-    private LocationResolver locationResolver;
-
-    @Autowired
-    private WeatherForecastProvider weatherForecastProvider;
-
-    @TestConfiguration
-    static class HostedHiddenTestConfiguration {
-        @Bean
-        @Primary
-        LocationResolver hostedHiddenLocationResolver() {
-            return Mockito.spy(new TestOpenMeteoLocationResolver());
-        }
-
-        @Bean
-        @Primary
-        WeatherForecastProvider hostedHiddenWeatherProvider() {
-            return Mockito.spy(new TestWeatherForecastProvider());
-        }
-    }
-
-    @Test
-    void keepsPlanningRouteHiddenBeforeItsBrowserConsumerLands() {
-        clearInvocations(locationResolver, weatherForecastProvider);
-
-        webTestClient.post().uri("/api/opportunities/planning")
-                .contentType(MediaType.APPLICATION_JSON)
-                .bodyValue("{\"locationId\":\"prague-cz\",\"preferences\":{\"version\":1}}")
-                .exchange()
-                .expectStatus().isNotFound()
-                .expectHeader().valueEquals("X-Content-Type-Options", "nosniff");
-
-        verifyNoInteractions(locationResolver, weatherForecastProvider);
     }
 }
