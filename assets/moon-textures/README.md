@@ -1,6 +1,6 @@
 # Moon texture source and provenance
 
-The compact Moon renderer uses a 128×64 grayscale luminance map embedded in
+The compact Moon renderer uses a 256×128 grayscale luminance map embedded in
 `frontend/src/moonTexture.js`. The exact 2048×1024 source
 JPEG is tracked here so the runtime derivative can be rebuilt and audited
 without depending on a mutable remote URL.
@@ -26,11 +26,11 @@ is not served to browsers or included in the backend runtime artifact.
 
 1. Verify the tracked JPEG SHA-256 and its 2048×1024 dimensions.
 2. Convert RGB to Pillow `L` grayscale.
-3. Resize to 128×64 with Pillow Lanczos resampling. This provides approximately
-   64 horizontal texture samples across the visible lunar hemisphere when the
-   Moon is rendered on a 64-pixel canvas.
-4. Verify the 8,192 luminance bytes have SHA-256
-   `ec492a4a37698ee395dfd0598a03c69497986504a0c55fc4319b48b77a8372cd`.
+3. Resize to 256×128 with Pillow Lanczos resampling. This provides approximately
+   128 horizontal texture samples across the visible lunar hemisphere, close
+   to the bright-limb dial's approximately 138-pixel Moon disk.
+4. Verify the 32,768 luminance bytes have SHA-256
+   `79df9883268abd38cef0a7b23c22f58f6fe92bc92f5ca7665f2fd8456cbdda53`.
 5. Base64-encode those bytes into the generated block in `moonTexture.js`.
 
 The recorded output was verified with Pillow 12.3.0. Install the asset-only
