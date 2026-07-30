@@ -521,13 +521,14 @@ server-side profile, analytics event, or shared cache. The server must not
 permanently store the body, a preference, an availability window, or a personal
 profile.
 
-Hosted alpha allows a bounded JSON body only for this exact product POST and
-the separately specified feedback submission route. It applies the same
-whole-site token, provider token, and provider-concurrency admission as the
-product GET. A rejected request keeps the existing `429 rate_limited` shape,
-does not call a provider, and includes `Cache-Control: no-store`. Forwarded
-identity headers remain ignored. The new route does not loosen another
-hosted-alpha path, method, body, CORS, or preflight rule.
+Hosted alpha allows a bounded JSON body only for this exact product POST, the
+separately specified planning POST, and the feedback submission route. It
+applies the same whole-site token, provider token, and provider-concurrency
+admission as the product GET. A rejected request keeps the existing
+`429 rate_limited` shape, does not call a provider, and includes
+`Cache-Control: no-store`. Forwarded identity headers remain ignored. The new
+route does not loosen another hosted-alpha path, method, body, CORS, or
+preflight rule.
 
 ## Moon Planning POST
 
@@ -537,8 +538,13 @@ returns at most one `nextPlanningWindow`. The ordinary seven-day weather-backed
 APIs, direct fixture POST, and independent `preferenceImpact` diagnostic keep
 their existing contracts.
 
-The browser does not call this route. [#233](https://github.com/rapucha/moon-service/issues/233)
-owns its future caller and hosted-alpha exposure; hosted alpha keeps it hidden until then.
+After an ordinary successful empty result for a real location, the browser may
+call this route only after explicit user activation. `app.js` calls through
+`opportunityPreferences.js` with the ordinary response's canonical location ID
+and the complete current page-memory version 1 preference snapshot.
+`planningView.js` renders the weather-free result. Hosted alpha exposes the
+exact planning POST and required browser module under the admission and surface
+rules below.
 
 ### Request and interval
 
@@ -550,9 +556,9 @@ owns its future caller and hosted-alpha exposure; hosted alpha keeps it hidden u
 ```
 
 `locationId` and `preferences` are required, and `preferences.version` must be `1`.
-The future browser in #233 must copy the normalized canonical `locationId` from a
-completed ordinary response. Every existing version 1 hard-preference field is
-optional and keeps the
+The browser must copy the normalized canonical `locationId` from a completed
+ordinary response. Every existing version 1 hard-preference field is optional
+and keeps the
 validation and semantics defined under [Product Preference POST](#product-preference-post).
 The route does not accept `q`, coordinates, timezone, a horizon, a result
 limit, a mode, or another lookup field. Unknown top-level fields are invalid.
@@ -692,8 +698,12 @@ cache may retain the normalized location ID under its current policy.
 Logs may contain the method, fixed route path, HTTP status, duration, request
 ID, and the existing ignored-field aggregate with version, count, and
 truncation state. That aggregate must not contain preference paths or values.
-In hosted-alpha mode, whole-site admission precedes surface policy, then the
-exact route remains hidden and cannot reach its controller or a provider.
+In hosted-alpha mode, whole-site admission precedes shared provider admission
+for the exact planning POST. A refusal returns the canonical no-store
+`429 rate_limited` response without a provider call. Surface policy permits
+only `POST` on the exact route and bodyless `GET` or `HEAD` on
+`/planningView.js`; path variants, other methods, CORS, and preflight remain
+closed.
 
 ## Admin Status Endpoint
 

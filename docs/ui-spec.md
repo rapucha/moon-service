@@ -12,9 +12,11 @@ visualization, the altitude and availability preferences tracked by
 phase, and bright-limb preference controls tracked by
 [#193](https://github.com/rapucha/moon-service/issues/193), and the
 calibration-feedback interaction tracked by
-[#33](https://github.com/rapucha/moon-service/issues/33). Broader visual design,
-feeds, calendar export pages, account flows, and native apps are out of scope
-for this document until they become active product work.
+[#33](https://github.com/rapucha/moon-service/issues/33), and the
+next-matching-date recovery tracked by
+[#233](https://github.com/rapucha/moon-service/issues/233). Broader visual
+design, feeds, calendar export pages, account flows, and native apps are out of
+scope for this document until they become active product work.
 
 If implementation and this document disagree, treat the disagreement as a
 product decision to resolve. Do not silently encode new UI behavior only in
@@ -100,7 +102,9 @@ The frontend module split is intended to keep future UI changes manageable:
 - `dom.js`: DOM and SVG element helpers;
 - `recentSearches.js`: localStorage behavior;
 - `opportunityPreferences.js`: preference state, storage, request options,
-  notices, and coordination of the focused preference controls;
+  notices, planning-request transport, and coordination of the focused
+  preference controls;
+- `planningView.js`: dedicated weather-free planning states and singular result;
 - `angularPreferenceControls.js`: altitude and azimuth preference
   coordination, normalization, and result-chart azimuth helpers;
 - `angularPreferencePreview.js`: schematic altitude and bearing sliders,
@@ -386,6 +390,68 @@ outside the authoritative `moonPass.azimuthMatchIntervals`. It must not infer
 the mask from returned opportunity windows or center-position path samples.
 Another hard preference or the global result limit must not dim an interval
 that the backend marked as an azimuth match.
+
+## Next matching Moon date
+
+The recovery action appears only after an ordinary opportunity request successfully returns
+`status: "ok"`, `location.kind: "real_location"`, and an empty `opportunities` array.
+It remains absent for a nonempty result, ambiguous or missing location, fixture result, invalid response, request failure, or provider failure; the browser never starts recovery automatically.
+
+The ordinary empty result shows a native button labeled
+`Find the next matching Moon date`. Its description says that the action
+searches ahead using Moon position, local time, and ambient light, and that
+weather is not considered. The button references that description with
+`aria-describedby`. The explanation remains outside the closed ordinary
+`No match` disclosure. The action works with pointer, Enter, and Space
+activation and does not depend on color or motion.
+
+Activation captures the successful response's canonical `location.id` and the complete
+normalized version 1 preference snapshot currently held in page memory. The browser sends
+exactly those values as `locationId` and `preferences`; it does not reconstruct preferences
+from `localStorage`, omit active fields, or add a horizon or mode. Planning does not change
+the page URL, browser history, share state, recent searches, saved preferences, or any other storage.
+
+`app.js` enters a dedicated `Next matching Moon date` state and disables the
+recovery button synchronously before starting the request. Planning shares the
+ordinary lookup's abort and supersession owner. A new ordinary lookup remains
+available, aborts or supersedes planning, and owns all later result and focus
+updates. A stale planning completion must not render or announce anything. The
+browser does not issue a duplicate request or retry automatically; any later attempt
+requires another explicit button activation.
+
+`planningView.js` renders loading, success, bounded empty, and
+planning-specific error states. It does not pass a planning response through
+`responseView.js` or `opportunityCard.js`. It validates the response's
+`planningHorizonDays`, `startsAt`, and `endsAt`; the browser does not carry its
+own horizon value. A bounded-empty horizon statement uses only those response
+facts.
+
+- Success presents the one `nextPlanningWindow` as a dedicated planning-date
+  card.
+  It shows the resolved location, local suggested date and time, window bounds
+  and IANA timezone, Moon altitude, azimuth with compass direction, exact named
+  phase, bright-limb orientation relative to local zenith, Sun altitude, and
+  ambient-light bucket. A `null` bright-limb orientation is explained as not
+  defined for that Moon phase; the browser does not invent an angle.
+- Bounded empty presents `emptyReason.text` and the response-owned horizon and
+  endpoint. It explains that the bounded search found no date, not that the
+  preferences can never match.
+- A request, validation, location, dependency, or malformed-response failure
+  stays a planning-specific error. It does not become a successful empty
+  result or alter the preceding ordinary search.
+
+The planning panel omits ordinary opportunity cards, Moon-pass grouping,
+candidate lists, weather and forecast facts, score and confidence, components,
+photo hints, ranking reasons, sharing controls, and calendar actions. It does
+not create a placeholder fact when bright-limb orientation is `null`.
+
+Activation replaces the ordinary workspace title with
+`Next matching Moon date`, makes that heading programmatically focusable, and
+moves focus to it while the results live region announces the loading and
+settled states. The complete ordinary `Weather checked` metadata group is
+hidden. A separate `Weather is not considered` notice remains visible through
+loading, success, bounded empty, and error states. Desktop and mobile use the
+same content, order, focus behavior, and omission rules.
 
 ## Opportunity Card
 

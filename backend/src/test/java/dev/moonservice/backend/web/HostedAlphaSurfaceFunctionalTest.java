@@ -89,7 +89,7 @@ class HostedAlphaSurfaceFunctionalTest {
             "/moonPathLightBands.js", "/moonPathSilhouetteSymbols.js", "/moonPathSilhouettes.js",
             "/moonPathView.js", "/moonPhaseView.js", "/moonTexture.js", "/opportunityCard.js",
             "/opportunityPreferences.css", "/opportunityPreferences.js",
-            "/recentSearches.js", "/responseView.js", "/scoreView.js"
+            "/planningView.js", "/recentSearches.js", "/responseView.js", "/scoreView.js"
     })
     void servesExactCurrentStaticAssetInventory(String path) {
         webTestClient.get()
@@ -100,7 +100,7 @@ class HostedAlphaSurfaceFunctionalTest {
     }
 
     @ParameterizedTest
-    @ValueSource(strings = {"/", "/app.js", "/readyz"})
+    @ValueSource(strings = {"/", "/app.js", "/planningView.js", "/readyz"})
     void allowsHeadForApprovedSurface(String path) {
         expectHostedHeaders(webTestClient.head()
                 .uri(path)
@@ -115,6 +115,21 @@ class HostedAlphaSurfaceFunctionalTest {
                 .exchange()
                 .expectStatus().isBadRequest()
                 .expectHeader().contentTypeCompatibleWith(MediaType.APPLICATION_JSON));
+    }
+
+    @Test
+    void exposesPlanningPostWithoutCorsAndAllowsItsFramedBody() {
+        advanceProviderRefill();
+
+        WebTestClient.ResponseSpec response = webTestClient.post()
+                .uri("/api/opportunities/planning")
+                .header("Origin", "https://other-origin.invalid")
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue("{}")
+                .exchange()
+                .expectHeader().doesNotExist("Access-Control-Allow-Origin");
+
+        expectProductError(response, 400, "invalid_request");
     }
 
     @Test
@@ -166,19 +181,23 @@ class HostedAlphaSurfaceFunctionalTest {
     }
 
     @Test
-    void appliesProviderConcurrencyToGetAndProductPost() {
+    void appliesProviderConcurrencyToOpportunityRequestsWithoutControllerWork() {
         CLOCK_SECONDS.addAndGet(600);
+        long geocodingCalls = openMeteoObservability.geocodingSnapshot().calls();
+        long weatherCalls = openMeteoObservability.weatherSnapshot().calls();
         try (HostedAlphaProviderAdmission.Admission first = providerAdmission.tryAcquire();
              HostedAlphaProviderAdmission.Admission second = providerAdmission.tryAcquire()) {
             assertThat(first.accepted()).isTrue();
             assertThat(second.accepted()).isTrue();
             expectRateLimited(webTestClient.get().uri("/api/opportunities?q=Prague").exchange(), false);
             expectRateLimited(productPost("{}", MediaType.APPLICATION_JSON), true);
+            expectRateLimited(planningPost(validPlanningBody()), true);
         }
+        assertProviderCalls(geocodingCalls, weatherCalls);
     }
 
     @Test
-    void appliesWholeSiteAdmissionToGetAndProductPost() {
+    void appliesWholeSiteAdmissionToOpportunityRequests() {
         CLOCK_SECONDS.addAndGet(600);
         CLOCK_FROZEN.set(true);
         try {
@@ -187,6 +206,29 @@ class HostedAlphaSurfaceFunctionalTest {
             }
             expectRateLimited(webTestClient.get().uri("/api/opportunities?q=Prague").exchange(), false);
             expectRateLimited(productPost("{}", MediaType.APPLICATION_JSON), true);
+            expectRateLimited(planningPost(validPlanningBody()), true);
+        } finally {
+            CLOCK_FROZEN.set(false);
+            CLOCK_SECONDS.incrementAndGet();
+        }
+    }
+
+    @Test
+    void appliesWholeSiteAdmissionBeforePlanningProviderAdmission() {
+        CLOCK_SECONDS.addAndGet(600);
+        CLOCK_FROZEN.set(true);
+        try {
+            for (int request = 0; request < 40; request++) {
+                webTestClient.get().uri("/about").exchange().expectStatus().isOk();
+            }
+            expectRateLimited(planningPost(validPlanningBody()), true);
+
+            for (int request = 0; request < 10; request++) {
+                CLOCK_SECONDS.incrementAndGet();
+                expectProductError(planningPost("{}"), 400, "invalid_request");
+            }
+            CLOCK_SECONDS.incrementAndGet();
+            expectRateLimited(planningPost("{}"), true);
         } finally {
             CLOCK_FROZEN.set(false);
             CLOCK_SECONDS.incrementAndGet();
@@ -197,6 +239,8 @@ class HostedAlphaSurfaceFunctionalTest {
     @ValueSource(strings = {
             "/admin", "/admin/", "/admin/other", "/admin/status/",
             "/api/opportunities/", "/api/opportunities/search", "/api/unknown",
+            "/api/opportunities/planning/", "/api/opportunities/Planning",
+            "/api/opportunities/planning;other", "/PlanningView.js",
             "/error", "/healthz", "/unknown"
     })
     void hidesUnapprovedPaths(String path) {
@@ -251,6 +295,17 @@ class HostedAlphaSurfaceFunctionalTest {
                 .expectHeader().valueEquals("Allow", "GET, HEAD, POST"));
     }
 
+    @ParameterizedTest
+    @ValueSource(strings = {"GET", "HEAD", "PUT", "PATCH", "DELETE", "OPTIONS"})
+    void allowsOnlyPostOnExactPlanningPath(String method) {
+        expectHostedHeaders(webTestClient.method(HttpMethod.valueOf(method))
+                .uri("/api/opportunities/planning")
+                .exchange()
+                .expectStatus().isEqualTo(405)
+                .expectHeader().valueEquals("Allow", "POST")
+                .expectHeader().doesNotExist("Access-Control-Allow-Origin"));
+    }
+
     @Test
     void connectorRejectsTraceBeforeTheApplicationFilter() {
         webTestClient.method(HttpMethod.TRACE)
@@ -286,10 +341,24 @@ class HostedAlphaSurfaceFunctionalTest {
                 MediaType.APPLICATION_JSON)
                 .expectStatus().isBadRequest();
 
+        advanceProviderRefill();
+        webTestClient.post()
+                .uri("/api/opportunities/planning")
+                .header("Forwarded", "for=planning-forwarded-marker.invalid")
+                .header("X-Forwarded-For", "planning-forwarded-marker.invalid")
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue("""
+                        {"locationId":"private-planning-marker","preferences":{"version":2}}
+                        """)
+                .exchange()
+                .expectStatus().isBadRequest();
+
         assertThat(output)
                 .doesNotContain("forwarded-identity-marker.invalid")
+                .doesNotContain("planning-forwarded-marker.invalid")
                 .doesNotContain(ADMIN_TOKEN)
-                .doesNotContain("private-body-marker");
+                .doesNotContain("private-body-marker")
+                .doesNotContain("private-planning-marker");
     }
 
     private WebTestClient.ResponseSpec productPost(String body, MediaType contentType) {
@@ -297,6 +366,19 @@ class HostedAlphaSurfaceFunctionalTest {
                 .contentType(contentType)
                 .bodyValue(body)
                 .exchange();
+    }
+
+    private WebTestClient.ResponseSpec planningPost(String body) {
+        return webTestClient.post().uri("/api/opportunities/planning")
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue(body)
+                .exchange();
+    }
+
+    private static String validPlanningBody() {
+        return """
+                {"locationId":"private-planning-location","preferences":{"version":1}}
+                """;
     }
 
     private static void expectProductError(

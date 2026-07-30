@@ -24,6 +24,7 @@ import java.util.Objects;
 @Order(Ordered.HIGHEST_PRECEDENCE + 5)
 final class HostedAlphaResourceLimitFilter extends OncePerRequestFilter {
     private static final String OPPORTUNITY_PATH = "/api/opportunities";
+    private static final String PLANNING_PATH = "/api/opportunities/planning";
     private static final String ADMIN_STATUS_PATH = "/admin/status";
     private static final String READINESS_PATH = "/readyz";
 
@@ -95,7 +96,7 @@ final class HostedAlphaResourceLimitFilter extends OncePerRequestFilter {
     ) throws IOException {
         HostedAlphaSurfaceFilter.addSecurityHeaders(response);
         if (ADMIN_STATUS_PATH.equals(path)
-                || (OPPORTUNITY_PATH.equals(path) && "POST".equals(request.getMethod()))) {
+                || isProductPost(request.getMethod(), path)) {
             response.setHeader("Cache-Control", "no-store");
         }
         response.setStatus(429);
@@ -112,10 +113,15 @@ final class HostedAlphaResourceLimitFilter extends OncePerRequestFilter {
     }
 
     private static boolean isProviderBackedOpportunityRequest(HttpServletRequest request, String path) {
-        return OPPORTUNITY_PATH.equals(path)
-                && ("GET".equals(request.getMethod())
-                || "HEAD".equals(request.getMethod())
-                || "POST".equals(request.getMethod()));
+        String method = request.getMethod();
+        return (OPPORTUNITY_PATH.equals(path)
+                && ("GET".equals(method) || "HEAD".equals(method) || "POST".equals(method)))
+                || (PLANNING_PATH.equals(path) && "POST".equals(method));
+    }
+
+    private static boolean isProductPost(String method, String path) {
+        return "POST".equals(method)
+                && (OPPORTUNITY_PATH.equals(path) || PLANNING_PATH.equals(path));
     }
 
     private static boolean isCalibrationFeedbackRequest(HttpServletRequest request) {

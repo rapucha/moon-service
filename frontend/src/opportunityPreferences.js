@@ -40,6 +40,7 @@ export function createOpportunityPreferences(options) {
 
   return {
     requestFor: requestFor,
+    planningRequestFor: planningRequestFor,
     beginSearch: clearResponse,
     renderResponse: renderResponse
   };
@@ -58,6 +59,20 @@ export function createOpportunityPreferences(options) {
         cache: "no-store",
         headers: { "Accept": "application/json", "Content-Type": "application/json" },
         body: JSON.stringify(body),
+        signal: signal
+      })
+    };
+  }
+
+  function planningRequestFor(locationId, signal) {
+    var snapshot = JSON.parse(JSON.stringify(state));
+    return {
+      path: "/api/opportunities/planning",
+      options: /** @type {RequestInit} */ ({
+        method: "POST",
+        cache: "no-store",
+        headers: { "Accept": "application/json", "Content-Type": "application/json" },
+        body: JSON.stringify({ locationId: locationId, preferences: snapshot }),
         signal: signal
       })
     };

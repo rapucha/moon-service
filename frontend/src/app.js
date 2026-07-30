@@ -1,6 +1,7 @@
 import { apiPathFor, fallbackPayload } from "./api.js";
 import { element } from "./dom.js";
 import { createOpportunityPreferences } from "./opportunityPreferences.js";
+import { createPlanningView } from "./planningView.js";
 import { readRecent, saveRecentLocation, writeRecent } from "./recentSearches.js";
 import { createResponseView } from "./responseView.js";
 
@@ -15,12 +16,23 @@ var recentList = /** @type {HTMLElement} */ (document.getElementById("recent-lis
 var clearRecent = /** @type {HTMLButtonElement} */ (document.getElementById("clear-recent"));
 var resultProviderCredit = /** @type {HTMLElement} */ (document.getElementById("result-provider-credit"));
 var resultObstructionNote = /** @type {HTMLElement} */ (document.getElementById("result-obstruction-note"));
+var workspaceTitle = /** @type {HTMLElement} */ (document.getElementById("workspace-title"));
+var workspaceHeading = /** @type {HTMLElement} */ (document.querySelector(".workspace-heading"));
+var ordinaryWorkspaceMeta = /** @type {HTMLElement} */ (document.querySelector(".workspace-meta"));
 var preferenceDetails = /** @type {HTMLDetailsElement} */ (document.getElementById("opportunity-preferences"));
 var preferenceForm = /** @type {HTMLFormElement} */ (document.getElementById("preference-form"));
 var preferenceResultRegion = /** @type {HTMLElement} */ (document.getElementById("preference-result-region"));
 var submitButton = /** @type {HTMLButtonElement} */ (form.querySelector("button[type='submit']"));
 var narrowSearchLayout = window.matchMedia("(max-width: 680px)");
 var activeRequest = null;
+var ordinaryWorkspaceTitle = workspaceTitle.textContent;
+var planningWeatherNotice = element("div", {
+  className: "workspace-meta planning-weather-notice",
+  ariaLabel: "Planning boundary"
+}, element("span", {}, "Weather is not considered"));
+planningWeatherNotice.hidden = true;
+planningWeatherNotice.style.display = "none";
+workspaceHeading.append(planningWeatherNotice);
 
 var responseView = createResponseView(results, {
   onResolvedLocation: function (location, request) {
@@ -32,6 +44,7 @@ var responseView = createResponseView(results, {
     searchLocationId(candidate.id, candidate.displayName || candidate.id || query, { updateUrl: true });
   }
 });
+var planningView = createPlanningView(results);
 
 var preferences = createOpportunityPreferences({
   details: preferenceDetails,
@@ -98,6 +111,7 @@ function lookupFromUrl() {
 
 function runLookup(request, options) {
   if (!request) {
+    beginOrdinaryLookup();
     input.value = "";
     updateResultNotes("");
     preferences.beginSearch();
@@ -116,6 +130,7 @@ function normalizeQuery(value) {
 }
 
 function search(rawQuery, options) {
+  beginOrdinaryLookup();
   var query = normalizeQuery(rawQuery);
   var validationMessage = validateQuery(query);
 
@@ -137,6 +152,7 @@ function search(rawQuery, options) {
 }
 
 function searchLocationId(rawLocationId, displayName, options) {
+  beginOrdinaryLookup();
   var locationId = normalizeQuery(rawLocationId);
   var label = normalizeQuery(displayName) || locationId;
   var validationMessage = validateLocationId(locationId);
@@ -208,9 +224,15 @@ function fetchOpportunities(request) {
           return fallbackPayload(response.status);
         })
         .then(function (payload) {
+          var recoveryLocationId = planningRecoveryLocationId(payload, response.status);
           updateResultNotes(payload && payload.status);
           preferences.renderResponse(payload);
           responseView.renderResponse(payload || fallbackPayload(response.status), request, response.status);
+          if (recoveryLocationId) {
+            planningView.renderRecovery(function () {
+              startPlanning(recoveryLocationId);
+            });
+          }
         });
     })
     .catch(function (error) {
@@ -230,6 +252,81 @@ function fetchOpportunities(request) {
         activeRequest = null;
       }
     });
+}
+
+function startPlanning(locationId) {
+  if (activeRequest) {
+    return;
+  }
+
+  activeRequest = new AbortController();
+  var requestController = activeRequest;
+  var planningRequest = preferences.planningRequestFor(locationId, requestController.signal);
+  workspaceTitle.textContent = "Next matching Moon date";
+  workspaceTitle.setAttribute("tabindex", "-1");
+  ordinaryWorkspaceMeta.hidden = true;
+  ordinaryWorkspaceMeta.style.display = "none";
+  planningWeatherNotice.hidden = false;
+  planningWeatherNotice.style.removeProperty("display");
+  preferences.beginSearch();
+  results.setAttribute("aria-busy", "true");
+  planningView.renderLoading();
+  workspaceTitle.focus();
+
+  fetch(planningRequest.path, planningRequest.options)
+    .then(function (response) {
+      return response.json()
+        .catch(function () {
+          return null;
+        })
+        .then(function (payload) {
+          if (activeRequest === requestController) {
+            planningView.renderResponse(payload, response.status, locationId);
+          }
+        });
+    })
+    .catch(function (error) {
+      if (error.name !== "AbortError" && activeRequest === requestController) {
+        planningView.renderNetworkError();
+      }
+    })
+    .finally(function () {
+      if (activeRequest === requestController) {
+        results.setAttribute("aria-busy", "false");
+        activeRequest = null;
+      }
+    });
+}
+
+function beginOrdinaryLookup() {
+  if (activeRequest) {
+    activeRequest.abort();
+  }
+  workspaceTitle.textContent = ordinaryWorkspaceTitle;
+  workspaceTitle.removeAttribute("tabindex");
+  ordinaryWorkspaceMeta.hidden = false;
+  ordinaryWorkspaceMeta.style.removeProperty("display");
+  planningWeatherNotice.hidden = true;
+  planningWeatherNotice.style.display = "none";
+  results.setAttribute("aria-busy", "false");
+  setSearchBusy(false);
+}
+
+function planningRecoveryLocationId(payload, statusCode) {
+  var location = payload && payload.location;
+  var locationId = location && location.id;
+  return payload && statusCode === 200 && payload.status === "ok"
+      && Array.isArray(payload.opportunities) && payload.opportunities.length === 0
+      && location && location.kind === "real_location"
+      && typeof location.displayName === "string" && Boolean(location.displayName.trim())
+      && typeof location.timezone === "string" && Boolean(location.timezone.trim())
+      && Number.isSafeInteger(payload.forecastHorizonDays) && payload.forecastHorizonDays > 0
+      && Number.isSafeInteger(payload.candidateWindowsEvaluated)
+      && payload.candidateWindowsEvaluated >= 0
+      && typeof locationId === "string" && locationId === normalizeQuery(locationId)
+      && !validateLocationId(locationId)
+    ? locationId
+    : null;
 }
 
 function searchRequestFor(request, signal) {
