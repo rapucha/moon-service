@@ -4,9 +4,10 @@ This is the canonical inventory of HTTP operations explicitly mapped by Moon
 Service controllers. It records who uses each route, why it exists, and how its
 exposure differs between the ordinary application and hosted-alpha mode.
 
-The route universe is the eleven mappings declared by `WebPageController`,
-`OpportunitySearchController`, `CalibrationFeedbackController`,
-`HealthController`, and `AdminStatusController`. Spring's implicit `HEAD`
+The route universe is the twelve mappings declared by `WebPageController`,
+`OpportunitySearchController`, `MoonPlanningController`,
+`CalibrationFeedbackController`, `HealthController`, and
+`AdminStatusController`. Spring's implicit `HEAD`
 handling, `/error`, exception handlers, and static-resource serving are
 behavior around those mappings, not additional inventory entries. Outbound
 Open-Meteo URLs are provider dependencies, not Moon Service routes.
@@ -20,6 +21,7 @@ Open-Meteo URLs are provider dependencies, not Moon Service routes.
 | `GET /about` | Product/privacy information page | Web browser | Allowlisted; whole-site bound |
 | `GET /api/opportunities` | Location-to-opportunity product API | Browser `app.js` | Allowlisted; site and search bounds |
 | `POST /api/opportunities` | Request-scoped preference product API | Browser `app.js` through `opportunityPreferences.js` | Allowlisted POST; site and provider bounds |
+| `POST /api/opportunities/planning` | Weather-free next-date planning API | None yet; browser work is #233 | Hidden after site admission |
 | `POST /api/opportunities/search` | Direct fixture/scoring prototype contract | None | Hidden after site admission |
 | `GET /api/calibration-feedback/v1/capability` | Public feedback feature/availability state | None yet | Allowlisted; exempt from hosted resource admission |
 | `POST /api/calibration-feedback/v1/submissions` | Bounded current-observation feedback write | None yet | Allowlisted POST; provider-bound resolution and feedback write bucket |
@@ -243,6 +245,49 @@ and [hosted-alpha functional tests](../backend/src/test/java/dev/moonservice/bac
   [service validation](../backend/src/main/java/dev/moonservice/backend/opportunity/OpportunitySearchService.java),
   [response model](../backend/src/main/java/dev/moonservice/backend/opportunity/search/OpportunitySearchResponse.java),
   [API contract](api-shape.md#product-preference-post).
+
+### `POST /api/opportunities/planning`
+
+- **Handler:** `MoonPlanningController.search`.
+- **Purpose/lifecycle:** weather-free search for the earliest Moon window that
+  matches all active version 1 hard preferences within one compiled planning
+  horizon, initially 365 days.
+- **Why it exists:** later browser recovery can find one possible date beyond
+  the ordinary seven-day weather horizon without representing long-range
+  weather, score, confidence, or ranking facts.
+- **Production invocation:** none yet. Issue
+  [#233](https://github.com/rapucha/moon-service/issues/233) owns the future
+  browser caller and hosted-alpha exposure.
+- **Other callers:** application tests and explicit manual API clients.
+- **Request:** same-origin `application/json` with required canonical
+  `locationId`, required `preferences`, and `preferences.version: 1`. It rejects
+  another top-level field, including `q`, coordinates, timezone, horizon,
+  limit, or mode. The 16,384-byte known and streamed body limit and existing
+  version 1 preference validation and unknown-field warning rules apply.
+- **Calculation:** after validation, the server captures one instant and
+  evaluates the exact half-open 365-day interval from that instant. It uses a
+  fixed `90.0`-degree natural-window ceiling, applies every active hard filter
+  together with five-minute sampling and one-second transition refinement,
+  evaluates the complete interval, and returns the earliest retained window by
+  `startsAt`, `suggestedAt`, then ID. It does not call weather, calculate or
+  rank by an ordinary opportunity score, or run `preferenceImpact`.
+- **Response:** `200 ok` contains the compiled `planningHorizonDays`, exact
+  `startsAt` and `endsAt`, resolved location, normalized filters, bounded
+  ignored-field warning, and one `nextPlanningWindow`. No match returns
+  `nextPlanningWindow: null` with `no_planning_date`. Validation, location, and
+  dependency failures remain distinct. Every response that reaches the planning
+  route uses `Cache-Control: no-store`.
+- **Authentication/data:** anonymous and same-origin. Preferences and returned
+  dates are not stored, logged, or cached. The existing bounded
+  location-resolution cache may retain the normalized ID and may use geocoding
+  on a miss; it never sends preferences to that provider.
+- **Exposure:** available on the ordinary listener. Hosted alpha applies
+  whole-site admission first and then hides this exact path as `404`; it cannot
+  reach the controller or a provider. Issue #233 owns any future exposure,
+  provider admission, bounded-body allowance, hosted `429`, and browser module.
+- **References:** [controller](../backend/src/main/java/dev/moonservice/backend/web/MoonPlanningController.java),
+  [response model](../backend/src/main/java/dev/moonservice/backend/opportunity/planning/MoonPlanningResponse.java),
+  [API contract](api-shape.md#moon-planning-post).
 
 ### `POST /api/opportunities/search`
 
