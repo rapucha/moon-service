@@ -114,7 +114,10 @@ public final class MoonPlanningService {
                 .orElse(null);
         PlanningWindow nextWindow = earliest == null
                 ? null
-                : planningWindow(earliest, resolvedLocation.zoneId().getId());
+                : planningWindow(
+                        earliest,
+                        resolvedLocation.zoneId().getId(),
+                        azimuthMatchIntervals(filtered, preferences, earliest));
         EmptyReason emptyReason = earliest == null
                 ? new EmptyReason(
                         "no_planning_date",
@@ -202,12 +205,17 @@ public final class MoonPlanningService {
         return trend + "_" + band;
     }
 
-    private static PlanningWindow planningWindow(PlanningCandidate candidate, String timezone) {
+    private static PlanningWindow planningWindow(
+            PlanningCandidate candidate,
+            String timezone,
+            List<OpportunityHardFilter.MatchInterval> azimuthMatchIntervals
+    ) {
         MoonWindow window = candidate.window();
         MoonSample suggested = candidate.suggested();
         return new PlanningWindow(
                 candidate.id(),
                 candidate.windowKind(),
+                moonPass(window, azimuthMatchIntervals),
                 window.startsAt().toString(),
                 suggested.instant().toString(),
                 window.endsAt().toString(),
@@ -218,10 +226,80 @@ public final class MoonPlanningService {
                         suggested.moonIlluminationPercent(),
                         suggested.moonPhaseAngleDegrees(),
                         suggested.brightLimbTiltDegrees(),
+                        suggested.northPoleTiltDegrees(),
                         namedPhase(suggested.moonPhaseAngleDegrees()).wireValue()),
                 new MoonPlanningResponse.Sun(
                         suggested.sunAltitudeDegrees(),
+                        suggested.sunAzimuthDegrees(),
                         ScoringModel.lightBucket(suggested.sunAltitudeDegrees())));
+    }
+
+    private static List<OpportunityHardFilter.MatchInterval> azimuthMatchIntervals(
+            OpportunityHardFilter.Result filtered,
+            OpportunityPreferences preferences,
+            PlanningCandidate candidate
+    ) {
+        if (preferences.azimuthDegrees() == null) {
+            return null;
+        }
+        List<OpportunityHardFilter.MatchInterval> intervals =
+                filtered.azimuthMatchIntervals().get(candidate.window().passId());
+        if (intervals == null) {
+            throw new IllegalStateException("Azimuth filter has no mask for the selected Moon pass.");
+        }
+        return intervals;
+    }
+
+    private static MoonPlanningResponse.MoonPass moonPass(
+            MoonWindow window,
+            List<OpportunityHardFilter.MatchInterval> azimuthMatchIntervals
+    ) {
+        List<MoonSample> samples = window.passPathSamples();
+        List<MoonPlanningResponse.MoonPathPoint> points = samples.stream()
+                .map(sample -> moonPathPoint(sample, roleForPass(window, sample)))
+                .toList();
+        List<MoonPlanningResponse.AzimuthMatchInterval> responseIntervals =
+                azimuthMatchIntervals == null ? null : azimuthMatchIntervals.stream()
+                        .map(interval -> new MoonPlanningResponse.AzimuthMatchInterval(
+                                interval.startsAt().toString(),
+                                interval.endsAt().toString()))
+                        .toList();
+        return new MoonPlanningResponse.MoonPass(
+                window.passId(),
+                window.passStartsAt().toString(),
+                window.passEndsAt().toString(),
+                new MoonPlanningResponse.MoonPassPath(
+                        moonPathPoint(samples.getFirst(), "start"),
+                        moonPathPoint(samples.getLast(), "end"),
+                        points),
+                responseIntervals);
+    }
+
+    private static MoonPlanningResponse.MoonPathPoint moonPathPoint(
+            MoonSample sample,
+            String role
+    ) {
+        return new MoonPlanningResponse.MoonPathPoint(
+                sample.instant().toString(),
+                sample.moonAltitudeDegrees(),
+                sample.moonAzimuthDegrees(),
+                sample.moonPhaseAngleDegrees(),
+                sample.brightLimbTiltDegrees(),
+                sample.northPoleTiltDegrees(),
+                sample.sunAltitudeDegrees(),
+                sample.sunAzimuthDegrees(),
+                ScoringModel.lightBucket(sample.sunAltitudeDegrees()),
+                role);
+    }
+
+    private static String roleForPass(MoonWindow window, MoonSample sample) {
+        if (sample.instant().equals(window.passStartsAt())) {
+            return "start";
+        }
+        if (sample.instant().equals(window.passEndsAt())) {
+            return "end";
+        }
+        return "path";
     }
 
     private static NamedPhase namedPhase(double rawAngle) {

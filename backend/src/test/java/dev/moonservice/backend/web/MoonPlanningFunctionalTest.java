@@ -5,6 +5,7 @@ import dev.moonservice.backend.location.LocationResolver;
 import dev.moonservice.backend.location.openmeteo.TestOpenMeteoLocationResolver;
 import dev.moonservice.backend.weather.TestWeatherForecastProvider;
 import dev.moonservice.backend.weather.WeatherForecastProvider;
+import dev.moonservice.scoringprototype.ephemeris.EphemerisSampler;
 import dev.moonservice.scoringprototype.ephemeris.MoonSample;
 import dev.moonservice.scoringprototype.fixture.Location;
 import dev.moonservice.scoringprototype.input.OpportunityPreferences;
@@ -12,6 +13,7 @@ import dev.moonservice.scoringprototype.input.OpportunityPreferences.AltitudeRan
 import dev.moonservice.scoringprototype.input.OpportunityPreferences.LocalClockWindow;
 import dev.moonservice.scoringprototype.input.OpportunityPreferences.TimeMode;
 import dev.moonservice.scoringprototype.input.OpportunityPreferences.TimePreference;
+import dev.moonservice.scoringprototype.scoring.ScoringModel;
 import dev.moonservice.scoringprototype.window.MoonWindow;
 import dev.moonservice.scoringprototype.window.OpportunityHardFilter;
 import dev.moonservice.scoringprototype.window.WindowGenerator;
@@ -149,9 +151,15 @@ class MoonPlanningFunctionalTest {
         assertTrue(window.at("/moon/illuminationPercent").isNumber());
         assertTrue(window.at("/moon/phaseAngleDegrees").isNumber());
         assertTrue(window.path("moon").has("brightLimbTiltDegrees"));
+        assertTrue(window.path("moon").has("northPoleTiltDegrees"));
         assertTrue(window.at("/moon/phaseName").isString());
         assertTrue(window.at("/sun/altitudeDegrees").isNumber());
+        assertTrue(window.at("/sun/azimuthDegrees").isNumber());
         assertTrue(window.at("/sun/lightBucket").isString());
+        JsonNode moonPass = window.path("moonPass");
+        assertMoonPass(moonPass, CAPTURED_AT, CAPTURED_AT.plus(Duration.ofDays(365)));
+        assertExactPassSamples(moonPass);
+        assertFalse(moonPass.has("azimuthMatchIntervals"));
         assertFalse(response.has("emptyReason"));
         assertEquals(Set.of(
                 "status", "generatedAt", "startsAt", "endsAt", "planningHorizonDays",
@@ -163,15 +171,15 @@ class MoonPlanningFunctionalTest {
                 Set.of("id", "kind", "displayName", "timezone", "countryCode"),
                 response.path("location").propertyNames());
         assertEquals(Set.of(
-                "id", "windowKind", "startsAt", "suggestedAt", "endsAt",
+                "id", "windowKind", "moonPass", "startsAt", "suggestedAt", "endsAt",
                 "localTimeZone", "moon", "sun"),
                 window.propertyNames());
         assertEquals(Set.of(
                 "altitudeDegrees", "azimuthDegrees", "illuminationPercent",
-                "phaseAngleDegrees", "brightLimbTiltDegrees", "phaseName"),
+                "phaseAngleDegrees", "brightLimbTiltDegrees", "northPoleTiltDegrees", "phaseName"),
                 window.path("moon").propertyNames());
         assertEquals(
-                Set.of("altitudeDegrees", "lightBucket"),
+                Set.of("altitudeDegrees", "azimuthDegrees", "lightBucket"),
                 window.path("sun").propertyNames());
 
         assertTrue(output.getOut().contains(
@@ -264,6 +272,16 @@ class MoonPlanningFunctionalTest {
         assertEquals("waning_crescent", window.at("/moon/phaseName").asString());
         double limb = window.at("/moon/brightLimbTiltDegrees").doubleValue();
         assertTrue(limb >= 292.0 && limb <= 294.0);
+        MoonSample expected = new EphemerisSampler().sampleAt(prototypeLocation(), suggestedAt);
+        assertEquals(expected.brightLimbTiltDegrees(), window.at("/moon/brightLimbTiltDegrees").doubleValue());
+        assertEquals(expected.northPoleTiltDegrees(), window.at("/moon/northPoleTiltDegrees").doubleValue());
+        assertEquals(expected.sunAzimuthDegrees(), window.at("/sun/azimuthDegrees").doubleValue());
+        JsonNode moonPass = window.path("moonPass");
+        assertEquals(response.path("endsAt").asString(), moonPass.path("endsAt").asString());
+        assertTrue(moonPass.path("azimuthMatchIntervals").isArray());
+        assertTrue(moonPass.path("azimuthMatchIntervals").valueStream().anyMatch(interval ->
+                !suggestedAt.isBefore(Instant.parse(interval.path("startsAt").asString()))
+                        && !suggestedAt.isAfter(Instant.parse(interval.path("endsAt").asString()))));
         assertEquals(5, response.path("normalizedActiveFilters").size());
         String altitudeBand = altitude <= 12.0 ? "low" : altitude <= 40.0 ? "context" : "high_context";
         assertTrue(window.path("windowKind").asString().endsWith("_" + altitudeBand));
@@ -476,6 +494,93 @@ class MoonPlanningFunctionalTest {
                 .expectHeader().contentTypeCompatibleWith(MediaType.APPLICATION_JSON)
                 .expectBody()
                 .jsonPath("$.status").isEqualTo(code);
+    }
+
+    private static void assertMoonPass(JsonNode pass, Instant horizonStart, Instant horizonEnd) {
+        assertEquals(Set.of("id", "startsAt", "endsAt", "path"), pass.propertyNames());
+        Instant startsAt = Instant.parse(pass.path("startsAt").asString());
+        Instant endsAt = Instant.parse(pass.path("endsAt").asString());
+        assertFalse(startsAt.isBefore(horizonStart));
+        assertFalse(endsAt.isAfter(horizonEnd));
+        JsonNode path = pass.path("path");
+        assertEquals(Set.of("start", "end", "samples"), path.propertyNames());
+        JsonNode samples = path.path("samples");
+        assertTrue(samples.isArray());
+        assertTrue(samples.size() >= 5);
+        assertEquals(pass.path("startsAt").asString(), path.at("/start/at").asString());
+        assertEquals(pass.path("endsAt").asString(), path.at("/end/at").asString());
+        assertEquals(path.path("start"), samples.get(0));
+        assertEquals(path.path("end"), samples.get(samples.size() - 1));
+        Instant previous = null;
+        for (int index = 0; index < samples.size(); index++) {
+            JsonNode point = samples.get(index);
+            assertMoonPathPoint(point);
+            Instant at = Instant.parse(point.path("at").asString());
+            assertFalse(at.isBefore(startsAt));
+            assertFalse(at.isAfter(endsAt));
+            assertTrue(previous == null || at.isAfter(previous));
+            assertEquals(index == 0 ? "start" : index == samples.size() - 1 ? "end" : "path",
+                    point.path("role").asString());
+            previous = at;
+        }
+    }
+
+    private static void assertExactPassSamples(JsonNode pass) {
+        Location location = prototypeLocation();
+        EphemerisSampler ephemeris = new EphemerisSampler();
+        MoonWindow expected = new WindowGenerator().findWindows(
+                        location,
+                        CAPTURED_AT,
+                        CAPTURED_AT.plus(Duration.ofDays(365)),
+                        90.0,
+                        instant -> ephemeris.sampleAt(location, instant)).stream()
+                .filter(window -> window.passId().equals(pass.path("id").asString()))
+                .findFirst()
+                .orElseThrow();
+        List<MoonSample> expectedSamples = expected.passPathSamples();
+        JsonNode actualSamples = pass.at("/path/samples");
+        assertEquals(expectedSamples.size(), actualSamples.size());
+        for (int index = 0; index < expectedSamples.size(); index++) {
+            MoonSample sample = expectedSamples.get(index);
+            JsonNode point = actualSamples.get(index);
+            assertEquals(sample.instant().toString(), point.path("at").asString());
+            assertEquals(sample.moonAltitudeDegrees(), point.path("altitudeDegrees").doubleValue());
+            assertEquals(sample.moonAzimuthDegrees(), point.path("azimuthDegrees").doubleValue());
+            assertEquals(sample.moonPhaseAngleDegrees(), point.path("moonPhaseAngleDegrees").doubleValue());
+            assertNullableDouble(sample.brightLimbTiltDegrees(), point.path("brightLimbTiltDegrees"));
+            assertNullableDouble(sample.northPoleTiltDegrees(), point.path("northPoleTiltDegrees"));
+            assertEquals(sample.sunAltitudeDegrees(), point.path("sunAltitudeDegrees").doubleValue());
+            assertEquals(sample.sunAzimuthDegrees(), point.path("sunAzimuthDegrees").doubleValue());
+            assertEquals(ScoringModel.lightBucket(sample.sunAltitudeDegrees()),
+                    point.path("lightBucket").asString());
+        }
+    }
+
+    private static void assertNullableDouble(Double expected, JsonNode actual) {
+        if (expected == null) {
+            assertTrue(actual.isNull());
+        } else {
+            assertEquals(expected.doubleValue(), actual.doubleValue());
+        }
+    }
+
+    private static void assertMoonPathPoint(JsonNode point) {
+        assertEquals(Set.of(
+                "at", "altitudeDegrees", "azimuthDegrees", "moonPhaseAngleDegrees",
+                "brightLimbTiltDegrees", "northPoleTiltDegrees", "sunAltitudeDegrees",
+                "sunAzimuthDegrees", "lightBucket", "role"), point.propertyNames());
+        assertTrue(point.path("altitudeDegrees").isNumber());
+        assertTrue(point.path("azimuthDegrees").isNumber());
+        assertTrue(point.path("moonPhaseAngleDegrees").isNumber());
+        assertTrue(point.has("brightLimbTiltDegrees"));
+        assertTrue(point.path("brightLimbTiltDegrees").isNull()
+                || point.path("brightLimbTiltDegrees").isNumber());
+        assertTrue(point.has("northPoleTiltDegrees"));
+        assertTrue(point.path("northPoleTiltDegrees").isNull()
+                || point.path("northPoleTiltDegrees").isNumber());
+        assertTrue(point.path("sunAltitudeDegrees").isNumber());
+        assertTrue(point.path("sunAzimuthDegrees").isNumber());
+        assertTrue(point.path("lightBucket").isString());
     }
 
     private static OpportunityPreferences preferences(

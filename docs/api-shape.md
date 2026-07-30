@@ -631,15 +631,72 @@ A nonempty result uses HTTP `200`, `status: "ok"`, and this closed shape:
     "moon": {
       "altitudeDegrees": 4.2, "azimuthDegrees": 82.3,
       "illuminationPercent": 98.1, "phaseAngleDegrees": 170.4,
-      "brightLimbTiltDegrees": 274.8, "phaseName": "full_moon"
+      "brightLimbTiltDegrees": 274.8, "northPoleTiltDegrees": 31.2,
+      "phaseName": "full_moon"
     },
-    "sun": { "altitudeDegrees": -4.7, "lightBucket": "civil_twilight" }
+    "sun": {
+      "altitudeDegrees": -4.7, "azimuthDegrees": 286.4,
+      "lightBucket": "civil_twilight"
+    },
+    "moonPass": {
+      "id": "moon-service-3067696-pass-2026-10-25T0420Z",
+      "startsAt": "2026-10-25T04:20:00Z",
+      "endsAt": "2026-10-25T06:00:00Z",
+      "path": {
+        "start": {
+          "at": "2026-10-25T04:20:00Z",
+          "altitudeDegrees": 0.0, "azimuthDegrees": 78.1,
+          "moonPhaseAngleDegrees": 170.4,
+          "brightLimbTiltDegrees": 275.1, "northPoleTiltDegrees": 31.1,
+          "sunAltitudeDegrees": -8.2, "sunAzimuthDegrees": 281.0,
+          "lightBucket": "nautical_twilight", "role": "start"
+        },
+        "end": {
+          "at": "2026-10-25T06:00:00Z",
+          "altitudeDegrees": 0.0, "azimuthDegrees": 101.4,
+          "moonPhaseAngleDegrees": 170.5,
+          "brightLimbTiltDegrees": 273.9, "northPoleTiltDegrees": 31.7,
+          "sunAltitudeDegrees": 4.1, "sunAzimuthDegrees": 300.3,
+          "lightBucket": "golden_hour", "role": "end"
+        },
+        "samples": [
+          {
+            "at": "2026-10-25T04:20:00Z",
+            "altitudeDegrees": 0.0, "azimuthDegrees": 78.1,
+            "moonPhaseAngleDegrees": 170.4,
+            "brightLimbTiltDegrees": 275.1, "northPoleTiltDegrees": 31.1,
+            "sunAltitudeDegrees": -8.2, "sunAzimuthDegrees": 281.0,
+            "lightBucket": "nautical_twilight", "role": "start"
+          },
+          {
+            "at": "2026-10-25T04:50:00Z",
+            "altitudeDegrees": 4.2, "azimuthDegrees": 82.3,
+            "moonPhaseAngleDegrees": 170.4,
+            "brightLimbTiltDegrees": 274.8, "northPoleTiltDegrees": 31.2,
+            "sunAltitudeDegrees": -4.7, "sunAzimuthDegrees": 286.4,
+            "lightBucket": "civil_twilight", "role": "path"
+          },
+          {
+            "at": "2026-10-25T06:00:00Z",
+            "altitudeDegrees": 0.0, "azimuthDegrees": 101.4,
+            "moonPhaseAngleDegrees": 170.5,
+            "brightLimbTiltDegrees": 273.9, "northPoleTiltDegrees": 31.7,
+            "sunAltitudeDegrees": 4.1, "sunAzimuthDegrees": 300.3,
+            "lightBucket": "golden_hour", "role": "end"
+          }
+        ]
+      }
+    }
   }
 }
 ```
 
+For readability, the `path.samples` array above is abridged. A live response
+contains the complete list described below.
+
 All shown members are required and non-null except
-`moon.brightLimbTiltDegrees`, which may be JSON `null`.
+`moon.brightLimbTiltDegrees`, `moon.northPoleTiltDegrees`, and either tilt in a
+Moon-pass path point, which may be JSON `null`.
 `normalizedActiveFilters` is an object, and all three ignored-field warning
 members remain present when empty or zero. All timestamps are RFC 3339 UTC
 strings. IDs, kinds, display names, timezones, country codes, phase names, and
@@ -655,6 +712,29 @@ request ID, and the window timezone equals the location timezone.
 and its own `endsAt <=` the top-level `endsAt`. Within the window,
 `startsAt < endsAt` and `startsAt <= suggestedAt <= endsAt`. The window's
 `endsAt` may equal the exclusive endpoint as an interval delimiter.
+
+`moonPass` identifies the selected window's natural Moon pass. Its interval is
+bounded by the same planning horizon, contains the returned window, and equals
+the first and last `path.samples` timestamps. `path.start` and `path.end`
+repeat those endpoint samples exactly. `path.samples` is the complete
+chronological `MoonWindow.passPathSamples()` list, including both endpoints.
+The server does not paginate, truncate, resample, or calculate another path for
+this response. A pass that touches either planning-horizon boundary stays
+bounded by that boundary.
+
+Each pass point contains the Moon altitude, azimuth, phase angle, nullable
+bright-limb tilt, nullable north-pole tilt, Sun altitude and azimuth, ambient
+light bucket, and `start`, `path`, or `end` role shown above. Suggested-time
+facts remain authoritative for `suggestedAt`; the browser may merge one
+UI-only `suggested` point into the pass samples for display.
+
+When `normalizedActiveFilters` contains `azimuthDegrees`, `moonPass` also
+contains the authoritative chronological, non-overlapping
+`azimuthMatchIntervals` described under
+[Successful response](#successful-response). The intervals are bounded by this
+returned pass. The response omits that member when azimuth filtering is
+inactive. A client must not infer a direction mask from path samples or from
+the retained planning window.
 
 The response must omit `opportunities`, `forecastHorizonDays`, `score`,
 `confidence`, `components`, `weather`, weather summaries, ranking reasons,

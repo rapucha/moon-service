@@ -431,8 +431,10 @@ facts.
   It shows the resolved location, local suggested date and time, window bounds
   and IANA timezone, Moon altitude, azimuth with compass direction, exact named
   phase, bright-limb orientation relative to local zenith, Sun altitude, and
-  ambient-light bucket. A `null` bright-limb orientation is explained as not
-  defined for that Moon phase; the browser does not invent an angle.
+  ambient-light bucket. It retains those matching-window facts and adds a
+  `Moon pass context` interval for the complete horizon-bounded pass. A `null`
+  bright-limb orientation is explained as not defined for that Moon phase; the
+  browser does not invent an angle.
 - Bounded empty presents `emptyReason.text` and the response-owned horizon and
   endpoint. It explains that the bounded search found no date, not that the
   preferences can never match.
@@ -444,6 +446,33 @@ The planning panel omits ordinary opportunity cards, Moon-pass grouping,
 candidate lists, weather and forecast facts, score and confidence, components,
 photo hints, ranking reasons, sharing controls, and calendar actions. It does
 not create a placeholder fact when bright-limb orientation is `null`.
+
+The planning renderer accepts only the closed documented `nextPlanningWindow`
+geometry. The pass interval must contain the matching window and stay inside
+the planning interval. Its samples must be chronological, include the complete
+point shape, begin and end at the declared pass boundaries, and match the
+separate `path.start` and `path.end` points. An active direction filter requires
+bounded chronological `moonPass.azimuthMatchIntervals`; an inactive filter
+requires that member to be absent. Incomplete, non-finite, unordered,
+out-of-bounds, or inconsistent geometry produces the planning-specific
+malformed-response state.
+
+The card passes that geometry to the existing `moonPathPanel()`. Before doing
+so, it adds one UI-only point at `suggestedAt` from the suggested-time Moon and
+Sun facts. It merges points by full RFC 3339 timestamp, with this point taking
+precedence, then restores chronological order. The Moon chart therefore
+contains exactly one `suggested` marker labeled `Suggested`, even when a
+backend pass sample has the same timestamp. It never labels a planning point
+`Best`, `Alternative`, with an option number, or with a rank.
+
+The full bounded pass supplies the Moon chart and its light bands. Direction
+dimming uses only the returned `azimuthMatchIntervals`; the browser does not
+infer another mask. The collapsed Sun pass appears only when at least one
+merged pass point puts the Sun at or above the horizon. The collapsed sky dome
+appears only when the Sun is at or above the horizon at `Suggested`, and it
+states the Sun/Moon angular separation there. The documented `-4.7°` suggested
+Sun example has no sky dome. These conditions and the full pass apply equally
+to the desktop and mobile charts.
 
 Activation replaces the ordinary workspace title with
 `Next matching Moon date`, makes that heading programmatically focusable, and
