@@ -529,6 +529,172 @@ does not call a provider, and includes `Cache-Control: no-store`. Forwarded
 identity headers remain ignored. The new route does not loosen another
 hosted-alpha path, method, body, CORS, or preflight rule.
 
+## Moon Planning POST
+
+`POST /api/opportunities/planning` is the anonymous same-origin, weather-free
+planning API. It searches one compiled backend horizon, initially 365 days, and
+returns at most one `nextPlanningWindow`. The ordinary seven-day weather-backed
+APIs, direct fixture POST, and independent `preferenceImpact` diagnostic keep
+their existing contracts.
+
+The browser does not call this route. [#233](https://github.com/rapucha/moon-service/issues/233)
+owns its future caller and hosted-alpha exposure; hosted alpha keeps it hidden until then.
+
+### Request and interval
+
+```json
+{
+  "locationId": "moon-service-3067696",
+  "preferences": { "version": 1 }
+}
+```
+
+`locationId` and `preferences` are required, and `preferences.version` must be `1`.
+The future browser in #233 must copy the normalized canonical `locationId` from a
+completed ordinary response. Every existing version 1 hard-preference field is
+optional and keeps the
+validation and semantics defined under [Product Preference POST](#product-preference-post).
+The route does not accept `q`, coordinates, timezone, a horizon, a result
+limit, a mode, or another lookup field. Unknown top-level fields are invalid.
+Unknown members below the supported `preferences` object keep the existing
+bounded JSON Pointer warning and aggregate-only logging rules.
+
+The client must send `Content-Type: application/json`; ordinary media-type
+parameters are allowed. The 16,384-byte raw-body limit applies to known and
+streamed lengths. The server must reject invalid media, an oversized body,
+invalid JSON, or invalid known fields before location work.
+
+After transport and body validation, the server captures the clock once before
+location resolution or calculation. One positive compile-time
+`PLANNING_HORIZON_DAYS` policy, initially `365`, defines the exact half-open
+interval `[capturedAt, capturedAt + Duration.ofDays(PLANNING_HORIZON_DAYS))`.
+At the initial value, the interval is exactly 8,760 hours. It is not 365
+local-midnight dates and does not start after the ordinary seven-day horizon.
+
+The horizon is not a request field, environment or Spring property, feature
+flag, user setting, configuration endpoint, or public extension point. The
+natural-window maximum Moon altitude is fixed at `90.0` degrees and cannot be
+overridden. The service may resolve the canonical ID through the existing
+bounded location-resolution cache and geocoder on a cache miss because the ID
+does not contain coordinates or timezone. It must not send preferences to the
+geocoder.
+
+### Calculation
+
+- Generate complete natural Moon windows chronologically over the exact instant interval.
+  Apply the captured lower and exclusive upper bounds to every retained
+  interval. A window whose `startsAt` equals the exclusive endpoint, or a
+  suggestion there, is ineligible; a clipped `endsAt` may equal it as a delimiter.
+- Preserve the deterministic Moon geometry, Sun altitude, ambient light,
+  timezone, natural-window, suggestion-selection, and ordinary
+  astronomy-visibility behavior. Apply altitude, azimuth, local-clock or
+  ambient-light, named-phase, and bright-limb preferences together, including
+  the existing lunar-disk azimuth and transition-refinement semantics.
+- Preserve the five-minute hard-filter sampling and one-second transition
+  refinement. A condition that begins and ends entirely between samples is
+  outside this contract; the route does not provide a continuous event solver.
+- Generate and filter the complete interval. Order retained windows by
+  `startsAt`, then `suggestedAt`, then ID, and return the first. Return an empty
+  result only after the complete interval has been evaluated.
+- Do not call `WeatherForecastProvider`, request weather, apply weather
+  rejection, calculate weather fit or forecast confidence, synthesize weather,
+  rank by an ordinary opportunity score, or run `preferenceImpact`.
+
+### Success and empty responses
+
+A nonempty result uses HTTP `200`, `status: "ok"`, and this closed shape:
+
+```json
+{
+  "status": "ok",
+  "generatedAt": "2026-10-24T12:00:00Z",
+  "startsAt": "2026-10-24T12:00:00Z",
+  "endsAt": "2027-10-24T12:00:00Z",
+  "planningHorizonDays": 365,
+  "location": { "id": "moon-service-3067696", "kind": "real_location",
+    "displayName": "Prague, Czechia", "timezone": "Europe/Prague", "countryCode": "CZ" },
+  "appliedPreferenceVersion": 1,
+  "normalizedActiveFilters": {},
+  "ignoredPreferenceFields": [],
+  "ignoredPreferenceFieldCount": 0,
+  "additionalIgnoredPreferenceFieldCount": 0,
+  "nextPlanningWindow": {
+    "id": "moon-service-3067696-2026-10-25T0450Z", "windowKind": "moonrise_low",
+    "startsAt": "2026-10-25T04:35:00Z", "suggestedAt": "2026-10-25T04:50:00Z",
+    "endsAt": "2026-10-25T05:10:00Z", "localTimeZone": "Europe/Prague",
+    "moon": {
+      "altitudeDegrees": 4.2, "azimuthDegrees": 82.3,
+      "illuminationPercent": 98.1, "phaseAngleDegrees": 170.4,
+      "brightLimbTiltDegrees": 274.8, "phaseName": "full_moon"
+    },
+    "sun": { "altitudeDegrees": -4.7, "lightBucket": "civil_twilight" }
+  }
+}
+```
+
+All shown members are required and non-null except
+`moon.brightLimbTiltDegrees`, which may be JSON `null`.
+`normalizedActiveFilters` is an object, and all three ignored-field warning
+members remain present when empty or zero. All timestamps are RFC 3339 UTC
+strings. IDs, kinds, display names, timezones, country codes, phase names, and
+light buckets are strings. Degree, illumination, and phase-angle values are
+finite JSON numbers. Horizon, version, and warning counts are integers.
+`location.kind` is `real_location`, `location.id` is the normalized canonical
+request ID, and the window timezone equals the location timezone.
+
+`generatedAt` and `startsAt` equal the captured instant.
+`planningHorizonDays` equals the compiled policy, and `endsAt` is exactly
+`Duration.ofDays(planningHorizonDays)` after `startsAt`. A returned window has
+`startsAt >=` the top-level `startsAt`, `suggestedAt <` the top-level `endsAt`,
+and its own `endsAt <=` the top-level `endsAt`. Within the window,
+`startsAt < endsAt` and `startsAt <= suggestedAt <= endsAt`. The window's
+`endsAt` may equal the exclusive endpoint as an interval delimiter.
+
+The response must omit `opportunities`, `forecastHorizonDays`, `score`,
+`confidence`, `components`, `weather`, weather summaries, ranking reasons,
+ordinary score-derived photo hints, synthetic placeholders, calendar links,
+and `preferenceImpact`. JSON `null` or zero does not satisfy this omission.
+
+`nextPlanningWindow` is always present. When nothing matches, it is JSON `null`
+and every other success member remains present; `emptyReason` is:
+
+```json
+{ "code": "no_planning_date", "text": "No matching Moon date was found in the next 365 days." }
+```
+
+`emptyReason` is absent for a nonempty result. Its text uses the same compiled
+horizon value as the interval and response. The horizon is a practical search
+bound, not a complete astronomical recurrence cycle, so an empty result does
+not prove that the preferences are impossible or cannot match after `endsAt`.
+
+### Errors, privacy, and exposure
+
+A dependency failure uses the existing three-field status envelope:
+
+```json
+{ "status": "temporarily_unavailable", "generatedAt": "2026-10-24T12:00:00Z",
+  "message": "Location lookup is temporarily unavailable." }
+```
+
+The route uses `400 invalid_request`, `413 request_too_large`, and
+`415 unsupported_media_type` for request failures. Location resolution keeps
+the existing `200 ambiguous_location` and `200 location_not_found` states. A
+required-dependency failure uses `503 temporarily_unavailable`; none of these
+states becomes a successful empty result.
+
+Every response that reaches this route uses `Cache-Control: no-store`. The
+server must not put the body, preference names or values, local-time
+availability, returned dates, or response content in a URL, cookie, application
+log, analytics event, server profile, permanent store, or shared cache. It must
+not add a planning-result cache. Only the existing bounded location-resolution
+cache may retain the normalized location ID under its current policy.
+
+Logs may contain the method, fixed route path, HTTP status, duration, request
+ID, and the existing ignored-field aggregate with version, count, and
+truncation state. That aggregate must not contain preference paths or values.
+In hosted-alpha mode, whole-site admission precedes surface policy, then the
+exact route remains hidden and cannot reach its controller or a provider.
+
 ## Admin Status Endpoint
 
 The first backend should provide this private operator endpoint:

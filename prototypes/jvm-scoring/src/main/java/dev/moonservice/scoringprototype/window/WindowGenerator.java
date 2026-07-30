@@ -12,6 +12,7 @@ import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.TreeSet;
 import java.util.function.ToDoubleFunction;
@@ -34,18 +35,57 @@ public final class WindowGenerator {
     }
 
     public List<MoonWindow> findWindows(PrototypeConfig config, SampleProvider samples) {
+        return generateWindows(
+                config.location(), config.start(), config.end(), config.maxMoonAltitudeDegrees(), samples, true);
+    }
+
+    public List<MoonWindow> findWindows(
+            Location location,
+            Instant start,
+            Instant end,
+            double maxMoonAltitudeDegrees,
+            SampleProvider samples
+    ) {
+        Objects.requireNonNull(location, "location");
+        Objects.requireNonNull(start, "start");
+        Objects.requireNonNull(end, "end");
+        Objects.requireNonNull(samples, "samples");
+        if (!end.isAfter(start)) {
+            throw new IllegalArgumentException("end must be after start.");
+        }
+        if (!Double.isFinite(maxMoonAltitudeDegrees) || maxMoonAltitudeDegrees < 0.0
+                || maxMoonAltitudeDegrees > 90.0) {
+            throw new IllegalArgumentException("maxMoonAltitudeDegrees must be between 0.0 and 90.0.");
+        }
+        return generateWindows(location, start, end, maxMoonAltitudeDegrees, samples, false);
+    }
+
+    private static List<MoonWindow> generateWindows(
+            Location location,
+            Instant start,
+            Instant end,
+            double maxMoonAltitudeDegrees,
+            SampleProvider samples,
+            boolean searchEndSuggestionAllowed
+    ) {
         TreeSet<Instant> passBoundaries = new TreeSet<>();
-        Instant start = config.start();
-        Instant end = config.end();
         passBoundaries.add(start);
         passBoundaries.add(end);
-        addMoonHorizonCrossings(config, samples, passBoundaries);
+        addMoonHorizonCrossings(start, end, samples, passBoundaries);
 
         List<MoonWindow> windows = new ArrayList<>();
         Instant previous = null;
         for (Instant boundary : passBoundaries) {
             if (previous != null && boundary.isAfter(previous)) {
-                addWindowsIfVisibleMoonPass(windows, config, samples, previous, boundary);
+                addWindowsIfVisibleMoonPass(
+                        windows,
+                        location,
+                        end,
+                        maxMoonAltitudeDegrees,
+                        samples,
+                        searchEndSuggestionAllowed,
+                        previous,
+                        boundary);
             }
             previous = boundary;
         }
@@ -61,7 +101,7 @@ public final class WindowGenerator {
             return Optional.empty();
         }
         Instant suggestionStart = max(window.startsAt(), notBefore);
-        MoonSample suggested = suggestedSample(samples, suggestionStart, window.endsAt());
+        MoonSample suggested = suggestedSample(samples, suggestionStart, window.endsAt(), true);
         String kind = windowKind(samples, window.startsAt(), window.endsAt(), suggested);
         return Optional.of(moonWindow(
                 window.location(),
@@ -75,14 +115,15 @@ public final class WindowGenerator {
     }
 
     private static void addMoonHorizonCrossings(
-            PrototypeConfig config,
+            Instant start,
+            Instant end,
             SampleProvider samples,
             TreeSet<Instant> boundaries
     ) {
-        Instant cursor = config.start();
+        Instant cursor = start;
         MoonSample previous = samples.sampleAt(cursor);
-        while (cursor.isBefore(config.end())) {
-            Instant nextInstant = min(cursor.plus(BRACKET_STEP), config.end());
+        while (cursor.isBefore(end)) {
+            Instant nextInstant = min(cursor.plus(BRACKET_STEP), end);
             MoonSample next = samples.sampleAt(nextInstant);
             addThresholdCrossing(samples, boundaries, previous, next, 0.0, MoonSample::moonAltitudeDegrees);
             cursor = nextInstant;
@@ -147,8 +188,11 @@ public final class WindowGenerator {
 
     private static void addWindowsIfVisibleMoonPass(
             List<MoonWindow> windows,
-            PrototypeConfig config,
+            Location location,
+            Instant searchEnd,
+            double maxMoonAltitudeDegrees,
             SampleProvider samples,
+            boolean searchEndSuggestionAllowed,
             Instant passStartsAt,
             Instant passEndsAt
     ) {
@@ -161,20 +205,35 @@ public final class WindowGenerator {
         TreeSet<Instant> windowBoundaries = new TreeSet<>();
         windowBoundaries.add(passStartsAt);
         windowBoundaries.add(passEndsAt);
-        addMaxAltitudeCrossings(config, samples, windowBoundaries, passStartsAt, passEndsAt);
+        addMaxAltitudeCrossings(
+                maxMoonAltitudeDegrees,
+                samples,
+                windowBoundaries,
+                passStartsAt,
+                passEndsAt);
         peakInstant(samples, passStartsAt, passEndsAt).ifPresent(windowBoundaries::add);
 
         Instant previous = null;
         for (Instant boundary : windowBoundaries) {
             if (previous != null && boundary.isAfter(previous)) {
-                addWindowIfUseful(windows, config, samples, passStartsAt, passEndsAt, previous, boundary);
+                addWindowIfUseful(
+                        windows,
+                        location,
+                        searchEnd,
+                        maxMoonAltitudeDegrees,
+                        samples,
+                        searchEndSuggestionAllowed,
+                        passStartsAt,
+                        passEndsAt,
+                        previous,
+                        boundary);
             }
             previous = boundary;
         }
     }
 
     private static void addMaxAltitudeCrossings(
-            PrototypeConfig config,
+            double maxMoonAltitudeDegrees,
             SampleProvider samples,
             TreeSet<Instant> boundaries,
             Instant startsAt,
@@ -190,7 +249,7 @@ public final class WindowGenerator {
                     boundaries,
                     previous,
                     next,
-                    config.maxMoonAltitudeDegrees(),
+                    maxMoonAltitudeDegrees,
                     MoonSample::moonAltitudeDegrees);
             cursor = nextInstant;
             previous = next;
@@ -199,8 +258,11 @@ public final class WindowGenerator {
 
     private static void addWindowIfUseful(
             List<MoonWindow> windows,
-            PrototypeConfig config,
+            Location location,
+            Instant searchEnd,
+            double maxMoonAltitudeDegrees,
             SampleProvider samples,
+            boolean searchEndSuggestionAllowed,
             Instant passStartsAt,
             Instant passEndsAt,
             Instant startsAt,
@@ -208,13 +270,14 @@ public final class WindowGenerator {
     ) {
         Instant midpoint = midpoint(startsAt, endsAt);
         double midpointAltitude = samples.sampleAt(midpoint).moonAltitudeDegrees();
-        if (midpointAltitude < 0.0 || midpointAltitude > config.maxMoonAltitudeDegrees()) {
+        if (midpointAltitude < 0.0 || midpointAltitude > maxMoonAltitudeDegrees) {
             return;
         }
 
-        MoonSample suggested = suggestedSample(samples, startsAt, endsAt);
+        boolean includeEndsAtCandidate = searchEndSuggestionAllowed || !endsAt.equals(searchEnd);
+        MoonSample suggested = suggestedSample(samples, startsAt, endsAt, includeEndsAtCandidate);
         String kind = windowKind(samples, startsAt, endsAt, suggested);
-        windows.add(moonWindow(config.location(), kind, passStartsAt, passEndsAt, startsAt, suggested, endsAt, samples));
+        windows.add(moonWindow(location, kind, passStartsAt, passEndsAt, startsAt, suggested, endsAt, samples));
     }
 
     private static MoonWindow moonWindow(
@@ -312,14 +375,21 @@ public final class WindowGenerator {
         }
     }
 
-    private static MoonSample suggestedSample(SampleProvider samples, Instant startsAt, Instant endsAt) {
+    private static MoonSample suggestedSample(
+            SampleProvider samples,
+            Instant startsAt,
+            Instant endsAt,
+            boolean includeEndsAtCandidate
+    ) {
         List<MoonSample> candidates = new ArrayList<>();
         Instant cursor = startsAt;
         while (cursor.isBefore(endsAt)) {
             candidates.add(samples.sampleAt(cursor));
             cursor = cursor.plus(SUGGESTION_STEP);
         }
-        candidates.add(samples.sampleAt(endsAt));
+        if (includeEndsAtCandidate) {
+            candidates.add(samples.sampleAt(endsAt));
+        }
         return candidates.stream()
                 .max(Comparator.comparingInt(ScoringModel::candidateFit)
                         .thenComparing(MoonSample::instant, Comparator.reverseOrder()))

@@ -23,6 +23,7 @@ import java.util.Set;
 @Order(Ordered.HIGHEST_PRECEDENCE + 10)
 public final class HostedAlphaSurfaceFilter extends OncePerRequestFilter {
     private static final String OPPORTUNITY_PATH = "/api/opportunities";
+    private static final String PLANNING_PATH = "/api/opportunities/planning";
     static final String FEEDBACK_CAPABILITY_PATH = "/api/calibration-feedback/v1/capability";
     static final String FEEDBACK_SUBMISSIONS_PATH = "/api/calibration-feedback/v1/submissions";
     static final String CONTENT_SECURITY_POLICY = "default-src 'none'; base-uri 'none'; "
@@ -66,7 +67,7 @@ public final class HostedAlphaSurfaceFilter extends OncePerRequestFilter {
             FilterChain filterChain
     ) throws ServletException, IOException {
         String path = applicationPath(request);
-        if (isProductOpportunityPost(request.getMethod(), path)) {
+        if (isProductPost(request.getMethod(), path)) {
             response.setHeader("Cache-Control", "no-store");
         }
         if (!enabled) {
@@ -122,8 +123,9 @@ public final class HostedAlphaSurfaceFilter extends OncePerRequestFilter {
                 && (FEEDBACK_SUBMISSIONS_PATH.equals(path) || OPPORTUNITY_PATH.equals(path));
     }
 
-    private static boolean isProductOpportunityPost(String method, String path) {
-        return "POST".equals(method) && OPPORTUNITY_PATH.equals(path);
+    private static boolean isProductPost(String method, String path) {
+        return "POST".equals(method)
+                && (OPPORTUNITY_PATH.equals(path) || PLANNING_PATH.equals(path));
     }
 
     static boolean isFeedbackPath(String path) {
