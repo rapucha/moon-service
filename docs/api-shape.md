@@ -305,7 +305,11 @@ filter is optional:
 - `brightLimbOrientationDegrees` contains one to eight inclusive directed
   ranges. Every range uses finite `start` and `end` values in `[0, 360)`.
   Greater starts cross `0°`, equal endpoints are invalid, and the ranges form a
-  union.
+  union. A request that combines this field with `full_moon` remains valid and
+  the field remains present in normalized active filters. When the field is
+  active, however, a sample in the existing `full_moon` phase-angle bucket
+  `[157.5°, 202.5°)` cannot match it. Other selected phase buckets use their
+  reported bright-limb orientation normally.
 
 The complete filter semantics, including lunar-disk azimuth matching,
 transition refinement, local-clock daylight-saving behavior, and the
@@ -541,7 +545,9 @@ their existing contracts.
 After an ordinary successful empty result for a real location, the browser may
 call this route only after explicit user activation. `app.js` calls through
 `opportunityPreferences.js` with the ordinary response's canonical location ID
-and the complete current page-memory version 1 preference snapshot.
+and the current active version 1 preference snapshot. A Full-only
+bright-limb target remains in browser state but is absent from both the
+ordinary and planning request snapshots.
 `planningView.js` renders the weather-free result. Hosted alpha exposes the
 exact planning POST and required browser module under the admission and surface
 rules below.

@@ -148,12 +148,12 @@ public final class OpportunityHardFilter {
         if (preferences.time() != null && !matchesTime(location, sample, preferences)) {
             return false;
         }
-        if (preferences.namedPhases() != null
-                && !preferences.namedPhases().contains(namedPhase(sample.moonPhaseAngleDegrees()))) {
+        NamedPhase phase = namedPhase(sample.moonPhaseAngleDegrees());
+        if (preferences.namedPhases() != null && !preferences.namedPhases().contains(phase)) {
             return false;
         }
         if (preferences.brightLimbOrientationDegrees() != null) {
-            Double tilt = sample.brightLimbTiltDegrees();
+            Double tilt = phase == NamedPhase.FULL_MOON ? null : sample.brightLimbTiltDegrees();
             if (tilt == null || preferences.brightLimbOrientationDegrees().stream()
                     .noneMatch(range -> range.contains(tilt))) {
                 return false;

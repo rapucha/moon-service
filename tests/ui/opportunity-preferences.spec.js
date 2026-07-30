@@ -50,7 +50,7 @@ const AMBIENT_PREFERENCES = {
 const ALL_PREFERENCES = {
   ...AMBIENT_PREFERENCES,
   azimuthDegrees: { included: { start: 330, end: 30 } },
-  namedPhases: ["full_moon"],
+  namedPhases: ["waxing_crescent", "waning_crescent"],
   brightLimbOrientationDegrees: [{ start: 337.5, end: 22.5 }]
 };
 const EMPTY_PREFERENCE_RESULT = {

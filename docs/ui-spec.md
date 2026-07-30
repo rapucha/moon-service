@@ -158,8 +158,8 @@ The editor exposes these hard filters:
   green endpoints are also joined, the request omits `azimuthDegrees`. With
   distinct green endpoints, it sends the included sector without `excluded`.
   Disabling direction filtering also omits `azimuthDegrees`.
-- Moon shape uses five checkboxes: `New`, `Crescent`, `Half`, `Gibbous`, and
-  `Full`. `New` expands to `new_moon`; `Crescent` expands to
+- Moon shape uses five checkboxes: `New / very thin`, `Crescent`, `Half`,
+  `Gibbous`, and `Full`. `New / very thin` expands to `new_moon`; `Crescent` expands to
   `waxing_crescent` and `waning_crescent`; `Half` expands to `first_quarter`
   and `last_quarter`; `Gibbous` expands to `waxing_gibbous` and
   `waning_gibbous`; and `Full` expands to `full_moon`. The union is persisted
@@ -172,9 +172,9 @@ The editor exposes these hard filters:
   single-handle dial. It has no editable numeric range inputs. The browser
   starts a new target at `270°` (`Left`) and
   snaps the target to `0°`, `45°`, `90°`, `135°`, `180°`, `225°`, `270°`, or
-  `315°` and sends exactly one inclusive `45°`-wide normalized range in
-  `brightLimbOrientationDegrees`; the range may cross `0°`. Neighboring
-  possible ranges share one endpoint and cover the complete circle.
+  `315°`. When active, it sends exactly one inclusive `45°`-wide normalized
+  range in `brightLimbOrientationDegrees`; the range may cross `0°`.
+  Neighboring possible ranges share one endpoint and cover the complete circle.
 
 The local-clock preference uses one `From` and `Until` pair of 24-hour `HH:mm`
 text fields. It has no add-window or remove-window control and does not use a
@@ -261,21 +261,30 @@ crescent is thicker than the earlier mockup but remains below quarter phase,
 and the disk has a neutral or dark rim rather than a bright circumference.
 `northPoleTiltDegrees` is not a preference.
 
-The five Moon-shape checkboxes have `aria-hidden` textured thumbnails at phase
-angles `0°`, `45°`, `90°`, `135°`, and `180°`. Every thumbnail uses the fixed
-`270°` (`Left`) bright-limb direction. While bright-limb orientation is enabled
-and the preference editor is visible and open, its preview cycles through each
-selected shape exactly once before repeating, at the chosen target orientation.
-It uses at most one timer and stops when any enabling condition no longer
-holds. A hidden document or `prefers-reduced-motion` stops the cycle; reduced
-motion shows the first selected shape in control order. This animation is
-presentational. It does not alter preference state, request fields, or the
-fixed `45°` interval width.
+The five Moon-shape checkboxes have `aria-hidden` textured symbolic thumbnails.
+`New / very thin`, `Crescent`, `Half`, and `Gibbous` each show two separate
+disks with phase angles `11.25°`, `45°`, `90°`, and `135°`, respectively. The
+first disk has its illuminated edge at `90°` (`Right`) and the second at `270°`
+(`Left`). `Full` shows one disk at `180°`. Every disk uses
+`northPoleTiltDegrees: 0`; only illumination is mirrored, not the north-up
+texture pixels. While bright-limb orientation is enabled and the preference
+editor is visible and open, its preview cycles through each selected shape
+exactly once before repeating, at the chosen target orientation. It uses at
+most one timer and stops when any enabling condition no longer holds. A hidden
+document or `prefers-reduced-motion` stops the cycle; reduced motion shows the
+first selected shape in control order. This animation is presentational. It
+does not alter preference state, request fields, or the fixed `45°` interval
+width.
 
 When Moon shape and bright-limb orientation are both active, a sample must
 match any exact named phase expanded from the selected shapes and the single
 bright-limb interval. A sample with no reported bright-limb orientation does
-not match an active orientation preference.
+not match an active orientation preference. A Full sample does not match an
+active bright-limb preference. With Full and any non-Full shape selected, the
+control remains active and explains that the limit applies only to the
+non-Full shapes. With Full selected alone, the checkbox is disabled, its dial
+is hidden, and the editor explains that Full has no useful bright-limb
+direction.
 
 These controls remove candidates that fall outside the limits. They do not
 adjust scores or change the order of candidates that remain. With no active
@@ -326,8 +335,9 @@ preference summary:
   last only for the current page while search continues.
 - The browser does not expose the server's internal excluded-sample count.
 
-The browser keeps one versioned preference state for the editor, request,
-storage, reset behavior, and result explanations. It stores supported state
+The browser keeps one versioned preference state for the editor, storage,
+reset behavior, and result explanations. It derives the active count and
+ordinary and planning request state from that stored editor state. It stores supported state
 under `moonService.opportunityPreferences.v1`. Version 1 storage retains only
 the supported `altitudeDegrees`, `time`, `azimuthDegrees`, `namedPhases`, and
 `brightLimbOrientationDegrees` fields. Local-clock state stores one
@@ -343,14 +353,19 @@ normalizes to omission. A bright-limb target is stored as an array
 containing exactly one normalized `{start, end}` range; the browser derives and
 snaps the dial midpoint when restoring it. An exact `20°`-wide range written by
 the earlier version 1 control migrates to the nearest current axis and the
-current `45°` width. The browser discards other malformed or unsupported stored
-state rather than sending it. If `localStorage` is blocked or unavailable, it
-keeps the state in page memory and lets search continue.
-Applying the form retains valid values from a disabled altitude, direction,
-availability, or bright-limb editor on the current page so re-enabling that
-control restores the user's draft. Disabled values remain absent from the
-request and version 1 storage; a reload restores only active stored state.
-Reset clears both active preferences and these page-memory drafts.
+current `45°` width. When Full is the only selected shape, a checked
+bright-limb target remains checked and stored through Apply and reload but is
+inactive. The browser omits it from the active count and from ordinary and
+planning requests. Selecting any non-Full shape re-enables the same snapped
+target. The browser discards other malformed or unsupported stored state
+rather than sending it. If `localStorage` is blocked or unavailable, it keeps
+the state in page memory and lets search continue.
+Applying the form retains valid values from a disabled altitude, direction, or
+availability editor on the current page so re-enabling that control restores
+the user's draft. Those disabled values remain absent from the request and
+version 1 storage; a reload restores only active stored state. Reset clears
+both active preferences, the stored Full-only bright-limb target, and
+page-memory drafts.
 
 `opportunityPreferences.js` owns this state, its normalization and storage, the
 editor coordination, preference request options, and storage or ignored-field
@@ -405,11 +420,13 @@ weather is not considered. The button references that description with
 `No match` disclosure. The action works with pointer, Enter, and Space
 activation and does not depend on color or motion.
 
-Activation captures the successful response's canonical `location.id` and the complete
-normalized version 1 preference snapshot currently held in page memory. The browser sends
-exactly those values as `locationId` and `preferences`; it does not reconstruct preferences
-from `localStorage`, omit active fields, or add a horizon or mode. Planning does not change
-the page URL, browser history, share state, recent searches, saved preferences, or any other storage.
+Activation captures the successful response's canonical `location.id` and the
+normalized active version 1 preference snapshot currently held in page memory.
+The browser sends exactly those values as `locationId` and `preferences`; it
+does not reconstruct preferences from `localStorage`, include a dormant
+Full-only bright-limb target, omit an active field, or add a horizon or mode.
+Planning does not change the page URL, browser history, share state, recent
+searches, saved preferences, or any other storage.
 
 `app.js` enters a dedicated `Next matching Moon date` state and disables the
 recovery button synchronously before starting the request. Planning shares the

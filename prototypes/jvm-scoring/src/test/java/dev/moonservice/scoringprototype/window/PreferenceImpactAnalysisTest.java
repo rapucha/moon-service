@@ -218,6 +218,6 @@ class PreferenceImpactAnalysisTest {
         if (sunAzimuth < 0.0) {
             sunAzimuth += 360.0;
         }
-        return sample(instant, 5.0, 0.0, 180.0, sunAltitude, sunAzimuth);
+        return sample(instant, 5.0, 0.0, 135.0, sunAltitude, sunAzimuth);
     }
 }

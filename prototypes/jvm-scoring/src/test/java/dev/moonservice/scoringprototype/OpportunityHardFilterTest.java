@@ -238,18 +238,18 @@ class OpportunityHardFilterTest {
     @Test
     void brightLimbRangesSupportOrdinaryAndNorthCrossingUnions() {
         Function<Instant, MoonSample> ninetyDegrees =
-                constantSamples(5.0, 0.0, 180.0, 0.0, 90.0);
+                constantSamples(5.0, 0.0, 135.0, 0.0, 90.0);
         assertEquals(1, filter(
                 List.of(window(BASE, BASE.plus(Duration.ofMinutes(10)), ninetyDegrees)),
                 ninetyDegrees, bright(new DegreeRange(80, 100)), BASE, 0.25).windows().size());
 
         Function<Instant, MoonSample> nearNorth =
-                constantSamples(5.0, 0.0, 180.0, 10.0, 0.0);
+                constantSamples(5.0, 0.0, 135.0, 10.0, 0.0);
         assertEquals(1, filter(List.of(window(BASE, BASE.plus(Duration.ofMinutes(10)), nearNorth)),
                 nearNorth, bright(new DegreeRange(350, 20)), BASE, 0.25).windows().size());
 
         Function<Instant, MoonSample> missing =
-                constantSamples(5.0, 0.0, 180.0, 5.0, 0.0);
+                constantSamples(5.0, 0.0, 135.0, 5.0, 0.0);
         assertTrue(filter(List.of(window(BASE, BASE.plus(Duration.ofMinutes(10)), missing)),
                 missing, bright(new DegreeRange(350, 20)), BASE, 0.25).windows().isEmpty());
     }
@@ -318,7 +318,7 @@ class OpportunityHardFilterTest {
                 instant,
                 0.0,
                 0.0,
-                180.0,
+                135.0,
                 10.0,
                 2.0 * minutesAfterBase(instant));
         OpportunityHardFilter.Result bright = filter(

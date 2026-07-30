@@ -84,7 +84,7 @@ test("edits, persists, removes, and resets the accepted controls", async ({ page
   await page.getByLabel("Golden hour").uncheck();
   await page.getByLabel("Night").check();
   await page.getByLabel("Limit illuminated-edge direction").check();
-  await page.getByLabel("New", { exact: true }).uncheck();
+  await page.getByLabel("New / very thin", { exact: true }).uncheck();
   const limbHandle = page.getByRole("slider", { name: "Bright-limb target orientation" });
   await expect(limbHandle).toHaveAttribute("aria-describedby", "preference-limb-instructions");
   const limbCanvas = page.locator("#preference-limb-moon");
@@ -110,7 +110,7 @@ test("edits, persists, removes, and resets the accepted controls", async ({ page
     "aria-valuetext",
     "0 degrees clockwise from zenith, toward zenith"
   );
-  await page.getByLabel("New", { exact: true }).check();
+  await page.getByLabel("New / very thin", { exact: true }).check();
 
   await page.getByRole("button", { name: "Use these limits" }).click();
   await waitForCallCount(calls, 1);
