@@ -21,6 +21,10 @@ another file gives a different number, use this file and correct the duplicate.
 
 Every maximum and trigger threshold is inclusive.
 
+In this policy, an **ordinary-file count** means the hard-gate count after the
+[documentation and media exemption](#documentation-and-media-file-count-exemption).
+A raw changed-path count is separate and may be recorded for context.
+
 ## Plan Before Editing
 
 Record these estimates before editing:
@@ -131,9 +135,35 @@ file. Agent- or LLM-authored files are ordinary. A file that mixes authored and
 generated content is ordinary. A manifest that causes a lock-file change is
 ordinary.
 
-Record the total added plus deleted lines in ordinary files. This churn is
-informational. It has no numeric limit and does not block a pull request, force
-a split, or trigger another scope review.
+### Documentation and media file-count exemption
+
+For the ordinary-file hard-gate count only, exclude:
+
+- authored documentation in any format, including every file whose content is
+  Markdown; and
+- every media asset, whether it supports documentation, production, or tests.
+  Media includes vector and raster images, audio, video, animation, 3D assets,
+  fonts, and fixed-layout or paginated documents. Every file whose content is
+  SVG or PDF is included.
+
+Classify formats other than Markdown, SVG, and PDF by their tracked content and
+primary role, not only by their directory or suffix. Source code,
+configuration, schemas, manifests, workflows, templates, data, and generators
+do not qualify merely because they produce, embed, or refer to documentation or
+media. A fixture qualifies only when its tracked content is itself a document
+or media asset.
+
+These files remain ordinary for scope and concern authority and for
+informational ordinary churn. The exemption does not waive authored-document
+review, code-size checks for executable or embedded code, generated, vendored,
+or lock-file budgets, sensitive-information review, validation, dependency
+rules, or any other applicable gate. Generated, vendored, and lock-file
+classification still takes precedence when it applies.
+
+Record the total added plus deleted lines in all ordinary files, including
+file-count-exempt documentation and media. This churn is informational. It has
+no numeric limit and does not block a pull request, force a split, or trigger
+another scope review.
 
 For this measure, exclude only payload-only lines that qualify under
 [Encoded-Binary Payloads](#encoded-binary-payloads). Record those lines as
