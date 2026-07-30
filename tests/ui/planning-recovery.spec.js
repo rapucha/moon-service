@@ -54,9 +54,30 @@ const PLANNING_SUCCESS = {
       illuminationPercent: 89,
       phaseAngleDegrees: 218.6,
       brightLimbTiltDegrees: 274.8,
+      northPoleTiltDegrees: 31.2,
       phaseName: "waning_gibbous"
     },
-    sun: { altitudeDegrees: -4.7, lightBucket: "civil_twilight" }
+    sun: {
+      altitudeDegrees: -4.7,
+      azimuthDegrees: 286.4,
+      lightBucket: "civil_twilight"
+    },
+    moonPass: {
+      id: "prague-pass-2027-08-20",
+      startsAt: "2027-08-20T18:30:00Z",
+      endsAt: "2027-08-20T20:30:00Z",
+      path: {
+        start: planningPoint("2027-08-20T18:30:00Z", 0, 76, -8, 278, "start"),
+        end: planningPoint("2027-08-20T20:30:00Z", 0, 101, -18, 300, "end"),
+        samples: [
+          planningPoint("2027-08-20T18:30:00Z", 0, 76, -8, 278, "start"),
+          planningPoint("2027-08-20T18:59:59.796100Z", 30, 81.9, -5.1, 285.9, "path"),
+          planningPoint("2027-08-20T18:59:59.796875Z", 7.9, 82, -5, 286, "path"),
+          planningPoint("2027-08-20T19:30:00Z", 13.8, 89, -10, 292, "path"),
+          planningPoint("2027-08-20T20:30:00Z", 0, 101, -18, 300, "end")
+        ]
+      }
+    }
   }
 };
 
@@ -179,10 +200,91 @@ test("posts the live preference snapshot once without changing browser state", a
   await expect(card).toContainText("274.8° clockwise from local zenith");
   await expect(card).toContainText("-4.7°");
   await expect(card).toContainText("Civil twilight");
+  await expect(card).toContainText("Moon pass context");
   await expect(card).not.toContainText(/weather|score|confidence|ranking|photo|sky/i);
   await expect(page.locator(".moon-pass-card, .pass-choice-card")).toHaveCount(0);
   await expect(card.getByRole("button")).toHaveCount(0);
   await expect(card.getByRole("link")).toHaveCount(0);
+  await expect(card.locator(".moon-path-panel")).toHaveCount(1);
+  await expect(card.locator(".sky-picture-details")).toHaveCount(0);
+  for (const mode of ["desktop", "mobile"]) {
+    const chart = card.locator(".moon-altitude-chart.altitude-chart-" + mode);
+    await expect(chart.locator(".moon-sample-marker.is-suggested")).toHaveCount(1);
+    await expect(chart.locator(".moon-sample-marker-label")).toHaveText("Suggested");
+    await expect(chart.locator(
+      ".moon-sample-marker[data-at='2027-08-20T18:59:59.796875Z']"
+    )).toHaveAttribute("aria-label", "Suggested Moon position, 8.4° altitude");
+    await expect(chart.locator(
+      ".moon-sample-marker[data-at='2027-08-20T18:59:59.796100Z']"
+    )).toHaveCount(1);
+    await expect(chart.locator(
+      ".moon-sample-marker[data-at='2027-08-20T18:30:00Z']"
+    )).toHaveCount(1);
+    await expect(chart.locator(
+      ".moon-sample-marker[data-at='2027-08-20T20:30:00Z']"
+    )).toHaveCount(1);
+  }
+});
+
+test("uses the authoritative direction mask and reveals positive-Sun context", async ({ page }) => {
+  const response = structuredClone(PLANNING_SUCCESS);
+  response.normalizedActiveFilters = {
+    azimuthDegrees: { included: { start: 80, end: 95 } }
+  };
+  response.nextPlanningWindow.moonPass.azimuthMatchIntervals = [{
+    startsAt: "2027-08-20T18:50:00Z",
+    endsAt: "2027-08-20T19:40:00Z"
+  }];
+  response.nextPlanningWindow.sun.altitudeDegrees = 6;
+  response.nextPlanningWindow.sun.azimuthDegrees = 286;
+  response.nextPlanningWindow.sun.lightBucket = "daylight";
+  await captureApi(page, {
+    ordinary: () => ({ status: 200, body: ORDINARY_EMPTY }),
+    planning: () => ({ status: 200, body: response })
+  });
+  await page.goto("/search?q=Prague");
+  await page.getByRole("button", { name: "Find the next matching Moon date" }).click();
+
+  const card = page.locator(".planning-date-card");
+  await expect(card.locator(".azimuth-preference-excluded")).toHaveCount(4);
+  await expect(card.locator(".sky-picture-details summary")).toHaveText([
+    "Sun passSun altitude and direction across the same Moon pass",
+    "Sky domeSun and Moon positions at the suggested time"
+  ]);
+  expect(await card.locator(".sky-picture-details").evaluateAll(details =>
+    details.map(detail => /** @type {HTMLDetailsElement} */ (detail).open)
+  )).toEqual([false, false]);
+  await card.getByText("Sky dome", { exact: true }).click();
+  await expect(card.locator(".sky-dome-chart")).toHaveAccessibleName(
+    /Sun .* altitude, .* azimuth .*; Moon .* altitude, .* azimuth .*; .* angular separation/
+  );
+  await expect(card).not.toContainText(/Best|Alternative|Option|Rank|score|confidence|weather|photo/i);
+});
+
+test("shows a later Sun pass without a sky dome at the negative-Sun suggestion", async ({ page }) => {
+  const response = structuredClone(PLANNING_SUCCESS);
+  const sunlitEnd = planningPoint(
+    "2027-08-20T20:30:00Z", 0, 101, 4.1, 300, "end"
+  );
+  const samples = response.nextPlanningWindow.moonPass.path.samples;
+  response.nextPlanningWindow.moonPass.path.end = sunlitEnd;
+  samples[samples.length - 1] = sunlitEnd;
+  await captureApi(page, {
+    ordinary: () => ({ status: 200, body: ORDINARY_EMPTY }),
+    planning: () => ({ status: 200, body: response })
+  });
+  await page.goto("/search?q=Prague");
+  await page.getByRole("button", { name: "Find the next matching Moon date" }).click();
+
+  const card = page.locator(".planning-date-card");
+  await expect(card.locator(".sky-picture-details summary")).toHaveText([
+    "Sun passSun altitude and direction across the same Moon pass"
+  ]);
+  await expect(card.locator(".sun-altitude-chart")).toHaveCount(2);
+  await expect(card.locator(".sky-dome-chart")).toHaveCount(0);
+  expect(await card.locator(".sky-picture-details").evaluateAll(details =>
+    details.map(detail => /** @type {HTMLDetailsElement} */ (detail).open)
+  )).toEqual([false]);
 });
 
 test("explains a phase with no defined bright-limb angle", async ({ page }) => {
@@ -308,6 +410,14 @@ for (const scenario of [
     heading: "Unexpected planning response"
   },
   {
+    name: "overflowing-horizon",
+    response: {
+      status: 200,
+      body: { ...PLANNING_SUCCESS, planningHorizonDays: Number.MAX_SAFE_INTEGER }
+    },
+    heading: "Unexpected planning response"
+  },
+  {
     name: "network-failure",
     response: { abort: true },
     heading: "Planning could not be reached"
@@ -411,6 +521,29 @@ async function storedPreferences(page) {
 
 function malformedPlanningSuccess() {
   const response = /** @type {any} */ (JSON.parse(JSON.stringify(PLANNING_SUCCESS)));
-  delete response.nextPlanningWindow.moon.illuminationPercent;
+  delete response.nextPlanningWindow.moonPass.path.samples[1].northPoleTiltDegrees;
   return response;
+}
+
+function planningPoint(at, altitude, azimuth, sunAltitude, sunAzimuth, role) {
+  return {
+    at: at,
+    altitudeDegrees: altitude,
+    azimuthDegrees: azimuth,
+    moonPhaseAngleDegrees: 218.6,
+    brightLimbTiltDegrees: 274.8,
+    northPoleTiltDegrees: 31.2,
+    sunAltitudeDegrees: sunAltitude,
+    sunAzimuthDegrees: sunAzimuth,
+    lightBucket: planningLightBucket(sunAltitude),
+    role: role
+  };
+}
+
+function planningLightBucket(sunAltitude) {
+  if (sunAltitude >= 6) return "daylight";
+  if (sunAltitude >= -0.833) return "golden_hour";
+  if (sunAltitude >= -6) return "civil_twilight";
+  if (sunAltitude >= -12) return "nautical_twilight";
+  return "night";
 }
