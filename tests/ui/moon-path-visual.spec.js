@@ -80,6 +80,9 @@ function visibleChartSelector(projectName) {
 async function hideMoonPathArtwork(page) {
   await page.addStyleTag({
     content: `
+      .camera-estimate {
+        display: none !important;
+      }
       .moon-path-silhouettes,
       .moon-path-landmark-scale,
       [data-moon-path-artwork] {

@@ -132,14 +132,19 @@ and [hosted-alpha functional tests](../backend/src/test/java/dev/moonservice/bac
   The browser keeps up to five successful display names, location IDs, and
   timezones under `moonService.recentSearches.v1`. It keeps the supported
   versioned altitude and availability preferences under
-  `moonService.opportunityPreferences.v1`. Both `localStorage` entries are
+  `moonService.opportunityPreferences.v1`. It separately keeps the camera
+  estimate setup under `moonService.cameraSetup.v1`; it never enters a request,
+  URL, share link, or recent-search entry. All three `localStorage` entries are
   optional and client-side; the page still works when browser storage is
   unavailable.
 - **Exposure:** available on the ordinary listener; allowlisted but subject to
-  the whole-site admission bound in hosted-alpha mode.
+  the whole-site admission bound in hosted-alpha mode. The exact
+  `/cameraSetup.js` browser module allows bodyless `GET` and `HEAD` under the
+  same hosted-alpha static-resource rules.
 - **References:** [controller](../backend/src/main/java/dev/moonservice/backend/web/WebPageController.java),
   [browser flow](../frontend/src/app.js),
   [recent-search storage](../frontend/src/recentSearches.js),
+  [camera setup](../frontend/src/cameraSetup.js),
   [preference state and transport](../frontend/src/opportunityPreferences.js),
   [share paths](../frontend/src/api.js).
 

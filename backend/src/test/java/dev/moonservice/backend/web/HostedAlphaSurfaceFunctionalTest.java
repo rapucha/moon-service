@@ -81,7 +81,7 @@ class HostedAlphaSurfaceFunctionalTest {
     @ValueSource(strings = {
             "/about.html", "/index.html", "/angularPreferenceControls.js",
             "/angularPreferencePreview.css", "/angularPreferencePreview.js",
-            "/angularPreferenceRules.js", "/api.js", "/app.js",
+            "/angularPreferenceRules.js", "/api.js", "/app.js", "/cameraSetup.js",
             "/dom.js", "/format.js", "/favicon.svg", "/moonAppearanceControls.js",
             "/moonAppearancePreview.css", "/moonPreferenceControls.css", "/styles.css",
             "/sun-marker-aperture-flare.svg",
@@ -100,7 +100,7 @@ class HostedAlphaSurfaceFunctionalTest {
     }
 
     @ParameterizedTest
-    @ValueSource(strings = {"/", "/app.js", "/planningView.js", "/readyz"})
+    @ValueSource(strings = {"/", "/app.js", "/cameraSetup.js", "/planningView.js", "/readyz"})
     void allowsHeadForApprovedSurface(String path) {
         expectHostedHeaders(webTestClient.head()
                 .uri(path)

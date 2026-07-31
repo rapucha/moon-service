@@ -6,11 +6,15 @@ import { moonPathPanel } from "./moonPathView.js";
 var UTC_INSTANT_PATTERN = /^(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2})(?:\.(\d{1,9}))?Z$/;
 
 export function createPlanningView(results) {
+  var cameraSetup = null;
+  var current = null;
   return {
     renderRecovery: renderRecovery,
     renderLoading: renderLoading,
     renderResponse: renderResponse,
-    renderNetworkError: renderNetworkError
+    renderNetworkError: renderNetworkError,
+    refresh: refresh,
+    setCameraSetup: function (next) { cameraSetup = next; }
   };
 
   function renderRecovery(onActivate) {
@@ -42,6 +46,7 @@ export function createPlanningView(results) {
   }
 
   function renderResponse(payload, statusCode, expectedLocationId) {
+    current = { payload: payload, statusCode: statusCode, expectedLocationId: expectedLocationId };
     if (statusCode !== 200 || !objectValue(payload) || payload.status !== "ok") {
       renderPlanningError(payload, statusCode);
       return;
@@ -65,6 +70,13 @@ export function createPlanningView(results) {
       return;
     }
     renderSuccess(context, planningWindow);
+  }
+
+  function refresh() {
+    var card = results.querySelector(".planning-date-card");
+    if (!current || !card || !cameraSetup) return;
+    cameraSetup.replaceEstimate(
+      card, current.payload.nextPlanningWindow?.moon, card.querySelector(".moon-path-panel"));
   }
 
   function renderSuccess(context, planningWindow) {
@@ -95,6 +107,7 @@ export function createPlanningView(results) {
       metric("Ambient light", readableToken(sun.lightBucket)),
       metric("Moon pass context", formatDateTime(moonPass.startsAt, context.timezone)
         + " to " + formatDateTime(moonPass.endsAt, context.timezone))),
+    cameraSetup ? cameraSetup.estimateFor(moon) : null,
     moonPathPanel(
       planningPathOpportunity(planningWindow),
       context.timezone,

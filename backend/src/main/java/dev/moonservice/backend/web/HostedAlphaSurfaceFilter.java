@@ -39,7 +39,7 @@ public final class HostedAlphaSurfaceFilter extends OncePerRequestFilter {
             FEEDBACK_CAPABILITY_PATH, FEEDBACK_SUBMISSIONS_PATH,
             "/angularPreferenceControls.js", "/angularPreferencePreview.css",
             "/angularPreferencePreview.js", "/angularPreferenceRules.js",
-            "/api.js", "/app.js", "/dom.js", "/format.js",
+            "/api.js", "/app.js", "/cameraSetup.js", "/dom.js", "/format.js",
             "/moonAppearanceControls.js", "/moonAppearancePreview.css",
             "/moonPreferenceControls.css", "/terms.js", "/types.js",
             "/favicon.svg", "/styles.css", "/sun-marker-aperture-flare.svg",
