@@ -1,4 +1,5 @@
 import { apiPathFor, fallbackPayload } from "./api.js";
+import { createCameraSetup } from "./cameraSetup.js";
 import { element } from "./dom.js";
 import { createOpportunityPreferences } from "./opportunityPreferences.js";
 import { createPlanningView } from "./planningView.js";
@@ -22,6 +23,9 @@ var ordinaryWorkspaceMeta = /** @type {HTMLElement} */ (document.querySelector("
 var preferenceDetails = /** @type {HTMLDetailsElement} */ (document.getElementById("opportunity-preferences"));
 var preferenceForm = /** @type {HTMLFormElement} */ (document.getElementById("preference-form"));
 var preferenceResultRegion = /** @type {HTMLElement} */ (document.getElementById("preference-result-region"));
+var cameraDetails = /** @type {HTMLDetailsElement} */ (document.getElementById("camera-setup"));
+var cameraForm = /** @type {HTMLFormElement} */ (document.getElementById("camera-setup-form"));
+var cameraStorageNotice = /** @type {HTMLElement} */ (document.getElementById("camera-storage-notice"));
 var submitButton = /** @type {HTMLButtonElement} */ (form.querySelector("button[type='submit']"));
 var narrowSearchLayout = window.matchMedia("(max-width: 680px)");
 var activeRequest = null;
@@ -45,6 +49,17 @@ var responseView = createResponseView(results, {
   }
 });
 var planningView = createPlanningView(results);
+var cameraSetup = createCameraSetup({
+  details: cameraDetails,
+  form: cameraForm,
+  storageNotice: cameraStorageNotice,
+  onChange: function () {
+    responseView.refresh();
+    planningView.refresh();
+  }
+});
+responseView.setCameraSetup(cameraSetup);
+planningView.setCameraSetup(cameraSetup);
 
 var preferences = createOpportunityPreferences({
   details: preferenceDetails,
@@ -345,6 +360,7 @@ function searchRequestFor(request, signal) {
 
 function syncSearchDisclosures(mediaQuery) {
   recentSearches.open = !mediaQuery.matches;
+  cameraDetails.open = !mediaQuery.matches;
   preferenceDetails.open = !mediaQuery.matches;
 }
 

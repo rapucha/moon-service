@@ -101,6 +101,7 @@ The frontend module split is intended to keep future UI changes manageable:
 - `format.js`: date, time, degree, and percentage formatting;
 - `dom.js`: DOM and SVG element helpers;
 - `recentSearches.js`: localStorage behavior;
+- `cameraSetup.js`: browser-only saved camera setup and illuminated-Moon estimates;
 - `opportunityPreferences.js`: preference state, storage, request options,
   notices, planning-request transport, and coordination of the focused
   preference controls;
@@ -124,6 +125,151 @@ The frontend module split is intended to keep future UI changes manageable:
 - `moonPathView.js`: Moon path, separate Sun pass, and suggested-time sky-position views;
 - `moonPhaseView.js`: Moon phase rendering;
 - `scoreView.js`: score block and score details.
+
+## Camera estimates
+
+The search sidebar contains one shared `Camera setup` disclosure for digital
+and film capture. The browser applies and saves each valid format, output-MP,
+marked-focal-length, or teleconverter change immediately. The editor has no
+Update or Apply button. While a numeric field is empty or invalid, the browser
+keeps the last valid estimate and saved setup and shows an inline validation
+message. Reset restores the first-use setup.
+
+`Camera setup` is a native disclosure at every viewport width. It starts open
+above `680 px` and closed at or below `680 px`, and the user can toggle it in
+either layout. Every control stays within the camera form. The Teleconverter
+label and selector have visible separation.
+
+First use selects Full-frame digital, `24 MP`, a marked focal length of
+`300 mm`, and no teleconverter (`1×`). The format selector groups these fixed
+presets:
+
+| Medium | Preset | Estimate geometry |
+| --- | --- | --- |
+| Digital | Full frame | `36.0 mm` sensor width, `3:2` |
+| Digital | APS-C | `23.5 mm` sensor width, `3:2` |
+| Digital | Micro Four Thirds | `17.3 mm` sensor width, `4:3` |
+| Digital | Medium format 44×33 digital | `43.8 mm` sensor width, `4:3` |
+| Film | Film | no frame geometry; physical image size depends only on the lens and selected teleconverter |
+
+Film uses one neutral choice and calls the capture surface a `film original`,
+not a negative. The editor does not ask for 35 mm, 120, sheet-film, or other
+film-frame formats because they do not change the physical Moon image size at
+a given marked focal length and teleconverter setting.
+
+The editor shows `Output resolution (MP)` only for digital formats. It offers
+`6`, `8`, `10`, `12`, `16`, `20`, `24`, `26`, `30`, `33`, `36`, `40`, `42`,
+`45`, `50`, `61`, `80`, `100`, `102`, and `150` as native suggestions and
+accepts any finite positive decimal value. The value is the final output MP,
+so a photographer can enter the output of a pixel-shift mode directly. The
+editor has no monochrome or generic pixel-shift multiplier. Visible help tells
+the photographer to choose a common value from the field's browser suggestions
+or type any positive value. The short help appears immediately after the field.
+
+The marked-focal-length field accepts any finite positive decimal value. Its
+deduplicated native suggestions contain:
+
+- classical primes: `14`, `20`, `24`, `28`, `35`, `50`, `85`, `100`, `105`,
+  `135`, `180`, `200`, `300`, `400`, `500`, `600`, `800`, `1000`, and `1200`;
+- Pentax Limited primes: `15`, `21`, `31`, `35`, `40`, `43`, `70`, and `77`;
+  and
+- the endpoints of these common zoom families: `10–20`, `11–18`, `12–24`,
+  `14–24`, `15–30`, `16–35`, `16–45`, `16–50`, `16–85`, `17–50`,
+  `17–70`, `18–55`, `18–135`, `18–270`, `18–300`, `20–40`, `24–70`,
+  `24–105`, `24–120`, `28–105`, `28–300`, `50–135`, `55–200`,
+  `55–300`, `60–250`, `70–200`, `70–300`, `80–200`, `100–400`,
+  `150–450`, `150–500`, `200–500`, and `200–600`.
+
+Visible help tells the photographer to choose a common marked focal length
+from the field's browser suggestions or type any positive value. The short help
+appears immediately after the field.
+
+The compact teleconverter selector contains `None (1×)`, `1.4×`, `1.7×`,
+and `2×`. The stored marked focal length and multiplier remain separate, and
+the editor displays their product as the focal length used for the estimate
+only when a teleconverter is selected. A marked focal length at or below
+`4 mm` remains valid but produces a nonblocking message that calls it very
+small. A marked focal length above `5000 mm` remains valid but produces a
+nonblocking message that calls it really big. The teleconverter does not affect
+these warnings. The editor also states that the calculation assumes rectilinear
+projection or a Moon near the image center because focal length alone cannot
+model the scale of an off-axis fisheye image.
+
+The browser stores this exact five-key state only under
+`moonService.cameraSetup.v1`:
+
+```json
+{
+  "version": 1,
+  "captureFormat": "digital_full_frame",
+  "outputMegapixels": 24,
+  "focalLengthMm": 300,
+  "teleconverterMultiplier": 1
+}
+```
+
+Loading accepts only a complete object with exactly those fields, supported
+enum values, and finite positive numbers. The browser silently removes invalid
+state and restores the defaults. There is no migration from the unpublished
+horizontal-pixel or format-specific film previews. While Film is active, the
+setup retains `outputMegapixels` so switching back to digital restores the last
+valid value. If `localStorage` is unavailable, valid changes remain in page
+memory and the editor shows a visible warning.
+
+The estimate uses the result's existing `moon.illuminationPercent` and a
+nominal lunar apparent diameter of `0.52°`:
+
+```text
+illuminated fraction = illuminationPercent / 100
+focal length used in the calculation = marked focal length × teleconverter multiplier
+angular thickness = 0.52° × illuminated fraction
+Moon image diameter = 2 × focal length used in the calculation × tan(0.52° / 2)
+illuminated thickness on the capture surface = Moon image diameter × illuminated fraction
+```
+
+Digital estimates derive horizontal sampling from output MP and the selected
+format's aspect ratio:
+
+```text
+horizontal output pixels = sqrt(output MP × 1,000,000 × aspect ratio)
+pixel thickness = illuminated thickness × horizontal output pixels / sensor width
+```
+
+The digital result shows angular thickness and pixel thickness. It shows
+`0 px` for zero illumination, `<1 px` for a positive subpixel value, and the
+nearest whole pixel otherwise.
+
+The Film result shows only the full Moon image diameter and the maximum
+illuminated thickness on the film original in millimetres. It shows `0 mm` for
+zero illuminated thickness, `<0.01 mm` for a positive value below `0.01 mm`,
+and two decimal places otherwise. It does not show angular thickness, a film
+format, frame dimensions, or percentage coverage.
+
+Both result types state that the value is the widest illuminated thickness and
+that a crescent tapers to zero at its horns. Digital copy describes capture
+sampling, states that resizing changes the pixel result, and notes that the
+estimate does not predict the success of a multi-shot pixel-shift capture. Film
+copy describes physical image size on the film original. The estimate does not
+predict visibility, optical resolution, film resolving power, or exposure.
+
+Each ordinary grouped result card contains one initially closed native
+`Camera estimate` disclosure based on its primary suggested opportunity. Each
+successful planning result contains the same disclosure based on that
+planning window's illumination. Loading, empty, and error states contain no
+estimate. A valid editor change replaces only the estimate inside each current
+card and preserves whether each disclosure is open; it does not rerender the
+whole card.
+
+Camera values stay in the browser. They never enter product API requests, page
+URLs, share links, recent-search storage, analytics, or logs. A shared result
+uses the receiving browser's setup.
+
+This version does not model scan resolution or pixels, PPI or DPI, print size,
+enlargement, printer output, slide projection, or film resolving power. It also
+does not add custom sensor dimensions, film formats or frame dimensions,
+film-frame coverage, camera or lens catalogues, custom or stacked
+teleconverters, event-specific lunar diameter, backend camera fields, exposure
+settings, or exposure advice.
 
 ## Opportunity Preferences
 

@@ -15,18 +15,23 @@ var IMPACT_FILTERS = [
 
 export function createResponseView(results, callbacks) {
   callbacks = callbacks || {};
+  var cameraSetup = null;
+  var current = null;
 
   return {
     renderIntro: renderIntro,
     renderLoading: renderLoading,
     renderInvalid: renderInvalid,
-    renderResponse: renderResponse
+    renderResponse: renderResponse,
+    refresh: refresh,
+    setCameraSetup: function (next) { cameraSetup = next; }
   };
 
   function renderResponse(payload, request, statusCode) {
+    current = { payload: payload, request: request, statusCode: statusCode };
     switch (payload.status) {
       case "ok":
-        renderOk(payload, request);
+        renderOk(payload, request, true);
         break;
       case "ambiguous_location":
         renderAmbiguous(payload, request.label);
@@ -46,6 +51,16 @@ export function createResponseView(results, callbacks) {
       default:
         renderStatus("Unexpected response", "The backend returned a response this page does not understand.", statusCode >= 500 ? "warning" : "error");
     }
+  }
+
+  function refresh() {
+    if (!current || current.payload.status !== "ok" || !cameraSetup) return;
+    var groups = opportunityGroups(Array.isArray(current.payload.opportunities)
+      ? current.payload.opportunities : []);
+    results.querySelectorAll(".moon-pass-card").forEach(function (card, index) {
+      var moon = groups[index]?.entries[0]?.opportunity?.moon;
+      cameraSetup.replaceEstimate(card, moon, card.querySelector(".moon-path-panel"));
+    });
   }
 
   function renderIntro() {
@@ -78,7 +93,7 @@ export function createResponseView(results, callbacks) {
     renderStatus("Check the location", message, "error");
   }
 
-  function renderOk(payload, request) {
+  function renderOk(payload, request, notifyResolvedLocation) {
     var location = payload.location || {};
     var timezone = location.timezone || "UTC";
     var countryCode = location.countryCode || "";
@@ -88,7 +103,8 @@ export function createResponseView(results, callbacks) {
       resultSummary(payload, request, groups.length, opportunities.length)
     ];
 
-    if (location.kind === "real_location" && location.displayName && callbacks.onResolvedLocation) {
+    if (notifyResolvedLocation && location.kind === "real_location"
+        && location.displayName && callbacks.onResolvedLocation) {
       callbacks.onResolvedLocation(location, request);
     }
 
@@ -140,7 +156,12 @@ export function createResponseView(results, callbacks) {
   }
 
   function opportunityGroup(group, index, timezone, countryCode, chartContext) {
-    return moonPassCard(group.pass, group.entries, index, timezone, countryCode, chartContext);
+    var card = moonPassCard(group.pass, group.entries, index, timezone, countryCode, chartContext);
+    if (cameraSetup) {
+      cameraSetup.replaceEstimate(
+        card, group.entries[0].opportunity.moon, card.querySelector(".moon-path-panel"));
+    }
+    return card;
   }
 
   function maxOpportunityDurationMs(opportunities) {

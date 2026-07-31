@@ -11,6 +11,40 @@
   min-width: 0;
 }
 
+.camera-panel > summary {
+  display: list-item;
+}
+
+.camera-panel:not([open]) > .preference-body {
+  display: none;
+}
+
+.camera-panel[open] > .preference-body {
+  display: block;
+  padding-top: 16px;
+  border-top: 1px solid var(--line);
+}
+
+.camera-panel .preference-heading {
+  justify-content: flex-end;
+}
+
+#camera-setup-form .camera-field {
+  display: grid;
+  gap: 5px;
+  min-width: 0;
+}
+
+#camera-setup-form .camera-field select {
+  justify-self: start;
+  max-width: 100%;
+}
+
+#camera-setup-form select[name="camera-capture-format"] {
+  width: 100%;
+  min-width: 0;
+}
+
 .preference-heading h2 {
   margin: 0;
   font-size: 1rem;
