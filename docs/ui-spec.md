@@ -51,12 +51,13 @@ terrain horizon, obstruction, and shooting-position limitations.
 - Recent searches may be stored only in browser `localStorage`, with display
   names and canonical IDs rather than timestamps, exact addresses, cookies, or
   server-side user identifiers.
-- Search keeps provider credit beside provider-derived recent searches,
-  ambiguous choices, resolved locations, and opportunity results. About holds
-  the full privacy, service-limit, and provider-processing explanations.
-- Search keeps short warnings beside the action or result they explain. The
-  form says that an exact home address is unnecessary. Results warn that local
-  hills, buildings, and trees may block the view.
+- Search does not repeat Open-Meteo or GeoNames provider credit. It keeps a
+  compact link to NASA's Moon-photography guide in the workspace. About holds
+  the full privacy, service-limit, and provider-processing explanations and
+  links the NASA guide as well.
+- The form says that an exact home address is unnecessary. About retains the
+  explanation that local hills, buildings, and trees are not modeled; Search
+  does not repeat it as a standalone result note or `Lookup notes` section.
 - The page should expose shareable lookup results.
 - The UI should present ranked opportunities, not only chronological events.
 - Opportunity cards are currently ranked by backend score.
@@ -180,6 +181,7 @@ deduplicated native suggestions contain:
   `55–300`, `60–250`, `70–200`, `70–300`, `80–200`, `100–400`,
   `150–450`, `150–500`, `200–500`, and `200–600`.
 
+The input uses bold type when it contains exactly `21`, `31`, `43`, or `77`.
 Visible help tells the photographer to choose a common marked focal length
 from the field's browser suggestions or type any positive value. The short help
 appears immediately after the field.
@@ -191,9 +193,8 @@ only when a teleconverter is selected. A marked focal length at or below
 `4 mm` remains valid but produces a nonblocking message that calls it very
 small. A marked focal length above `5000 mm` remains valid but produces a
 nonblocking message that calls it really big. The teleconverter does not affect
-these warnings. The editor also states that the calculation assumes rectilinear
-projection or a Moon near the image center because focal length alone cannot
-model the scale of an off-axis fisheye image.
+these warnings. The editor says: `This works best with a regular lens. With a
+fisheye, keep the Moon near the center—the edges can stretch its apparent size.`
 
 The browser stores this exact five-key state only under
 `moonService.cameraSetup.v1`:
@@ -246,11 +247,10 @@ and two decimal places otherwise. It does not show angular thickness, a film
 format, frame dimensions, or percentage coverage.
 
 Both result types state that the value is the widest illuminated thickness and
-that a crescent tapers to zero at its horns. Digital copy describes capture
-sampling, states that resizing changes the pixel result, and notes that the
-estimate does not predict the success of a multi-shot pixel-shift capture. Film
-copy describes physical image size on the film original. The estimate does not
-predict visibility, optical resolution, film resolving power, or exposure.
+that a crescent tapers to zero at its horns. Digital copy adds no sampling,
+resizing, visibility, optical-resolution, exposure, or pixel-shift caveat. Film
+copy continues to describe physical image size on the film original and its
+existing limits.
 
 Each ordinary grouped result card contains one initially closed native
 `Camera estimate` disclosure based on its primary suggested opportunity. Each
@@ -283,6 +283,9 @@ The editor exposes these hard filters:
 
 - Moon altitude is one optional inclusive range edited with a vertical
   dual-handle slider over `[0°, 90°]` on the schematic Moon-pass selector.
+  With no active stored altitude range, its dormant first-use values are
+  `10°–30°`; the control remains disabled until the user enables it. A valid
+  active version 1 stored range remains the user's selected range.
   The range remains at least `10°` wide.
   The bottom is `0°` and the top is `90°`. The display position is
   `(altitude / 90)^0.85`, which gives low altitudes mildly more room. Pointer
@@ -450,6 +453,9 @@ receiving browser applies its own saved preferences, if any.
 
 Result-specific messages remain near the results without recreating an active
 preference summary:
+
+- The browser does not render the API's general `messages` array as a separate
+  `Lookup notes` section. The API contract remains unchanged.
 
 - If active filters remove every candidate, a closed native `No match`
   disclosure says that no opportunities were found in the response's forecast
@@ -660,7 +666,6 @@ The card should include:
 - Sun altitude and light bucket;
 - weather summary and relevant forecast risk;
 - exposure balance text;
-- local horizon caveat when applicable;
 - `.ics` action when available.
 
 Cards should avoid hiding the main decision behind decoration. The primary
@@ -1061,9 +1066,13 @@ Agreed behavior:
 - At widths up to 680px, Recent searches is one native disclosure that starts
   closed whenever `/search` loads. Its summary must work with a keyboard and a
   screen reader. Opening it shows the current browser-local list, storage note,
-  provider credit, location selection, and clear action.
+  location selection, and clear action.
 - Above 680px, Recent searches stays open and visible in the sidebar. The page
   does not show the mobile disclosure control.
+- Above 920px, the complete left sidebar has its own viewport-bounded vertical
+  scroll area. Wheel or trackpad input over it scrolls the sidebar without
+  moving the workspace, and keyboard focus reveals the focused control. At
+  920px and below, the sidebar returns to ordinary document scrolling.
 - The long privacy, service-limit, and data-source explanations do not appear
   between city search and results. They remain available on About.
 - Mobile should not require horizontal scrolling to understand a single

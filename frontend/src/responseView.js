@@ -121,10 +121,6 @@ export function createResponseView(results, callbacks) {
       ));
     }
 
-    if (Array.isArray(payload.messages) && payload.messages.length > 0) {
-      children.push(messagesList(payload.messages));
-    }
-
     if (Array.isArray(payload.rejected) && payload.rejected.length > 0) {
       children.push(rejectedDetails(payload.rejected, timezone, countryCode));
     }
@@ -266,16 +262,6 @@ export function createResponseView(results, callbacks) {
       return ["Try again in about " + payload.retryAfterSeconds + " seconds."];
     }
     return [];
-  }
-
-  function messagesList(messages) {
-    return element("section", { className: "message-panel" },
-      element("h3", {}, "Lookup notes"),
-      element("ul", { className: "messages" },
-        messages.map(function (message) {
-          return element("li", {}, message.text || message.code || "Additional lookup note.");
-        }))
-    );
   }
 
   function rejectedDetails(rejected, timezone, countryCode) {

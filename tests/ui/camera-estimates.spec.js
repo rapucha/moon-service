@@ -131,6 +131,13 @@ test("builds the accessible editor with approved defaults, choices, and suggesti
   expect(await suggestionValues(page, "#camera-focal-suggestions")).toEqual(FOCAL_SUGGESTIONS);
   expect(FOCAL_SUGGESTIONS).toEqual(expect.arrayContaining([15, 21, 31, 35, 40, 43, 70, 77]));
   expect(FOCAL_SUGGESTIONS).toEqual(expect.arrayContaining([60, 250]));
+  for (const value of [21, 31, 43, 77]) {
+    await focal.fill(String(value));
+    await expect(focal).toHaveCSS("font-weight", "800");
+  }
+  await editor.getByRole("button", { name: "Reset", exact: true }).click();
+  await expect(focal).toHaveValue("300");
+  await expect(focal).not.toHaveClass(/camera-focal-easter-egg/);
   expect(await teleconverter.locator("option").evaluateAll(options => options.map(option => ({
     value: Number(/** @type {HTMLOptionElement} */ (option).value), label: option.textContent
   })))).toEqual([
@@ -151,13 +158,13 @@ test("builds the accessible editor with approved defaults, choices, and suggesti
   });
   await expect(editor.locator(".preference-intro"))
     .toContainText("Estimate Moon size in digital pixels");
-  await expect(estimate).toContainText("capture sampling");
-  await expect(estimate).toContainText("resizing changes the pixel result");
+  await expect(estimate).not.toContainText("capture sampling");
+  await expect(estimate).not.toContainText("resizing changes the pixel result");
   await expect(estimate).not.toContainText("uncropped");
   await expect(estimate).toContainText("widest illuminated thickness");
   await expect(estimate).toContainText("tapers to zero at its horns");
-  await expect(estimate).toContainText("multi-shot pixel-shift mode");
-  await expect(estimate).toContainText("off-axis fisheye scale varies by lens projection");
+  await expect(estimate).not.toContainText("multi-shot pixel-shift mode");
+  await expect(estimate).toContainText("This works best with a regular lens. With a fisheye, keep the Moon near the center—the edges can stretch its apparent size.");
 });
 
 test("uses each digital geometry and applies decimal MP, focal, and teleconverter edits immediately", async ({ page }) => {
@@ -316,7 +323,7 @@ test("warns about very small and very large marked focal lengths", async ({ page
   await expect(warning).toHaveText("This marked focal length is really big.");
   expect((await storedSetup(page)).focalLengthMm).toBe(5000.1);
   await expect(page.locator(".camera-estimate"))
-    .toContainText("off-axis fisheye scale varies by lens projection");
+    .toContainText("With a fisheye, keep the Moon near the center");
 
   await teleconverter.selectOption("1");
   await page.getByLabel("Output resolution (MP)").fill("6");

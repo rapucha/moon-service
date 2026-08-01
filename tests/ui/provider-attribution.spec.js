@@ -3,7 +3,7 @@ import { expect, test } from "@playwright/test";
 const removedCommercialCopy = "This is a noncommercial tester alpha. "
   + "A commercial launch requires a separately approved provider plan.";
 
-test("keeps compact provider credit on Search and full provider details on About", async ({ page, baseURL }) => {
+test("keeps the NASA guide on Search and provider details on About", async ({ page, baseURL }) => {
   if (!baseURL) {
     throw new Error("Playwright baseURL is required");
   }
@@ -23,16 +23,12 @@ test("keeps compact provider credit on Search and full provider details on About
   await expect(page.getByRole("heading", { name: "Data sources and alpha use" })).toHaveCount(0);
   await expect(page.locator("body")).not.toContainText(removedCommercialCopy);
 
-  const searchCredits = page.locator(".provider-credit");
-  await expect(searchCredits).toHaveCount(2);
-  for (const credit of await searchCredits.all()) {
-    await expect(credit.locator("a[href='https://open-meteo.com/']"))
-      .toHaveAttribute("href", "https://open-meteo.com/");
-    await expect(credit.locator("a[href='https://www.geonames.org/export/']"))
-      .toHaveAttribute("href", "https://www.geonames.org/export/");
-    expect(await credit.locator("a").evaluateAll(links => links.map(link => link.getAttribute("rel"))))
-      .toEqual(["noreferrer", "noreferrer"]);
-  }
+  await expect(page.locator(".provider-credit")).toHaveCount(0);
+  const photographyGuide = page.locator("#result-photography-guide");
+  await expect(photographyGuide).toBeVisible();
+  await expect(photographyGuide.getByRole("link", { name: "NASA: How to Photograph the Moon" }))
+    .toHaveAttribute("href", "https://science.nasa.gov/solar-system/moon/how-to-photograph-the-moon/");
+  await expect(page.getByText("Data providers:", { exact: true })).toHaveCount(0);
 
   await page.goto("/about");
 
@@ -53,6 +49,8 @@ test("keeps compact provider credit on Search and full provider details on About
   await expect(sources.getByRole("link", { name: "GeoNames" }))
     .toHaveAttribute("href", "https://www.geonames.org/export/");
   await expect(sources).toContainText("The free Open-Meteo API is rate-limited and has no uptime guarantee.");
+  await expect(page.getByRole("link", { name: "how to photograph the Moon" }))
+    .toHaveAttribute("href", "https://science.nasa.gov/solar-system/moon/how-to-photograph-the-moon/");
   expect(await sources.locator("a").evaluateAll(links => links.map(link => link.getAttribute("rel"))))
     .toEqual(["noreferrer", "noreferrer", "noreferrer", "noreferrer"]);
   await expect(page.locator("body")).not.toContainText(removedCommercialCopy);

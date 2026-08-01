@@ -15,8 +15,6 @@ var results = /** @type {HTMLElement} */ (document.getElementById("results"));
 var recentSearches = /** @type {HTMLDetailsElement} */ (document.getElementById("recent-searches"));
 var recentList = /** @type {HTMLElement} */ (document.getElementById("recent-list"));
 var clearRecent = /** @type {HTMLButtonElement} */ (document.getElementById("clear-recent"));
-var resultProviderCredit = /** @type {HTMLElement} */ (document.getElementById("result-provider-credit"));
-var resultObstructionNote = /** @type {HTMLElement} */ (document.getElementById("result-obstruction-note"));
 var workspaceTitle = /** @type {HTMLElement} */ (document.getElementById("workspace-title"));
 var workspaceHeading = /** @type {HTMLElement} */ (document.querySelector(".workspace-heading"));
 var ordinaryWorkspaceMeta = /** @type {HTMLElement} */ (document.querySelector(".workspace-meta"));
@@ -128,7 +126,6 @@ function runLookup(request, options) {
   if (!request) {
     beginOrdinaryLookup();
     input.value = "";
-    updateResultNotes("");
     preferences.beginSearch();
     responseView.renderIntro();
     return;
@@ -153,7 +150,6 @@ function search(rawQuery, options) {
   formFeedback.textContent = validationMessage || "";
 
   if (validationMessage) {
-    updateResultNotes("");
     preferences.beginSearch();
     responseView.renderInvalid(validationMessage);
     return;
@@ -176,7 +172,6 @@ function searchLocationId(rawLocationId, displayName, options) {
   formFeedback.textContent = validationMessage || "";
 
   if (validationMessage) {
-    updateResultNotes("");
     preferences.beginSearch();
     responseView.renderInvalid(validationMessage);
     return;
@@ -228,7 +223,6 @@ function fetchOpportunities(request) {
   var searchRequest = searchRequestFor(request, requestController.signal);
   setSearchBusy(true);
   results.setAttribute("aria-busy", "true");
-  updateResultNotes("");
   preferences.beginSearch();
   responseView.renderLoading(request.label);
 
@@ -240,7 +234,6 @@ function fetchOpportunities(request) {
         })
         .then(function (payload) {
           var recoveryLocationId = planningRecoveryLocationId(payload, response.status);
-          updateResultNotes(payload && payload.status);
           preferences.renderResponse(payload);
           responseView.renderResponse(payload || fallbackPayload(response.status), request, response.status);
           if (recoveryLocationId) {
@@ -252,7 +245,6 @@ function fetchOpportunities(request) {
     })
     .catch(function (error) {
       if (error.name !== "AbortError") {
-        updateResultNotes("");
         preferences.renderResponse(null);
         responseView.renderResponse({
           status: "temporarily_unavailable",
@@ -362,11 +354,6 @@ function syncSearchDisclosures(mediaQuery) {
   recentSearches.open = !mediaQuery.matches;
   cameraDetails.open = !mediaQuery.matches;
   preferenceDetails.open = !mediaQuery.matches;
-}
-
-function updateResultNotes(status) {
-  resultProviderCredit.hidden = status !== "ok" && status !== "ambiguous_location";
-  resultObstructionNote.hidden = status !== "ok";
 }
 
 function renderRecent() {

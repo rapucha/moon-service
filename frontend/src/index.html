@@ -60,11 +60,6 @@
           </div>
           <div id="recent-list" class="recent-list"></div>
           <p class="panel-note">Stored only in this browser.</p>
-          <p class="panel-note provider-credit">
-            Data providers:
-            <a href="https://open-meteo.com/" rel="noreferrer">Open-Meteo</a> and
-            <a href="https://www.geonames.org/export/" rel="noreferrer">GeoNames</a>.
-          </p>
         </details>
 
         <details id="opportunity-preferences" class="side-panel preference-panel">
@@ -136,9 +131,9 @@
                         aria-label="Minimum Moon altitude"
                         aria-describedby="preference-altitude-help preference-altitude-axis-description preference-handle-instructions preference-altitude-minimum-description"
                         aria-valuemin="0"
-                        aria-valuemax="15"
-                        aria-valuenow="2"
-                        data-altitude-minimum><span aria-hidden="true">2°</span>
+                        aria-valuemax="20"
+                        aria-valuenow="10"
+                        data-altitude-minimum><span aria-hidden="true">10°</span>
                       </button>
                       <button
                         type="button"
@@ -146,10 +141,10 @@
                         role="slider"
                         aria-label="Maximum Moon altitude"
                         aria-describedby="preference-altitude-help preference-altitude-axis-description preference-handle-instructions preference-altitude-minimum-description"
-                        aria-valuemin="2"
+                        aria-valuemin="20"
                         aria-valuemax="90"
-                        aria-valuenow="15"
-                        data-altitude-maximum><span aria-hidden="true">15°</span>
+                        aria-valuenow="30"
+                        data-altitude-maximum><span aria-hidden="true">30°</span>
                       </button>
                     </div>
                     <div id="preference-compass-track" class="preference-compass-track">
@@ -373,13 +368,8 @@
           </p>
         </div>
         <div id="results" class="results-region" aria-live="polite" aria-busy="false"></div>
-        <p id="result-provider-credit" class="panel-note provider-credit" hidden>
-          Data providers:
-          <a href="https://open-meteo.com/" rel="noreferrer">Open-Meteo</a> and
-          <a href="https://www.geonames.org/export/" rel="noreferrer">GeoNames</a>.
-        </p>
-        <p id="result-obstruction-note" class="panel-note" hidden>
-          Local hills, buildings, and trees may block the view.
+        <p id="result-photography-guide" class="panel-note">
+          <a href="https://science.nasa.gov/solar-system/moon/how-to-photograph-the-moon/" rel="noreferrer">NASA: How to Photograph the Moon</a>
         </p>
       </section>
     </div>

@@ -258,7 +258,7 @@ test("uses the authoritative direction mask and reveals positive-Sun context", a
   await expect(card.locator(".sky-dome-chart")).toHaveAccessibleName(
     /Sun .* altitude, .* azimuth .*; Moon .* altitude, .* azimuth .*; .* angular separation/
   );
-  await expect(card).not.toContainText(/Best|Alternative|Option|Rank|score|confidence|weather|photo/i);
+  await expect(card).not.toContainText(/Alternative|Option|Rank|score|confidence|weather|photo/i);
 });
 
 test("shows a later Sun pass without a sky dome at the negative-Sun suggestion", async ({ page }) => {

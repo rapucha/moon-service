@@ -51,10 +51,10 @@ test("edits, persists, removes, and resets the accepted controls", async ({ page
   expect(Math.abs(minimumBox.x - maximumBox.x)).toBeLessThanOrEqual(1);
   expect(minimumBox.y).toBeGreaterThan(maximumBox.y);
   const altitudePercent = await altitudeMaximum.evaluate(handle => parseFloat(handle.style.bottom));
-  expect(altitudePercent).toBeCloseTo(Math.pow(15 / 90, 0.85) * 100, 4);
+  expect(altitudePercent).toBeCloseTo(Math.pow(30 / 90, 0.85) * 100, 4);
   await altitudeMinimum.focus();
   await page.keyboard.press("ArrowUp");
-  await expect(altitudeMinimum).toHaveAttribute("aria-valuenow", "3");
+  await expect(altitudeMinimum).toHaveAttribute("aria-valuenow", "11");
 
   await page.getByLabel("Limit Moon direction").check();
   const compassTrack = page.locator("#preference-compass-track");
@@ -119,7 +119,7 @@ test("edits, persists, removes, and resets the accepted controls", async ({ page
     q: "Prague",
     preferences: {
       version: 1,
-      altitudeDegrees: { minimum: 3, maximum: 15 },
+      altitudeDegrees: { minimum: 11, maximum: 30 },
       azimuthDegrees: EDITED_DIRECTION,
       time: { mode: "light_bucket", buckets: ["night"] },
       brightLimbOrientationDegrees: [{ start: 337.5, end: 22.5 }]
@@ -152,7 +152,7 @@ test("edits, persists, removes, and resets the accepted controls", async ({ page
   await page.getByLabel("Limit Moon direction").check();
   await page.getByLabel("Ambient light").check();
   await page.getByLabel("Limit illuminated-edge direction").check();
-  await expect(altitudeMinimum).toHaveAttribute("aria-valuenow", "3");
+  await expect(altitudeMinimum).toHaveAttribute("aria-valuenow", "11");
   await expect(includedStartHandle).toHaveAttribute("aria-valuenow", "329");
   await expect(blockedStartHandle).toHaveAttribute("aria-valuenow", "349");
   await expect(page.getByLabel("Night")).toBeChecked();
@@ -407,17 +407,17 @@ test("uses the schematic sliders to explain and preview angular limits", async (
     x: zoneBox.width * bearing / 360,
     y: zoneBox.height * (1 - Math.pow(altitude / 90, 0.85))
   } });
-  await hoverZone(340, 8);
+  await hoverZone(340, 15);
   await expect(zoneTooltip)
-    .toHaveText("Azimuth 330°–350° and altitude 2°–15° are included.");
-  await hoverZone(355, 8);
+    .toHaveText("Azimuth 330°–350° and altitude 10°–30° are included.");
+  await hoverZone(355, 15);
   await expect(zoneTooltip).toHaveText("Azimuth 350°–10° is blocked.");
-  await hoverZone(340, 30);
-  await expect(zoneTooltip).toHaveText("Altitude 15°–90° is excluded.");
+  await hoverZone(340, 40);
+  await expect(zoneTooltip).toHaveText("Altitude 30°–90° is excluded.");
 
   await expect(zone).toHaveClass(/is-tooltip-visible/);
   await expect(zone).not.toHaveClass(/is-tooltip-visible/, { timeout: 2500 });
-  await hoverZone(340, 8);
+  await hoverZone(340, 15);
   await altitudeMinimum.hover();
   await expect(zone).not.toHaveClass(/is-tooltip-visible/);
   await expect(page.locator(".preference-control-tooltip")).toHaveCount(0);

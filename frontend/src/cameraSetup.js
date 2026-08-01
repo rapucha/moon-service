@@ -22,6 +22,7 @@ var FOCAL_SUGGESTIONS = [
   50, 55, 60, 70, 77, 80, 85, 100, 105, 120, 135, 150, 180, 200, 250, 270,
   300, 400, 450, 500, 600, 800, 1000, 1200
 ];
+var FOCAL_EASTER_EGGS = [21, 31, 43, 77];
 var TELECONVERTERS = [1, 1.4, 1.7, 2];
 var DEFAULT_SETUP = {
   version: VERSION,
@@ -48,6 +49,7 @@ export function createCameraSetup(options) {
     if (input.name === "camera-output-megapixels") {
       commitNumber("outputMegapixels", input.value, "Enter a positive output MP value.");
     } else if (input.name === "camera-focal-length") {
+      markFocalEasterEgg(input);
       commitNumber("focalLengthMm", input.value, "Enter a positive marked focal length.");
     }
   });
@@ -132,6 +134,7 @@ export function createCameraSetup(options) {
     fields.captureFormat.value = setup.captureFormat;
     fields.outputMegapixels.value = String(setup.outputMegapixels);
     fields.focalLengthMm.value = String(setup.focalLengthMm);
+    markFocalEasterEgg(fields.focalLengthMm);
     fields.teleconverter.value = String(setup.teleconverterMultiplier);
     renderDependent();
     showValidation();
@@ -173,6 +176,10 @@ export function createCameraSetup(options) {
 function markInvalid(control, invalid) {
   if (invalid) control.setAttribute("aria-invalid", "true");
   else control.removeAttribute("aria-invalid");
+}
+
+function markFocalEasterEgg(input) {
+  input.classList.toggle("camera-focal-easter-egg", FOCAL_EASTER_EGGS.includes(Number(input.value)));
 }
 
 function buildEditor(form) {
@@ -262,9 +269,9 @@ function cameraEstimateDisclosure(moon, setup) {
         : [fact("Full Moon diameter", estimate.diameterText),
           fact("Illuminated thickness", estimate.thicknessText)]),
       element("p", {}, digital
-        ? "This is the widest illuminated thickness. A crescent tapers to zero at its horns. It estimates capture sampling; resizing changes the pixel result. It does not predict visibility, optical resolution, or exposure. A multi-shot pixel-shift mode may not register a moving Moon successfully."
+        ? "This is the widest illuminated thickness. A crescent tapers to zero at its horns."
         : "This is the widest illuminated thickness. A crescent tapers to zero at its horns. It describes physical image size on the film original, not visibility, optical resolution, film resolving power, exposure, scanning, or printing."),
-      element("p", {}, "Assumes rectilinear projection or a Moon near the image center; off-axis fisheye scale varies by lens projection.")));
+      element("p", {}, "This works best with a regular lens. With a fisheye, keep the Moon near the center—the edges can stretch its apparent size.")));
 }
 
 function cameraEstimate(moon, setup) {
