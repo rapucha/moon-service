@@ -45,6 +45,10 @@
   min-width: 0;
 }
 
+.camera-focal-easter-egg {
+  font-weight: 800;
+}
+
 .preference-heading h2 {
   margin: 0;
   font-size: 1rem;
@@ -358,6 +362,15 @@
   border-color: #e0ada6;
   background: var(--danger-soft);
   color: var(--danger);
+}
+
+@media (min-width: 921px) {
+  .side-column {
+    max-height: calc(100vh - 36px);
+    overflow-y: auto;
+    overscroll-behavior-y: contain;
+    scrollbar-gutter: stable;
+  }
 }
 
 @media (max-width: 680px) {

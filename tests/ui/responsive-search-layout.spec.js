@@ -14,7 +14,8 @@ const resolvedResponse = {
   opportunities: [],
   emptyReason: {
     text: "No useful Moon window passed the current scoring threshold."
-  }
+  },
+  messages: ["Local hills, buildings, and trees may block the view."]
 };
 
 const ambiguousResponse = {
@@ -66,9 +67,12 @@ test("keeps Recent searches accessible without placing it ahead of mobile result
   await expect(recent).toHaveJSProperty("open", !isMobile);
   await expect(page.getByRole("heading", { name: "Privacy and caveats" })).toHaveCount(0);
   await expect(page.getByRole("heading", { name: "Data sources and alpha use" })).toHaveCount(0);
+  await expect(page.locator("[data-altitude-minimum]")).toHaveAttribute("aria-valuenow", "10");
+  await expect(page.locator("[data-altitude-maximum]")).toHaveAttribute("aria-valuenow", "30");
 
   if (isMobile) {
     await expect(summary).toBeVisible();
+    await expect(page.locator(".side-column")).toHaveCSS("overflow-y", "visible");
     const recentBox = await recent.boundingBox();
     const workspaceBox = await workspace.boundingBox();
     expect(recentBox).not.toBeNull();
@@ -89,16 +93,30 @@ test("keeps Recent searches accessible without placing it ahead of mobile result
     expect(recentBox).not.toBeNull();
     expect(workspaceBox).not.toBeNull();
     expect(recentBox.x).toBeLessThan(workspaceBox.x);
+    const sidebar = page.locator(".side-column");
+    await expect(sidebar).toHaveCSS("overflow-y", "auto");
+    expect(await sidebar.evaluate(element => element.scrollHeight > element.clientHeight)).toBe(true);
+    await sidebar.hover();
+    const pageScroll = await page.evaluate(() => window.scrollY);
+    await page.mouse.wheel(0, 200);
+    await expect.poll(() => sidebar.evaluate(element => element.scrollTop)).toBeGreaterThan(0);
+    expect(await page.evaluate(() => window.scrollY)).toBe(pageScroll);
+    await page.setViewportSize({ width: 920, height: 900 });
+    await expect(sidebar).toHaveCSS("overflow-y", "visible");
   }
 
   await expect(recent).toContainText("Stored only in this browser.");
-  await expect(recent.locator(".provider-credit")).toBeVisible();
+  await expect(recent.locator(".provider-credit")).toHaveCount(0);
   await recent.getByRole("button", { name: /Prague, Czechia/ }).click();
 
   await expect(page).toHaveURL(/locationId=prague-cz/);
   await expect(page.getByRole("heading", { name: "Prague, Czechia" })).toBeVisible();
-  await expect(page.locator("#result-provider-credit")).toBeVisible();
-  await expect(page.locator("#result-obstruction-note")).toBeVisible();
+  await expect(page.locator("#result-provider-credit")).toHaveCount(0);
+  await expect(page.locator("#result-photography-guide")).toBeVisible();
+  await expect(page.locator("#result-obstruction-note")).toHaveCount(0);
+  await expect(page.getByRole("heading", { name: "Lookup notes" })).toHaveCount(0);
+  await expect(page.getByRole("link", { name: "NASA: How to Photograph the Moon" }))
+    .toBeVisible();
   await expect(page.getByRole("link", { name: "Open share link" })).toBeVisible();
 
   await recent.getByRole("button", { name: "Clear" }).click();
@@ -116,8 +134,9 @@ test("keeps ambiguous selection and unavailable-result flows", async ({ page }) 
   await page.getByLabel("City or town").fill("Springfield");
   await page.getByRole("button", { name: "Find" }).click();
   await expect(page.getByRole("heading", { name: "Choose a location" })).toBeVisible();
-  await expect(page.locator("#result-provider-credit")).toBeVisible();
-  await expect(page.locator("#result-obstruction-note")).toBeHidden();
+  await expect(page.locator("#result-provider-credit")).toHaveCount(0);
+  await expect(page.locator("#result-photography-guide")).toBeVisible();
+  await expect(page.locator("#result-obstruction-note")).toHaveCount(0);
 
   await page.locator(".candidate-list").getByRole("button", { name: /Prague, Czechia/ }).click();
   await expect(page).toHaveURL(/locationId=prague-cz/);
@@ -126,6 +145,7 @@ test("keeps ambiguous selection and unavailable-result flows", async ({ page }) 
   await page.getByLabel("City or town").fill("Unavailable");
   await page.getByRole("button", { name: "Find", exact: true }).click();
   await expect(page.getByRole("heading", { name: "Lookup temporarily unavailable" })).toBeVisible();
-  await expect(page.locator("#result-provider-credit")).toBeHidden();
-  await expect(page.locator("#result-obstruction-note")).toBeHidden();
+  await expect(page.locator("#result-provider-credit")).toHaveCount(0);
+  await expect(page.locator("#result-photography-guide")).toBeVisible();
+  await expect(page.locator("#result-obstruction-note")).toHaveCount(0);
 });

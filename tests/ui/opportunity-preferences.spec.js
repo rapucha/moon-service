@@ -19,8 +19,8 @@ const ALTITUDE_PREFERENCES = {
 const SLIDER_ALTITUDE_PREFERENCES = {
   version: 1,
   altitudeDegrees: {
-    minimum: 3,
-    maximum: 15
+    minimum: 11,
+    maximum: 30
   }
 };
 

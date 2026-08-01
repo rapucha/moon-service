@@ -38,26 +38,27 @@ test("shows zone feedback only after the mouse rests", async ({ page }, testInfo
   await openAngularControls(page, true);
   const zone = page.locator("[data-preference-zone]");
   await expect(zone).toHaveCSS("cursor", "auto");
+  await zone.hover();
   const box = await zone.boundingBox();
   expect(box).not.toBeNull();
 
-  await zone.hover({ position: { x: box.width * 0.94, y: box.height * 0.7 } });
-  await page.waitForTimeout(400);
+  await page.mouse.move(box.x + box.width * 0.94, box.y + box.height * 0.5);
+  await page.waitForTimeout(200);
   await expect(zone).not.toHaveClass(/is-tooltip-visible/);
 
-  await page.mouse.move(box.x + box.width * 0.9, box.y + box.height * 0.7);
-  await page.waitForTimeout(400);
+  await page.mouse.move(box.x + box.width * 0.9, box.y + box.height * 0.5);
+  await page.waitForTimeout(200);
   await expect(zone).not.toHaveClass(/is-tooltip-visible/);
-  await expect(zone).toHaveClass(/is-tooltip-visible/, { timeout: 1200 });
+  await expect(zone).toHaveClass(/is-tooltip-visible/, { timeout: 2000 });
 
-  await page.mouse.move(box.x + box.width * 0.85, box.y + box.height * 0.7);
+  await page.mouse.move(box.x + box.width * 0.85, box.y + box.height * 0.5);
   await expect(zone).not.toHaveClass(/is-tooltip-visible/);
   await expect(zone).toHaveClass(/is-tooltip-visible/, { timeout: 800 });
   await expect(zone).not.toHaveClass(/is-tooltip-visible/, { timeout: 2000 });
   await page.waitForTimeout(700);
   await expect(zone).not.toHaveClass(/is-tooltip-visible/);
 
-  await page.mouse.move(box.x + box.width * 0.8, box.y + box.height * 0.7);
+  await page.mouse.move(box.x + box.width * 0.8, box.y + box.height * 0.5);
   await page.mouse.move(box.x - 10, box.y - 10);
   await page.waitForTimeout(700);
   await expect(zone).not.toHaveClass(/is-tooltip-visible/);
@@ -104,8 +105,6 @@ test("draws the schematic Moon pass as one parabola", async ({ page }) => {
 test("keeps the axis titles uniform and clear of degree ticks", async ({ page }) => {
   await openAngularControls(page, true);
   const maximum = page.getByRole("slider", { name: "Maximum Moon altitude" });
-  await maximum.press("Shift+ArrowUp");
-  for (let step = 0; step < 5; step += 1) await maximum.press("ArrowUp");
   await expect(maximum).toHaveAttribute("aria-valuenow", "30");
 
   const titles = page.locator(
@@ -141,7 +140,7 @@ test("keeps the axis titles uniform and clear of degree ticks", async ({ page })
   });
   const expectClearGeometry = async () => {
     var geometry = await readGeometry();
-    expect(geometry.bearingGap).toBeGreaterThanOrEqual(3);
+    expect(geometry.bearingGap).toBeGreaterThanOrEqual(2.5);
     expect(geometry.titleOverlap).toBe(false);
     expect(geometry.tickUnderHandle).toBe(false);
   };

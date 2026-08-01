@@ -9,7 +9,7 @@ import {
   numberText, rectanglePath, validAltitude
 } from "./angularPreferenceRules.js";
 
-var DEFAULT_ALTITUDE = { minimum: 2, maximum: 15 };
+var DEFAULT_ALTITUDE = { minimum: 10, maximum: 30 };
 var DEFAULT_AZIMUTH = { included: { start: 330, end: 30 }, excluded: { start: 350, end: 10 } };
 var BEARING_SNAP_RELEASE_DEGREES = 16;
 var PREVIEW = { left: 40, right: 340, top: 30, bottom: 190 };
