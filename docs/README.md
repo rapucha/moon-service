@@ -29,6 +29,8 @@ Start Here
   - `prototypes/jvm-scoring/README.md`
   - `prototypes/jvm-ephemeris/README.md`
   - `live-tests/README.md`
+- Offline authoring guides:
+  - `docs/camera-preview-scene-authoring.md`
 - AI-agent operating docs:
   - `docs/ai-agent/README.md`
   - `docs/ai-agent/github-identity.md`
