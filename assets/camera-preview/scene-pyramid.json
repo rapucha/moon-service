@@ -1,0 +1,114 @@
+{
+  "schemaVersion": 1,
+  "cumulativeWorldWidthRatio": 635.8234348125749,
+  "levels": [
+    {
+      "id": "level-0",
+      "parent": null,
+      "width": 960,
+      "height": 720,
+      "worldWidthMetres": 1350,
+      "anchor": { "x": 0.46875, "y": 0.5138888888888888 },
+      "parentCrop": null,
+      "accepted": {
+        "path": "level-0.webp",
+        "width": 960,
+        "height": 720,
+        "bytes": 595464,
+        "sha256": "ae3f5bc18f1899426a974e756afc4b1bc2fec83253c288f6acdaed0905e87e45",
+        "pillowVersion": "12.3.0",
+        "webpCodecVersion": "1.6.0"
+      }
+    },
+    {
+      "id": "level-1",
+      "parent": "level-0",
+      "width": 960,
+      "height": 720,
+      "worldWidthMetres": 371.25,
+      "anchor": { "x": 0.46875, "y": 0.5138888888888888 },
+      "parentCrop": [326, 268, 590, 466],
+      "accepted": {
+        "path": "level-1.webp",
+        "width": 960,
+        "height": 720,
+        "bytes": 523112,
+        "sha256": "289d1c681be4c9a8a34dfe36a33b1709989f3a5525f6199d6c51addb23708b0b",
+        "pillowVersion": "12.3.0",
+        "webpCodecVersion": "1.6.0"
+      }
+    },
+    {
+      "id": "level-2",
+      "parent": "level-1",
+      "width": 960,
+      "height": 720,
+      "worldWidthMetres": 102.09375,
+      "anchor": { "x": 0.46875, "y": 0.5138888888888888 },
+      "parentCrop": [326, 268, 590, 466],
+      "accepted": {
+        "path": "level-2.webp",
+        "width": 960,
+        "height": 720,
+        "bytes": 531956,
+        "sha256": "62c9e08d65b731cf3d73845f119144402139002b1552f09febe4482f6fd31966",
+        "pillowVersion": "12.3.0",
+        "webpCodecVersion": "1.6.0"
+      }
+    },
+    {
+      "id": "level-3",
+      "parent": "level-2",
+      "width": 960,
+      "height": 720,
+      "worldWidthMetres": 28.07578125,
+      "anchor": { "x": 0.46875, "y": 0.5138888888888888 },
+      "parentCrop": [326, 268, 590, 466],
+      "accepted": {
+        "path": "level-3.webp",
+        "width": 960,
+        "height": 720,
+        "bytes": 594140,
+        "sha256": "3a3adffbc3097d59894e7569396b64365727493d5cc215937d73b2193b0847ac",
+        "pillowVersion": "12.3.0",
+        "webpCodecVersion": "1.6.0"
+      }
+    },
+    {
+      "id": "level-4",
+      "parent": "level-3",
+      "width": 960,
+      "height": 720,
+      "worldWidthMetres": 7.72083984375,
+      "anchor": { "x": 0.46875, "y": 0.5138888888888888 },
+      "parentCrop": [326, 268, 590, 466],
+      "accepted": {
+        "path": "level-4.webp",
+        "width": 960,
+        "height": 720,
+        "bytes": 511290,
+        "sha256": "d74bb2f12970f3df918dfb91ce97b9681380c87ceaba6bd741c84cfb95196b6f",
+        "pillowVersion": "12.3.0",
+        "webpCodecVersion": "1.6.0"
+      }
+    },
+    {
+      "id": "level-5",
+      "parent": "level-4",
+      "width": 960,
+      "height": 720,
+      "worldWidthMetres": 2.12323095703125,
+      "anchor": { "x": 0.46875, "y": 0.5138888888888888 },
+      "parentCrop": [326, 268, 590, 466],
+      "accepted": {
+        "path": "level-5.webp",
+        "width": 960,
+        "height": 720,
+        "bytes": 417948,
+        "sha256": "11e901adc1f355f8480d3a66f869e98d871547774174c7e7a93d142e41eff253",
+        "pillowVersion": "12.3.0",
+        "webpCodecVersion": "1.6.0"
+      }
+    }
+  ]
+}
