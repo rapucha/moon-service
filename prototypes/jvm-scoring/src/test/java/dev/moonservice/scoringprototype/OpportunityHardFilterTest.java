@@ -398,12 +398,12 @@ class OpportunityHardFilterTest {
                 BASE,
                 0.25);
 
-        assertEquals(2, result.windows().size());
+        assertEquals(1, result.windows().size());
         assertEquals(3, result.excludedSampleCount());
         OpportunityHardFilter.MatchInterval mask =
                 result.azimuthMatchIntervals().get(first.passId()).getFirst();
         assertEquals(result.windows().getFirst().startsAt(), mask.startsAt());
-        assertEquals(result.windows().getLast().endsAt(), mask.endsAt());
+        assertEquals(result.windows().getFirst().endsAt(), mask.endsAt());
         assertTrue(mask.startsAt().isBefore(naturalBoundary));
         assertTrue(mask.endsAt().isAfter(naturalBoundary));
     }
@@ -485,7 +485,7 @@ class OpportunityHardFilterTest {
     }
 
     @Test
-    void serviceRanksSplitIntervalsGloballyThenLimitsAndKeepsPassScopedMasks() {
+    void serviceRanksRetainedIntervalsGloballyThenLimitsAndKeepsPassScopedMasks() {
         OpportunityPreferences preferences = new OpportunityPreferences(
                 1,
                 null,
@@ -496,26 +496,21 @@ class OpportunityHardFilterTest {
                 null);
         OpportunityService service = new OpportunityService();
         PrototypeConfig fullConfig = new PrototypeConfig(
-                PRAGUE, LocalDate.parse("2026-06-29"), 1, 12.0, 100);
+                PRAGUE, LocalDate.parse("2026-06-29"), 7, 12.0, 100);
         OpportunityService.PreferenceEvaluation full =
                 evaluateWithDefaultWeather(service, fullConfig, preferences, fullConfig.start());
-        String repeatedPassId = full.result().opportunities().stream()
-                .map(item -> item.window().passId())
-                .filter(passId -> full.result().opportunities().stream()
-                        .filter(item -> item.window().passId().equals(passId))
-                        .count() > 1)
-                .findFirst()
-                .orElseThrow();
+        assertTrue(full.result().opportunities().size() > 1);
+        String highestRankedPassId = full.result().opportunities().getFirst().window().passId();
 
-        assertTrue(full.azimuthMatchIntervals().containsKey(repeatedPassId));
+        assertTrue(full.azimuthMatchIntervals().containsKey(highestRankedPassId));
 
         PrototypeConfig limitedConfig = new PrototypeConfig(
-                PRAGUE, LocalDate.parse("2026-06-29"), 1, 12.0, 1);
+                PRAGUE, LocalDate.parse("2026-06-29"), 7, 12.0, 1);
         OpportunityService.PreferenceEvaluation limited =
                 evaluateWithDefaultWeather(service, limitedConfig, preferences, limitedConfig.start());
         String returnedPassId = limited.result().opportunities().getFirst().window().passId();
 
-        assertEquals(repeatedPassId, returnedPassId);
+        assertEquals(highestRankedPassId, returnedPassId);
         assertEquals(full.result().opportunities().getFirst().window(),
                 limited.result().opportunities().getFirst().window());
         assertEquals(Set.of(returnedPassId), limited.azimuthMatchIntervals().keySet());

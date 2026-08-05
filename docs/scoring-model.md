@@ -74,13 +74,19 @@ the suggested best time within it.
 - Without active hard preferences, `startsAt` and `endsAt` describe the natural
   interval when the Moon is visible from the location and stays within the
   configured visible-Moon ceiling.
-- With active version 1 preferences, `startsAt` and `endsAt` instead bound one
-  continuous retained interval in which every active filter matches.
-- In the target contract, `suggestedAt` is the strongest moment within the
-  interval under the full v0 rule-based score.
-- The current implementation selects `suggestedAt` from five-minute candidates
-  using Moon-altitude fit plus sunlight fit. Illumination, weather, and forecast
-  confidence affect the later window ranking, not this time selection.
+- With active version 1 preferences, `startsAt` and `endsAt` bound a practical
+  recommendation envelope assembled from precise matching fragments. Nearby
+  fragments may include a short nonmatching gap under the rule below.
+- Serialized `startsAt`, `suggestedAt`, and `endsAt` values remain precise;
+  grouping does not round them.
+- `suggestedAt` is a precisely calculated instant that matches every active
+  preference. It is selected within one retained matching fragment, not from a
+  tolerated nonmatching gap.
+- The current implementation selects each fragment suggestion from five-minute
+  candidates using Moon-altitude fit plus sunlight fit. A grouped opportunity
+  compares those member suggestions with the same fit and earlier-instant
+  tie-break. Illumination, weather, and forecast confidence affect later window
+  ranking, not this time selection.
 - The service should not describe `suggestedAt` as a guaranteed best photograph,
   an exact landmark alignment, or an exact local-horizon visibility time.
 - UI, feed, and calendar wording should say that local hills, buildings, trees,
@@ -139,22 +145,41 @@ The opportunity engine applies active preferences in this order:
 2. The hard filter evaluates the complete window. A provisional suggestion or
    preliminary score cannot remove another matching part of that window.
 3. The hard filter refines every filter transition and splits the window into
-   zero, one, or several continuous matching intervals.
-4. For a live search, the engine applies the request's captured `notBefore`
-   after splitting. It drops an interval whose `endsAt` is not after
-   `notBefore` and starts final suggestion selection no earlier than the later
-   of the interval start and `notBefore`.
-5. The engine chooses a final `suggestedAt` inside each retained interval and
-   recomputes the current score, selected weather, and displayed facts for that
-   instant.
-6. The engine ranks all retained intervals and then applies the ordinary global
-   result limit.
+   zero, one, or several continuous matching fragments.
+4. For a live search, the hard filter drops each fragment whose `endsAt` is not
+   after the request's captured `notBefore`. It finalizes every other fragment
+   with one precise matching suggestion no earlier than the later of the
+   fragment start and `notBefore`. An ongoing fragment keeps its original
+   start.
+5. Before scoring and ranking, the engine groups consecutive finalized
+   fragments when they have the same `moonPass.id`, their natural source-window
+   coverage touches or overlaps, and each precise gap is no more than ten
+   minutes. The rule is transitive across several qualifying gaps. It does not
+   restore an expired fragment, bridge a system-created natural-window gap, or
+   join different physical passes.
+6. An ungrouped fragment remains unchanged. A grouped opportunity keeps the
+   earliest retained start and latest retained end and selects from its
+   members' precise suggestions before that end. It prefers suggestions that
+   pass the near-conjunction visibility rule, then uses the existing
+   candidate-fit and earlier-instant tie-break. If every member fails the
+   visibility rule, the existing downstream rejection still records the
+   grouped opportunity. The selected member supplies the window kind.
+7. The engine calculates score, selected weather, and displayed facts for the
+   selected suggestion, ranks all retained opportunities, and then applies the
+   ordinary global result limit.
 
-Every retained interval enters normal ranking. Several intervals from one
-physical pass remain flat opportunities with the same `moonPass.id`; the
-engine does not guarantee one result per pass. Preferences add no score
-component. The existing component weights, tie-break order, and result-limit
-behavior remain unchanged.
+The practical envelope may contain an active-preference mismatch, including an
+altitude, azimuth, time or light, phase, or bright-limb mismatch. The selected
+suggestion still matches every active preference precisely. The combined
+`moonPath` is the chronological, deduplicated union of member path points and
+the combined boundaries and suggestion; it does not claim continuous
+preference match through a tolerated gap.
+
+Several fragments separated by a gap longer than ten minutes, a system-created
+natural-window gap, or a physical-pass boundary remain flat opportunities.
+The engine does not otherwise guarantee one result per pass. Preferences add
+no score component. The existing component weights, tie-break order, and
+result-limit behavior remain unchanged.
 
 ### Boundary and sampling contract
 
@@ -170,7 +195,9 @@ boundaries, and refines a detected transition to one-second tolerance.
 Sampling brackets numerical crossings; it is not an analytical guarantee. An
 enter-and-exit event that occurs entirely between two evaluated samples may be
 missed. The contract does not impose a minimum azimuth-sector width to hide
-that limitation.
+that limitation. This precise calculation produces matching fragments and
+diagnostics; the practical-envelope rule above determines how nearby fragments
+are presented as opportunities.
 
 ### Lunar-disk azimuth filter
 
