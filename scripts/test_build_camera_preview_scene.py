@@ -22,8 +22,8 @@ import build_camera_preview_scene as scene  # noqa: E402
 class CameraPreviewSceneToolTest(unittest.TestCase):
     WIDTH = 960
     HEIGHT = 720
-    CROP = [320, 360, 640, 600]
-    ANCHOR = {"x": 0.5, "y": 0.75}
+    CROP = [326, 268, 590, 466]
+    ANCHOR = {"x": 450 / 960, "y": 370 / 720}
 
     def setUp(self) -> None:
         self.temporary = tempfile.TemporaryDirectory()
@@ -40,13 +40,13 @@ class CameraPreviewSceneToolTest(unittest.TestCase):
     def make_manifest(self) -> dict:
         step = self.WIDTH / (self.CROP[2] - self.CROP[0])
         levels = []
-        for index in range(9):
+        for index in range(scene.LEVEL_COUNT):
             levels.append({
                 "id": f"level-{index}",
                 "parent": None if index == 0 else f"level-{index - 1}",
                 "width": self.WIDTH,
                 "height": self.HEIGHT,
-                "worldWidthMetres": 1314.0 / step ** index,
+                "worldWidthMetres": 1350.0 / step ** index,
                 "anchor": self.ANCHOR.copy(),
                 "parentCrop": None if index == 0 else self.CROP.copy(),
             })
@@ -70,7 +70,11 @@ class CameraPreviewSceneToolTest(unittest.TestCase):
             draw.line((offset, 0, offset, self.HEIGHT), fill=(80, offset % 255, 40, 255), width=3)
         for offset in range(0, self.HEIGHT, 40):
             draw.line((0, offset, self.WIDTH, offset), fill=(offset % 255, 90, 60, 255), width=3)
-        draw.rectangle((self.WIDTH // 2, 0, self.WIDTH, self.HEIGHT), fill=(0, 0, 0, 0))
+        alpha = Image.new("L", image.size)
+        ImageDraw.Draw(alpha).polygon(
+            ((0, 0), (79, 0), (799, self.HEIGHT), (0, self.HEIGHT)), fill=255
+        )
+        image.putalpha(alpha)
         return image
 
     def quiet(self):
@@ -110,11 +114,11 @@ class CameraPreviewSceneToolTest(unittest.TestCase):
     def test_complete_exact_chain_check_and_diagnostics(self) -> None:
         guides, accepted = self.build_chain()
         levels = self.manifest["levels"]
-        self.assertGreaterEqual(self.manifest["cumulativeWorldWidthRatio"], 6330)
-        for index in range(1, 9):
+        self.assertGreaterEqual(self.manifest["cumulativeWorldWidthRatio"], 625)
+        for index in range(1, scene.LEVEL_COUNT):
             parent_level, child_level = levels[index - 1:index + 1]
             scale = parent_level["worldWidthMetres"] / child_level["worldWidthMetres"]
-            self.assertLessEqual(scale, 3.2)
+            self.assertLessEqual(scale, 3.7)
             with Image.open(accepted[index - 1]) as parent, Image.open(guides[index]) as guide:
                 expected = parent.convert("RGBA").crop(tuple(self.CROP)).resize(
                     (self.WIDTH, self.HEIGHT), Image.Resampling.LANCZOS
@@ -143,7 +147,7 @@ class CameraPreviewSceneToolTest(unittest.TestCase):
         with self.quiet():
             scene.diagnose(self.manifest_path, diagnostics)
         sheets = sorted(diagnostics.glob("[0-9][0-9]-*.png"))
-        self.assertEqual(8, len(sheets))
+        self.assertEqual(5, len(sheets))
         for sheet_path in sheets:
             with Image.open(sheet_path) as sheet:
                 self.assertEqual((self.WIDTH, 2376), sheet.size)
@@ -151,18 +155,13 @@ class CameraPreviewSceneToolTest(unittest.TestCase):
                 child_panel = sheet.crop((0, 888, self.WIDTH, 1608))
                 self.assertIsNone(ImageChops.difference(parent_panel, child_panel).getbbox())
         with Image.open(diagnostics / "pyramid-overview.png") as overview:
-            self.assertEqual((1440, 1224), overview.size)
+            self.assertEqual((1440, 816), overview.size)
 
     def test_recursive_prepare_preserves_transparent_and_opaque_regions(self) -> None:
         parent = self.root / "alpha-level-0.png"
-        image = Image.new("RGBA", (self.WIDTH, self.HEIGHT), "#725a38")
-        alpha = Image.new("L", image.size, 255)
-        ImageDraw.Draw(alpha).rectangle(
-            (0, 0, self.WIDTH, int(self.ANCHOR["y"] * self.HEIGHT) - 1), fill=0
-        )
-        image.putalpha(alpha)
+        image = self.make_alpha_image()
         image.save(parent)
-        for index in range(1, 9):
+        for index in range(1, scene.LEVEL_COUNT):
             child = self.root / f"alpha-level-{index}.png"
             with self.quiet():
                 scene.prepare(self.manifest_path, f"level-{index}", parent, child)
@@ -171,7 +170,7 @@ class CameraPreviewSceneToolTest(unittest.TestCase):
                 self.assertEqual((0, 255), prepared_alpha.getextrema())
                 self.assertEqual((0, 0), prepared_alpha.crop((672, 0, 960, 144)).getextrema())
                 self.assertEqual(
-                    (255, 255), prepared_alpha.crop((0, 576, 288, 720)).getextrema()
+                    (255, 255), prepared_alpha.crop((0, 650, 100, 720)).getextrema()
                 )
             parent = child
 
@@ -236,11 +235,11 @@ class CameraPreviewSceneToolTest(unittest.TestCase):
         out_of_bounds["levels"][1]["parentCrop"][2] = self.WIDTH + 1
         cases.append((out_of_bounds, "out of bounds"))
         excessive_step = copy.deepcopy(self.manifest)
-        excessive_step["levels"][1]["worldWidthMetres"] = 1314.0 / 3.21
-        cases.append((excessive_step, "must be >1 and <=3.2"))
+        excessive_step["levels"][1]["worldWidthMetres"] = 1350.0 / 3.71
+        cases.append((excessive_step, "must be >1 and <=3.7"))
         insufficient_ratio = copy.deepcopy(self.manifest)
-        insufficient_ratio["cumulativeWorldWidthRatio"] = 6329.9
-        cases.append((insufficient_ratio, "both be at least 6330"))
+        insufficient_ratio["cumulativeWorldWidthRatio"] = 624.9
+        cases.append((insufficient_ratio, "both be at least 625"))
         invalid_anchor = copy.deepcopy(self.manifest)
         invalid_anchor["levels"][1]["anchor"]["x"] = 1.1
         cases.append((invalid_anchor, "within 0..1"))
@@ -249,7 +248,7 @@ class CameraPreviewSceneToolTest(unittest.TestCase):
         cases.append((distorted, "aspect ratio"))
         wrong_count = copy.deepcopy(self.manifest)
         wrong_count["levels"].pop()
-        cases.append((wrong_count, "exactly 9"))
+        cases.append((wrong_count, "exactly 6"))
         for invalid_version in (True, 1.0):
             wrong_schema = copy.deepcopy(self.manifest)
             wrong_schema["schemaVersion"] = invalid_version

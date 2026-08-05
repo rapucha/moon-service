@@ -26,9 +26,9 @@ except ModuleNotFoundError as exc:  # pragma: no cover - only without tooling
 
 
 PINNED_PILLOW_VERSION = "12.3.0"
-LEVEL_COUNT = 9
-MAX_SCALE_STEP = 3.2
-MIN_CUMULATIVE_RATIO = 6330.0
+LEVEL_COUNT = 6
+MAX_SCALE_STEP = 3.7
+MIN_CUMULATIVE_RATIO = 625.0
 GEOMETRY_TOLERANCE_PIXELS = 1.0
 WEBP_OPTIONS = {"lossless": True, "quality": 100, "method": 6, "exact": True}
 LEVEL_ID_PATTERN = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]*\Z")
@@ -131,7 +131,7 @@ def load_manifest(path: Path) -> dict:
         parent_world = _number(parent["worldWidthMetres"], "Parent world width")
         scale = parent_world / world_width
         if scale <= 1.0 or scale > MAX_SCALE_STEP:
-            raise SceneToolError(f"Level {level_id} scale step {scale:.6g} must be >1 and <=3.2.")
+            raise SceneToolError(f"Level {level_id} scale step {scale:.6g} must be >1 and <={MAX_SCALE_STEP:g}.")
         if abs(crop_width - parent_width / scale) > GEOMETRY_TOLERANCE_PIXELS:
             raise SceneToolError(f"Level {level_id} crop width conflicts with its world width.")
         if abs(crop_height - crop_width * height / width) > GEOMETRY_TOLERANCE_PIXELS:
@@ -151,7 +151,7 @@ def load_manifest(path: Path) -> dict:
         levels[-1]["worldWidthMetres"]
     )
     if declared_ratio < MIN_CUMULATIVE_RATIO or computed_ratio < MIN_CUMULATIVE_RATIO:
-        raise SceneToolError("Declared and endpoint world-width ratios must both be at least 6330.")
+        raise SceneToolError(f"Declared and endpoint world-width ratios must both be at least {MIN_CUMULATIVE_RATIO:g}.")
     if not math.isclose(declared_ratio, computed_ratio, rel_tol=1e-6, abs_tol=1e-6):
         raise SceneToolError("Declared cumulative ratio does not match the endpoint world widths.")
     return manifest
@@ -363,12 +363,12 @@ def _accepted_images(manifest: dict, manifest_path: Path) -> list[Image.Image]:
 def check(manifest_path: Path) -> None:
     manifest = load_manifest(manifest_path)
     _accepted_images(manifest, manifest_path)
-    print("Checked 9 accepted files and metadata; visible-feature geometry still needs human review.")
+    print(f"Checked {LEVEL_COUNT} accepted files and metadata; visible-feature geometry still needs human review.")
 
 
 def _overview(images: list[Image.Image], levels: list[dict]) -> Image.Image:
     tile_width, tile_height, label_height = 480, 360, 48
-    sheet = Image.new("RGB", (tile_width * 3, (tile_height + label_height) * 3), "#17202a")
+    sheet = Image.new("RGB", (tile_width * 3, (tile_height + label_height) * 2), "#17202a")
     draw = ImageDraw.Draw(sheet)
     for index, (source, level) in enumerate(zip(images, levels, strict=True)):
         panel = _checkerboard(source)
@@ -405,7 +405,7 @@ def diagnose(manifest_path: Path, output_dir: Path) -> None:
     )))
     for path, data in outputs:
         _atomic_write(path, data)
-    print(f"Wrote 8 adjacent comparisons and one overview to {output_dir}.")
+    print(f"Wrote {LEVEL_COUNT - 1} adjacent comparisons and one overview to {output_dir}.")
 
 
 def _chroma_key(value: str) -> tuple[int, int, int]:

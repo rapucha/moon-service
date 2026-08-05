@@ -1,7 +1,7 @@
 # Camera-preview scene authoring
 
 Use `scripts/build_camera_preview_scene.py` to author one fixed, registered
-nine-level foreground pyramid for issue #249. The command is offline tooling.
+six-level foreground pyramid for issue #249. The command is offline tooling.
 It does not define a browser contract, select runtime levels, call Image Gen,
 or make a candidate acceptable without human review.
 
@@ -27,10 +27,10 @@ those files.
 
 ## Manifest contract
 
-The tooling-only JSON manifest has `schemaVersion: 1`, exactly nine ordered
+The tooling-only JSON manifest has `schemaVersion: 1`, exactly six ordered
 levels, and `cumulativeWorldWidthRatio`. The declared cumulative ratio and the
 ratio computed from the first and last `worldWidthMetres` must each be at least
-6,330 and must agree.
+625 and must agree.
 
 Each level contains these fields:
 
@@ -47,7 +47,7 @@ Each level contains these fields:
 - `accepted`: metadata copied from an accepted `build` report.
 
 `accepted` may be absent while `prepare` and `build` create candidates. It is
-required on all nine levels before `check` or `diagnose` can run.
+required on all six levels before `check` or `diagnose` can run.
 
 An accepted record has this shape:
 
@@ -66,7 +66,7 @@ An accepted record has this shape:
 The first level has no parent or crop. Every later level names the immediately
 preceding level as its parent. Its declared scale step is
 `parent world width / child world width`; the value must be greater than one
-and no greater than 3.2. The crop width must represent that same world extent.
+and no greater than 3.7. The crop width must represent that same world extent.
 The crop aspect ratio must match the child output without distortion. The
 declared and computed cumulative ratios use relative and absolute tolerances of
 `1e-6` when the command compares them.
@@ -158,7 +158,7 @@ versions without writing files:
 `check` proves file and metadata consistency. It does not inspect content
 geometry or accept an Image Gen result.
 
-Create the temporary human-review diagnostics only after all nine accepted
+Create the temporary human-review diagnostics only after all six accepted
 records are present:
 
 ```bash
@@ -168,10 +168,10 @@ records are present:
   --output-dir /tmp/scene/review/transitions
 ```
 
-The eight adjacent sheets render the accepted parent crop and accepted child
+The five adjacent sheets render the accepted parent crop and accepted child
 in the child's declared common world-space viewport, plus a 50 percent overlay.
 Shared features must have the same position and size. The separate overview
-labels all nine progressively smaller declared world widths. It is not a map
+labels all six progressively smaller declared world widths. It is not a map
 of issue #245 runtime selection boundaries.
 
 Record the final accepted files' build reports and source or Image Gen
