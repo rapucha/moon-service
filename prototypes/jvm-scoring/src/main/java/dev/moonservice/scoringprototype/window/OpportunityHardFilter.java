@@ -102,11 +102,10 @@ public final class OpportunityHardFilter {
         Map<String, List<MatchInterval>> masks =
                 azimuthMasks(completeWindows, samples, radii, preferences.azimuthDegrees());
         Set<CandidateKey> excluded = new HashSet<>();
-        List<MoonWindow> retained = new ArrayList<>();
+        List<FilteredWindowCoalescer.SourceWindow> retained = new ArrayList<>();
+        Predicate<Instant> matches = instant -> matchesAll(location, samples.sampleAt(instant), radii, preferences);
 
         for (MoonWindow window : completeWindows) {
-            Predicate<Instant> matches = instant ->
-                    matchesAll(location, samples.sampleAt(instant), radii, preferences);
             for (Instant instant : sampleInstants(
                     window.passStartsAt(), window.startsAt(), window.endsAt(), List.of())) {
                 if (!matches.test(instant)) {
@@ -122,11 +121,12 @@ public final class OpportunityHardFilter {
                         window.passStartsAt(), max(interval.startsAt(), notBefore),
                         interval.endsAt(), samples, matches);
                 if (suggested != null) {
-                    retained.add(clippedWindow(window, interval, suggested, samples));
+                    retained.add(new FilteredWindowCoalescer.SourceWindow(window,
+                            clippedWindow(window, interval, suggested, samples)));
                 }
             }
         }
-        return new Result(retained, excluded.size(), masks);
+        return new Result(FilteredWindowCoalescer.coalesce(retained), excluded.size(), masks);
     }
 
     static boolean matchesAll(

@@ -467,14 +467,13 @@ class OpportunitySearchFunctionalTest {
     }
 
     @Test
-    void returnsCompleteAzimuthMasksForRepeatedPasses() throws JacksonException {
+    void returnsCompleteAzimuthMasksForRetainedPasses() throws JacksonException {
         JsonNode response = productPostOk("""
                 {"q":"Prague","preferences":{"version":1,
                   "azimuthDegrees":{"included":{"start":10,"end":350}},
                   "time":{"mode":"local_clock","window":{"start":"00:00","end":"04:00"}}}}
                 """);
         Map<String, JsonNode> masksByPass = new HashMap<>();
-        boolean repeatedPass = false;
         boolean maskExtendsUsefulWindow = false;
         for (JsonNode opportunity : response.path("opportunities")) {
             JsonNode pass = opportunity.path("moonPass");
@@ -482,7 +481,6 @@ class OpportunitySearchFunctionalTest {
             assertFalse(mask.isEmpty());
             JsonNode previous = masksByPass.putIfAbsent(pass.path("id").asString(), mask);
             if (previous != null) {
-                repeatedPass = true;
                 assertEquals(previous, mask);
             }
             Instant passStart = Instant.parse(pass.path("startsAt").asString());
@@ -504,7 +502,6 @@ class OpportunitySearchFunctionalTest {
                 .map(opportunity -> opportunity.path("moonPass"))
                 .anyMatch(pass -> pass.path("azimuthMatchIntervals").equals(
                         masksByPass.get(pass.path("id").asString()))));
-        assertTrue(repeatedPass);
         assertTrue(maskExtendsUsefulWindow);
     }
 
