@@ -12,11 +12,11 @@ for choosing a level and drawing the Moon as a separate canvas layer.
 ## Package
 
 The six lossless alpha WebPs are the canonical authored media. Each image is
-960 × 720 pixels. Together they occupy 3,173,910 bytes.
+960 × 720 pixels. Together they occupy 3,174,948 bytes.
 
 | Asset | Parent | World width (m) | Bytes | SHA-256 |
 | --- | --- | ---: | ---: | --- |
-| `level-0.webp` | — | 1,350 | 595,464 | `ae3f5bc18f1899426a974e756afc4b1bc2fec83253c288f6acdaed0905e87e45` |
+| `level-0.webp` | — | 1,350 | 596,502 | `0f08e48ac32a05128c7ead88a8303168cd8c046612d690d4d6fc481f9446e55a` |
 | `level-1.webp` | `level-0` | 371.25 | 523,112 | `289d1c681be4c9a8a34dfe36a33b1709989f3a5525f6199d6c51addb23708b0b` |
 | `level-2.webp` | `level-1` | 102.09375 | 531,956 | `62c9e08d65b731cf3d73845f119144402139002b1552f09febe4482f6fd31966` |
 | `level-3.webp` | `level-2` | 28.07578125 | 594,140 | `3a3adffbc3097d59894e7569396b64365727493d5cc215937d73b2193b0847ac` |
@@ -24,8 +24,9 @@ The six lossless alpha WebPs are the canonical authored media. Each image is
 | `level-5.webp` | `level-4` | 2.12323095703125 | 417,948 | `11e901adc1f355f8480d3a66f869e98d871547774174c7e7a93d142e41eff253` |
 
 `scene-pyramid.json` is the tooling manifest. Its accepted records bind these
-paths to their byte lengths, hashes, dimensions, Pillow version, and libwebp
-codec version.
+paths to their byte lengths, hashes, dimensions, and encoding provenance. For
+Level 0, the Pillow and libwebp fields retain the original #249 build
+environment, and `postAcceptanceEdit` records the final #245 GIMP export.
 
 ## Geometry
 
@@ -67,8 +68,10 @@ text for rejected calls whose outputs contribute no pixels remain temporary
 working evidence outside the repository. The exact prompts whose outputs
 contribute pixels to the accepted chain are recorded below.
 
-The table records only the accepted source chain. `Accepted PNG` is the exact
-960 × 720 alpha image encoded into the corresponding package WebP.
+The table records the accepted Image Gen source chain. For Levels 1 through 5,
+`Accepted PNG` is the exact 960 × 720 alpha image encoded into the package
+WebP. The Level 0 PNG supplied the pre-trim WebP that the owner edited as
+described below.
 
 | Level | Accepted operation | Accepted PNG SHA-256 |
 | --- | --- | --- |
@@ -85,6 +88,16 @@ The accepted wide master keeps a small ruin integrated into a rocky slope,
 large open sky, sparse vegetation, and restrained warm side light. Its built-in
 Image Gen source SHA-256 is
 `b90b43cc902c96769274ba4327071fb47644ae8d5ead5c3312a363390d6937c0`.
+
+During the final #245 runtime review, the owner used GIMP 2.10.36 with system
+libwebp 1.3.2 to trim one unwanted small structure from the accepted Level 0
+WebP and exported it as lossless WebP. This operation introduced no external
+or newly generated image. A raw decoded comparison against the #249 file found
+50 alpha changes within `[426, 353, 434, 362]`: alpha only decreased, 36 pixels
+became fully transparent, and no pixel gained foreground coverage. It also
+found 1,304 RGB-only changes under pixels that were fully transparent in both
+files. Those values span `[5, 221, 959, 491]` but cannot affect composited
+output. The owner accepted the revised file in the hosted #245 preview.
 
 ### Level 1
 
@@ -377,7 +390,7 @@ Avoid: broad redesign; invented structure; dense surface detail; patterned micro
 
 ## Encoding
 
-The six accepted PNGs were encoded separately with this command shape:
+The six #249 PNGs were encoded separately with this command shape:
 
 ```bash
 /tmp/moon-scene-authoring-venv/bin/python -B \
@@ -391,6 +404,10 @@ The six accepted PNGs were encoded separately with this command shape:
 The encoder used Pillow 12.3.0, libwebp 1.6.0, lossless WebP, quality 100,
 method 6, and exact transparent RGB preservation. The package images are
 authored media, not generated build output.
+
+Level 0 received the later owner-authored GIMP trim described above. Its final
+lossless export replaces only that package file; Levels 1 through 5 retain the
+original encoding path.
 
 ## Validation
 

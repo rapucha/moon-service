@@ -102,7 +102,16 @@ The frontend module split is intended to keep future UI changes manageable:
 - `format.js`: date, time, degree, and percentage formatting;
 - `dom.js`: DOM and SVG element helpers;
 - `recentSearches.js`: localStorage behavior;
-- `cameraSetup.js`: browser-only saved camera setup and illuminated-Moon estimates;
+- `cameraSetup.js`: browser-only saved camera setup, illuminated-Moon estimates,
+  and camera-preview lifecycle;
+- `cameraFramingPreview.js`: camera-preview loading, failure handling, and
+  digital rectilinear framing geometry;
+- `cameraReferenceScene.js`: private six-level foreground selection,
+  registered world-space composition, and endpoint cropping;
+- `highResolutionMoonRenderer.js`: lazy 2K texture loading and event-oriented
+  Moon rendering for camera previews;
+- `cameraFramingPreview.css`: responsive Moon-detail and reference-scene
+  presentation;
 - `opportunityPreferences.js`: preference state, storage, request options,
   notices, planning-request transport, and coordination of the focused
   preference controls;
@@ -260,9 +269,121 @@ estimate. A valid editor change replaces only the estimate inside each current
 card and preserves whether each disclosure is open; it does not rerender the
 whole card.
 
-Camera values stay in the browser. They never enter product API requests, page
-URLs, share links, recent-search storage, analytics, or logs. A shared result
-uses the receiving browser's setup.
+### Camera preview
+
+Opening a `Camera estimate` lazily loads the tracked 2048×1024 NASA Moon
+texture from `/moon-textures/lroc_color_2k.jpg`. Closed estimates request no
+preview media. An eligible digital estimate calculates its framing geometry,
+selects one foreground level, and loads only that level. It does not prefetch
+the other five levels or add an application cache. Already loaded resources may
+still be shared through ordinary browser caching. A valid camera change
+recomputes the selection for every open estimate and preserves its open state.
+
+Every opened digital or Film estimate shows a `Moon detail` figure when the
+texture is available. It uses the opportunity's required phase angle and the
+same observer-oriented bright-limb and north-pole conventions as the compact
+Moon renderer. A missing `brightLimbTiltDegrees` uses the location-independent
+phase orientation and labels the limb angle as approximate. A missing
+`northPoleTiltDegrees` keeps the texture canonical north-up and labels the
+surface orientation as approximate. Visible copy states that `Moon detail`
+uses the opportunity's phase and orientation. Its caption also states that the
+enlarged figure is not to camera scale.
+
+Digital estimates also show `Example framing`. Film does not because the
+neutral Film setup has no selected frame or output geometry. The digital figure
+uses a rectilinear pinhole projection:
+
+```text
+focal length used = marked focal length × teleconverter multiplier
+sensor height = sensor width / aspect ratio
+horizontal field of view = 2 × atan(sensor width / (2 × focal length used))
+vertical field of view = 2 × atan(sensor height / (2 × focal length used))
+full-Moon image diameter = 2 × focal length used × tan(0.52° / 2)
+scene width at reference distance = 120 m × sensor width / focal length used
+```
+
+The foreground is the six-level, project-owned proof-of-concept package
+accepted through issue #249, with the owner-accepted Level 0 alpha trim from
+issue #245. Each lossless alpha WebP is 960×720 pixels. The images form one
+registered fictional foreground, contain no baked Moon, and do not set a
+production-quality photography standard.
+
+| Level | Public route | Declared world width |
+| --- | --- | ---: |
+| 0 | `/camera-preview/level-0.webp` | `1350 m` |
+| 1 | `/camera-preview/level-1.webp` | `371.25 m` |
+| 2 | `/camera-preview/level-2.webp` | `102.09375 m` |
+| 3 | `/camera-preview/level-3.webp` | `28.07578125 m` |
+| 4 | `/camera-preview/level-4.webp` | `7.72083984375 m` |
+| 5 | `/camera-preview/level-5.webp` | `2.12323095703125 m` |
+
+All levels use the shared normalized foreground contact
+`{ x: 0.46875, y: 0.5138888888888888 }`, which is pixel `(450, 370)`. The
+renderer keeps these descriptors as private constants. It does not fetch
+`scene-pyramid.json`; that file remains authoring and verification metadata.
+
+The renderer draws a restrained synthetic sky behind the selected alpha
+foreground. It draws the event-oriented Moon separately in the transparent sky
+on the right side of the shared contact. It selects the smallest declared world
+width that fully covers the calculated world-space view, keeps the contact
+registered, and crops the selected image at its declared scale. It does not
+stretch a level to fit the frame or synthesize scene detail.
+
+The scene uses one private fixed reference distance of `120 m`. The distance is
+not a control, stored value, URL or API field, constructor option, fallback, or
+extension point. The package's authored-detail range ends at an effective focal
+length of `2500 mm`. Above that endpoint, including the supported `2000 mm`
+marked lens with the `2×` teleconverter, the renderer keeps Level 5 at the
+correct scale and crops it more tightly. Pixelation and clipping are allowed,
+and the preview claims no additional authored detail. When a view is wider than
+Level 0, the renderer keeps Level 0 at the correct scale and lets the synthetic
+sky show beyond the foreground image. It does not stretch the image to fill the
+frame.
+
+The existing camera editor continues to accept any finite positive marked focal
+length. Its native supported examples run from `4 mm` through `2000 mm` with
+the existing teleconverter choices. A valid value outside the package's
+authored range uses the endpoint behavior above. When a valid setup cannot
+produce finite preview geometry with both fields of view strictly between
+`0°` and `180°`, the estimate omits only `Example framing` and shows the
+accessible framing-unavailable message. Wide views receive no artificial
+minimum Moon or foreground size. Long views may crop the Moon or foreground.
+The display-sized canvas clips the calculated composition and never allocates
+the camera's full native output dimensions.
+
+For digital formats, output MP determines output width and height, the
+calculated full-Moon pixel diameter, and the source-limited texture sampling
+used for the framing Moon. A megapixel-only change does not change field of
+view, normalized scene geometry, Moon position, angular size, selected
+foreground level, preview backing size, or CSS display size. Sampling never
+invents detail beyond the tracked 2K source.
+
+Each canvas has an accessible name. Visible text outside the canvases states the
+phase and orientation basis, labels only an affected orientation as
+approximate, reports output sampling, and gives either failure result. The
+framing caption says: `Reference scene only—the scale is calculated; the
+placement is illustrative.` It does not claim a real viewpoint, alignment,
+terrain, obstruction, exposure, or photograph prediction.
+
+If the Moon texture cannot load or decode, the estimate keeps its numerical
+facts, omits every preview figure, and shows an accessible preview-unavailable
+message. If the selected foreground WebP cannot load or decode, the estimate
+keeps `Moon detail` and its numerical facts, omits only `Example framing`, and
+shows an accessible framing-unavailable message. It does not substitute a
+neighboring level. Film loads and shows `Moon detail`, keeps its numerical
+estimate, and has no `Example framing` because it has no selected frame or
+output geometry.
+
+The two digital figures sit side by side when space permits and stack in a
+narrow workspace. Replacing an estimate after a valid camera edit preserves
+its open state and renders the new setup without changing the result card
+around it.
+
+Exact camera values stay in the browser. They never enter product API requests,
+page URLs, share links, recent-search storage, or analytics. Selecting digital
+framing requests one `/camera-preview/level-N.webp` static asset; that path is a
+coarse setup-derived level and may appear in ordinary request logs. A shared
+result uses the receiving browser's setup.
 
 This version does not model scan resolution or pixels, PPI or DPI, print size,
 enlargement, printer output, slide projection, or film resolving power. It also

@@ -79,9 +79,16 @@ Open-Meteo URLs are provider dependencies, not Moon Service routes.
   body to that route's 16,384-byte bound. It adds the hosted security headers,
   returns empty `404` for hidden or unknown path variants, empty `405` with a
   path-specific `Allow` value for disallowed methods, and empty `400` for a
-  framed `GET` or `HEAD` body. The exact `/planningView.js` module allows only
-  bodyless `GET` and `HEAD`. These POST operations and the module send no
-  permissive CORS headers, and `OPTIONS` does not provide preflight support.
+  framed `GET` or `HEAD` body. The exact `/cameraFramingPreview.js`,
+  `/cameraReferenceScene.js`, `/highResolutionMoonRenderer.js`,
+  `/planningView.js`, `/cameraFramingPreview.css`, and
+  `/moon-textures/lroc_color_2k.jpg` resources allow only bodyless `GET` and
+  `HEAD`. The same rule applies to the six exact camera-preview paths:
+  `/camera-preview/level-0.webp`, `/camera-preview/level-1.webp`,
+  `/camera-preview/level-2.webp`, `/camera-preview/level-3.webp`,
+  `/camera-preview/level-4.webp`, and `/camera-preview/level-5.webp`. These POST
+  operations and static resources send no permissive CORS headers, and
+  `OPTIONS` does not provide preflight support.
   Tomcat rejects `TRACE` before the application filter, so those application
   headers and empty-body guarantees do not apply to `TRACE`.
 - The web lookup is anonymous and creates no durable user profile or preference.
@@ -133,18 +140,26 @@ and [hosted-alpha functional tests](../backend/src/test/java/dev/moonservice/bac
   timezones under `moonService.recentSearches.v1`. It keeps the supported
   versioned altitude and availability preferences under
   `moonService.opportunityPreferences.v1`. It separately keeps the camera
-  estimate setup under `moonService.cameraSetup.v1`; it never enters a request,
-  URL, share link, or recent-search entry. All three `localStorage` entries are
-  optional and client-side; the page still works when browser storage is
-  unavailable.
+  estimate setup under `moonService.cameraSetup.v1`; exact setup values never
+  enter a product API request, URL, share link, or recent-search entry. Digital
+  framing requests one setup-derived `/camera-preview/level-N.webp` static
+  asset, whose coarse selected-level path may appear in ordinary request logs.
+  All three `localStorage` entries are optional and client-side; the page still
+  works when browser storage is unavailable.
 - **Exposure:** available on the ordinary listener; allowlisted but subject to
   the whole-site admission bound in hosted-alpha mode. The exact
-  `/cameraSetup.js` browser module allows bodyless `GET` and `HEAD` under the
-  same hosted-alpha static-resource rules.
+  `/cameraSetup.js`, `/cameraFramingPreview.js`, `/cameraReferenceScene.js`,
+  `/highResolutionMoonRenderer.js`, `/cameraFramingPreview.css`, and
+  `/moon-textures/lroc_color_2k.jpg` resources allow bodyless `GET` and `HEAD`
+  under the same hosted-alpha static-resource rules. So do the exact
+  `/camera-preview/level-0.webp`, `/camera-preview/level-1.webp`,
+  `/camera-preview/level-2.webp`, `/camera-preview/level-3.webp`,
+  `/camera-preview/level-4.webp`, and `/camera-preview/level-5.webp` resources.
 - **References:** [controller](../backend/src/main/java/dev/moonservice/backend/web/WebPageController.java),
   [browser flow](../frontend/src/app.js),
   [recent-search storage](../frontend/src/recentSearches.js),
   [camera setup](../frontend/src/cameraSetup.js),
+  [camera reference scene](../frontend/src/cameraReferenceScene.js),
   [preference state and transport](../frontend/src/opportunityPreferences.js),
   [share paths](../frontend/src/api.js).
 
@@ -482,8 +497,17 @@ and [hosted-alpha functional tests](../backend/src/test/java/dev/moonservice/bac
 ## Deliberate non-routes
 
 - Files under `frontend/src/`, `frontend/assets/`, and `frontend/generated/`
-  are packaged into classpath `/static`. They support the three browser mappings
-  but are not independent controller operations in this inventory.
+  are packaged into classpath `/static`. The build also packages only
+  `assets/moon-textures/lroc_color_2k.jpg` at
+  `/moon-textures/lroc_color_2k.jpg`, with content type `image/jpeg`. It packages
+  the six accepted proof-of-concept foreground levels at the exact public paths
+  `/camera-preview/level-0.webp`, `/camera-preview/level-1.webp`,
+  `/camera-preview/level-2.webp`, `/camera-preview/level-3.webp`,
+  `/camera-preview/level-4.webp`, and `/camera-preview/level-5.webp`, each with
+  content type `image/webp`. The build does not publish the package's
+  `scene-pyramid.json` tooling manifest. These static resources support the
+  three browser mappings but are not independent controller operations in this
+  inventory.
 - `/error` is Spring Boot's internal error-dispatch path, not an application
   controller mapping. `/test/slow` exists only in `GracefulShutdownTest`.
 - `/l/{location}`, `/feeds/*.atom`, `/calendars/*.ics`, and `/o/*.ics` are

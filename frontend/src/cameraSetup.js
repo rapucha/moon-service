@@ -1,8 +1,11 @@
 import { element } from "./dom.js";
+import {
+  attachCameraFramingPreview,
+  NOMINAL_MOON_DIAMETER_DEGREES
+} from "./cameraFramingPreview.js";
 
 var STORAGE_KEY = "moonService.cameraSetup.v1";
 var VERSION = 1;
-var MOON_DIAMETER_DEGREES = 0.52;
 var FORMATS = {
   digital_full_frame: digitalFormat("Full-frame digital", 36.0, 3 / 2),
   digital_aps_c: digitalFormat("APS-C digital", 23.5, 3 / 2),
@@ -259,19 +262,22 @@ function cameraEstimateDisclosure(moon, setup) {
   var estimate = cameraEstimate(moon, setup);
   if (!estimate) return null;
   var digital = estimate.format.medium === "digital";
-  return element("details", { className: "camera-estimate" },
+  var content = element("div", { className: "sky-picture-content" },
+    element("p", {}, estimate.contextText),
+    element("dl", { className: "detail-grid" }, digital
+      ? [fact("Illuminated angle", estimate.angularText), fact("Maximum thickness", estimate.pixelText)]
+      : [fact("Full Moon diameter", estimate.diameterText),
+        fact("Illuminated thickness", estimate.thicknessText)]),
+    element("p", {}, digital
+      ? "This is the widest illuminated thickness. A crescent tapers to zero at its horns."
+      : "This is the widest illuminated thickness. A crescent tapers to zero at its horns. It describes physical image size on the film original, not visibility, optical resolution, film resolving power, exposure, scanning, or printing."),
+    element("p", {}, "This works best with a regular lens. With a fisheye, keep the Moon near the center—the edges can stretch its apparent size."));
+  var disclosure = element("details", { className: "camera-estimate" },
     element("summary", {}, element("span", { className: "sky-picture-title" }, "Camera estimate"),
       " — ", element("span", { className: "sky-picture-description" }, "Illuminated Moon thickness")),
-    element("div", { className: "sky-picture-content" },
-      element("p", {}, estimate.contextText),
-      element("dl", { className: "detail-grid" }, digital
-        ? [fact("Illuminated angle", estimate.angularText), fact("Maximum thickness", estimate.pixelText)]
-        : [fact("Full Moon diameter", estimate.diameterText),
-          fact("Illuminated thickness", estimate.thicknessText)]),
-      element("p", {}, digital
-        ? "This is the widest illuminated thickness. A crescent tapers to zero at its horns."
-        : "This is the widest illuminated thickness. A crescent tapers to zero at its horns. It describes physical image size on the film original, not visibility, optical resolution, film resolving power, exposure, scanning, or printing."),
-      element("p", {}, "This works best with a regular lens. With a fisheye, keep the Moon near the center—the edges can stretch its apparent size.")));
+    content);
+  attachCameraFramingPreview(disclosure, content, moon, setup, estimate.format);
+  return disclosure;
 }
 
 function cameraEstimate(moon, setup) {
@@ -281,11 +287,11 @@ function cameraEstimate(moon, setup) {
   if (!normalized || !Number.isFinite(illumination) || illumination < 0 || illumination > 1) return null;
   var format = FORMATS[normalized.captureFormat];
   var focalForEstimate = normalized.focalLengthMm * normalized.teleconverterMultiplier;
-  var diameterMm = focalForEstimate * 2 * Math.tan(MOON_DIAMETER_DEGREES * Math.PI / 360);
+  var diameterMm = focalForEstimate * 2 * Math.tan(NOMINAL_MOON_DIAMETER_DEGREES * Math.PI / 360);
   var thicknessMm = diameterMm * illumination;
   var estimate = {
     format: format,
-    angularText: formatAngle(MOON_DIAMETER_DEGREES * illumination),
+    angularText: formatAngle(NOMINAL_MOON_DIAMETER_DEGREES * illumination),
     contextText: estimateContext(normalized, format, focalForEstimate)
   };
   if (format.medium === "digital") {
