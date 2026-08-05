@@ -7,6 +7,7 @@ import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -22,8 +23,11 @@ import org.springframework.test.web.reactive.server.WebTestClient;
 import org.mockito.Mockito;
 import reactor.core.publisher.Flux;
 
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.time.Clock;
 import java.time.Instant;
+import java.util.HexFormat;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 
@@ -81,10 +85,15 @@ class HostedAlphaSurfaceFunctionalTest {
     @ValueSource(strings = {
             "/about.html", "/index.html", "/angularPreferenceControls.js",
             "/angularPreferencePreview.css", "/angularPreferencePreview.js",
-            "/angularPreferenceRules.js", "/api.js", "/app.js", "/cameraSetup.js",
-            "/dom.js", "/format.js", "/favicon.svg", "/moonAppearanceControls.js",
+            "/angularPreferenceRules.js", "/api.js", "/app.js", "/cameraFramingPreview.css",
+            "/cameraFramingPreview.js", "/camera-preview/level-0.webp",
+            "/camera-preview/level-1.webp", "/camera-preview/level-2.webp",
+            "/camera-preview/level-3.webp", "/camera-preview/level-4.webp",
+            "/camera-preview/level-5.webp", "/cameraReferenceScene.js",
+            "/cameraSetup.js", "/dom.js", "/format.js", "/highResolutionMoonRenderer.js",
+            "/favicon.svg", "/moonAppearanceControls.js",
             "/moonAppearancePreview.css", "/moonPreferenceControls.css", "/styles.css",
-            "/sun-marker-aperture-flare.svg",
+            "/sun-marker-aperture-flare.svg", "/moon-textures/lroc_color_2k.jpg",
             "/terms.js", "/types.js",
             "/moonPathLightBands.js", "/moonPathSilhouetteSymbols.js", "/moonPathSilhouettes.js",
             "/moonPathView.js", "/moonPhaseView.js", "/moonTexture.js", "/opportunityCard.js",
@@ -100,12 +109,67 @@ class HostedAlphaSurfaceFunctionalTest {
     }
 
     @ParameterizedTest
-    @ValueSource(strings = {"/", "/app.js", "/cameraSetup.js", "/planningView.js", "/readyz"})
+    @ValueSource(strings = {
+            "/", "/app.js", "/cameraFramingPreview.css", "/cameraFramingPreview.js",
+            "/camera-preview/level-0.webp", "/camera-preview/level-1.webp",
+            "/camera-preview/level-2.webp", "/camera-preview/level-3.webp",
+            "/camera-preview/level-4.webp", "/camera-preview/level-5.webp",
+            "/cameraReferenceScene.js", "/cameraSetup.js", "/highResolutionMoonRenderer.js",
+            "/moon-textures/lroc_color_2k.jpg", "/planningView.js", "/readyz"
+    })
     void allowsHeadForApprovedSurface(String path) {
         expectHostedHeaders(webTestClient.head()
                 .uri(path)
                 .exchange()
                 .expectStatus().isOk());
+    }
+
+    @Test
+    void servesExactMoonTextureBytes() throws NoSuchAlgorithmException {
+        WebTestClient textureClient = webTestClient.mutate()
+                .codecs(configurer -> configurer.defaultCodecs().maxInMemorySize(500_000))
+                .build();
+        WebTestClient.ResponseSpec response = textureClient.get()
+                .uri("/moon-textures/lroc_color_2k.jpg")
+                .exchange()
+                .expectStatus().isOk()
+                .expectHeader().contentType(MediaType.IMAGE_JPEG)
+                .expectHeader().contentLength(457_942);
+        expectHostedHeaders(response);
+
+        byte[] body = response.expectBody().returnResult().getResponseBody();
+        assertThat(body).hasSize(457_942);
+        byte[] digest = MessageDigest.getInstance("SHA-256").digest(body);
+        assertThat(HexFormat.of().formatHex(digest))
+                .isEqualTo("f7130a1822681fa7512d7dcfd40db8c10b9ba4f06777910348698260ed7a2170");
+    }
+
+    @ParameterizedTest
+    @CsvSource(delimiter = '|', textBlock = """
+            /camera-preview/level-0.webp | 596502 | 0f08e48ac32a05128c7ead88a8303168cd8c046612d690d4d6fc481f9446e55a
+            /camera-preview/level-1.webp | 523112 | 289d1c681be4c9a8a34dfe36a33b1709989f3a5525f6199d6c51addb23708b0b
+            /camera-preview/level-2.webp | 531956 | 62c9e08d65b731cf3d73845f119144402139002b1552f09febe4482f6fd31966
+            /camera-preview/level-3.webp | 594140 | 3a3adffbc3097d59894e7569396b64365727493d5cc215937d73b2193b0847ac
+            /camera-preview/level-4.webp | 511290 | d74bb2f12970f3df918dfb91ce97b9681380c87ceaba6bd741c84cfb95196b6f
+            /camera-preview/level-5.webp | 417948 | 11e901adc1f355f8480d3a66f869e98d871547774174c7e7a93d142e41eff253
+            """)
+    void servesExactCameraPreviewBytes(String path, int size, String expectedDigest)
+            throws NoSuchAlgorithmException {
+        WebTestClient imageClient = webTestClient.mutate()
+                .codecs(configurer -> configurer.defaultCodecs().maxInMemorySize(700_000))
+                .build();
+        WebTestClient.ResponseSpec response = imageClient.get()
+                .uri(path)
+                .exchange()
+                .expectStatus().isOk()
+                .expectHeader().contentType(MediaType.parseMediaType("image/webp"))
+                .expectHeader().contentLength(size);
+        expectHostedHeaders(response);
+
+        byte[] body = response.expectBody().returnResult().getResponseBody();
+        assertThat(body).hasSize(size);
+        byte[] digest = MessageDigest.getInstance("SHA-256").digest(body);
+        assertThat(HexFormat.of().formatHex(digest)).isEqualTo(expectedDigest);
     }
 
     @Test

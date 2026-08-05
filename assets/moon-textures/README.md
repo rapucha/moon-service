@@ -1,9 +1,9 @@
 # Moon texture source and provenance
 
 The compact Moon renderer uses a 256×128 grayscale luminance map embedded in
-`frontend/src/moonTexture.js`. The exact 2048×1024 source
-JPEG is tracked here so the runtime derivative can be rebuilt and audited
-without depending on a mutable remote URL.
+`frontend/src/moonTexture.js`. The exact 2048×1024 source JPEG is tracked here
+for the high-resolution preview and so the compact runtime derivative can be
+rebuilt and audited without depending on a mutable remote URL.
 
 ## Source
 
@@ -17,8 +17,9 @@ without depending on a mutable remote URL.
 This 2K JPEG is the retained source for Moon Service. NASA also publishes EXR
 and TIFF products ranging from hundreds of megabytes to multiple gigabytes;
 those are not needed for this renderer and are not stored in the repository.
-Because this directory is outside `backend/src/main/resources`, the source JPEG
-is not served to browsers or included in the backend runtime artifact.
+The backend build packages this exact JPEG, and no other file from this
+directory, at `/moon-textures/lroc_color_2k.jpg`. The Docker builder copies the
+same tracked file before packaging the backend runtime artifact.
 
 ## Generated runtime texture
 
@@ -69,3 +70,12 @@ endorsement, and do not use NASA insignia or logotypes as product branding.
 The texture is sampled as a longitude/latitude map on the visible lunar sphere.
 Phase illumination remains a separate calculation so lighting and surface
 orientation can be handled independently.
+
+## Camera preview
+
+The camera preview loads this tracked 2K source only after a camera-estimate
+disclosure opens. It uses the source for the enlarged `Moon detail` figure and
+for the separately drawn Moon in eligible digital `Example framing` figures.
+Output megapixels limit the framing Moon's source sampling; they do not change
+the field of view, normalized geometry, Moon placement, angular size, selected
+foreground level, or CSS display size.

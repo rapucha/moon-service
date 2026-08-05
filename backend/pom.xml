@@ -83,6 +83,25 @@
         <directory>${project.basedir}/../frontend/generated</directory>
         <targetPath>static</targetPath>
       </resource>
+      <resource>
+        <directory>${project.basedir}/../assets/moon-textures</directory>
+        <targetPath>static/moon-textures</targetPath>
+        <includes>
+          <include>lroc_color_2k.jpg</include>
+        </includes>
+      </resource>
+      <resource>
+        <directory>${project.basedir}/../assets/camera-preview</directory>
+        <targetPath>static/camera-preview</targetPath>
+        <includes>
+          <include>level-0.webp</include>
+          <include>level-1.webp</include>
+          <include>level-2.webp</include>
+          <include>level-3.webp</include>
+          <include>level-4.webp</include>
+          <include>level-5.webp</include>
+        </includes>
+      </resource>
     </resources>
     <plugins>
       <plugin>

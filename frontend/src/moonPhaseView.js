@@ -49,15 +49,28 @@ export function moonPhaseImageDataUrl(
   }
 }
 
-export function drawMoonPhase(canvas, phaseAngleDegrees, brightLimbTiltDegrees, northPoleTiltDegrees) {
+export function drawMoonPhase(
+  canvas,
+  phaseAngleDegrees,
+  brightLimbTiltDegrees,
+  northPoleTiltDegrees,
+  options
+) {
   var context = canvas.getContext && canvas.getContext("2d");
   if (!context) {
     return;
   }
 
+  var surfaceAlbedo = options && typeof options.surfaceAlbedo === "function"
+    ? options.surfaceAlbedo
+    : moonSurfaceAlbedo;
+  var radiusRatio = options && Number.isFinite(options.radiusRatio)
+    ? options.radiusRatio
+    : 0.43;
+
   var size = canvas.width;
   var center = size / 2;
-  var radius = size * 0.43;
+  var radius = size * radiusRatio;
   var image = context.createImageData(size, size);
   var phase = Number.isFinite(phaseAngleDegrees) ? normalizeDegrees(phaseAngleDegrees) : 180;
   var radians = phase * Math.PI / 180;
@@ -97,7 +110,7 @@ export function drawMoonPhase(canvas, phaseAngleDegrees, brightLimbTiltDegrees, 
       var limbShade = 0.72 + 0.28 * z;
       var textureX = dx * textureCos + dy * textureSin;
       var textureY = -dx * textureSin + dy * textureCos;
-      var textureFactor = 0.52 + 0.65 * moonSurfaceAlbedo(textureX, textureY, z);
+      var textureFactor = 0.52 + 0.65 * surfaceAlbedo(textureX, textureY, z);
       var color = lit ? MOON_LIT_COLOR : MOON_SHADED_COLOR;
       image.data[index] = texturedChannel(color[0], limbShade, textureFactor);
       image.data[index + 1] = texturedChannel(color[1], limbShade, textureFactor);
@@ -107,11 +120,13 @@ export function drawMoonPhase(canvas, phaseAngleDegrees, brightLimbTiltDegrees, 
   }
 
   context.putImageData(image, 0, 0);
-  context.beginPath();
-  context.arc(center, center, radius, 0, Math.PI * 2);
-  context.strokeStyle = "#d8e0df";
-  context.lineWidth = 1.5;
-  context.stroke();
+  if (!options || options.outline !== false) {
+    context.beginPath();
+    context.arc(center, center, radius, 0, Math.PI * 2);
+    context.strokeStyle = "#d8e0df";
+    context.lineWidth = 1.5;
+    context.stroke();
+  }
 }
 
 function texturedChannel(color, limbShade, textureFactor) {

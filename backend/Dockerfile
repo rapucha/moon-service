@@ -12,6 +12,14 @@ RUN --mount=type=cache,target=/root/.m2 \
     mvn -B -pl backend -am dependency:go-offline
 
 COPY backend/src backend/src
+COPY assets/moon-textures/lroc_color_2k.jpg assets/moon-textures/lroc_color_2k.jpg
+COPY assets/camera-preview/level-0.webp \
+     assets/camera-preview/level-1.webp \
+     assets/camera-preview/level-2.webp \
+     assets/camera-preview/level-3.webp \
+     assets/camera-preview/level-4.webp \
+     assets/camera-preview/level-5.webp \
+     assets/camera-preview/
 COPY frontend frontend
 COPY prototypes/jvm-scoring/src prototypes/jvm-scoring/src
 
