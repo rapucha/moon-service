@@ -7,7 +7,9 @@ so far, separates them from open design questions, and gives future UI work a
 stable target.
 
 The current scope is the `/search` web page, opportunity cards, Moon path
-visualization, the altitude and availability preferences tracked by
+visualization, the opportunity ordering tracked by
+[#257](https://github.com/rapucha/moon-service/issues/257), the altitude and
+availability preferences tracked by
 [#192](https://github.com/rapucha/moon-service/issues/192), the direction,
 phase, and bright-limb preference controls tracked by
 [#193](https://github.com/rapucha/moon-service/issues/193), and the
@@ -59,8 +61,10 @@ terrain horizon, obstruction, and shooting-position limitations.
   explanation that local hills, buildings, and trees are not modeled; Search
   does not repeat it as a standalone result note or `Lookup notes` section.
 - The page should expose shareable lookup results.
-- The UI should present ranked opportunities, not only chronological events.
-- Opportunity cards are currently ranked by backend score.
+- The UI supports backend-selected Best match and Soonest opportunities. Best
+  match remains the default.
+- Soonest changes chronological presentation, not opportunity scores or the
+  Best and Alternative comparison inside one Moon pass.
 - Opportunity cards may use a layered information model. The first scan should
   show the decisive facts, while score details, dense weather numbers, and some
   caveats can move into secondary or collapsible treatment.
@@ -97,8 +101,8 @@ tooling and `tests/ui/` stay at the repository root.
 
 The frontend module split is intended to keep future UI changes manageable:
 
-- `app.js`: bootstrapping, events, lookup flow;
-- `api.js`: API path construction and fetch handling;
+- `app.js`: bootstrapping, events, lookup flow, and order history state;
+- `api.js`: API, page-navigation, and canonical share path construction;
 - `format.js`: date, time, degree, and percentage formatting;
 - `dom.js`: DOM and SVG element helpers;
 - `recentSearches.js`: localStorage behavior;
@@ -392,6 +396,53 @@ film-frame coverage, camera or lens catalogues, custom or stacked
 teleconverters, event-specific lunar diameter, backend camera fields, exposure
 settings, or exposure advice.
 
+## Opportunity Ordering
+
+After a successful real-location lookup returns at least two distinct Moon
+passes, Search shows one native radio group with `Best match` and `Soonest`.
+Zero or one Moon pass leaves the group hidden because candidate windows inside
+one pass always follow that pass's timeline. A single pass uses the neutral
+heading `Moon pass`, even when the URL retains `order=soonest`. Best match
+starts selected when the URL omits `order`. The group stays mounted after the
+workspace heading and outside the replaceable result subtree. An order refresh
+therefore keeps the selected radio focused while the result live region becomes
+busy, loads, and settles.
+
+The browser hides the group for the initial page, a new unresolved lookup, an
+ambiguous location, and every unsuccessful result. It keeps the group visible
+when an already reorderable lookup refreshes because of an order or preference
+change. Browser back and forward keep it visible only when the target history
+entry has the same reorderable lookup.
+
+The browser sends selected order as a query parameter through both product
+transports. A preference-free search uses `GET /api/opportunities`. A search
+with at least one active hard preference uses `POST /api/opportunities`; its
+JSON body remains limited to the lookup and preferences. Empty and unsupported
+present URL values reach the server unchanged and follow its invalid-request
+flow.
+
+`order=soonest` remains in the page URL and generated share links. An omitted
+order is canonical Best match. An explicit `order=best_match` reaches the
+server once and is removed with `replaceState` only after a successful
+real-location response. A user order change uses `pushState`, so browser back
+and forward restore and request each mode. Preference apply and reset do not
+add history. Ambiguous selection, another city submission, and recent-location
+selection retain the selected order.
+
+Soonest sorts top-level Moon-pass cards by the earliest returned `suggestedAt`
+inside each pass. Its headings are `Soonest`, `Later pass 2`, and onward. Inside
+every pass, candidate windows appear by `suggestedAt`, earlier to later,
+regardless of the selected order. The highest-scoring candidate keeps the
+`Best` badge and the others remain `Alternative`, so `Best` need not appear
+first on the card. Equal top scores use the first returned candidate. Soonest
+cards show `Score X` without a rank claim and use score-focused explanation
+copy. Best-match headings, ranks, and explanation copy remain unchanged.
+
+Order exists only in page request state and the URL. The browser creates no
+order account, cookie, server profile, or `localStorage` entry. Share links
+contain the location and may contain order, but never contain preferences. A
+receiving browser applies its own saved preferences, if any.
+
 ## Opportunity Preferences
 
 The accepted option A places the preference editor, labeled `Limits`, in the
@@ -567,10 +618,11 @@ Each enabled preference can be removed through its own editor control without
 changing the others. Reset removes every active filter and removes the stored
 preference object when browser storage accepts the removal. If removal fails,
 the current page uses reset state in memory and reports the storage failure.
-The location-timezone and location-only share explanations stay with the
+The location-timezone and share-privacy explanations stay with the
 relevant controls in `Limits`. When preferences are active, the share
-explanation says that the link still contains only the location and that a
-receiving browser applies its own saved preferences, if any.
+explanation says that the link contains the location and may contain order,
+never contains preferences, and lets a receiving browser apply its own saved
+preferences, if any.
 
 Result-specific messages remain near the results without recreating an active
 preference summary:
@@ -800,14 +852,17 @@ move secondary diagnostics into a lower-priority presentation rather than
 showing every backend fact at equal visual weight.
 
 Each user-facing result card should represent one Moon pass, even when that pass
-has only one ranked recommendation window. The card should be ranked by the best
-recommendation in that pass. The card title should state whether there is one
-or multiple candidate windows in that Moon pass, while the page-level summary
-states both the ranked Moon-pass count and the total candidate-window count.
+has only one recommendation window. In Best match, the card is ranked by the
+best recommendation in that pass. In Soonest, the card is placed by its earliest
+returned suggested time while its highest-score recommendation remains `Best`.
+The card title should state whether there is one or multiple candidate windows
+in that Moon pass. The page-level summary states the Moon-pass count and total
+candidate-window count, and uses `ranked` only in Best match.
 The full pass start and end should be
 shown as lower-priority Moon pass context below the recommendation cards, with
 exact dates and a short location timezone label. Each recommendation card should show a
-`Best` or `Alternative` badge, its raw candidate rank and score, suggested time,
+`Best` or `Alternative` badge, its score and, in Best match, raw candidate rank,
+suggested time,
 window side, Moon altitude and direction, window duration, light bucket, Sun
 altitude, a coarse sky/weather label, and a short photo hint. Keep the API
 ranking explanation available in a collapsed candidate-level detail. Avoid

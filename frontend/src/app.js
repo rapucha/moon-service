@@ -1,4 +1,4 @@
-import { apiPathFor, fallbackPayload } from "./api.js";
+import { apiPathFor, fallbackPayload, searchPathFor, sharePathFor } from "./api.js";
 import { createCameraSetup } from "./cameraSetup.js";
 import { element } from "./dom.js";
 import { createOpportunityPreferences } from "./opportunityPreferences.js";
@@ -12,6 +12,9 @@ var form = /** @type {HTMLFormElement} */ (document.getElementById("search-form"
 var input = /** @type {HTMLInputElement} */ (document.getElementById("location-input"));
 var formFeedback = /** @type {HTMLElement} */ (document.getElementById("form-feedback"));
 var results = /** @type {HTMLElement} */ (document.getElementById("results"));
+var orderControl = /** @type {HTMLFieldSetElement} */ (document.getElementById("opportunity-order"));
+var orderInputs = /** @type {NodeListOf<HTMLInputElement>} */ (
+  orderControl.querySelectorAll("input[name='opportunity-order']"));
 var recentSearches = /** @type {HTMLDetailsElement} */ (document.getElementById("recent-searches"));
 var recentList = /** @type {HTMLElement} */ (document.getElementById("recent-list"));
 var clearRecent = /** @type {HTMLButtonElement} */ (document.getElementById("clear-recent"));
@@ -27,6 +30,8 @@ var cameraStorageNotice = /** @type {HTMLElement} */ (document.getElementById("c
 var submitButton = /** @type {HTMLButtonElement} */ (form.querySelector("button[type='submit']"));
 var narrowSearchLayout = window.matchMedia("(max-width: 680px)");
 var activeRequest = null;
+var activeOrder;
+var resolvedRequest = null;
 var ordinaryWorkspaceTitle = workspaceTitle.textContent;
 var planningWeatherNotice = element("div", {
   className: "workspace-meta planning-weather-notice",
@@ -77,6 +82,18 @@ form.addEventListener("submit", function (event) {
   search(input.value, { updateUrl: true });
 });
 
+orderControl.addEventListener("change", function (event) {
+  if (!(event.target instanceof HTMLInputElement)) return;
+  activeOrder = event.target.value === "soonest" ? "soonest" : undefined;
+  var request = lookupFromUrl();
+  if (!request) {
+    return;
+  }
+  request.order = activeOrder;
+  window.history.pushState(request, "", searchPathFor(request));
+  fetchOpportunities(request);
+});
+
 clearRecent.addEventListener("click", function () {
   writeRecent([]);
   renderRecent();
@@ -113,37 +130,48 @@ function lookupFromUrl() {
   var params = new URLSearchParams(window.location.search);
   var locationId = normalizeQuery(params.get("locationId") || "");
   var query = normalizeQuery(params.get("q") || "");
+  var order = params.has("order") ? params.get("order") || "" : undefined;
   if (locationId) {
-    return { locationId: locationId, label: locationId };
+    return { locationId: locationId, label: locationId, order: order };
   }
   if (query) {
-    return { q: query, label: query };
+    return { q: query, label: query, order: order };
   }
   return null;
 }
 
 function runLookup(request, options) {
+  activeOrder = request?.order;
+  syncOrderInputs();
   if (!request) {
-    beginOrdinaryLookup();
+    beginOrdinaryLookup(request);
     input.value = "";
     preferences.beginSearch();
     responseView.renderIntro();
     return;
   }
   if (request.locationId) {
-    searchLocationId(request.locationId, request.label, options);
+    searchLocationId(request.locationId, request.label, options, request);
   } else {
-    search(request.q, options);
+    search(request.q, options, request);
   }
+}
+
+function syncOrderInputs() {
+  var selected = activeOrder === "soonest" ? "soonest" : "best_match";
+  orderInputs.forEach(function (input) {
+    input.checked = input.value === selected;
+  });
 }
 
 function normalizeQuery(value) {
   return String(value || "").trim().replace(/\s+/g, " ");
 }
 
-function search(rawQuery, options) {
-  beginOrdinaryLookup();
+function search(rawQuery, options, existingRequest) {
   var query = normalizeQuery(rawQuery);
+  var request = existingRequest || { q: query, label: query, order: activeOrder };
+  beginOrdinaryLookup(request);
   var validationMessage = validateQuery(query);
 
   input.value = query;
@@ -156,16 +184,17 @@ function search(rawQuery, options) {
   }
 
   if (options.updateUrl) {
-    window.history.pushState({ q: query }, "", "/search?q=" + encodeURIComponent(query));
+    window.history.pushState(request, "", searchPathFor(request));
   }
 
-  fetchOpportunities({ q: query, label: query });
+  fetchOpportunities(request);
 }
 
-function searchLocationId(rawLocationId, displayName, options) {
-  beginOrdinaryLookup();
+function searchLocationId(rawLocationId, displayName, options, existingRequest) {
   var locationId = normalizeQuery(rawLocationId);
   var label = normalizeQuery(displayName) || locationId;
+  var request = existingRequest || { locationId: locationId, label: label, order: activeOrder };
+  beginOrdinaryLookup(request);
   var validationMessage = validateLocationId(locationId);
 
   input.value = label;
@@ -178,13 +207,10 @@ function searchLocationId(rawLocationId, displayName, options) {
   }
 
   if (options.updateUrl) {
-    window.history.pushState(
-      { locationId: locationId },
-      "",
-      "/search?locationId=" + encodeURIComponent(locationId));
+    window.history.pushState(request, "", searchPathFor(request));
   }
 
-  fetchOpportunities({ locationId: locationId, label: label });
+  fetchOpportunities(request);
 }
 
 function validateQuery(query) {
@@ -235,7 +261,8 @@ function fetchOpportunities(request) {
         .then(function (payload) {
           var recoveryLocationId = planningRecoveryLocationId(payload, response.status);
           preferences.renderResponse(payload);
-          responseView.renderResponse(payload || fallbackPayload(response.status), request, response.status);
+          settleOrderControl(payload, request,
+            responseView.renderResponse(payload || fallbackPayload(response.status), request, response.status));
           if (recoveryLocationId) {
             planningView.renderRecovery(function () {
               startPlanning(recoveryLocationId);
@@ -246,6 +273,7 @@ function fetchOpportunities(request) {
     .catch(function (error) {
       if (error.name !== "AbortError") {
         preferences.renderResponse(null);
+        settleOrderControl(null, request);
         responseView.renderResponse({
           status: "temporarily_unavailable",
           message: "The lookup could not be reached. Try again shortly."
@@ -269,6 +297,7 @@ function startPlanning(locationId) {
   activeRequest = new AbortController();
   var requestController = activeRequest;
   var planningRequest = preferences.planningRequestFor(locationId, requestController.signal);
+  orderControl.hidden = true;
   workspaceTitle.textContent = "Next matching Moon date";
   workspaceTitle.setAttribute("tabindex", "-1");
   ordinaryWorkspaceMeta.hidden = true;
@@ -305,10 +334,11 @@ function startPlanning(locationId) {
     });
 }
 
-function beginOrdinaryLookup() {
+function beginOrdinaryLookup(request) {
   if (activeRequest) {
     activeRequest.abort();
   }
+  orderControl.hidden = !sameLookup(request, resolvedRequest);
   workspaceTitle.textContent = ordinaryWorkspaceTitle;
   workspaceTitle.removeAttribute("tabindex");
   ordinaryWorkspaceMeta.hidden = false;
@@ -348,6 +378,23 @@ function searchRequestFor(request, signal) {
       signal: signal
     }
   };
+}
+
+function settleOrderControl(payload, request, hasMultiplePasses) {
+  var resolved = payload && payload.status === "ok" && payload.location?.kind === "real_location";
+  orderControl.hidden = !resolved || !hasMultiplePasses;
+  resolvedRequest = resolved && hasMultiplePasses ? request : null;
+  if (resolved && request.order === "best_match") {
+    activeOrder = undefined;
+    window.history.replaceState({}, "", sharePathFor(request));
+  }
+}
+
+function sameLookup(left, right) {
+  if (!left || !right) return false;
+  return left.locationId
+    ? left.locationId === right.locationId
+    : !right.locationId && left.q === right.q;
 }
 
 function syncSearchDisclosures(mediaQuery) {

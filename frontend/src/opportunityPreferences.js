@@ -2,6 +2,7 @@ import {
   createAngularPreferenceControls,
   normalizeAngularPreferences
 } from "./angularPreferenceControls.js";
+import { preferenceApiPathFor } from "./api.js";
 import {
   createMoonAppearanceControls,
   normalizeMoonAppearancePreferences
@@ -54,7 +55,7 @@ export function createOpportunityPreferences(options) {
     var locationKey = request.locationId ? "locationId" : "q";
     body[locationKey] = request[locationKey];
     return {
-      path: "/api/opportunities",
+      path: preferenceApiPathFor(request),
       options: /** @type {RequestInit} */ ({
         method: "POST",
         cache: "no-store",

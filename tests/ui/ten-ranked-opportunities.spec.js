@@ -37,34 +37,34 @@ test("renders ten ranked candidates as responsive pass groups", async ({ page })
   );
   await expect(page.locator(".score-value")).toHaveText(["90", "89", "88", "87", "86"]);
   await expect(page.locator(".choice-rank")).toHaveText([
-    "Rank 1 · score 90",
     "Rank 6 · score 85",
-    "Rank 2 · score 89",
+    "Rank 1 · score 90",
     "Rank 7 · score 84",
-    "Rank 3 · score 88",
+    "Rank 2 · score 89",
     "Rank 8 · score 83",
-    "Rank 4 · score 87",
+    "Rank 3 · score 88",
     "Rank 9 · score 82",
-    "Rank 5 · score 86",
-    "Rank 10 · score 81"
+    "Rank 4 · score 87",
+    "Rank 10 · score 81",
+    "Rank 5 · score 86"
   ]);
   await expect(page.locator(".choice-badge.is-best")).toHaveCount(5);
   await expect(page.locator(".choice-badge.is-alt")).toHaveCount(5);
   await expect(page.locator(".pass-photo-hint")).toHaveCount(10);
   await expect(page.locator(".pass-choice-explanation")).toHaveCount(10);
-  await expect(page.locator(".pass-choice-card").first()).toContainText("partly cloudy");
+  await expect(page.locator(".pass-choice-card").first()).toContainText("clear");
   await expect(page.locator(".pass-choice-card").first()).toContainText(
-    "Ambient light should support foreground detail"
-  );
-  await expect(page.locator(".pass-choice-card").first()).toContainText(
-    "Fixture recommendation for UI smoke checks."
-  );
-  await expect(page.locator(".pass-choice-card").last()).toContainText("clear");
-  await expect(page.locator(".pass-choice-card").last()).toContainText(
     "foreground light is limited"
   );
-  await expect(page.locator(".pass-choice-card").last()).toContainText(
+  await expect(page.locator(".pass-choice-card").first()).toContainText(
     "Fixture alternate recommendation for UI smoke checks."
+  );
+  await expect(page.locator(".pass-choice-card").last()).toContainText("partly cloudy");
+  await expect(page.locator(".pass-choice-card").last()).toContainText(
+    "Ambient light should support foreground detail"
+  );
+  await expect(page.locator(".pass-choice-card").last()).toContainText(
+    "Fixture recommendation for UI smoke checks."
   );
 
   const lastCard = page.locator(".moon-pass-card").last();

@@ -31,8 +31,7 @@ export function createResponseView(results, callbacks) {
     current = { payload: payload, request: request, statusCode: statusCode };
     switch (payload.status) {
       case "ok":
-        renderOk(payload, request, true);
-        break;
+        return renderOk(payload, request, true);
       case "ambiguous_location":
         renderAmbiguous(payload, request.label);
         break;
@@ -51,14 +50,15 @@ export function createResponseView(results, callbacks) {
       default:
         renderStatus("Unexpected response", "The backend returned a response this page does not understand.", statusCode >= 500 ? "warning" : "error");
     }
+    return false;
   }
 
   function refresh() {
     if (!current || current.payload.status !== "ok" || !cameraSetup) return;
     var groups = opportunityGroups(Array.isArray(current.payload.opportunities)
-      ? current.payload.opportunities : []);
+      ? current.payload.opportunities : [], current.request.order === "soonest");
     results.querySelectorAll(".moon-pass-card").forEach(function (card, index) {
-      var moon = groups[index]?.entries[0]?.opportunity?.moon;
+      var moon = bestMoon(groups[index]?.entries || []);
       cameraSetup.replaceEstimate(card, moon, card.querySelector(".moon-path-panel"));
     });
   }
@@ -98,9 +98,10 @@ export function createResponseView(results, callbacks) {
     var timezone = location.timezone || "UTC";
     var countryCode = location.countryCode || "";
     var opportunities = Array.isArray(payload.opportunities) ? payload.opportunities : [];
-    var groups = opportunityGroups(opportunities);
+    var soonest = request.order === "soonest";
+    var groups = opportunityGroups(opportunities, soonest);
     var children = [
-      resultSummary(payload, request, groups.length, opportunities.length)
+      resultSummary(payload, request, groups.length, opportunities.length, soonest)
     ];
 
     if (notifyResolvedLocation && location.kind === "real_location"
@@ -116,7 +117,7 @@ export function createResponseView(results, callbacks) {
       };
       children.push(element("div", { className: "opportunity-list" },
         groups.map(function (group, index) {
-          return opportunityGroup(group, index, timezone, countryCode, chartContext);
+          return opportunityGroup(group, index, timezone, countryCode, chartContext, soonest, groups.length);
         })
       ));
     }
@@ -126,18 +127,20 @@ export function createResponseView(results, callbacks) {
     }
 
     replaceResults(children);
+    return groups.length > 1;
   }
 
-  function opportunityGroups(opportunities) {
+  function opportunityGroups(opportunities, soonest) {
     var groupsByPass = new Map();
     var groups = [];
     opportunities.forEach(function (opportunity, index) {
       var pass = opportunity.moonPass || {};
-      var key = pass.id || opportunity.id || String(index);
+      var key = pass.id || Symbol();
       var group = groupsByPass.get(key);
       if (!group) {
         group = {
           pass: pass,
+          index: index,
           entries: []
         };
         groupsByPass.set(key, group);
@@ -145,17 +148,29 @@ export function createResponseView(results, callbacks) {
       }
       group.entries.push({
         opportunity: opportunity,
-        index: index
+        index: index,
+        isBest: false
       });
     });
+    groups.forEach(function (group) {
+      var best = group.entries.slice().sort(compareScores)[0];
+      group.entries.forEach(function (entry) {
+        entry.isBest = entry === best;
+      });
+      group.entries.sort(compareCandidateTimes);
+    });
+    if (soonest) {
+      groups.sort(compareSuggestedTimes);
+    }
     return groups;
   }
 
-  function opportunityGroup(group, index, timezone, countryCode, chartContext) {
-    var card = moonPassCard(group.pass, group.entries, index, timezone, countryCode, chartContext);
+  function opportunityGroup(group, index, timezone, countryCode, chartContext, soonest, passCount) {
+    var card = moonPassCard(
+      group.pass, group.entries, index, timezone, countryCode, chartContext, soonest, passCount);
     if (cameraSetup) {
       cameraSetup.replaceEstimate(
-        card, group.entries[0].opportunity.moon, card.querySelector(".moon-path-panel"));
+        card, bestMoon(group.entries), card.querySelector(".moon-path-panel"));
     }
     return card;
   }
@@ -171,11 +186,12 @@ export function createResponseView(results, callbacks) {
     }, 0);
   }
 
-  function resultSummary(payload, request, passCount, candidateCount) {
+  function resultSummary(payload, request, passCount, candidateCount, soonest) {
     var location = payload.location || {};
     var sharePath = sharePathFor(request);
     var shareUrl = window.location.origin + sharePath;
-    var passText = passCount === 1 ? "1 ranked Moon pass" : passCount + " ranked Moon passes";
+    var passNoun = soonest ? "Moon pass" : "ranked Moon pass";
+    var passText = passCount + " " + passNoun + (passCount === 1 ? "" : "es");
     var candidateText = candidateCount === 1 ? "1 candidate window" : candidateCount + " candidate windows";
 
     return element("section", { className: "result-panel result-summary", ariaLabelledby: "result-title" },
@@ -286,6 +302,36 @@ export function createResponseView(results, callbacks) {
     }
     results.replaceChildren.apply(results, children.filter(Boolean));
   }
+}
+
+function compareScores(left, right) {
+  var leftScore = Number.isFinite(left.opportunity.score) ? left.opportunity.score : -Infinity;
+  var rightScore = Number.isFinite(right.opportunity.score) ? right.opportunity.score : -Infinity;
+  return leftScore === rightScore ? left.index - right.index : rightScore - leftScore;
+}
+
+function compareCandidateTimes(left, right) {
+  var leftTime = new Date(left.opportunity.suggestedAt).getTime();
+  var rightTime = new Date(right.opportunity.suggestedAt).getTime();
+  return Number.isFinite(leftTime) && Number.isFinite(rightTime) && leftTime !== rightTime
+    ? leftTime - rightTime : left.index - right.index;
+}
+
+function bestMoon(entries) {
+  return entries.find(function (entry) { return entry.isBest; })?.opportunity?.moon;
+}
+
+function compareSuggestedTimes(left, right) {
+  var leftTime = earliestSuggestedTime(left);
+  var rightTime = earliestSuggestedTime(right);
+  return leftTime === rightTime ? left.index - right.index : leftTime - rightTime;
+}
+
+function earliestSuggestedTime(group) {
+  return group.entries.reduce(function (earliest, entry) {
+    var time = new Date(entry.opportunity.suggestedAt).getTime();
+    return Number.isFinite(time) ? Math.min(earliest, time) : earliest;
+  }, Infinity);
 }
 
 function preferenceImpactDetails(payload) {

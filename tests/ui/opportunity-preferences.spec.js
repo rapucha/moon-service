@@ -561,7 +561,7 @@ for (const scenario of [
   });
 }
 
-test("documents local preference storage, request use, and location-only sharing", async ({ page }) => {
+test("documents local preference storage, request use, and preference-free sharing", async ({ page }) => {
   await page.goto("/about");
 
   const privacy = page.locator("#privacy-and-providers");
@@ -575,7 +575,7 @@ test("documents local preference storage, request use, and location-only sharing
     "The server does not permanently store them"
   );
   await expect(privacy).toContainText(
-    "Share links include only the location, not the preferences."
+    "Share links include the location and may include the selected order, but never include preferences."
   );
   await expect(privacy).toContainText(
     "A browser opening the link applies its own saved preferences, if any."
