@@ -995,6 +995,108 @@ Response rules:
 - Do not expose ephemeris sampling cadence such as `stepMinutes` in the public
   API.
 
+### Current-Moon product snapshot
+
+Every `status: "ok"` response from `GET /api/opportunities` and product
+`POST /api/opportunities` contains required top-level `asOf` and `currentMoon`
+members. The server captures `asOf` once before it derives the resolved
+location's default local start date. `generatedAt` equals `asOf`. The same
+instant governs the live-window cutoff, current Moon and Sun facts, and the
+containing-pass calculation.
+
+This addition applies only after a real location resolves and the opportunity
+search succeeds. Ambiguous, not-found, invalid, unavailable, and rate-limited
+envelopes keep their existing shapes. Fixture-backed
+`POST /api/opportunities/search` omits `asOf` and `currentMoon`.
+
+`currentMoon` contains:
+
+```json
+{
+  "horizonState": "above_or_on_horizon",
+  "moon": {
+    "altitudeDegrees": 12.3,
+    "azimuthDegrees": 118.4,
+    "illuminationPercent": 72.1,
+    "phaseAngleDegrees": 115.2,
+    "brightLimbTiltDegrees": 241.8,
+    "northPoleTiltDegrees": 18.5,
+    "phaseName": "waxing_gibbous"
+  },
+  "sun": {
+    "altitudeDegrees": -5.2,
+    "azimuthDegrees": 283.1,
+    "lightBucket": "civil_twilight"
+  },
+  "activePass": {
+    "startBoundary": {
+      "status": "found",
+      "at": "2026-08-05T20:12:03Z"
+    },
+    "endBoundary": {
+      "status": "not_found_within_range"
+    },
+    "representedStartsAt": "2026-08-05T20:12:03Z",
+    "representedEndsAt": "2026-08-07T23:00:00Z",
+    "path": {
+      "start": {},
+      "now": {},
+      "end": {},
+      "samples": []
+    }
+  }
+}
+```
+
+The abbreviated path above shows its required structure. Every path point has
+the complete existing Moon-path point shape. A live `samples` array is not
+empty and follows the sampling rules below.
+
+The server derives `horizonState` from the unrounded Moon altitude in the
+`asOf` sample. An altitude at least `0.0` is
+`above_or_on_horizon`; an altitude below `0.0` is `below_horizon`. It rounds
+wire numbers only after this decision. `moon` and `sun` use the existing field
+names and nullability. Both Moon orientation values may be JSON `null`; all
+other current Moon and Sun members are required.
+
+When the Moon is below the horizon, `activePass` is required and is JSON
+`null`. The outer response's non-null omission rule must not remove this
+member. The response does not add next-rise advice.
+
+When the Moon is at or above the horizon, `activePass` is required. The server
+searches backward from `asOf` through the inclusive instant 26 hours earlier
+for the latest directional Moonrise. It searches forward through the
+inclusive instant 26 hours later for the next directional Moonset. A Moonrise
+crosses from below `0.0` to at or above `0.0`; a Moonset crosses in the other
+direction. A crossing exactly at `asOf` or either 26-hour edge counts only for
+its correct direction. The server refines a strict crossing to the existing
+one-second tolerance.
+
+Each boundary has `status: "found"` and required `at`, or
+`status: "not_found_within_range"` with `at` omitted. A found boundary supplies
+its represented endpoint. A missing boundary uses its corresponding 26-hour
+edge. The finite search does not establish or return
+`continuous_visibility`.
+
+`activePass.path.start.at`, `activePass.path.now.at`, and
+`activePass.path.end.at` equal the represented start, top-level `asOf`, and
+represented end. Those separately serialized points keep `start`, `now`, and
+`end` roles even when two points share an instant.
+
+The path's `samples` array is chronological and deduplicated by instant. It
+contains both represented endpoints, the three quarter-interval points,
+30-minute points anchored at the represented start, relevant refined
+light-bucket crossings, and exact `asOf`. Exactly one sample has `role: "now"`;
+that role wins when `asOf` equals another sampled instant. Every sample carries
+Moon position, sample-specific phase and orientations, Sun position, and the
+light bucket from the same instant.
+
+The server calculates `currentMoon` independently of candidate eligibility,
+preferences, scores, IDs, paths, counts, ordering, and the ten-result limit.
+It returns the snapshot when `opportunities` is empty. If a ranked opportunity
+represents the same physical pass, both representations remain and all ranked
+facts remain unchanged.
+
 The current engine selects the hourly forecast record that covers
 `suggestedAt`. The response's weather summary and aggregate-shaped fields
 currently describe that one record. The target V0 weather-window contract
@@ -1031,6 +1133,25 @@ instead describes weather across the opportunity window:
     "countryCode": "CZ"
   },
   "generatedAt": "2026-06-14T09:00:00Z",
+  "asOf": "2026-06-14T09:00:00Z",
+  "currentMoon": {
+    "horizonState": "below_horizon",
+    "moon": {
+      "altitudeDegrees": -18.2,
+      "azimuthDegrees": 301.4,
+      "illuminationPercent": 3.2,
+      "phaseAngleDegrees": 344.0,
+      "brightLimbTiltDegrees": 88.1,
+      "northPoleTiltDegrees": 14.7,
+      "phaseName": "new_moon"
+    },
+    "sun": {
+      "altitudeDegrees": 45.2,
+      "azimuthDegrees": 144.1,
+      "lightBucket": "daylight"
+    },
+    "activePass": null
+  },
   "forecastHorizonDays": 7,
   "opportunities": [
     {
