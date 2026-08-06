@@ -1,8 +1,12 @@
 export function apiPathFor(request) {
-  if (request.locationId) {
-    return "/api/opportunities?locationId=" + encodeURIComponent(request.locationId);
-  }
-  return "/api/opportunities?q=" + encodeURIComponent(request.q);
+  var path = request.locationId
+    ? "/api/opportunities?locationId=" + encodeURIComponent(request.locationId)
+    : "/api/opportunities?q=" + encodeURIComponent(request.q);
+  return orderedPath(path, request.order);
+}
+
+export function preferenceApiPathFor(request) {
+  return orderedPath("/api/opportunities", request.order);
 }
 
 export function fallbackPayload(statusCode) {
@@ -25,8 +29,22 @@ export function fallbackPayload(statusCode) {
 }
 
 export function sharePathFor(request) {
+  var order = request.order === "soonest" ? request.order : undefined;
+  return orderedPath(lookupPath("/search", request), order);
+}
+
+export function searchPathFor(request) {
+  return orderedPath(lookupPath("/search", request), request.order);
+}
+
+function lookupPath(path, request) {
   if (request.locationId) {
-    return "/search?locationId=" + encodeURIComponent(request.locationId);
+    return path + "?locationId=" + encodeURIComponent(request.locationId);
   }
-  return "/search?q=" + encodeURIComponent(request.q);
+  return path + "?q=" + encodeURIComponent(request.q);
+}
+
+function orderedPath(path, order) {
+  var separator = path.includes("?") ? "&" : "?";
+  return order === undefined ? path : path + separator + "order=" + encodeURIComponent(order);
 }

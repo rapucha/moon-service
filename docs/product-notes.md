@@ -204,14 +204,18 @@ hard limits for that search. It must not permanently store the request body or
 preferences, add them to a server-side profile, cookie, or analytics event, or
 put them in a URL, access log, application log, or shared cache.
 
-Share links remain location-only and contain no preference value. A browser
-opening a share link applies its own saved preferences, if any. Resetting all
-preferences removes the version 1 object when browser storage accepts the
-removal. If removal fails, the current page uses reset state in memory and
-reports that it cannot save preferences; the stored value may remain for a
-later page load. If `localStorage` is blocked or unavailable, the browser keeps
-preferences only in page memory and search continues. There is no server
-preference profile or cross-device sync.
+Search order is request state. The browser puts `order=soonest` in the page URL
+and generated share links, and omits the default `best_match` order. It does
+not store order in an account, cookie, server profile, or `localStorage` entry.
+
+Share links contain the location and may contain order. They contain no
+preference value. A browser opening a share link applies its own saved
+preferences, if any. Resetting all preferences removes the version 1 object
+when browser storage accepts the removal. If removal fails, the current page
+uses reset state in memory and reports that it cannot save preferences; the
+stored value may remain for a later page load. If `localStorage` is blocked or
+unavailable, the browser keeps preferences only in page memory and search
+continues. There is no server preference profile or cross-device sync.
 
 ## Calibration Feedback Boundary
 

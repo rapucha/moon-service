@@ -128,11 +128,12 @@ and [hosted-alpha functional tests](../backend/src/test/java/dev/moonservice/bac
   `/index.html`.
 - **Purpose/audience:** current lookup page and shareable result URL.
 - **Production invocation:** navigation links, browser history, and generated
-  share links use `/search?q=...` or `/search?locationId=...`. Browser code reads
-  those parameters. It calls `GET /api/opportunities` when no hard preference is
-  active and `POST /api/opportunities` when at least one is active. `locationId`
-  wins if both lookup fields are present in a page URL. Preference values never
-  enter the page URL or a generated share link.
+  share links use `/search?q=...` or `/search?locationId=...`, with optional
+  `order=soonest`. Browser code reads the lookup and order parameters. It calls
+  `GET /api/opportunities` when no hard preference is active and
+  `POST /api/opportunities` when at least one is active. `locationId` wins if
+  both lookup fields are present in a page URL. Preference values never enter
+  the page URL or a generated share link.
 - **Other callers:** browser and application functional tests.
 - **Authentication/data:** none. The URL can contain a location query or
   selected location ID and is therefore visible in browser history/share links.
@@ -155,6 +156,9 @@ and [hosted-alpha functional tests](../backend/src/test/java/dev/moonservice/bac
   `/camera-preview/level-0.webp`, `/camera-preview/level-1.webp`,
   `/camera-preview/level-2.webp`, `/camera-preview/level-3.webp`,
   `/camera-preview/level-4.webp`, and `/camera-preview/level-5.webp` resources.
+- **Order state:** omitted order selects `best_match`; a generated Soonest link
+  contains `order=soonest`. The browser keeps order only in page request state
+  and the URL. It creates no order cookie, profile, or `localStorage` entry.
 - **References:** [controller](../backend/src/main/java/dev/moonservice/backend/web/WebPageController.java),
   [browser flow](../frontend/src/app.js),
   [recent-search storage](../frontend/src/recentSearches.js),
@@ -193,8 +197,8 @@ and [hosted-alpha functional tests](../backend/src/test/java/dev/moonservice/bac
   the product POST based on its own active preferences.
 - **Production invocation:** browser `app.js` calls it through `api.js` when no
   hard preference is active. Query searches use `q`, while an ambiguity
-  selection uses `locationId`. The browser does not call the direct prototype
-  POST below.
+  selection uses `locationId`. The browser sends the selected optional `order`
+  query parameter and does not call the direct prototype POST below.
 - **Other callers:** manual HTTP/Postman requests, UI tests, application tests,
   and container/live smoke checks.
 - **Request:** exactly one usable `q` or `locationId`; values are trimmed,
@@ -239,8 +243,8 @@ and [hosted-alpha functional tests](../backend/src/test/java/dev/moonservice/bac
 - **Production invocation:** browser `app.js` calls it through
   `opportunityPreferences.js` when at least one supported hard preference is
   active. The module sends exactly one `q` or `locationId` with the versioned
-  preference object, disables request caching, and keeps preference values out
-  of the page and share URLs.
+  preference object, puts selected order in the query, disables request
+  caching, and keeps preference values out of the page and share URLs.
 - **Other callers:** application tests and explicit manual API clients.
 - **Request:** `application/json`, including ordinary media-type parameters,
   with exactly one usable `q` or `locationId` and optional complete version 1

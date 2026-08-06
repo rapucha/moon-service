@@ -8,18 +8,18 @@ import {
 import { moonPathPanel } from "./moonPathView.js";
 import { scoreBlock, scoreDetails } from "./scoreView.js";
 
-export function moonPassCard(pass, entries, index, timezone, countryCode, chartContext) {
-  var primaryEntry = entries[0];
+export function moonPassCard(pass, entries, index, timezone, countryCode, chartContext, soonest, passCount) {
+  var primaryEntry = entries.find(function (entry) { return entry.isBest; }) || entries[0];
   var primary = primaryEntry.opportunity;
 
   return element("article", { className: "opportunity-card moon-pass-card" + (index === 0 ? " is-primary" : "") },
     element("header", { className: "opportunity-header" },
       element("div", { className: "opportunity-title" },
-        element("p", { className: "rank-label" }, index === 0 ? "Best match" : "Option " + (index + 1)),
+        element("p", { className: "rank-label" }, passOrderLabel(index, soonest, passCount)),
         element("h3", {}, passSummaryText(entries.length))),
       scoreBlock(primary.score)
     ),
-    passRecommendations(entries, timezone, countryCode),
+    passRecommendations(entries, timezone, countryCode, soonest),
     passIntervalContext(pass, primary, timezone, countryCode),
     moonPathPanel(moonPassPathOpportunity(pass, entries, primary), timezone, countryCode, chartContext),
     opportunityActions(primary),
@@ -157,15 +157,15 @@ function passIntervalContext(pass, primary, timezone, countryCode) {
       element("dd", {}, title)));
 }
 
-function passRecommendations(entries, timezone, countryCode) {
+function passRecommendations(entries, timezone, countryCode, soonest) {
   var className = "pass-choices" + (entries.length === 1 ? " is-single" : "");
   return element("section", { className: className, ariaLabel: "Recommendations in this Moon pass" },
-    entries.map(function (entry, index) {
-      return passRecommendation(entry, index === 0, timezone, countryCode);
+    entries.map(function (entry) {
+      return passRecommendation(entry, entry.isBest, timezone, countryCode, soonest);
     }));
 }
 
-function passRecommendation(entry, isBest, timezone, countryCode) {
+function passRecommendation(entry, isBest, timezone, countryCode, soonest) {
   var opportunity = entry.opportunity;
   var rawRank = entry.index + 1;
   var moon = opportunity.moon || {};
@@ -178,7 +178,7 @@ function passRecommendation(entry, isBest, timezone, countryCode) {
       element("div", {},
         element("div", { className: "choice-meta" },
           element("span", { className: "choice-badge" + (isBest ? " is-best" : " is-alt") }, isBest ? "Best" : "Alternative"),
-          element("span", { className: "choice-rank" }, candidateRankText(rawRank, opportunity.score))),
+          element("span", { className: "choice-rank" }, candidateRankText(rawRank, opportunity.score, soonest))),
         element("h4", {}, formatDateTimeWithZone(opportunity.suggestedAt, timezone, countryCode))),
       element("span", { className: "pass-choice-kind" }, recommendationLabel(opportunity.windowKind))),
     element("dl", { className: "pass-metric-grid" },
@@ -197,13 +197,28 @@ function passRecommendation(entry, isBest, timezone, countryCode) {
       : null,
     opportunity.reason
       ? element("details", { className: "pass-choice-explanation" },
-        element("summary", {}, "Why this candidate ranked here"),
+        element("summary", {}, soonest
+          ? "Why this candidate scored this way"
+          : "Why this candidate ranked here"),
         element("p", {}, opportunity.reason))
       : null);
 }
 
-function candidateRankText(rank, score) {
+function candidateRankText(rank, score, soonest) {
+  if (soonest) {
+    return Number.isFinite(score) ? "Score " + score : "Score unavailable";
+  }
   return "Rank " + rank + " · " + (Number.isFinite(score) ? "score " + score : "score unavailable");
+}
+
+function passOrderLabel(index, soonest, passCount) {
+  if (passCount === 1) {
+    return "Moon pass";
+  }
+  if (soonest) {
+    return index === 0 ? "Soonest" : "Later pass " + (index + 1);
+  }
+  return index === 0 ? "Best match" : "Option " + (index + 1);
 }
 
 function passSummaryText(count) {

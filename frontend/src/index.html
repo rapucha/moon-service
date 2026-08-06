@@ -327,7 +327,7 @@
 
               <div class="preference-context-note">
                 <p id="preference-timezone-note" hidden></p>
-                <p>Share links include only the location. Another browser uses its own saved preferences, if any.</p>
+                <p>Share links include the location and may include the selected order. They never include preferences. Another browser uses its own saved preferences, if any.</p>
               </div>
               <p id="preference-form-status" class="preference-form-status" role="status" aria-live="polite"></p>
               <button type="submit" class="preference-apply">Use these limits</button>
@@ -360,6 +360,19 @@
             <span class="tooltip" title="Result pages can be opened again or sent to someone else." data-tooltip="Result pages can be opened again or sent to someone else.">Share link</span>
           </div>
         </div>
+        <fieldset id="opportunity-order" class="preference-group preference-time-group" hidden>
+          <legend>Order opportunities</legend>
+          <div class="preference-mode-choices">
+            <label class="preference-choice">
+              <input type="radio" name="opportunity-order" value="best_match" checked>
+              <span>Best match</span>
+            </label>
+            <label class="preference-choice">
+              <input type="radio" name="opportunity-order" value="soonest">
+              <span>Soonest</span>
+            </label>
+          </div>
+        </fieldset>
         <div id="preference-result-region" class="preference-result-region" aria-live="polite">
           <p id="preference-storage-notice" class="preference-notice warning" role="status" hidden></p>
           <p id="preference-excluded-notice" class="preference-notice excluded" hidden></p>
