@@ -29,6 +29,9 @@ user authorization before spawning subagents, get that authorization first.
 Before requesting the review, the primary agent should:
 
 - Complete the intended implementation pass.
+- Compare the complete intended diff with the smallest direct implementation.
+  Remove unrequested extractions, renames, formatting, cleanup, and other
+  structural changes before requesting the review.
 - Run the smallest meaningful validation commands, unless blocked.
 - Check the worktree state and identify the intended diff to review.
 - Keep unrelated user or generated changes separate when possible.
@@ -106,7 +109,8 @@ Check scope before implementation quality:
    criteria, and approved exceptions. Flag unaccepted concerns even when the
    diff remains below its hard gates. Do not flag an extra, missing, or replaced
    planned path by itself. Check whether the difference changes behavior,
-   concerns, dependencies, output classes, or a hard gate.
+   concerns, dependencies, output classes, or a hard gate. Separately flag an
+   unrequested refactor even when it changes none of those things.
 2. Verify ordinary file counts, informational churn, code-line base and result
    counts, oversized-file deltas and exceptions, and generated/vendored/lock
    measurements against project policy. Record meaningful differences from the
@@ -136,7 +140,11 @@ Check scope before implementation quality:
    every other gate and review normally.
 6. Look for unrequested refactors, incidental fixes, opportunistic cleanup,
    unrelated tests/docs, and abstractions without the required production-use
-   evidence.
+   evidence. For each extraction, rename, move, formatting-only rewrite, or
+   similar structural change, identify the accepted requirement or concrete
+   correctness, compilation, or test need. Readability preference alone is not
+   authority. Report an unsupported change as a finding even when behavior is
+   unchanged.
 7. Flag manifest, lock, workflow, provider, account, network, runtime, build, or
    test dependencies that lack explicit source authority.
 8. Then prioritize concrete bugs, behavior regressions, public contract drift,
@@ -155,6 +163,12 @@ counts, a word limit, a readability score, or a style-linter requirement.
 For each finding, include severity, file and line reference when possible,
 why it matters, and the smallest practical fix. If there are no findings,
 say that clearly and mention any residual test or validation risk.
+
+After the findings, always include this section:
+
+Diff minimality:
+- Required structural changes: <changes and authority or concrete need, or None>
+- Unrequested structural changes: <findings, or None>
 ```
 
 The reviewer output should lead with findings ordered by severity. It should
@@ -168,6 +182,9 @@ decorative metaphors.
 
 After receiving the review:
 
+- Treat a review that omits the **Diff minimality** section as incomplete and
+  ask the same reviewer to finish it before triage. This completes the existing
+  review; it does not start another review round.
 - Triage every finding as accepted, rejected, or deferred.
 - Fix accepted findings narrowly.
 - Explain rejected findings with a concrete reason, not a preference.

@@ -1,5 +1,6 @@
 package dev.moonservice.backend.opportunity.scoring;
 
+import static dev.moonservice.backend.opportunity.search.OpportunitySearchRequest.Order.BEST_MATCH;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -38,6 +39,18 @@ import java.util.Set;
 import java.util.concurrent.atomic.AtomicReference;
 
 class ScoringOpportunitySearchEngineTest {
+    @Test
+    void assignsBestMatchToDirectFixtureRequests() {
+        ObjectNode request = new ObjectMapper().createObjectNode();
+        request.put("locationId", "prague-cz");
+        request.put("start", "2026-06-29");
+        request.put("forecastHorizonDays", 7);
+        request.put("maxMoonAltitudeDegrees", 12);
+        request.put("limit", 5);
+
+        assertEquals(BEST_MATCH, OpportunitySearchRequest.fromJson(request).order());
+    }
+
     @Test
     void preservesNullMoonOrientationFromPrototypeResponse() throws ReflectiveOperationException {
         ObjectNode moonNode = new ObjectMapper().createObjectNode();
@@ -88,7 +101,7 @@ class ScoringOpportunitySearchEngineTest {
         OpportunitySearchResponse response = searchWithoutLiveCutoff(
                 engine,
                 amsterdam(),
-                new OpportunitySearchRequest("amsterdam-nl", "2026-06-29", 7, 90.0, 5));
+                new OpportunitySearchRequest("amsterdam-nl", "2026-06-29", 7, 90.0, 5, BEST_MATCH));
 
         assertEquals("ok", response.status());
         assertEquals("amsterdam-nl", response.location().id());
@@ -169,7 +182,7 @@ class ScoringOpportunitySearchEngineTest {
         OpportunitySearchResponse response = searchWithoutLiveCutoff(
                 engine,
                 amsterdam(),
-                new OpportunitySearchRequest("amsterdam-nl", "2026-06-29", 7, 90.0, 5));
+                new OpportunitySearchRequest("amsterdam-nl", "2026-06-29", 7, 90.0, 5, BEST_MATCH));
 
         OpportunitySearchResponse.Weather weather = response.opportunities().getFirst().weather();
         assertEquals(amsterdam(), requestedLocation.get());
@@ -198,7 +211,7 @@ class ScoringOpportunitySearchEngineTest {
 
         OpportunitySearchResponse response = engine.search(
                 prague(),
-                new OpportunitySearchRequest("prague-cz", "2026-06-29", 7, 12.0, 100),
+                new OpportunitySearchRequest("prague-cz", "2026-06-29", 7, 12.0, 100, BEST_MATCH),
                 notBefore);
 
         assertTrue(response.opportunities().stream()
@@ -221,7 +234,7 @@ class ScoringOpportunitySearchEngineTest {
     void preferenceFreeTypedSearchPreservesLiveAdapterResult() {
         OpportunitySearchEngine engine = engineWithPartlyCloudyWeather();
         OpportunitySearchRequest request =
-                new OpportunitySearchRequest("prague-cz", "2026-06-29", 1, 12.0, 10);
+                new OpportunitySearchRequest("prague-cz", "2026-06-29", 1, 12.0, 10, BEST_MATCH);
         Instant notBefore = Instant.parse("2026-06-29T00:00:00Z");
 
         OpportunitySearchResponse ordinary = engine.search(prague(), request, notBefore);
@@ -259,7 +272,7 @@ class ScoringOpportunitySearchEngineTest {
 
         PreferenceSearchResult result = engine.search(
                 prague(),
-                new OpportunitySearchRequest("prague-cz", "2026-06-29", 1, 12.0, 10),
+                new OpportunitySearchRequest("prague-cz", "2026-06-29", 1, 12.0, 10, BEST_MATCH),
                 Instant.parse("2026-06-28T22:00:00Z"),
                 preferences);
 
@@ -287,7 +300,7 @@ class ScoringOpportunitySearchEngineTest {
 
         PreferenceSearchResult result = engine.search(
                 prague(),
-                new OpportunitySearchRequest("prague-cz", "2026-07-14", 1, 90.0, 100),
+                new OpportunitySearchRequest("prague-cz", "2026-07-14", 1, 90.0, 100, BEST_MATCH),
                 Instant.parse("2026-07-14T00:00:00Z"),
                 preferences);
 
@@ -311,7 +324,7 @@ class ScoringOpportunitySearchEngineTest {
 
         PreferenceSearchResult result = engine.search(
                 prague(),
-                new OpportunitySearchRequest("prague-cz", "2026-06-29", 1, 12.0, 10),
+                new OpportunitySearchRequest("prague-cz", "2026-06-29", 1, 12.0, 10, BEST_MATCH),
                 Instant.parse("2026-06-30T00:00:00Z"),
                 preferences);
 
@@ -346,7 +359,7 @@ class ScoringOpportunitySearchEngineTest {
 
         PreferenceSearchResult result = engine.search(
                 prague(),
-                new OpportunitySearchRequest("prague-cz", "2026-06-29", 1, 12.0, 1),
+                new OpportunitySearchRequest("prague-cz", "2026-06-29", 1, 12.0, 1, BEST_MATCH),
                 Instant.parse("2026-06-28T22:00:00Z"),
                 preferences);
 
@@ -367,11 +380,11 @@ class ScoringOpportunitySearchEngineTest {
         assertNearConjunctionRejected(searchWithoutLiveCutoff(
                 engine,
                 prague(),
-                new OpportunitySearchRequest("prague-cz", "2026-07-14", 1, 90.0, 100)));
+                new OpportunitySearchRequest("prague-cz", "2026-07-14", 1, 90.0, 100, BEST_MATCH)));
         assertNearConjunctionRejected(searchWithoutLiveCutoff(
                 engine,
                 abuDhabi(),
-                new OpportunitySearchRequest("abu-dhabi-ae", "2026-07-14", 1, 90.0, 100)));
+                new OpportunitySearchRequest("abu-dhabi-ae", "2026-07-14", 1, 90.0, 100, BEST_MATCH)));
     }
 
     @Test
@@ -380,7 +393,8 @@ class ScoringOpportunitySearchEngineTest {
 
         InvalidOpportunitySearchRequestException exception = assertThrows(
                 InvalidOpportunitySearchRequestException.class,
-                () -> engine.search(new OpportunitySearchRequest("prague-cz", "2026-06-29", 0, 90.0, 5)));
+                () -> engine.search(new OpportunitySearchRequest(
+                        "prague-cz", "2026-06-29", 0, 90.0, 5, BEST_MATCH)));
 
         assertEquals("forecastHorizonDays must be between 1 and 30.", exception.getMessage());
         assertNotNull(exception.getCause());
@@ -395,7 +409,8 @@ class ScoringOpportunitySearchEngineTest {
                 () -> searchWithoutLiveCutoff(
                         engine,
                         amsterdam(),
-                        new OpportunitySearchRequest("amsterdam-nl", "2026-06-29", 0, 90.0, 5)));
+                        new OpportunitySearchRequest(
+                                "amsterdam-nl", "2026-06-29", 0, 90.0, 5, BEST_MATCH)));
 
         assertEquals("Resolved opportunity scoring request was invalid.", exception.getMessage());
         assertNotNull(exception.getCause());

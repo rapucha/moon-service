@@ -199,14 +199,19 @@ and [hosted-alpha functional tests](../backend/src/test/java/dev/moonservice/bac
   and container/live smoke checks.
 - **Request:** exactly one usable `q` or `locationId`; values are trimmed,
   limited to 100 Unicode code points, and reject control/bidirectional-format
-  characters. Query whitespace is collapsed.
+  characters. Query whitespace is collapsed. The optional query parameter
+  `order` accepts `best_match` or `soonest`; omission selects `best_match`. The
+  server rejects a present empty or unsupported value before location or
+  weather provider work.
 - **Response:** `200 application/json` for `ok`, `ambiguous_location`, or
   `location_not_found`; `400` with `invalid_request` for invalid input; `503`
   with `temporarily_unavailable` for unavailable location or weather lookup.
   The full `ok` shape includes location, evaluated windows, opportunities,
-  rejected windows, and messages. Hosted-alpha resource admission can instead
-  return `429` with `rate_limited`, `retryAfterSeconds`, and `Retry-After`
-  before the controller runs.
+  rejected windows, and messages. The server applies the selected order to all
+  eligible finalized opportunities before taking the ten-result product
+  limit. Hosted-alpha resource admission can instead return `429` with
+  `rate_limited`, `retryAfterSeconds`, and `Retry-After` before the controller
+  runs.
 - **Authentication/data:** anonymous. `q` is sent to Open-Meteo geocoding;
   normalized queries or location IDs and resolution results are cached in the
   current process with bounded size and status-specific TTLs. Resolved location
@@ -229,8 +234,8 @@ and [hosted-alpha functional tests](../backend/src/test/java/dev/moonservice/bac
   request-scoped version 1 hard preferences.
 - **Why it exists:** preference values stay out of shareable URLs while the
   server reuses the GET route's live location, weather, Moon-window, scoring,
-  ranking, and result-limit flow. The GET and fixture-backed POST remain
-  unchanged.
+  ordering, and result-limit flow. Both product routes share the ordering
+  option; the fixture-backed direct POST remains score ordered.
 - **Production invocation:** browser `app.js` calls it through
   `opportunityPreferences.js` when at least one supported hard preference is
   active. The module sends exactly one `q` or `locationId` with the versioned
@@ -242,15 +247,20 @@ and [hosted-alpha functional tests](../backend/src/test/java/dev/moonservice/bac
   `preferences`. The raw body is limited to 16,384 bytes for known and streamed
   lengths. Unknown top-level fields are invalid; supported-version unknown
   preference fields are ignored and reported through the bounded,
-  deterministic warning contract.
+  deterministic warning contract. The optional query parameter `order` accepts
+  `best_match` or `soonest`; omission selects `best_match`. `order` is not a
+  JSON body field. The server rejects a present empty or unsupported query
+  value before location or weather provider work.
 - **Response:** the same product states and opportunity facts as GET. A request
   with preferences adds the applied version, normalized active filters,
   excluded-sample count, ignored-field warning, and authoritative per-pass
   azimuth match intervals when azimuth filtering is active. Active filters that
   remove every candidate return `200 ok` with the distinct preference
-  `emptyReason`. Errors use the documented `400 invalid_request`,
-  `413 request_too_large`, and `415 unsupported_media_type` shapes. Every
-  response uses `Cache-Control: no-store`.
+  `emptyReason`. The server orders all eligible finalized opportunities before
+  taking the ten-result product limit. Errors use the documented
+  `400 invalid_request`, `413 request_too_large`, and
+  `415 unsupported_media_type` shapes. Invalid-order responses and every other
+  response use `Cache-Control: no-store`.
 - **Authentication/data:** anonymous and same-origin. The current location flow
   may send `q` or `locationId` upstream, but it never sends a preference to
   geocoding or weather. The service does not store a request body, preference,
@@ -334,7 +344,8 @@ and [hosted-alpha functional tests](../backend/src/test/java/dev/moonservice/bac
   `prague-cz` is supported because the direct path delegates to the scoring
   prototype's one-entry fixture registry; it does not call `LocationResolver`.
   `start` accepts an ISO date or UTC instant; ranges are 1–30 days, 0–90
-  degrees, and 1–100 results.
+  degrees, and 1–100 results. The product `order` query is not part of this
+  contract; the route remains score ordered.
 - **Response:** `200 application/json` with the opportunity result; malformed,
   incomplete, unsupported, or out-of-range input returns `400` with
   `invalid_request`, `generatedAt`, and a message.

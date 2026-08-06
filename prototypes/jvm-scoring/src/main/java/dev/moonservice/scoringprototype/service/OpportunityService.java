@@ -18,6 +18,7 @@ import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -31,6 +32,11 @@ public final class OpportunityService {
     @FunctionalInterface
     public interface WindowAdjustment {
         Optional<MoonWindow> adjust(MoonWindow window, WindowGenerator.SampleProvider samples);
+    }
+
+    public enum ResultOrder {
+        BEST_MATCH,
+        SOONEST
     }
 
     public OpportunityService() {
@@ -80,6 +86,15 @@ public final class OpportunityService {
             WindowWeatherProvider weatherProvider,
             WindowAdjustment windowAdjustment
     ) {
+        return evaluate(config, weatherProvider, windowAdjustment, ResultOrder.BEST_MATCH);
+    }
+
+    public PrototypeResult evaluate(
+            PrototypeConfig config,
+            WindowWeatherProvider weatherProvider,
+            WindowAdjustment windowAdjustment,
+            ResultOrder order
+    ) {
         WindowGenerator.SampleProvider samples = instant -> sampler.sampleAt(config.location(), instant);
         List<MoonWindow> windows = windowGenerator.findWindows(config, samples);
         List<ScoredWindow> scored = new ArrayList<>();
@@ -100,8 +115,7 @@ public final class OpportunityService {
             }
         }
 
-        scored.sort(Comparator.comparingInt((ScoredWindow item) -> item.components().total()).reversed()
-                .thenComparing(item -> item.window().suggested().instant()));
+        scored.sort(comparator(order));
         if (scored.size() > config.limit()) {
             scored = scored.subList(0, config.limit());
         }
@@ -115,13 +129,24 @@ public final class OpportunityService {
             OpportunityPreferences preferences,
             Instant notBefore
     ) {
+        return evaluate(config, weatherProvider, preferences, notBefore, ResultOrder.BEST_MATCH);
+    }
+
+    public PreferenceEvaluation evaluate(
+            PrototypeConfig config,
+            WindowWeatherProvider weatherProvider,
+            OpportunityPreferences preferences,
+            Instant notBefore,
+            ResultOrder order
+    ) {
         if (!preferences.active()) {
             PrototypeResult result = evaluate(
                     config,
                     weatherProvider,
                     (window, samples) -> window.startsAt().isAfter(notBefore)
                             ? Optional.of(window)
-                            : WindowGenerator.withSuggestedAtOrAfter(window, samples, notBefore));
+                            : WindowGenerator.withSuggestedAtOrAfter(window, samples, notBefore),
+                    order);
             return new PreferenceEvaluation(result, preferences.version(), Map.of(), 0, false, Map.of());
         }
 
@@ -136,7 +161,8 @@ public final class OpportunityService {
                 instant -> sampler.topocentricLunarAngularRadiusDegrees(config.location(), instant),
                 preferences,
                 notBefore);
-        PrototypeResult result = score(config, weatherProvider, completeWindows.size(), filtered.windows());
+        PrototypeResult result = score(
+                config, weatherProvider, completeWindows.size(), filtered.windows(), order);
         Set<String> returnedPassIds = result.opportunities().stream()
                 .map(item -> item.window().passId())
                 .collect(Collectors.toSet());
@@ -159,7 +185,8 @@ public final class OpportunityService {
             PrototypeConfig config,
             WindowWeatherProvider weatherProvider,
             int candidateWindowsEvaluated,
-            List<MoonWindow> windows
+            List<MoonWindow> windows,
+            ResultOrder order
     ) {
         List<ScoredWindow> scored = new ArrayList<>();
         List<RejectedWindow> rejected = new ArrayList<>();
@@ -172,11 +199,26 @@ public final class OpportunityService {
             WeatherFixture weather = weatherProvider.weatherFor(window);
             scored.add(new ScoredWindow(window, weather, ScoringModel.scoreWindow(window, weather)));
         }
-        scored.sort(Comparator.comparingInt((ScoredWindow item) -> item.components().total()).reversed()
-                .thenComparing(item -> item.window().suggested().instant()));
+        scored.sort(comparator(order));
         if (scored.size() > config.limit()) {
             scored = scored.subList(0, config.limit());
         }
         return new PrototypeResult(config, candidateWindowsEvaluated, scored, rejected);
+    }
+
+    private static Comparator<ScoredWindow> comparator(ResultOrder order) {
+        // A missing value must not fall through to Soonest; callers choose a closed order.
+        if (Objects.requireNonNull(order, "order") == ResultOrder.BEST_MATCH) {
+            // Preserve the existing ranking: highest score first, then the earlier suggestion.
+            return Comparator.comparingInt((ScoredWindow item) -> item.components().total()).reversed()
+                    .thenComparing(item -> item.window().suggested().instant());
+        }
+        // Soonest starts with actionable time, then prefers the higher score for equal times.
+        // The stable opportunity ID is the final deterministic key. If every key matches,
+        // the comparator returns equality so the stable list sort retains source order.
+        return Comparator.comparing((ScoredWindow item) -> item.window().suggested().instant())
+                .thenComparing(Comparator.comparingInt(
+                        (ScoredWindow item) -> item.components().total()).reversed())
+                .thenComparing(item -> item.window().id());
     }
 }

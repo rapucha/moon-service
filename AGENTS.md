@@ -193,6 +193,11 @@ complete. It changes publication timing only. Every gate and trigger under
   pull request by default.
 - Implement only the approved result and run focused local validation for each
   feedback revision.
+- Before presenting each local review version, compare the complete diff with
+  the smallest direct implementation. Revert any extraction, rename,
+  formatting, cleanup, or other structural change that is neither requested
+  nor required by accepted behavior, correctness, compilation, or tests.
+  Readability preference alone does not authorize the change.
 - Host the current unmerged worktree on an available `127.0.0.1` port. The
   hosted state may be staged or unstaged.
 - Use the most direct review surface: the application route for runtime or UI
@@ -306,10 +311,26 @@ people named above do not participate in, endorse, or provide the review.
   draft as permission to implement, ask a fresh read-only agent to run
   `$issue-design-review`. The user must first authorize subagents for the
   active session.
+- Before delegation, compare the draft with the raw user request and established
+  authority. Add an **Agent-added scope** section that lists every material
+  behavior the drafting agent added, strengthened, or made more specific, its
+  source, and whether it is authorized, required for current correctness or
+  safety, or unsupported. Write `None` only after making that comparison.
+  Report and omit an unsupported nonblocking finding. Stop for an owner decision
+  when it blocks the approved work. Do not rely on general approval of a draft
+  as authority for an item that was not surfaced in this section.
+- Give the reviewer the raw user request and decisions, the complete draft, and
+  the authority comparison. An agent-authored parent issue or draft is not a
+  substitute for the raw authority.
 - This rule covers implementation, technical-debt, follow-up, decision,
   dependency, privacy, and operational issues.
 - The reviewer must return `ready`, `revise`, or `split_required`. Record the
   verdict or a short summary in the issue.
+- Treat a verdict as invalid when the full review omits a required output
+  section, does not independently trace every material criterion to authority,
+  or leaves agent-added scope unresolved. Preserve the full review and exact
+  reviewed draft as evidence; the short issue record does not replace them.
+  Repeat an invalid review or a review followed by a material draft change.
 - Do not publish or use a `revise` draft. Follow the repository split workflow
   for `split_required`.
 - A tiny bookkeeping issue may skip this review only when it directly records
@@ -340,6 +361,9 @@ people named above do not participate in, endorse, or provide the review.
   - documentation measures and required reviews;
   - output classes, including generated, vendored, and lock-file output; and
   - which pull request owns each acceptance criterion.
+- Before editing, map every material behavior change to an accepted result or
+  criterion in that plan. If no mapping exists, apply the incidental-finding
+  rules below instead of treating the implementation plan as authority.
 - Choose the change category from the work that the issue or user approved. Do
   this before editing. Do not relabel the work later to gain a larger limit.
   Use the stricter rule or split when the category is mixed or unclear.
@@ -362,6 +386,9 @@ people named above do not participate in, endorse, or provide the review.
 - Before editing a plan that may cross a scope gate, ask a fresh read-only agent
   to run `$implementation-scope-review`. The user must first authorize
   subagents for the active session.
+- Give the scope reviewer the same raw user decisions and resolved authority
+  comparison used for issue design. An issue-design verdict is review evidence,
+  not authority for a material criterion.
 - The reviewer must return `single_pr`, `split_required`, or `revise`. For
   `single_pr` and `split_required`, map every acceptance criterion to a proposed
   pull request, identify dependencies, and recommend merge order.

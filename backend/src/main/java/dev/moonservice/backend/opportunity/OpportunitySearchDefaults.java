@@ -18,14 +18,20 @@ public class OpportunitySearchDefaults {
         this.clock = clock;
     }
 
-    public OpportunitySearchRequest requestFor(ResolvedLocation location) {
-        LocalDate start = LocalDate.now(clock.withZone(location.zoneId()));
+    public OpportunitySearchRequest requestFor(
+            ResolvedLocation location,
+            Instant notBefore,
+            OpportunitySearchRequest.Order order
+    ) {
+        // Reuse the live cutoff instant so a second clock read at local midnight cannot shorten the horizon.
+        LocalDate start = notBefore.atZone(location.zoneId()).toLocalDate();
         return new OpportunitySearchRequest(
                 location.locationId(),
                 start.toString(),
                 FORECAST_HORIZON_DAYS,
                 MAX_MOON_ALTITUDE_DEGREES,
-                LIMIT);
+                LIMIT,
+                order);
     }
 
     public Instant now() {

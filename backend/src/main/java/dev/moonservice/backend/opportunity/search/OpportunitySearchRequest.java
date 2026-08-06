@@ -7,6 +7,7 @@ import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneOffset;
 import java.time.format.DateTimeParseException;
+import java.util.Objects;
 import java.util.regex.Pattern;
 
 public record OpportunitySearchRequest(
@@ -14,7 +15,8 @@ public record OpportunitySearchRequest(
         LocalDate startDate,
         int forecastHorizonDays,
         double maxMoonAltitudeDegrees,
-        int limit
+        int limit,
+        Order order
 ) {
     private static final Pattern ISO_LOCAL_DATE = Pattern.compile("\\d{4}-\\d{2}-\\d{2}");
     private static final Pattern UTC_INSTANT = Pattern.compile("\\d{4}-\\d{2}-\\d{2}T.+Z");
@@ -24,9 +26,20 @@ public record OpportunitySearchRequest(
             String start,
             int forecastHorizonDays,
             double maxMoonAltitudeDegrees,
-            int limit
+            int limit,
+            Order order
     ) {
-        this(locationId, parseIsoLocalDateOrUtcInstantDate(start), forecastHorizonDays, maxMoonAltitudeDegrees, limit);
+        this(
+                locationId,
+                parseIsoLocalDateOrUtcInstantDate(start),
+                forecastHorizonDays,
+                maxMoonAltitudeDegrees,
+                limit,
+                order);
+    }
+
+    public OpportunitySearchRequest {
+        Objects.requireNonNull(order, "order");
     }
 
     public static OpportunitySearchRequest fromJson(JsonNode root) {
@@ -38,12 +51,30 @@ public record OpportunitySearchRequest(
                 parseIsoLocalDateOrUtcInstantDate(text(root, "start")),
                 intValue(root, "forecastHorizonDays"),
                 maxMoonAltitudeDegrees(root),
-                intValue(root, "limit")
+                intValue(root, "limit"),
+                Order.BEST_MATCH
         );
     }
 
     public String start() {
         return startDate.toString();
+    }
+
+    public enum Order {
+        BEST_MATCH,
+        SOONEST;
+
+        public static Order fromProductQuery(String value) {
+            if (value == null) {
+                return BEST_MATCH;
+            }
+            return switch (value) {
+                case "best_match" -> BEST_MATCH;
+                case "soonest" -> SOONEST;
+                default -> throw new InvalidOpportunitySearchRequestException(
+                        "order must be best_match or soonest.");
+            };
+        }
     }
 
     private static LocalDate parseIsoLocalDateOrUtcInstantDate(String value) {

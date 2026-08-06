@@ -98,7 +98,8 @@ Version 1 preferences are typed, request-scoped hard filters. A present
 preference object must carry version `1`. They remove unusable times before
 ranking; they do not adjust scoring weights. The object and every filter inside
 it are optional. An absent object and a version 1 object with no active filters
-must preserve the current candidates, scores, and order.
+must preserve the preference-free candidates and scores and use the request's
+selected product order.
 
 The typed model supports:
 
@@ -165,8 +166,8 @@ The opportunity engine applies active preferences in this order:
    visibility rule, the existing downstream rejection still records the
    grouped opportunity. The selected member supplies the window kind.
 7. The engine calculates score, selected weather, and displayed facts for the
-   selected suggestion, ranks all retained opportunities, and then applies the
-   ordinary global result limit.
+   selected suggestion, applies the selected product comparator to all retained
+   opportunities, and then applies the ordinary global result limit.
 
 The practical envelope may contain an active-preference mismatch, including an
 altitude, azimuth, time or light, phase, or bright-limb mismatch. The selected
@@ -178,8 +179,9 @@ preference match through a tolerated gap.
 Several fragments separated by a gap longer than ten minutes, a system-created
 natural-window gap, or a physical-pass boundary remain flat opportunities.
 The engine does not otherwise guarantee one result per pass. Preferences add
-no score component. The existing component weights, tie-break order, and
-result-limit behavior remain unchanged.
+no score component and do not change the selected product order. The engine
+applies that order after filtering, grouping, eligibility, and scoring, and
+before the result limit.
 
 ### Boundary and sampling contract
 
@@ -436,20 +438,23 @@ possible
 poor
 ```
 
-Sort candidate windows by:
+The total score reflects:
 
 - Weather usability across the merged forecast segment.
 - Useful ambient-light overlap, especially golden hour and civil twilight.
 - Low-Moon geometry within the window.
 - Moon illumination fit for the default photography profile.
 - Forecast confidence, including forecast age and distance into the horizon.
-- Earlier local time when quality is otherwise similar.
 
 The current implementation adds five component scores: Moon altitude,
-sunlight, illumination, weather, and forecast confidence. It sorts by total
-score in descending order. When total scores match, it places the earlier
-`suggestedAt` first. It then applies the result limit without a minimum-score
-cutoff.
+sunlight, illumination, weather, and forecast confidence. The product API
+supports two result orders. `best_match` sorts total score descending and uses
+the existing earlier-`suggestedAt` tie-break. `soonest` sorts `suggestedAt`
+ascending, total score descending, then stable opportunity `id` ascending. If
+the IDs are equal, stable sorting retains deterministic source order. Both
+comparators run across the complete eligible set before the global result
+limit, without a minimum-score cutoff. The direct fixture POST remains score
+ordered with its caller-supplied limit.
 
 Moon altitude assessment:
 
@@ -517,26 +522,34 @@ Forecast confidence:
 
 ## Implemented V0 Evaluation Flow
 
-The diagram below shows the preference-free executable behavior. It does not
-include every target rule above. An active version 1 preference inserts the
-hard-filter, interval-splitting, and final-rescoring steps described above
-before ranking and limiting. For a browser GET, the engine fetches an hourly
-forecast before it enters this pipeline. It uses the forecast record that
-covers each retained window's `suggestedAt`. A direct POST instead uses the
-fixed Prague fixture weather.
+The diagram below shows the preference-free `best_match` product GET and direct
+fixture executable behavior. It does not include every target rule above. An
+active version 1 preference inserts the hard-filter, interval-splitting, and
+final-rescoring steps described above before ordering and limiting. For either
+live product route, the engine fetches an hourly forecast before it enters this
+pipeline. It uses the forecast record that covers each retained window's
+`suggestedAt`. A direct POST instead uses the fixed Prague fixture weather.
 
 [![Implemented V0 opportunity-evaluation flow](diagrams/scoring-flow.svg)](diagrams/scoring-flow.svg)
 
 [PlantUML source](diagrams/scoring-flow.puml)
 
-Window generation can return no windows. For a live GET, adjustment can remove
-every window that has ended. An active hard preference can remove every
-retained interval, and the ordinary visibility rule can reject every retained
-window. Each case still returns a successful `ok` response with an empty
-opportunity list. Weather currently raises or lowers one component score; it
-does not reject a window. Apart from active hard preferences, the engine
-explicitly rejects a window only when Moon illumination is below 1 percent and
-Sun-Moon separation is below 8 degrees.
+Window generation can return no windows. For either live product route, the
+service captures one instant for the location's local start date and
+`notBefore`. Without active preferences, adjustment removes a completed window,
+moves an ongoing window's suggestion to its next valid instant at or after
+`notBefore`, and leaves a future suggestion unchanged. With active hard
+preferences, the engine instead filters complete natural windows, finalizes
+matching live fragments at `notBefore`, groups and scores them, applies the
+selected order, and then applies the limit. It does not pre-adjust natural
+windows before hard filtering.
+
+An active hard preference can remove every retained interval, and the ordinary
+visibility rule can reject every retained window. Each case still returns a
+successful `ok` response with an empty opportunity list. Weather currently
+raises or lowers one component score; it does not reject a window. Apart from
+active hard preferences, the engine explicitly rejects a window only when Moon
+illumination is below 1 percent and Sun-Moon separation is below 8 degrees.
 
 The implementation authority is the
 [window generator](../prototypes/jvm-scoring/src/main/java/dev/moonservice/scoringprototype/window/WindowGenerator.java),
