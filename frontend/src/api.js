@@ -1,5 +1,8 @@
 export function apiPathFor(request) {
-  return orderedPath(lookupPath("/api/opportunities", request), request.order);
+  var path = request.locationId
+    ? "/api/opportunities?locationId=" + encodeURIComponent(request.locationId)
+    : "/api/opportunities?q=" + encodeURIComponent(request.q);
+  return orderedPath(path, request.order);
 }
 
 export function preferenceApiPathFor(request) {
