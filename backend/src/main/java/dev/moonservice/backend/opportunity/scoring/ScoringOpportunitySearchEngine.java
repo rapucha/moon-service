@@ -96,11 +96,19 @@ public class ScoringOpportunitySearchEngine implements OpportunitySearchEngine {
                     config.start(),
                     config.end(),
                     request.forecastHorizonDays());
-            OpportunityService.PreferenceEvaluation evaluation = opportunityService.evaluate(
-                    config,
-                    window -> forecast.weatherAt(window.suggested().instant()).toWeatherFixture(),
-                    preferences,
-                    notBefore);
+            OpportunityService.PreferenceEvaluation evaluation = switch (request.order()) {
+                case BEST_MATCH -> opportunityService.evaluate(
+                        config,
+                        window -> forecast.weatherAt(window.suggested().instant()).toWeatherFixture(),
+                        preferences,
+                        notBefore);
+                case SOONEST -> opportunityService.evaluate(
+                        config,
+                        window -> forecast.weatherAt(window.suggested().instant()).toWeatherFixture(),
+                        preferences,
+                        notBefore,
+                        OpportunityService.ResultOrder.SOONEST);
+            };
             OpportunitySearchResponse response =
                     toBackendResponse(responseFormatter.format(evaluation.result()));
             return new PreferenceSearchResult(
@@ -131,7 +139,7 @@ public class ScoringOpportunitySearchEngine implements OpportunitySearchEngine {
             PrototypeResult result = opportunityService.evaluate(
                     config,
                     window -> forecast.weatherAt(window.suggested().instant()).toWeatherFixture(),
-                    windowAdjustment);
+                    windowAdjustment, toResultOrder(request.order()));
             return toBackendResponse(responseFormatter.format(result));
         } catch (UsageException ex) {
             throw new IllegalStateException("Resolved opportunity scoring request was invalid.", ex);
@@ -148,6 +156,15 @@ public class ScoringOpportunitySearchEngine implements OpportunitySearchEngine {
                 request.forecastHorizonDays(),
                 request.maxMoonAltitudeDegrees(),
                 request.limit());
+    }
+
+    private static OpportunityService.ResultOrder toResultOrder(
+            OpportunitySearchRequest.Order order
+    ) {
+        return switch (order) {
+            case BEST_MATCH -> OpportunityService.ResultOrder.BEST_MATCH;
+            case SOONEST -> OpportunityService.ResultOrder.SOONEST;
+        };
     }
 
     private static Location toPrototypeLocation(ResolvedLocation location) {

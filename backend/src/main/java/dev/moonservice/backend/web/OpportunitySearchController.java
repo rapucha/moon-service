@@ -2,6 +2,7 @@ package dev.moonservice.backend.web;
 
 import dev.moonservice.backend.opportunity.OpportunitySearchService;
 import dev.moonservice.backend.opportunity.search.OpportunityResponse;
+import dev.moonservice.backend.opportunity.search.OpportunitySearchRequest.Order;
 import dev.moonservice.backend.opportunity.search.OpportunitySearchResponse;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.http.HttpHeaders;
@@ -26,22 +27,29 @@ class OpportunitySearchController {
     @GetMapping("/api/opportunities")
     ResponseEntity<OpportunityResponse> searchByQuery(
             @RequestParam(name = "q", required = false) String query,
-            @RequestParam(name = "locationId", required = false) String locationId
+            @RequestParam(name = "locationId", required = false) String locationId,
+            @RequestParam(name = "order", required = false) String rawOrder
     ) {
-        OpportunityResponse response = opportunitySearchService.search(query, locationId);
+        Order order = Order.fromProductQuery(rawOrder);
+        OpportunityResponse response = opportunitySearchService.search(query, locationId, order);
         return ResponseEntity.status(httpStatusFor(response)).body(response);
     }
 
     @PostMapping(value = "/api/opportunities", produces = MediaType.APPLICATION_JSON_VALUE)
-    ResponseEntity<OpportunityResponse> searchWithPreferences(HttpServletRequest request) {
+    ResponseEntity<OpportunityResponse> searchWithPreferences(
+            HttpServletRequest request,
+            @RequestParam(name = "order", required = false) String rawOrder
+    ) {
+        Order order = Order.fromProductQuery(rawOrder);
         ProductRequestParser.OpportunityRequest productRequest =
                 ProductRequestParser.parseOpportunity(request);
         ProductRequestParser.IgnoredFields ignoredFields = productRequest.ignoredFields();
         OpportunityResponse response = productRequest.preferences() == null
-                ? opportunitySearchService.search(productRequest.query(), productRequest.locationId())
+                ? opportunitySearchService.search(productRequest.query(), productRequest.locationId(), order)
                 : opportunitySearchService.search(
                         productRequest.query(),
                         productRequest.locationId(),
+                        order,
                         productRequest.preferences(),
                         ignoredFields.paths(),
                         ignoredFields.count());

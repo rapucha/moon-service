@@ -8,6 +8,7 @@ import dev.moonservice.backend.opportunity.search.LocationCandidatesResponse;
 import dev.moonservice.backend.opportunity.search.OpportunityResponse;
 import dev.moonservice.backend.opportunity.search.OpportunitySearchEngine;
 import dev.moonservice.backend.opportunity.search.OpportunitySearchRequest;
+import dev.moonservice.backend.opportunity.search.OpportunitySearchRequest.Order;
 import dev.moonservice.backend.opportunity.search.OpportunitySearchResponse;
 import dev.moonservice.backend.opportunity.search.OpportunityStatusResponse;
 import dev.moonservice.backend.weather.WeatherForecastUnavailableException;
@@ -15,6 +16,7 @@ import dev.moonservice.scoringprototype.input.OpportunityPreferences;
 import org.springframework.stereotype.Service;
 import tools.jackson.databind.JsonNode;
 
+import java.time.Instant;
 import java.util.List;
 import java.util.Objects;
 import java.util.function.Function;
@@ -41,21 +43,34 @@ public class OpportunitySearchService {
         return opportunitySearchEngine.search(OpportunitySearchRequest.fromJson(request));
     }
 
-    public OpportunityResponse search(String rawQuery, String rawLocationId) {
-        return search(rawQuery, rawLocationId, this::searchResolvedLocation);
+    public OpportunityResponse search(String rawQuery, String rawLocationId, Order order) {
+        Objects.requireNonNull(order, "order");
+        if (order == Order.BEST_MATCH) {
+            boolean hasQuery = rawQuery != null && !rawQuery.isBlank();
+            boolean hasLocationId = rawLocationId != null && !rawLocationId.isBlank();
+            if (hasQuery && hasLocationId) {
+                throw new InvalidOpportunitySearchRequestException("Use q or locationId, not both.");
+            }
+            return hasLocationId
+                    ? searchByLocationId(rawLocationId)
+                    : searchByQuery(rawQuery);
+        }
+        return search(rawQuery, rawLocationId, location -> searchResolvedLocation(location, order));
     }
 
     public OpportunityResponse search(
             String rawQuery,
             String rawLocationId,
+            Order order,
             OpportunityPreferences preferences,
             List<String> ignoredPreferenceFields,
             int ignoredPreferenceFieldCount
     ) {
+        Objects.requireNonNull(order, "order");
         Objects.requireNonNull(preferences, "preferences");
         Objects.requireNonNull(ignoredPreferenceFields, "ignoredPreferenceFields");
         return search(rawQuery, rawLocationId, location -> searchResolvedLocation(
-                location, preferences, ignoredPreferenceFields, ignoredPreferenceFieldCount));
+                location, order, preferences, ignoredPreferenceFields, ignoredPreferenceFieldCount));
     }
 
     private OpportunityResponse search(
@@ -81,13 +96,13 @@ public class OpportunitySearchService {
     public OpportunityResponse searchByQuery(String rawQuery) {
         String query = normalizeQuery(rawQuery);
         LocationResolution resolution = locationResolver.resolve(new LocationQuery(query));
-        return searchLocationResolution(resolution, this::searchResolvedLocation);
+        return searchLocationResolution(resolution, location -> searchResolvedLocation(location, Order.BEST_MATCH));
     }
 
     public OpportunityResponse searchByLocationId(String rawLocationId) {
         String locationId = normalizeLocationId(rawLocationId);
         LocationResolution resolution = locationResolver.resolveLocationId(locationId);
-        return searchLocationResolution(resolution, this::searchResolvedLocation);
+        return searchLocationResolution(resolution, location -> searchResolvedLocation(location, Order.BEST_MATCH));
     }
 
     private OpportunityResponse searchLocationResolution(
@@ -105,12 +120,13 @@ public class OpportunitySearchService {
                 .orElseGet(OpportunityStatusResponse::locationNotFound);
     }
 
-    private OpportunityResponse searchResolvedLocation(ResolvedLocation location) {
+    private OpportunityResponse searchResolvedLocation(ResolvedLocation location, Order order) {
         try {
+            Instant notBefore = opportunitySearchDefaults.now();
             return opportunitySearchEngine.search(
                     location,
-                    opportunitySearchDefaults.requestFor(location),
-                    opportunitySearchDefaults.now());
+                    opportunitySearchDefaults.requestFor(location, notBefore, order),
+                    notBefore);
         } catch (WeatherForecastUnavailableException ex) {
             return OpportunityStatusResponse.temporarilyUnavailable(
                     "Opportunity weather lookup is temporarily unavailable.");
@@ -119,15 +135,17 @@ public class OpportunitySearchService {
 
     private OpportunityResponse searchResolvedLocation(
             ResolvedLocation location,
+            Order order,
             OpportunityPreferences preferences,
             List<String> ignoredPreferenceFields,
             int ignoredPreferenceFieldCount
     ) {
         try {
+            Instant notBefore = opportunitySearchDefaults.now();
             OpportunitySearchEngine.PreferenceSearchResult result = opportunitySearchEngine.search(
                     location,
-                    opportunitySearchDefaults.requestFor(location),
-                    opportunitySearchDefaults.now(),
+                    opportunitySearchDefaults.requestFor(location, notBefore, order),
+                    notBefore,
                     preferences);
             return OpportunitySearchResponse.withPreferences(
                     result, ignoredPreferenceFields, ignoredPreferenceFieldCount);

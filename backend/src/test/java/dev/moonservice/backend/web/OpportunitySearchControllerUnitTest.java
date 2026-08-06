@@ -26,7 +26,7 @@ class OpportunitySearchControllerUnitTest {
                 new OpportunitySearchService(engineThatMustNotBeCalled(), query ->
                         LocationResolution.temporarilyUnavailable(), new OpportunitySearchDefaults(Clock.systemUTC())));
 
-        ResponseEntity<OpportunityResponse> response = controller.searchByQuery("Praha", null);
+        ResponseEntity<OpportunityResponse> response = controller.searchByQuery("Praha", null, null);
 
         assertEquals(HttpStatus.SERVICE_UNAVAILABLE, response.getStatusCode());
         assertEquals("temporarily_unavailable", response.getBody().status());

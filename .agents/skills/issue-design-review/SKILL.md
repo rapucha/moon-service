@@ -39,6 +39,11 @@ Give the reviewer raw source material rather than the drafting agent's preferred
 answer:
 
 - The proposed issue title and complete draft body.
+- The draft's **Agent-added scope** section and the primary agent's authority
+  comparison. List every material behavior the drafting agent added,
+  strengthened, or made more specific than the raw motivating material, with
+  its source and status: authorized, required for current correctness or safety
+  with evidence, or unsupported. Use `None` only after making the comparison.
 - The user's request, evidence, failure, or feedback that motivated the draft.
 - The user's exact statements about the current threat model, risk tolerance,
   acceptable failure, and maintenance tradeoffs. Do not substitute an
@@ -83,12 +88,15 @@ answer:
    point. Review a required interface seam separately from its default or
    fallback body. Return `revise` when the required evidence is absent;
    acceptance criteria written by the drafting agent do not supply it.
-5. Classify proposed behavior as the minimum end-to-end capability, behavior
-   required for current correctness or safety, or optional hardening. Require a
-   concrete authority or evidence trace for each material criterion; the draft's
-   own wording is not authority. Treat deduplication, pagination, recovery,
-   reconciliation, supersession, generalized extensibility, and hypothetical
-   scale or threat handling as optional unless the inputs demonstrate otherwise.
+5. Independently compare the raw motivating material with the draft and
+   reconstruct its agent-added scope. Do not assume the drafting agent's list is
+   complete. Classify proposed behavior as the minimum end-to-end capability,
+   behavior required for current correctness or safety, or optional hardening.
+   Require a concrete authority or evidence trace for each material criterion;
+   the draft's own wording is not authority. Treat deduplication, pagination,
+   recovery, reconciliation, supersession, generalized extensibility, and
+   hypothetical scale or threat handling as optional unless the inputs
+   demonstrate otherwise.
    Do not require a custom protocol client without explicit owner approval after
    the standard and stricter alternatives have been presented.
 6. Prefer an issue whose first deliverable is the smallest observable
@@ -115,8 +123,12 @@ answer:
    forecasts, not a fixed list or permission to add work. Do not choose a more
    generous category to fit an estimate.
 10. Identify incidental findings, opportunistic cleanup, unrelated tests/docs,
-   and dependencies not authorized by the user's request or existing source
-   issue. Remove them or return `revise`; room under a limit is not authority.
+    and dependencies not authorized by the raw user request, an established
+    contract, a current correctness or safety need, or an explicit owner
+    decision. Return `revise` when the **Agent-added scope** section is absent
+    or incomplete, or when any listed or independently found item is
+    unsupported. Remove unsupported work; room under a limit and general
+    approval of a draft that did not surface the item are not authority.
 11. Split distinct outcomes, decision work, or independently deliverable
    concerns rather than hiding them under one issue.
 12. Test acceptance criteria for observable outcomes, completeness,
@@ -129,10 +141,11 @@ answer:
 ## Verdict Rules
 
 - `ready`: the problem is supported, the smallest standard implementation was
-  considered, the scope is coherent, material decisions and criteria are
-  explicit and authorized, optional hardening is justified or excluded, and
-  acceptance criteria are testable. The required delivery sequence must also
-  be executable and acyclic.
+  considered, the scope is coherent, the independently reconstructed
+  agent-added scope is complete and resolved, material decisions and criteria
+  are explicit and authorized, optional hardening is justified or excluded,
+  and acceptance criteria are testable. The required delivery sequence must
+  also be executable and acyclic.
 - `revise`: one coherent issue remains appropriate, but its premise, choices,
   dependencies, boundaries, scope authority, or acceptance criteria need
   correction before it is created or acted upon. Use this verdict when a draft
@@ -161,6 +174,11 @@ Problem and evidence:
 
 Ownership and duplication:
 - Existing authority: <issue, PR, decision, or none>
+
+Agent-added scope:
+- Declared by the drafter: <items with source and status, or None>
+- Independently identified: <omissions or None>
+- Unsupported items: <items that must be removed or approved, or None>
 
 Decisions and hidden dependencies:
 - <decision/dependency; owner approval state>
@@ -229,6 +247,9 @@ Start with the smallest standard implementation that matches the user's current
 threat model. Present any materially stricter alternative with its current need,
 tradeoffs, and ongoing maintenance cost. Trace every material criterion to user
 intent, evidence, a current correctness/safety need, or an explicit decision.
+Independently compare the raw motivating material with the draft. Reconstruct
+the agent-added scope instead of trusting the drafter's list. Return revise when
+that section is absent or incomplete or when an item remains unsupported.
 Identify the minimum end-to-end capability and separate unsupported optional
 hardening. Return revise when an unapproved stricter design or custom protocol
 client is required. Apply the production-use evidence rule to every proposed
@@ -248,6 +269,9 @@ suggest simpler wording when it preserves the meaning.
 
 - For `ready`, create the issue only when authorized and record the verdict or
   a concise review summary in the issue.
+- Treat a verdict that omits a required output section or authority trace as
+  invalid and repeat the review. Preserve the full review and exact reviewed
+  draft; a concise issue summary does not replace that evidence.
 - For `revise`, correct the draft and re-run review when the changes are
   material; do not publish the rejected version as implementation authority.
 - For `split_required`, present the ordered issue set for owner acceptance.

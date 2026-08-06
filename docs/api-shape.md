@@ -84,6 +84,17 @@ Content-Type: application/json
 - The current backend accepts provider-backed IDs returned after
   `ambiguous_location`; curated fictional IDs remain a future contract.
 
+`order`:
+
+- Optional query parameter on `GET /api/opportunities` and
+  `POST /api/opportunities`.
+- Accepted values are `best_match` and `soonest`.
+- Omission selects `best_match`.
+- A present empty or unsupported value is `invalid_request`. The server rejects
+  it before location resolution or weather lookup.
+- For the product POST, `order` remains in the query. It is not a JSON body
+  member.
+
 ## Response Statuses
 
 Use `status` to report the result of the whole request:
@@ -242,16 +253,17 @@ Safety rules:
 
 `POST /api/opportunities` is the anonymous same-origin product route for one
 request-scoped version 1 preference search. It uses the same location
-resolution, live weather lookup, Moon-window generation, scoring, and result
-limit as `GET /api/opportunities`.
+resolution, live weather lookup, Moon-window generation, scoring, selected
+order, and result limit as `GET /api/opportunities`.
 
-The existing routes keep their current contracts:
+The product and direct routes remain distinct:
 
-- `GET /api/opportunities` remains the preference-free default. A location-only
-  share URL does not choose the API method; the receiving browser uses GET or
-  the product POST based on its own active preferences.
+- `GET /api/opportunities` remains the preference-free product route. Both
+  product routes accept the same optional `order` query parameter. A
+  location-only share URL does not choose the API method; the receiving browser
+  uses GET or the product POST based on its own active preferences.
 - `POST /api/opportunities/search` remains the fixture-backed direct scoring
-  route. It does not accept this product request.
+  route. It does not accept this product request or its ordering option.
 
 ### Request
 
@@ -276,7 +288,8 @@ The route applies the existing normalization and limits to `q` and
 `locationId`. It rejects a missing, blank, oversized, or unsupported-control
 value. It also rejects a request that contains both lookup fields or neither
 one. A field outside `q`, `locationId`, and `preferences` is an unknown
-top-level field and makes the request invalid.
+top-level field and makes the request invalid. In particular, `order` belongs
+in the query and is invalid in this JSON object.
 
 When `preferences` is present, `version` is required and must be `1`. Every
 filter is optional:
@@ -318,9 +331,9 @@ bright-limb orientation convention, are defined in
 `northPoleTiltDegrees` is not a preference field.
 
 An absent `preferences` member must produce the same candidates, scores, and
-order as GET for the same location and captured server time. A preferences
-object that contains only `{"version": 1}` must preserve that candidate set,
-scores, and order.
+final order as GET for the same location, captured server time, and selected
+order. A preferences object that contains only `{"version": 1}` must preserve
+that candidate set, scores, and final order.
 
 ### Transport and errors
 
@@ -335,7 +348,7 @@ Every validation error uses the existing opportunity error fields `status`,
 
 | HTTP status | `status` | Applies when |
 | ---: | --- | --- |
-| `400` | `invalid_request` | The body is empty or invalid JSON; a known field, version, lookup value, or top-level field is invalid. |
+| `400` | `invalid_request` | The order query value is invalid; the body is empty or invalid JSON; or a known field, version, lookup value, or top-level field is invalid. |
 | `413` | `request_too_large` | The raw body exceeds 16,384 bytes, whether its length is known or streamed. |
 | `415` | `unsupported_media_type` | `Content-Type` is missing or is not `application/json`. |
 
@@ -509,8 +522,8 @@ other provider request. A complete enter-and-exit event between five-minute
 samples can be missed.
 
 When `preferences` is absent, the response omits all preference-only metadata,
-including ignored-field fields and azimuth masks, so the current GET and
-preference-free response contract remain unchanged.
+including ignored-field fields and azimuth masks, so the GET and
+preference-free response shape remains unchanged.
 
 ### Privacy, caches, and hosted alpha
 
@@ -917,14 +930,18 @@ Response rules:
 - The current response remains a flat `opportunities` array. Follow-up #53
   tracks whether the API should later become pass-centric, with Moon passes as
   the primary ranked objects and recommendation windows nested inside them.
-- By default, the anonymous `GET /api/opportunities` lookup requests up to ten
-  raw recommendation windows. It orders them by the existing score and
-  tie-break rules. Ten is a provisional discovery safeguard while #33 evaluates
-  the scoring model. It does not mean that every returned candidate will
-  produce an objectively good photograph.
-- The direct `POST /api/opportunities/search` scoring contract keeps its
-  caller-supplied `limit`; increasing the anonymous lookup default does not
-  change that explicit request control.
+- Both product routes apply the selected order to every eligible finalized
+  opportunity before applying the default ten-result limit. An omitted
+  `order`, or `order=best_match`, keeps the current score ordering and tie
+  behavior. `order=soonest` sorts by `suggestedAt` ascending, total score
+  descending, then stable opportunity `id` ascending. If the IDs are also
+  equal, stable sorting preserves deterministic source order.
+- Ten remains a provisional discovery safeguard while #33 evaluates the
+  scoring model. It does not mean that every returned candidate will produce
+  an objectively good photograph.
+- `POST /api/opportunities/search` remains score ordered and keeps its
+  caller-supplied `limit`. The product `order` query is not part of that direct
+  fixture contract.
 - `startsAt` and `endsAt` define the useful opportunity window.
 - `moonPass` identifies the physical Moon pass that contains the opportunity.
   Clients may use `moonPass.id` to group ascending and descending
@@ -1948,15 +1965,27 @@ not.
 
 [PlantUML source](diagrams/opportunity-search-post.puml)
 
-GET first validates one lookup input and resolves it through a status-aware
-cache. It stops when the location is ambiguous, missing, or unavailable.
-Otherwise, it gets a cached hourly forecast and runs the opportunity pipeline.
-A successful pipeline may return an empty list. The product preference POST
-performs the same steps after validating its bounded JSON body. It passes the
-typed version 1 preferences only to the opportunity engine and does not send
-them to either provider. The direct prototype POST bypasses both live provider
-paths. It uses the scoring prototype's only `prague-cz` fixture and fixed
-fixture weather.
+Each product route validates `order` before it calls a location or weather
+provider. After resolving the location, the service captures one server
+instant and uses it for both the location's local start date and `notBefore`.
+It stops when the location is ambiguous, missing, or unavailable. Otherwise,
+it gets a cached hourly forecast and runs the opportunity pipeline. A
+successful pipeline may return an empty list.
+
+For a preference-free GET or product POST, including a version-only preference
+object, live adjustment removes a window whose `endsAt` is not after
+`notBefore`, moves an ongoing window's suggestion to its next valid instant at
+or after `notBefore`, and leaves a future suggestion unchanged. With active
+hard preferences, the engine instead evaluates complete natural windows,
+finalizes matching live fragments at `notBefore`, groups them, scores them,
+applies the selected order, and then applies the limit. It does not pre-adjust
+natural windows before hard filtering.
+
+The product preference POST validates its bounded JSON body and passes typed
+version 1 preferences only to the opportunity engine. It does not send them to
+either provider. The direct prototype POST bypasses both live provider paths.
+It uses the scoring prototype's only `prague-cz` fixture and fixed fixture
+weather.
 
 These files define the current implementation:
 [controller](../backend/src/main/java/dev/moonservice/backend/web/OpportunitySearchController.java),
