@@ -3,8 +3,10 @@ package dev.moonservice.backend.opportunity.search;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import dev.moonservice.scoringprototype.window.PreferenceImpactAnalysis;
 
+import java.time.Instant;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 
 @JsonInclude(JsonInclude.Include.NON_NULL)
 public record OpportunitySearchResponse(
@@ -26,7 +28,9 @@ public record OpportunitySearchResponse(
         Integer ignoredPreferenceFieldCount,
         Integer additionalIgnoredPreferenceFieldCount,
         EmptyReason emptyReason,
-        PreferenceImpactDetails preferenceImpact
+        PreferenceImpactDetails preferenceImpact,
+        String asOf,
+        CurrentMoonResponse currentMoon
 ) implements OpportunityResponse {
     public OpportunitySearchResponse(
             String status,
@@ -44,7 +48,7 @@ public record OpportunitySearchResponse(
         this(
                 status, generatedAt, location, forecastHorizonDays, startsAt, endsAt,
                 candidateWindowsEvaluated, maxMoonAltitudeDegrees, opportunities, rejected, messages,
-                null, null, null, null, null, null, null, null);
+                null, null, null, null, null, null, null, null, null, null);
     }
 
     public static OpportunitySearchResponse withPreferences(
@@ -89,7 +93,40 @@ public record OpportunitySearchResponse(
                 ignoredPreferenceFieldCount,
                 Math.max(0, ignoredPreferenceFieldCount - ignoredPreferenceFields.size()),
                 emptyReason,
-                preferenceImpact);
+                preferenceImpact,
+                response.asOf(),
+                response.currentMoon());
+    }
+
+    public static OpportunitySearchResponse forProduct(
+            OpportunitySearchResponse response,
+            Instant asOf,
+            CurrentMoonResponse currentMoon
+    ) {
+        Objects.requireNonNull(response, "response");
+        String capturedAt = Objects.requireNonNull(asOf, "asOf").toString();
+        return new OpportunitySearchResponse(
+                response.status(),
+                capturedAt,
+                response.location(),
+                response.forecastHorizonDays(),
+                response.startsAt(),
+                response.endsAt(),
+                response.candidateWindowsEvaluated(),
+                response.maxMoonAltitudeDegrees(),
+                response.opportunities(),
+                response.rejected(),
+                response.messages(),
+                response.appliedPreferenceVersion(),
+                response.normalizedActiveFilters(),
+                response.excludedSampleCount(),
+                response.ignoredPreferenceFields(),
+                response.ignoredPreferenceFieldCount(),
+                response.additionalIgnoredPreferenceFieldCount(),
+                response.emptyReason(),
+                response.preferenceImpact(),
+                capturedAt,
+                Objects.requireNonNull(currentMoon, "currentMoon"));
     }
 
     private static PreferenceImpactDetails preferenceImpact(
