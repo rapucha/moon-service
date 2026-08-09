@@ -88,9 +88,13 @@ class CurrentMoonProductResponseFunctionalTest {
         assertEquals(1, post.path("appliedPreferenceVersion").intValue());
 
         JsonNode currentMoon = get.path("currentMoon");
-        assertEquals(Set.of("horizonState", "moon", "sun", "activePass"), currentMoon.propertyNames());
+        assertEquals(Set.of(
+                        "horizonState", "moon", "sun", "nextRiseBoundary", "nextPass", "activePass"),
+                currentMoon.propertyNames());
         assertEquals("above_or_on_horizon", currentMoon.path("horizonState").asString());
         assertTrue(currentMoon.at("/moon/altitudeDegrees").doubleValue() >= 0.0);
+        assertTrue(currentMoon.path("nextRiseBoundary").isNull());
+        assertTrue(currentMoon.path("nextPass").isNull());
         assertEquals(Set.of(
                         "altitudeDegrees", "azimuthDegrees", "illuminationPercent",
                         "phaseAngleDegrees", "brightLimbTiltDegrees", "northPoleTiltDegrees",
@@ -124,9 +128,16 @@ class CurrentMoonProductResponseFunctionalTest {
     }
 
     @Test
-    void serializesAnExplicitNullActivePassBelowTheHorizon() throws JacksonException {
+    void serializesTheSameNextRiseForGetAndPostBelowTheHorizon() throws JacksonException {
         JsonNode response = ok(webTestClient.get()
                 .uri("/api/opportunities?locationId=springfield-mo-us")
+                .exchange());
+        JsonNode post = ok(webTestClient.post().uri("/api/opportunities")
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue("""
+                        {"locationId":"springfield-mo-us","preferences":{"version":1,
+                          "altitudeDegrees":{"minimum":90,"maximum":90}}}
+                        """)
                 .exchange());
 
         JsonNode currentMoon = response.path("currentMoon");
@@ -135,7 +146,26 @@ class CurrentMoonProductResponseFunctionalTest {
         assertTrue(currentMoon.at("/moon/altitudeDegrees").doubleValue() < 0.0);
         assertTrue(currentMoon.has("activePass"));
         assertTrue(currentMoon.path("activePass").isNull());
-        assertFalse(currentMoon.has("nextRiseAt"));
+        assertEquals(currentMoon.path("nextRiseBoundary"), post.at("/currentMoon/nextRiseBoundary"));
+        assertEquals(currentMoon.path("nextPass"), post.at("/currentMoon/nextPass"));
+        assertTrue(currentMoon.path("nextRiseBoundary").isObject());
+        assertTrue(Set.of("found", "not_found_within_range")
+                .contains(currentMoon.at("/nextRiseBoundary/status").asString()));
+        if ("found".equals(currentMoon.at("/nextRiseBoundary/status").asString())) {
+            assertTrue(currentMoon.at("/nextRiseBoundary/at").isTextual());
+        } else {
+            assertFalse(currentMoon.at("/nextRiseBoundary").has("at"));
+        }
+
+        JsonNode nextPass = currentMoon.path("nextPass");
+        assertTrue(nextPass.isObject());
+        assertEquals(currentMoon.path("nextRiseBoundary"), nextPass.path("startBoundary"));
+        assertTrue(Set.of("found", "not_found_within_range")
+                .contains(nextPass.at("/endBoundary/status").asString()));
+        assertEquals(nextPass.path("representedStartsAt"), nextPass.at("/path/start/at"));
+        assertEquals(nextPass.path("representedEndsAt"), nextPass.at("/path/end/at"));
+        assertFalse(nextPass.at("/path").has("now"));
+        assertChronologicalSamplesWithoutNow(nextPass.at("/path/samples"));
     }
 
     @Test
@@ -182,6 +212,20 @@ class CurrentMoonProductResponseFunctionalTest {
             previous = at;
         }
         assertEquals(1, nowCount);
+    }
+
+    private static void assertChronologicalSamplesWithoutNow(JsonNode samples) {
+        Instant previous = null;
+        Set<Instant> instants = new HashSet<>();
+        for (JsonNode sample : samples) {
+            Instant at = Instant.parse(sample.path("at").asString());
+            assertTrue(instants.add(at));
+            if (previous != null) {
+                assertTrue(at.isAfter(previous));
+            }
+            assertFalse("now".equals(sample.path("role").asString()));
+            previous = at;
+        }
     }
 
     private JsonNode ok(WebTestClient.ResponseSpec response) throws JacksonException {

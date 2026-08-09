@@ -1028,6 +1028,8 @@ envelopes keep their existing shapes. Fixture-backed
     "azimuthDegrees": 283.1,
     "lightBucket": "civil_twilight"
   },
+  "nextRiseBoundary": null,
+  "nextPass": null,
   "activePass": {
     "startBoundary": {
       "status": "found",
@@ -1059,9 +1061,24 @@ wire numbers only after this decision. `moon` and `sun` use the existing field
 names and nullability. Both Moon orientation values may be JSON `null`; all
 other current Moon and Sun members are required.
 
+`nextRiseBoundary` is required. When the Moon is below the horizon, it is a
+boundary object. The server searches forward from `asOf` through the inclusive
+instant 26 hours later for the next directional Moonrise, using the same
+one-hour bracketing and one-second refinement rules as `activePass`. When it
+is at or above the horizon, `nextRiseBoundary` is JSON `null`. The outer
+response's non-null omission rule must not remove this member.
+
+`nextPass` is required. It is JSON `null` when the Moon is at or above the
+horizon, when no rise is found, or when the rise is exactly at the inclusive
+26-hour end. Otherwise it has the found rise boundary, the next-set boundary,
+represented start and end instants, and a path with `start`, `end`, and
+`samples`. It has no `now` member. The server searches for the set only after
+the found rise and only through the same 26-hour end. A missing set uses that
+end as the represented end.
+
 When the Moon is below the horizon, `activePass` is required and is JSON
-`null`. The outer response's non-null omission rule must not remove this
-member. The response does not add next-rise advice.
+`null`. A `nextRiseBoundary` with `status: "found"` includes `at`; a
+`not_found_within_range` boundary omits it.
 
 When the Moon is at or above the horizon, `activePass` is required. The server
 searches backward from `asOf` through the inclusive instant 26 hours earlier
@@ -1083,13 +1100,18 @@ edge. The finite search does not establish or return
 represented end. Those separately serialized points keep `start`, `now`, and
 `end` roles even when two points share an instant.
 
-The path's `samples` array is chronological and deduplicated by instant. It
+`nextPass.path.start.at` and `nextPass.path.end.at` equal its represented
+endpoints. Its samples follow the same path rules but do not include top-level
+`asOf` or a `now` role.
+
+Each path's `samples` array is chronological and deduplicated by instant. It
 contains both represented endpoints, the three quarter-interval points,
-30-minute points anchored at the represented start, relevant refined
-light-bucket crossings, and exact `asOf`. Exactly one sample has `role: "now"`;
-that role wins when `asOf` equals another sampled instant. Every sample carries
-Moon position, sample-specific phase and orientations, Sun position, and the
-light bucket from the same instant.
+30-minute points anchored at the represented start, and relevant refined
+light-bucket crossings. `activePass.path.samples` also contains exact top-level
+`asOf`. Exactly one active-pass sample has `role: "now"`; that role wins when
+`asOf` equals another sampled instant. Every sample carries Moon position,
+sample-specific phase and orientations, Sun position, and the light bucket from
+the same instant.
 
 The server calculates `currentMoon` independently of candidate eligibility,
 preferences, scores, IDs, paths, counts, ordering, and the ten-result limit.
@@ -1149,6 +1171,17 @@ instead describes weather across the opportunity window:
       "altitudeDegrees": 45.2,
       "azimuthDegrees": 144.1,
       "lightBucket": "daylight"
+    },
+    "nextRiseBoundary": {
+      "status": "found",
+      "at": "2026-06-14T20:48:11Z"
+    },
+    "nextPass": {
+      "startBoundary": { "status": "found", "at": "2026-06-14T20:48:11Z" },
+      "endBoundary": { "status": "found", "at": "2026-06-15T04:11:22Z" },
+      "representedStartsAt": "2026-06-14T20:48:11Z",
+      "representedEndsAt": "2026-06-15T04:11:22Z",
+      "path": { "start": {}, "end": {}, "samples": [] }
     },
     "activePass": null
   },

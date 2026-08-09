@@ -27,16 +27,53 @@ class CurrentMoonCalculatorTest {
     private static final Instant AS_OF = Instant.parse("2026-08-06T12:00:00Z");
 
     @Test
-    void returnsOnlyTheCurrentSampleWhenMoonIsBelowTheHorizon() {
-        RecordingSamples samples = new RecordingSamples(instant -> sample(instant, -0.01, -5.0));
+    void findsTheNextRiseWhenMoonIsBelowTheHorizon() {
+        Instant expectedRise = AS_OF.plus(Duration.ofMinutes(95));
+        RecordingSamples samples = new RecordingSamples(instant -> sample(
+                instant, hoursBetween(expectedRise, instant), -5.0));
 
         CurrentMoonCalculator.Result result = new CurrentMoonCalculator().calculate(AS_OF, samples);
 
         assertEquals(AS_OF, result.current().instant());
-        assertEquals(-0.01, result.current().moonAltitudeDegrees());
+        assertTrue(result.current().moonAltitudeDegrees() < 0.0);
         assertNull(result.activePass());
+        assertEquals(FOUND, result.nextRiseBoundary().status());
+        assertWithinOneSecond(expectedRise, result.nextRiseBoundary().at());
+        CurrentMoonCalculator.NextPass pass = nextPass(result);
+        assertEquals(result.nextRiseBoundary(), pass.startBoundary());
+        assertEquals(new CurrentMoonCalculator.Boundary(NOT_FOUND_WITHIN_RANGE, null), pass.endBoundary());
+        assertEquals(expectedRise, pass.representedStartsAt());
+        assertEquals(AS_OF.plus(Duration.ofHours(26)), pass.representedEndsAt());
+        assertEquals(expectedRise, pass.pathSamples().getFirst().instant());
+        assertEquals(AS_OF.plus(Duration.ofHours(26)), pass.pathSamples().getLast().instant());
         assertEquals(1, samples.callsAt(AS_OF));
-        assertEquals(List.of(AS_OF), samples.requestedInstants());
+        assertFalse(samples.requestedInstants().stream().anyMatch(
+                instant -> instant.isAfter(AS_OF.plus(Duration.ofHours(26)))));
+    }
+
+    @Test
+    void reportsNoNextRiseWithinTheInclusiveSearchRange() {
+        RecordingSamples samples = new RecordingSamples(instant -> sample(instant, -0.01, -5.0));
+
+        CurrentMoonCalculator.Result result = new CurrentMoonCalculator().calculate(AS_OF, samples);
+
+        assertEquals(new CurrentMoonCalculator.Boundary(NOT_FOUND_WITHIN_RANGE, null),
+                result.nextRiseBoundary());
+        assertNull(result.nextPass());
+        assertTrue(samples.requestedInstants().contains(AS_OF.plus(Duration.ofHours(26))));
+    }
+
+    @Test
+    void keepsTheNextPassNullWhenTheRiseIsExactlyAtTheSearchEnd() {
+        Instant searchEndsAt = AS_OF.plus(Duration.ofHours(26));
+        RecordingSamples samples = new RecordingSamples(instant -> sample(
+                instant, hoursBetween(searchEndsAt, instant), -5.0));
+
+        CurrentMoonCalculator.Result result = new CurrentMoonCalculator().calculate(AS_OF, samples);
+
+        assertEquals(new CurrentMoonCalculator.Boundary(FOUND, searchEndsAt), result.nextRiseBoundary());
+        assertNull(result.nextPass());
+        assertFalse(samples.requestedInstants().stream().anyMatch(instant -> instant.isAfter(searchEndsAt)));
     }
 
     @Test
@@ -177,6 +214,11 @@ class CurrentMoonCalculatorTest {
     private static CurrentMoonCalculator.ActivePass activePass(CurrentMoonCalculator.Result result) {
         assertNotNull(result.activePass());
         return result.activePass();
+    }
+
+    private static CurrentMoonCalculator.NextPass nextPass(CurrentMoonCalculator.Result result) {
+        assertNotNull(result.nextPass());
+        return result.nextPass();
     }
 
     private static void assertWithinOneSecond(Instant expected, Instant actual) {

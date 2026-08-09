@@ -6,7 +6,7 @@ import {
   formatTime,
   readableToken
 } from "./format.js";
-import { currentMoonPathPanel } from "./moonPathView.js";
+import { expandablePicture, renderMoonPathPanel } from "./moonPathView.js";
 import { currentSnapshotSkyDome } from "./skyDomeView.js";
 
 var CARD_ID = "current-moon-card";
@@ -31,8 +31,13 @@ function currentMoonCard(asOf, currentMoon, timezone, countryCode, dome) {
     && objectValue(currentMoon.activePass)
     ? currentMoon.activePass
     : null;
-  var chartContext = activePass
-    ? { mobileReferenceDurationMs: intervalDuration(activePass) }
+  var nextPass = currentMoon.horizonState === "below_horizon"
+    && objectValue(currentMoon.nextPass)
+    ? currentMoon.nextPass
+    : null;
+  var displayedPass = activePass || nextPass;
+  var chartContext = displayedPass
+    ? { mobileReferenceDurationMs: intervalDuration(displayedPass) }
     : {};
   var summary = currentMoonSummary(
     asOf, currentMoon, activePass, timezone, countryCode);
@@ -44,11 +49,55 @@ function currentMoonCard(asOf, currentMoon, timezone, countryCode, dome) {
     element("summary", { id: "current-moon-title" },
       element("span", { className: "sky-picture-title" }, "Moon now"),
       " — ",
-      element("span", { className: "sky-picture-description" }, collapsedPosition(currentMoon))),
-    activePass
-      ? currentMoonPathPanel(currentMoon, timezone, countryCode, chartContext, dome, summary)
+      element("span", { className: "sky-picture-description" }, collapsedPosition(asOf, currentMoon))),
+    displayedPass
+      ? currentMoonPassPanel(
+        currentMoon, displayedPass, Boolean(activePass), timezone, countryCode, chartContext, dome, summary)
       : currentSkyDomePicture(dome, summary)
   );
+}
+
+function currentMoonPassPanel(
+  currentMoon,
+  pass,
+  activePass,
+  timezone,
+  countryCode,
+  chartContext,
+  currentSkyDome,
+  footerContent
+) {
+  var path = pass.path || {};
+  var description = activePass
+    ? "Altitude over time across the active Moon pass at Now"
+    : "Altitude over time across the upcoming Moon pass";
+  var chartSubject = activePass ? "active Moon pass at Now" : "upcoming Moon pass";
+  return renderMoonPathPanel(
+    {
+      moon: currentMoon.moon || {},
+      moonPath: {
+        description: description,
+        chartSubject: chartSubject,
+        hideSummary: true,
+        start: path.start,
+        now: activePass ? path.now : null,
+        end: path.end,
+        samples: path.samples
+      }
+    },
+    timezone,
+    countryCode,
+    chartContext,
+    activePass ? "Moon path at Now" : "Upcoming Moon path",
+    chartSubject,
+    false,
+    function () {
+      return expandablePicture(
+        "Sky dome at snapshot time",
+        "Sun and Moon positions at the response snapshot",
+        currentSkyDome);
+    },
+    footerContent);
 }
 
 function currentMoonSummary(asOf, currentMoon, activePass, timezone, countryCode) {
@@ -77,11 +126,26 @@ function boundaryText(boundary, timezone, countryCode) {
     : "Unavailable";
 }
 
-function collapsedPosition(currentMoon) {
+function collapsedPosition(asOf, currentMoon) {
   if (currentMoon.horizonState === "below_horizon") {
-    return "Below horizon";
+    return "Below horizon · " + nextRiseText(asOf, currentMoon.nextRiseBoundary);
   }
   return Math.round(currentMoon.moon.altitudeDegrees) + "° high";
+}
+
+function nextRiseText(asOf, boundary) {
+  if (boundary?.status === "not_found_within_range") {
+    return "Rise not found within 26 hours";
+  }
+  var durationMs = new Date(boundary?.at).getTime() - new Date(asOf).getTime();
+  if (durationMs < 60_000) {
+    return "Rises in less than 1 min";
+  }
+  var minutes = Math.round(durationMs / 60_000);
+  var hours = Math.floor(minutes / 60);
+  var remainingMinutes = minutes % 60;
+  return "Rises in " + (hours ? hours + " hr" + (remainingMinutes ? " " : "") : "")
+    + (remainingMinutes ? remainingMinutes + " min" : "");
 }
 
 function localDateTimeText(value, timezone, countryCode) {

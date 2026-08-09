@@ -1015,8 +1015,13 @@ appear once as the current card and again in ranked results.
 
 The collapsed disclosure gives a useful position summary. At or above the
 horizon it says `Moon now — <rounded altitude>° high`, with altitude rounded to
-the nearest whole degree. Below the horizon it says `Moon now — Below horizon`.
-It does not use `Not ranked` as the collapsed summary.
+the nearest whole degree. Below the horizon it says `Moon now — Below horizon ·
+Rises in <duration>` from the response's `nextRiseBoundary`. The duration is
+relative to the response's top-level snapshot instant, rounded to the nearest
+minute, and remains static: it does not use a timer, poll, refresh, or make
+another request. A found rise under one minute away says `Rises in less than 1
+min`; a bounded missing rise says `Rise not found within 26 hours`. It does not
+use `Not ranked` as the collapsed summary.
 
 Expanded content uses the response's top-level snapshot instant. Visible copy
 calls this the `snapshot time`; it never exposes the API field name `asOf`. The
@@ -1047,7 +1052,7 @@ illumination percentage, phase angle as a separate fact, bright-limb or
 north-pole orientation, an explicit modelled-horizon fact, ambient-light
 bucket as a text fact, or numeric Sun facts. The active Moon path retains the
 existing Sun-derived light-band backgrounds as useful photographic context.
-The current card does not show the separate Sun pass chart.
+The current card does not show a separate Sun pass chart.
 
 The omitted orientation facts remain part of Moon rendering. Moon-path markers
 retain the existing independent image fallbacks when either orientation is
@@ -1055,10 +1060,14 @@ absent, and the UI never converts a missing orientation to `0°`.
 
 When the Moon is below the modelled horizon, the bottom prose reports its
 below-horizon position without adding `No Moon pass is active at this
-snapshot.` It shows no pass boundary, Moon-path chart, Sun-pass chart,
-recommendation, or next-rise advice. It still provides the snapshot-time sky
-dome. The Sun and Moon values needed to draw and describe that diagram remain
-available inside the diagram; they are not repeated as numeric card facts.
+snapshot.` The collapsed summary includes the bounded next-rise state. When
+the response has `nextPass`, the first expanded content is `Upcoming Moon
+path`. It has no `Now` point or marker, because the path starts later. It keeps
+the existing light bands and has no separate Sun chart. The snapshot-time sky
+dome still describes the current sky. When `nextPass` is `null`, expanded
+content stays snapshot-only. The Sun and Moon values needed to draw and
+describe that diagram remain available inside the diagram; they are not
+repeated as numeric card facts.
 
 When the Moon is at or above the modelled horizon, the card displays the start
 and end boundary states. A `found` boundary uses the resolved location's

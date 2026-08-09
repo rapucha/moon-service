@@ -14,6 +14,8 @@ public record CurrentMoonResponse(
         String horizonState,
         OpportunitySearchResponse.Moon moon,
         OpportunitySearchResponse.Sun sun,
+        @JsonInclude(JsonInclude.Include.ALWAYS) Boundary nextRiseBoundary,
+        @JsonInclude(JsonInclude.Include.ALWAYS) UpcomingPass nextPass,
         @JsonInclude(JsonInclude.Include.ALWAYS) ActivePass activePass
 ) {
     public static CurrentMoonResponse from(CurrentMoonCalculator.Result result) {
@@ -24,6 +26,9 @@ public record CurrentMoonResponse(
                 aboveOrOnHorizon ? "above_or_on_horizon" : "below_horizon",
                 moon(current),
                 sun(current),
+                aboveOrOnHorizon ? null : boundary(Objects.requireNonNull(
+                        result.nextRiseBoundary(), "A below-horizon result must include its next rise.")),
+                nextPass(result),
                 aboveOrOnHorizon ? activePass(result, current) : null);
     }
 
@@ -46,6 +51,27 @@ public record CurrentMoonResponse(
                 new Path(
                         point(start, "start"),
                         point(current, "now"),
+                        point(end, "end"),
+                        samples));
+    }
+
+    private static UpcomingPass nextPass(CurrentMoonCalculator.Result result) {
+        CurrentMoonCalculator.NextPass pass = result.nextPass();
+        if (pass == null) {
+            return null;
+        }
+        MoonSample start = sampleAt(pass.pathSamples(), pass.representedStartsAt());
+        MoonSample end = sampleAt(pass.pathSamples(), pass.representedEndsAt());
+        List<OpportunitySearchResponse.MoonPathPoint> samples = pass.pathSamples().stream()
+                .map(sample -> point(sample, upcomingSampleRole(sample.instant(), pass)))
+                .toList();
+        return new UpcomingPass(
+                boundary(pass.startBoundary()),
+                boundary(pass.endBoundary()),
+                pass.representedStartsAt().toString(),
+                pass.representedEndsAt().toString(),
+                new UpcomingPath(
+                        point(start, "start"),
                         point(end, "end"),
                         samples));
     }
@@ -74,6 +100,19 @@ public record CurrentMoonResponse(
         if (instant.equals(current)) {
             return "now";
         }
+        if (instant.equals(pass.representedStartsAt())) {
+            return "start";
+        }
+        if (instant.equals(pass.representedEndsAt())) {
+            return "end";
+        }
+        return "path";
+    }
+
+    private static String upcomingSampleRole(
+            Instant instant,
+            CurrentMoonCalculator.NextPass pass
+    ) {
         if (instant.equals(pass.representedStartsAt())) {
             return "start";
         }
@@ -161,6 +200,15 @@ public record CurrentMoonResponse(
     ) {
     }
 
+    public record UpcomingPass(
+            Boundary startBoundary,
+            Boundary endBoundary,
+            String representedStartsAt,
+            String representedEndsAt,
+            UpcomingPath path
+    ) {
+    }
+
     @JsonInclude(JsonInclude.Include.NON_NULL)
     public record Boundary(String status, String at) {
     }
@@ -168,6 +216,13 @@ public record CurrentMoonResponse(
     public record Path(
             OpportunitySearchResponse.MoonPathPoint start,
             OpportunitySearchResponse.MoonPathPoint now,
+            OpportunitySearchResponse.MoonPathPoint end,
+            List<OpportunitySearchResponse.MoonPathPoint> samples
+    ) {
+    }
+
+    public record UpcomingPath(
+            OpportunitySearchResponse.MoonPathPoint start,
             OpportunitySearchResponse.MoonPathPoint end,
             List<OpportunitySearchResponse.MoonPathPoint> samples
     ) {

@@ -30,12 +30,17 @@ public final class CurrentMoonCalculator {
                 instant,
                 key -> Objects.requireNonNull(samples.sampleAt(key), "samples returned null"));
         MoonSample current = cachedSamples.sampleAt(asOf);
+        Instant searchEndsAt = asOf.plus(SEARCH_RANGE);
         if (current.moonAltitudeDegrees() < 0.0) {
-            return new Result(current, null);
+            Boundary nextRiseBoundary = findNextRise(cachedSamples, current, searchEndsAt);
+            return new Result(
+                    current,
+                    null,
+                    nextRiseBoundary,
+                    nextPass(cachedSamples, nextRiseBoundary, searchEndsAt));
         }
 
         Instant searchStartsAt = asOf.minus(SEARCH_RANGE);
-        Instant searchEndsAt = asOf.plus(SEARCH_RANGE);
         Boundary startBoundary = findLatestRise(cachedSamples, current, searchStartsAt);
         Boundary endBoundary = findNextSet(cachedSamples, current, searchEndsAt);
         Instant representedStartsAt = startBoundary.at() == null ? searchStartsAt : startBoundary.at();
@@ -53,7 +58,9 @@ public final class CurrentMoonCalculator {
                         endBoundary,
                         representedStartsAt,
                         representedEndsAt,
-                        pathSamples));
+                        pathSamples),
+                null,
+                null);
     }
 
     private static Boundary findLatestRise(
@@ -96,6 +103,47 @@ public final class CurrentMoonCalculator {
             earlier = later;
         }
         return new Boundary(BoundaryStatus.NOT_FOUND_WITHIN_RANGE, null);
+    }
+
+    private static Boundary findNextRise(
+            WindowGenerator.SampleProvider samples,
+            MoonSample current,
+            Instant searchEndsAt
+    ) {
+        MoonSample earlier = current;
+        while (earlier.instant().isBefore(searchEndsAt)) {
+            Instant laterInstant = earlier.instant().plus(BRACKET_STEP);
+            if (laterInstant.isAfter(searchEndsAt)) {
+                laterInstant = searchEndsAt;
+            }
+            MoonSample later = samples.sampleAt(laterInstant);
+            Instant crossing = risingCrossing(samples, earlier, later);
+            if (crossing != null) {
+                return new Boundary(BoundaryStatus.FOUND, crossing);
+            }
+            earlier = later;
+        }
+        return new Boundary(BoundaryStatus.NOT_FOUND_WITHIN_RANGE, null);
+    }
+
+    private static NextPass nextPass(
+            WindowGenerator.SampleProvider samples,
+            Boundary startBoundary,
+            Instant searchEndsAt
+    ) {
+        Instant startsAt = startBoundary.at();
+        if (startsAt == null || !startsAt.isBefore(searchEndsAt)) {
+            return null;
+        }
+        MoonSample start = samples.sampleAt(startsAt);
+        Boundary endBoundary = findNextSet(samples, start, searchEndsAt);
+        Instant representedEndsAt = endBoundary.at() == null ? searchEndsAt : endBoundary.at();
+        List<MoonSample> pathSamples = WindowGenerator.pathSamples(
+                samples,
+                startsAt,
+                List.of(),
+                representedEndsAt);
+        return new NextPass(startBoundary, endBoundary, startsAt, representedEndsAt, pathSamples);
     }
 
     private static Instant risingCrossing(
@@ -156,9 +204,21 @@ public final class CurrentMoonCalculator {
         return crossing;
     }
 
-    public record Result(MoonSample current, ActivePass activePass) {
+    public record Result(
+            MoonSample current,
+            ActivePass activePass,
+            Boundary nextRiseBoundary,
+            NextPass nextPass
+    ) {
         public Result {
             Objects.requireNonNull(current, "current");
+            boolean belowHorizon = current.moonAltitudeDegrees() < 0.0;
+            if (belowHorizon != (nextRiseBoundary != null)) {
+                throw new IllegalArgumentException("Only below-horizon results include a next-rise boundary.");
+            }
+            if (nextPass != null && (!belowHorizon || !nextPass.startBoundary().equals(nextRiseBoundary))) {
+                throw new IllegalArgumentException("Next passes require the below-horizon next-rise boundary.");
+            }
         }
     }
 
@@ -174,6 +234,25 @@ public final class CurrentMoonCalculator {
             Objects.requireNonNull(endBoundary, "endBoundary");
             Objects.requireNonNull(representedStartsAt, "representedStartsAt");
             Objects.requireNonNull(representedEndsAt, "representedEndsAt");
+            pathSamples = List.copyOf(pathSamples);
+        }
+    }
+
+    public record NextPass(
+            Boundary startBoundary,
+            Boundary endBoundary,
+            Instant representedStartsAt,
+            Instant representedEndsAt,
+            List<MoonSample> pathSamples
+    ) {
+        public NextPass {
+            Objects.requireNonNull(startBoundary, "startBoundary");
+            Objects.requireNonNull(endBoundary, "endBoundary");
+            Objects.requireNonNull(representedStartsAt, "representedStartsAt");
+            Objects.requireNonNull(representedEndsAt, "representedEndsAt");
+            if (!representedEndsAt.isAfter(representedStartsAt)) {
+                throw new IllegalArgumentException("Next passes need a non-zero duration.");
+            }
             pathSamples = List.copyOf(pathSamples);
         }
     }
