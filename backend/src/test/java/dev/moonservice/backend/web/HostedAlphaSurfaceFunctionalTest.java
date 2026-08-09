@@ -90,7 +90,8 @@ class HostedAlphaSurfaceFunctionalTest {
             "/camera-preview/level-1.webp", "/camera-preview/level-2.webp",
             "/camera-preview/level-3.webp", "/camera-preview/level-4.webp",
             "/camera-preview/level-5.webp", "/cameraReferenceScene.js",
-            "/cameraSetup.js", "/dom.js", "/format.js", "/highResolutionMoonRenderer.js",
+            "/cameraSetup.js", "/currentMoonCard.js", "/dom.js", "/format.js",
+            "/highResolutionMoonRenderer.js",
             "/favicon.svg", "/moonAppearanceControls.js",
             "/moonAppearancePreview.css", "/moonPreferenceControls.css", "/styles.css",
             "/sun-marker-aperture-flare.svg", "/moon-textures/lroc_color_2k.jpg",
@@ -98,7 +99,8 @@ class HostedAlphaSurfaceFunctionalTest {
             "/moonPathLightBands.js", "/moonPathSilhouetteSymbols.js", "/moonPathSilhouettes.js",
             "/moonPathView.js", "/moonPhaseView.js", "/moonTexture.js", "/opportunityCard.js",
             "/opportunityPreferences.css", "/opportunityPreferences.js",
-            "/planningView.js", "/recentSearches.js", "/responseView.js", "/scoreView.js"
+            "/planningView.js", "/recentSearches.js", "/responseView.js", "/scoreView.js",
+            "/skyDomeView.js"
     })
     void servesExactCurrentStaticAssetInventory(String path) {
         webTestClient.get()
@@ -114,8 +116,9 @@ class HostedAlphaSurfaceFunctionalTest {
             "/camera-preview/level-0.webp", "/camera-preview/level-1.webp",
             "/camera-preview/level-2.webp", "/camera-preview/level-3.webp",
             "/camera-preview/level-4.webp", "/camera-preview/level-5.webp",
-            "/cameraReferenceScene.js", "/cameraSetup.js", "/highResolutionMoonRenderer.js",
-            "/moon-textures/lroc_color_2k.jpg", "/planningView.js", "/readyz"
+            "/cameraReferenceScene.js", "/cameraSetup.js", "/currentMoonCard.js",
+            "/highResolutionMoonRenderer.js", "/moon-textures/lroc_color_2k.jpg",
+            "/planningView.js", "/skyDomeView.js", "/readyz"
     })
     void allowsHeadForApprovedSurface(String path) {
         expectHostedHeaders(webTestClient.head()

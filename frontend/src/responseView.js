@@ -1,4 +1,5 @@
 import { sharePathFor } from "./api.js";
+import { createCurrentMoonView } from "./currentMoonCard.js";
 import { element } from "./dom.js";
 import { candidateMeta, formatDateTime } from "./format.js";
 import { moonPassCard } from "./opportunityCard.js";
@@ -100,9 +101,11 @@ export function createResponseView(results, callbacks) {
     var opportunities = Array.isArray(payload.opportunities) ? payload.opportunities : [];
     var soonest = request.order === "soonest";
     var groups = opportunityGroups(opportunities, soonest);
+    var currentMoonCard = createCurrentMoonView(payload, timezone, countryCode);
     var children = [
       resultSummary(payload, request, groups.length, opportunities.length, soonest)
     ];
+    if (currentMoonCard) children.push(currentMoonCard);
 
     if (notifyResolvedLocation && location.kind === "real_location"
         && location.displayName && callbacks.onResolvedLocation) {

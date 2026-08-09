@@ -84,9 +84,10 @@ terrain horizon, obstruction, and shooting-position limitations.
   helpers so future localization does not require rewriting card structure.
 - Display instants in the opportunity location's timezone. The 12-hour or
   24-hour clock convention should follow the user's browser locale settings.
-- Card-level window and suggested-time labels should include the location's
-  short timezone label when available, so comparisons with UTC-based ephemeris
-  tools are less ambiguous.
+- Ranked and planning card window and suggested-time labels should include the
+  location's short timezone label when available, so comparisons with UTC-based
+  ephemeris tools are less ambiguous. The Current Moon Card instead uses the
+  explicit local-time and numeric-UTC-offset treatment defined below.
 
 ## Frontend Structure
 
@@ -134,9 +135,13 @@ The frontend module split is intended to keep future UI changes manageable:
   layout;
 - `moonPreferenceControls.css`: shared preference-control base, Moon-shape,
   and Moon-dial presentation;
-- `responseView.js`: response states and result rendering;
+- `responseView.js`: response states, result rendering, and Current Moon Card
+  placement;
 - `opportunityCard.js`: opportunity card layout;
-- `moonPathView.js`: Moon path, separate Sun pass, and suggested-time sky-position views;
+- `currentMoonCard.js`: current Moon disclosure, status, and active-path
+  adaptation;
+- `moonPathView.js`: Moon path and separate Sun pass views;
+- `skyDomeView.js`: ranked, planning, and current-snapshot sky-position views;
 - `moonPhaseView.js`: Moon phase rendering;
 - `scoreView.js`: score block and score details.
 
@@ -988,6 +993,98 @@ Created, replayed, conflict, unknown-outcome, rate-limited, and unavailable
 states are announced in a polite live region. A success confirmation stays
 available to assistive technology before the form is cleared. Exact retry is a
 labeled tester action, never a timer or background behavior.
+
+## Current Moon Card
+
+A successful real-location product response shows the response's
+`currentMoon` snapshot before the ranked Moon-pass cards. This applies to the
+preference-free product GET and the active-preference product POST. Fixture
+responses and non-success statuses do not show the card.
+
+`Moon now` is a native `details`/`summary` disclosure in the result flow. It is
+collapsed by default every time a response renders. Expanding or collapsing it
+does not make another request. The open state is not carried to a new response
+and does not enter the share URL, `localStorage`, a cookie, an account, or a
+server profile. There is no separate checkbox or other summary-level control.
+
+The card is unranked. It does not contribute to pass or candidate counts,
+scores, order, Best or Alternative comparisons, preference-impact counts, or
+empty-result recovery. A response with no ranked opportunities shows both the
+current card and the existing empty-result recovery. The same physical pass may
+appear once as the current card and again in ranked results.
+
+The collapsed disclosure gives a useful position summary. At or above the
+horizon it says `Moon now — <rounded altitude>° high`, with altitude rounded to
+the nearest whole degree. Below the horizon it says `Moon now — Below horizon`.
+It does not use `Not ranked` as the collapsed summary.
+
+Expanded content uses the response's top-level snapshot instant. Visible copy
+calls this the `snapshot time`; it never exposes the API field name `asOf`. The
+card does not refresh or poll.
+
+The bottom prose starts `Status for <local date and time with UTC offset>:`. It
+does not add `A new search gets a new snapshot.`
+
+The prose snapshot and every found pass-boundary timestamp in this card use the
+resolved place's local date and time followed by `local time` and that instant's
+numeric UTC offset. For example:
+
+```text
+Aug 9, 2026, 1:25 PM local time (UTC−04:00)
+```
+
+The date and 12-hour or 24-hour clock still follow the browser locale. The UTC
+offset always has hours and minutes, uses `+` or the minus sign `−`, and is
+calculated separately for each instant so daylight-saving transitions remain
+truthful. The sky dome uses the same local-time and numeric-offset treatment but
+may omit the date to keep its diagram label compact. The card does not use
+timezone abbreviations or browser-dependent `GMT` names.
+
+For an active pass, the Moon path is the first expanded content. A concise
+Moon/pass text summary follows the path. It identifies the named phase, Moon
+altitude and direction, snapshot time, and pass boundary states. It does not show
+illumination percentage, phase angle as a separate fact, bright-limb or
+north-pole orientation, an explicit modelled-horizon fact, ambient-light
+bucket as a text fact, or numeric Sun facts. The active Moon path retains the
+existing Sun-derived light-band backgrounds as useful photographic context.
+The current card does not show the separate Sun pass chart.
+
+The omitted orientation facts remain part of Moon rendering. Moon-path markers
+retain the existing independent image fallbacks when either orientation is
+absent, and the UI never converts a missing orientation to `0°`.
+
+When the Moon is below the modelled horizon, the bottom prose reports its
+below-horizon position without adding `No Moon pass is active at this
+snapshot.` It shows no pass boundary, Moon-path chart, Sun-pass chart,
+recommendation, or next-rise advice. It still provides the snapshot-time sky
+dome. The Sun and Moon values needed to draw and describe that diagram remain
+available inside the diagram; they are not repeated as numeric card facts.
+
+When the Moon is at or above the modelled horizon, the card displays the start
+and end boundary states. A `found` boundary uses the resolved location's
+timezone. A `not_found_within_range` boundary says that the boundary was not
+found within 26 hours. It does not claim permanent or continuous visibility.
+
+An active card reuses the existing Moon-path presentation with the synchronized
+`activePass.path.samples`. API role `now` receives the suggested-marker
+emphasis inside the view and is labelled `Now`. Current-card headings,
+summaries, and accessible copy use `Now` or `snapshot time`; they do not use the
+technical term `asOf`, `Suggested`, `Best`, `Alternative`, or a rank. Every Moon
+marker uses that sample's phase angle and orientation values.
+
+The current sky dome selects the facts from the exact response snapshot. It
+draws and labels a below-horizon Sun or Moon below the horizon instead of
+clamping the body into the visible dome. Ranked and planning domes retain their
+existing suggested sample selection and above-horizon behavior.
+
+`skyDomeView.js` owns the shared private renderer behind two explicit entry
+points: one for ranked or planning paths and one for a current snapshot.
+`moonPathView.js` remains the ranked/planning consumer. `currentMoonCard.js`
+owns the current disclosure and current-snapshot dome call.
+
+The native summary exposes the disclosure state to assistive technology.
+Keyboard users can expand and collapse it without losing focus. The card has
+no calibration-feedback action.
 
 ## Moon Path Panel
 
