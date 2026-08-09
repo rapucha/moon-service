@@ -4,6 +4,7 @@ import dev.moonservice.backend.location.LocationQuery;
 import dev.moonservice.backend.location.LocationResolution;
 import dev.moonservice.backend.location.LocationResolver;
 import dev.moonservice.backend.location.ResolvedLocation;
+import dev.moonservice.backend.opportunity.search.CurrentMoonResponse;
 import dev.moonservice.backend.opportunity.search.LocationCandidatesResponse;
 import dev.moonservice.backend.opportunity.search.OpportunityResponse;
 import dev.moonservice.backend.opportunity.search.OpportunitySearchEngine;
@@ -12,7 +13,9 @@ import dev.moonservice.backend.opportunity.search.OpportunitySearchRequest.Order
 import dev.moonservice.backend.opportunity.search.OpportunitySearchResponse;
 import dev.moonservice.backend.opportunity.search.OpportunityStatusResponse;
 import dev.moonservice.backend.weather.WeatherForecastUnavailableException;
+import dev.moonservice.scoringprototype.fixture.Location;
 import dev.moonservice.scoringprototype.input.OpportunityPreferences;
+import dev.moonservice.scoringprototype.window.CurrentMoonCalculator;
 import org.springframework.stereotype.Service;
 import tools.jackson.databind.JsonNode;
 
@@ -28,6 +31,7 @@ public class OpportunitySearchService {
     private final OpportunitySearchEngine opportunitySearchEngine;
     private final LocationResolver locationResolver;
     private final OpportunitySearchDefaults opportunitySearchDefaults;
+    private final CurrentMoonCalculator currentMoonCalculator = new CurrentMoonCalculator();
 
     public OpportunitySearchService(
             OpportunitySearchEngine opportunitySearchEngine,
@@ -122,11 +126,12 @@ public class OpportunitySearchService {
 
     private OpportunityResponse searchResolvedLocation(ResolvedLocation location, Order order) {
         try {
-            Instant notBefore = opportunitySearchDefaults.now();
-            return opportunitySearchEngine.search(
+            Instant asOf = opportunitySearchDefaults.now();
+            OpportunitySearchResponse response = opportunitySearchEngine.search(
                     location,
-                    opportunitySearchDefaults.requestFor(location, notBefore, order),
-                    notBefore);
+                    opportunitySearchDefaults.requestFor(location, asOf, order),
+                    asOf);
+            return currentMoonResponse(response, location, asOf);
         } catch (WeatherForecastUnavailableException ex) {
             return OpportunityStatusResponse.temporarilyUnavailable(
                     "Opportunity weather lookup is temporarily unavailable.");
@@ -141,18 +146,43 @@ public class OpportunitySearchService {
             int ignoredPreferenceFieldCount
     ) {
         try {
-            Instant notBefore = opportunitySearchDefaults.now();
+            Instant asOf = opportunitySearchDefaults.now();
             OpportunitySearchEngine.PreferenceSearchResult result = opportunitySearchEngine.search(
                     location,
-                    opportunitySearchDefaults.requestFor(location, notBefore, order),
-                    notBefore,
+                    opportunitySearchDefaults.requestFor(location, asOf, order),
+                    asOf,
                     preferences);
-            return OpportunitySearchResponse.withPreferences(
+            OpportunitySearchResponse response = OpportunitySearchResponse.withPreferences(
                     result, ignoredPreferenceFields, ignoredPreferenceFieldCount);
+            return currentMoonResponse(response, location, asOf);
         } catch (WeatherForecastUnavailableException ex) {
             return OpportunityStatusResponse.temporarilyUnavailable(
                     "Opportunity weather lookup is temporarily unavailable.");
         }
+    }
+
+    private OpportunitySearchResponse currentMoonResponse(
+            OpportunitySearchResponse response,
+            ResolvedLocation location,
+            Instant asOf
+    ) {
+        CurrentMoonCalculator.Result result = currentMoonCalculator.calculate(
+                toPrototypeLocation(location), asOf);
+        return OpportunitySearchResponse.forProduct(
+                response, asOf, CurrentMoonResponse.from(result));
+    }
+
+    private static Location toPrototypeLocation(ResolvedLocation location) {
+        return new Location(
+                location.locationId(),
+                "real_location",
+                location.locationId(),
+                location.displayName(),
+                location.latitude(),
+                location.longitude(),
+                location.elevationMeters(),
+                location.zoneId().getId(),
+                location.countryCode());
     }
 
     private static String normalizeQuery(String rawQuery) {

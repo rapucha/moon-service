@@ -211,11 +211,16 @@ and [hosted-alpha functional tests](../backend/src/test/java/dev/moonservice/bac
   `location_not_found`; `400` with `invalid_request` for invalid input; `503`
   with `temporarily_unavailable` for unavailable location or weather lookup.
   The full `ok` shape includes location, evaluated windows, opportunities,
-  rejected windows, and messages. The server applies the selected order to all
-  eligible finalized opportunities before taking the ten-result product
-  limit. Hosted-alpha resource admission can instead return `429` with
-  `rate_limited`, `retryAfterSeconds`, and `Retry-After` before the controller
-  runs.
+  rejected windows, messages, and one current-Moon snapshot at the captured
+  `asOf`. `generatedAt` equals `asOf`. When the Moon is at or above the
+  horizon, the snapshot contains the physical pass around that instant with
+  independently bounded rise and set states. When it is below the horizon,
+  the snapshot contains current Moon and Sun facts and explicit
+  `activePass: null`. The server returns the snapshot even when no ranked
+  opportunity remains. It applies the selected order to all eligible finalized
+  opportunities before taking the ten-result product limit. Hosted-alpha
+  resource admission can instead return `429` with `rate_limited`,
+  `retryAfterSeconds`, and `Retry-After` before the controller runs.
 - **Authentication/data:** anonymous. `q` is sent to Open-Meteo geocoding;
   normalized queries or location IDs and resolution results are cached in the
   current process with bounded size and status-specific TTLs. Resolved location
@@ -227,6 +232,8 @@ and [hosted-alpha functional tests](../backend/src/test/java/dev/moonservice/bac
 - **References:** [controller](../backend/src/main/java/dev/moonservice/backend/web/OpportunitySearchController.java),
   [service validation](../backend/src/main/java/dev/moonservice/backend/opportunity/OpportunitySearchService.java),
   [server defaults](../backend/src/main/java/dev/moonservice/backend/opportunity/OpportunitySearchDefaults.java),
+  [current-Moon calculation](../prototypes/jvm-scoring/src/main/java/dev/moonservice/scoringprototype/window/CurrentMoonCalculator.java),
+  [current-Moon response](../backend/src/main/java/dev/moonservice/backend/opportunity/search/CurrentMoonResponse.java),
   [geocoding cache](../backend/src/main/java/dev/moonservice/backend/location/CachingLocationResolver.java),
   [response model](../backend/src/main/java/dev/moonservice/backend/opportunity/search/OpportunitySearchResponse.java),
   [API design](api-shape.md).
@@ -255,16 +262,17 @@ and [hosted-alpha functional tests](../backend/src/test/java/dev/moonservice/bac
   `best_match` or `soonest`; omission selects `best_match`. `order` is not a
   JSON body field. The server rejects a present empty or unsupported query
   value before location or weather provider work.
-- **Response:** the same product states and opportunity facts as GET. A request
-  with preferences adds the applied version, normalized active filters,
-  excluded-sample count, ignored-field warning, and authoritative per-pass
-  azimuth match intervals when azimuth filtering is active. Active filters that
-  remove every candidate return `200 ok` with the distinct preference
-  `emptyReason`. The server orders all eligible finalized opportunities before
-  taking the ten-result product limit. Errors use the documented
-  `400 invalid_request`, `413 request_too_large`, and
-  `415 unsupported_media_type` shapes. Invalid-order responses and every other
-  response use `Cache-Control: no-store`.
+- **Response:** the same product states, current-Moon snapshot, and opportunity
+  facts as GET. A request with preferences adds the applied version, normalized
+  active filters, excluded-sample count, ignored-field warning, and
+  authoritative per-pass azimuth match intervals when azimuth filtering is
+  active. Active filters that remove every candidate return `200 ok` with the
+  distinct preference `emptyReason` and still include `asOf` and `currentMoon`.
+  The server orders all eligible finalized opportunities before taking the
+  ten-result product limit. Errors use the documented `400 invalid_request`,
+  `413 request_too_large`, and `415 unsupported_media_type` shapes.
+  Invalid-order responses and every other response use
+  `Cache-Control: no-store`.
 - **Authentication/data:** anonymous and same-origin. The current location flow
   may send `q` or `locationId` upstream, but it never sends a preference to
   geocoding or weather. The service does not store a request body, preference,
@@ -352,7 +360,8 @@ and [hosted-alpha functional tests](../backend/src/test/java/dev/moonservice/bac
   contract; the route remains score ordered.
 - **Response:** `200 application/json` with the opportunity result; malformed,
   incomplete, unsupported, or out-of-range input returns `400` with
-  `invalid_request`, `generatedAt`, and a message.
+  `invalid_request`, `generatedAt`, and a message. Successful direct responses
+  omit the product-only `asOf` and `currentMoon` members.
 - **Authentication/data:** unauthenticated in ordinary mode; inputs are bounded
   to the saved Prague fixture and are not stored as user data.
 - **Exposure:** reachable on the ordinary listener. In hosted alpha it consumes
