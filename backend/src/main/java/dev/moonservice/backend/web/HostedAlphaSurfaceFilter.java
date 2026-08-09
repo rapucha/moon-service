@@ -43,7 +43,8 @@ public final class HostedAlphaSurfaceFilter extends OncePerRequestFilter {
             "/camera-preview/level-0.webp", "/camera-preview/level-1.webp",
             "/camera-preview/level-2.webp", "/camera-preview/level-3.webp",
             "/camera-preview/level-4.webp", "/camera-preview/level-5.webp",
-            "/cameraReferenceScene.js", "/cameraSetup.js", "/dom.js", "/format.js",
+            "/cameraReferenceScene.js", "/cameraSetup.js", "/currentMoonCard.js",
+            "/dom.js", "/format.js",
             "/highResolutionMoonRenderer.js",
             "/moonAppearanceControls.js", "/moonAppearancePreview.css",
             "/moonPreferenceControls.css", "/terms.js", "/types.js",
@@ -52,7 +53,8 @@ public final class HostedAlphaSurfaceFilter extends OncePerRequestFilter {
             "/moonPathLightBands.js", "/moonPathSilhouetteSymbols.js", "/moonPathSilhouettes.js",
             "/moonPathView.js", "/moonPhaseView.js", "/moonTexture.js", "/opportunityCard.js",
             "/opportunityPreferences.css", "/opportunityPreferences.js",
-            "/planningView.js", "/recentSearches.js", "/responseView.js", "/scoreView.js"
+            "/planningView.js", "/recentSearches.js", "/responseView.js", "/scoreView.js",
+            "/skyDomeView.js"
     );
     private static final Set<String> FORWARDED_IDENTITY_HEADERS = Set.of(
             "cf-connecting-ip", "forwarded", "true-client-ip", "x-client-ip", "x-forwarded-for", "x-real-ip",
