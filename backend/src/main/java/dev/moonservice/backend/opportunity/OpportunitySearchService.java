@@ -15,6 +15,7 @@ import dev.moonservice.backend.opportunity.search.OpportunityStatusResponse;
 import dev.moonservice.backend.weather.WeatherForecastUnavailableException;
 import dev.moonservice.scoringprototype.fixture.Location;
 import dev.moonservice.scoringprototype.input.OpportunityPreferences;
+import dev.moonservice.scoringprototype.scoring.WeatherRanking;
 import dev.moonservice.scoringprototype.window.CurrentMoonCalculator;
 import org.springframework.stereotype.Service;
 import tools.jackson.databind.JsonNode;
@@ -59,7 +60,20 @@ public class OpportunitySearchService {
                     ? searchByLocationId(rawLocationId)
                     : searchByQuery(rawQuery);
         }
-        return search(rawQuery, rawLocationId, location -> searchResolvedLocation(location, order));
+        return search(rawQuery, rawLocationId, location -> searchResolvedLocation(
+                location, order, WeatherRanking.BALANCED, null));
+    }
+
+    public OpportunityResponse search(
+            String rawQuery,
+            String rawLocationId,
+            Order order,
+            WeatherRanking weatherRanking
+    ) {
+        Objects.requireNonNull(order, "order");
+        Objects.requireNonNull(weatherRanking, "weatherRanking");
+        return search(rawQuery, rawLocationId, location -> searchResolvedLocation(
+                location, order, weatherRanking, weatherRanking.wireValue()));
     }
 
     public OpportunityResponse search(
@@ -70,11 +84,44 @@ public class OpportunitySearchService {
             List<String> ignoredPreferenceFields,
             int ignoredPreferenceFieldCount
     ) {
+        return searchWithPreferences(
+                rawQuery, rawLocationId, order, preferences,
+                ignoredPreferenceFields, ignoredPreferenceFieldCount,
+                WeatherRanking.BALANCED, null);
+    }
+
+    public OpportunityResponse search(
+            String rawQuery,
+            String rawLocationId,
+            Order order,
+            OpportunityPreferences preferences,
+            List<String> ignoredPreferenceFields,
+            int ignoredPreferenceFieldCount,
+            WeatherRanking weatherRanking
+    ) {
+        Objects.requireNonNull(weatherRanking, "weatherRanking");
+        return searchWithPreferences(
+                rawQuery, rawLocationId, order, preferences,
+                ignoredPreferenceFields, ignoredPreferenceFieldCount,
+                weatherRanking, weatherRanking.wireValue());
+    }
+
+    private OpportunityResponse searchWithPreferences(
+            String rawQuery,
+            String rawLocationId,
+            Order order,
+            OpportunityPreferences preferences,
+            List<String> ignoredPreferenceFields,
+            int ignoredPreferenceFieldCount,
+            WeatherRanking weatherRanking,
+            String appliedWeatherRanking
+    ) {
         Objects.requireNonNull(order, "order");
         Objects.requireNonNull(preferences, "preferences");
         Objects.requireNonNull(ignoredPreferenceFields, "ignoredPreferenceFields");
         return search(rawQuery, rawLocationId, location -> searchResolvedLocation(
-                location, order, preferences, ignoredPreferenceFields, ignoredPreferenceFieldCount));
+                location, order, preferences, ignoredPreferenceFields, ignoredPreferenceFieldCount,
+                weatherRanking, appliedWeatherRanking));
     }
 
     private OpportunityResponse search(
@@ -100,13 +147,15 @@ public class OpportunitySearchService {
     public OpportunityResponse searchByQuery(String rawQuery) {
         String query = normalizeQuery(rawQuery);
         LocationResolution resolution = locationResolver.resolve(new LocationQuery(query));
-        return searchLocationResolution(resolution, location -> searchResolvedLocation(location, Order.BEST_MATCH));
+        return searchLocationResolution(resolution, location -> searchResolvedLocation(
+                location, Order.BEST_MATCH, WeatherRanking.BALANCED, null));
     }
 
     public OpportunityResponse searchByLocationId(String rawLocationId) {
         String locationId = normalizeLocationId(rawLocationId);
         LocationResolution resolution = locationResolver.resolveLocationId(locationId);
-        return searchLocationResolution(resolution, location -> searchResolvedLocation(location, Order.BEST_MATCH));
+        return searchLocationResolution(resolution, location -> searchResolvedLocation(
+                location, Order.BEST_MATCH, WeatherRanking.BALANCED, null));
     }
 
     private OpportunityResponse searchLocationResolution(
@@ -124,14 +173,20 @@ public class OpportunitySearchService {
                 .orElseGet(OpportunityStatusResponse::locationNotFound);
     }
 
-    private OpportunityResponse searchResolvedLocation(ResolvedLocation location, Order order) {
+    private OpportunityResponse searchResolvedLocation(
+            ResolvedLocation location,
+            Order order,
+            WeatherRanking weatherRanking,
+            String appliedWeatherRanking
+    ) {
         try {
             Instant asOf = opportunitySearchDefaults.now();
             OpportunitySearchResponse response = opportunitySearchEngine.search(
                     location,
-                    opportunitySearchDefaults.requestFor(location, asOf, order),
+                    opportunitySearchDefaults.requestFor(location, asOf, order)
+                            .withWeatherRanking(weatherRanking),
                     asOf);
-            return currentMoonResponse(response, location, asOf);
+            return currentMoonResponse(response, location, asOf, appliedWeatherRanking);
         } catch (WeatherForecastUnavailableException ex) {
             return OpportunityStatusResponse.temporarilyUnavailable(
                     "Opportunity weather lookup is temporarily unavailable.");
@@ -143,18 +198,21 @@ public class OpportunitySearchService {
             Order order,
             OpportunityPreferences preferences,
             List<String> ignoredPreferenceFields,
-            int ignoredPreferenceFieldCount
+            int ignoredPreferenceFieldCount,
+            WeatherRanking weatherRanking,
+            String appliedWeatherRanking
     ) {
         try {
             Instant asOf = opportunitySearchDefaults.now();
             OpportunitySearchEngine.PreferenceSearchResult result = opportunitySearchEngine.search(
                     location,
-                    opportunitySearchDefaults.requestFor(location, asOf, order),
+                    opportunitySearchDefaults.requestFor(location, asOf, order)
+                            .withWeatherRanking(weatherRanking),
                     asOf,
                     preferences);
             OpportunitySearchResponse response = OpportunitySearchResponse.withPreferences(
                     result, ignoredPreferenceFields, ignoredPreferenceFieldCount);
-            return currentMoonResponse(response, location, asOf);
+            return currentMoonResponse(response, location, asOf, appliedWeatherRanking);
         } catch (WeatherForecastUnavailableException ex) {
             return OpportunityStatusResponse.temporarilyUnavailable(
                     "Opportunity weather lookup is temporarily unavailable.");
@@ -164,12 +222,16 @@ public class OpportunitySearchService {
     private OpportunitySearchResponse currentMoonResponse(
             OpportunitySearchResponse response,
             ResolvedLocation location,
-            Instant asOf
+            Instant asOf,
+            String appliedWeatherRanking
     ) {
         CurrentMoonCalculator.Result result = currentMoonCalculator.calculate(
                 toPrototypeLocation(location), asOf);
         return OpportunitySearchResponse.forProduct(
-                response, asOf, CurrentMoonResponse.from(result));
+                response,
+                asOf,
+                CurrentMoonResponse.from(result),
+                "ok".equals(response.status()) ? appliedWeatherRanking : null);
     }
 
     private static Location toPrototypeLocation(ResolvedLocation location) {

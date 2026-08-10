@@ -21,6 +21,7 @@ public record OpportunitySearchResponse(
         List<Opportunity> opportunities,
         List<RejectedWindow> rejected,
         List<Message> messages,
+        String appliedWeatherRanking,
         Integer appliedPreferenceVersion,
         Map<String, Object> normalizedActiveFilters,
         Integer excludedSampleCount,
@@ -48,7 +49,7 @@ public record OpportunitySearchResponse(
         this(
                 status, generatedAt, location, forecastHorizonDays, startsAt, endsAt,
                 candidateWindowsEvaluated, maxMoonAltitudeDegrees, opportunities, rejected, messages,
-                null, null, null, null, null, null, null, null, null, null);
+                null, null, null, null, null, null, null, null, null, null, null);
     }
 
     public static OpportunitySearchResponse withPreferences(
@@ -86,6 +87,7 @@ public record OpportunitySearchResponse(
                 opportunities,
                 response.rejected(),
                 response.messages(),
+                response.appliedWeatherRanking(),
                 result.appliedPreferenceVersion(),
                 result.normalizedActiveFilters(),
                 result.excludedSampleCount(),
@@ -101,7 +103,8 @@ public record OpportunitySearchResponse(
     public static OpportunitySearchResponse forProduct(
             OpportunitySearchResponse response,
             Instant asOf,
-            CurrentMoonResponse currentMoon
+            CurrentMoonResponse currentMoon,
+            String appliedWeatherRanking
     ) {
         Objects.requireNonNull(response, "response");
         String capturedAt = Objects.requireNonNull(asOf, "asOf").toString();
@@ -117,6 +120,7 @@ public record OpportunitySearchResponse(
                 response.opportunities(),
                 response.rejected(),
                 response.messages(),
+                appliedWeatherRanking,
                 response.appliedPreferenceVersion(),
                 response.normalizedActiveFilters(),
                 response.excludedSampleCount(),
@@ -158,6 +162,7 @@ public record OpportunitySearchResponse(
     ) {
     }
 
+    @JsonInclude(JsonInclude.Include.NON_NULL)
     public record Opportunity(
             String id,
             String windowKind,
@@ -169,6 +174,7 @@ public record OpportunitySearchResponse(
             int score,
             String confidence,
             ComponentScores components,
+            ScoreBasis scoreBasis,
             Moon moon,
             MoonPath moonPath,
             Sun sun,
@@ -180,7 +186,7 @@ public record OpportunitySearchResponse(
         private Opportunity withMoonPass(MoonPass value) {
             return new Opportunity(
                     id, windowKind, value, startsAt, suggestedAt, endsAt, localTimeZone,
-                    score, confidence, components, moon, moonPath, sun, weather,
+                    score, confidence, components, scoreBasis, moon, moonPath, sun, weather,
                     exposureBalance, reason, links);
         }
     }
@@ -246,12 +252,20 @@ public record OpportunitySearchResponse(
     ) {
     }
 
+    @JsonInclude(JsonInclude.Include.NON_NULL)
     public record ComponentScores(
             int moonAltitudeFit,
             int sunLightFit,
             int moonIlluminationFit,
-            int weatherFit,
-            int forecastConfidence
+            Integer weatherFit,
+            Integer forecastConfidence
+    ) {
+    }
+
+    public record ScoreBasis(
+            int componentPoints,
+            int componentMaximum,
+            List<String> excludedComponents
     ) {
     }
 

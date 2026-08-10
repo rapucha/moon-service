@@ -242,7 +242,7 @@ and [hosted-alpha functional tests](../backend/src/test/java/dev/moonservice/bac
 
 - **Handler:** `OpportunitySearchController.searchWithPreferences`.
 - **Purpose/lifecycle:** anonymous same-origin product lookup with optional
-  request-scoped version 1 hard preferences.
+  request-scoped version 1 hard preferences and weather ranking.
 - **Why it exists:** preference values stay out of shareable URLs while the
   server reuses the GET route's live location, weather, Moon-window, scoring,
   ordering, and result-limit flow. Both product routes share the ordering
@@ -255,19 +255,26 @@ and [hosted-alpha functional tests](../backend/src/test/java/dev/moonservice/bac
 - **Other callers:** application tests and explicit manual API clients.
 - **Request:** `application/json`, including ordinary media-type parameters,
   with exactly one usable `q` or `locationId` and optional complete version 1
-  `preferences`. The raw body is limited to 16,384 bytes for known and streamed
+  `preferences`. Optional top-level `weatherRanking` accepts only `balanced`,
+  `prefer_clear`, or `ignore_weather`; omission keeps the existing balanced
+  behavior. The raw body is limited to 16,384 bytes for known and streamed
   lengths. Unknown top-level fields are invalid; supported-version unknown
   preference fields are ignored and reported through the bounded,
   deterministic warning contract. The optional query parameter `order` accepts
   `best_match` or `soonest`; omission selects `best_match`. `order` is not a
   JSON body field. The server rejects a present empty or unsupported query
-  value before location or weather provider work.
+  value before location or weather provider work. It also rejects an invalid
+  weather-ranking value before that work.
 - **Response:** the same product states, current-Moon snapshot, and opportunity
   facts as GET. A request with preferences adds the applied version, normalized
   active filters, excluded-sample count, ignored-field warning, and
   authoritative per-pass azimuth match intervals when azimuth filtering is
   active. Active filters that remove every candidate return `200 ok` with the
   distinct preference `emptyReason` and still include `asOf` and `currentMoon`.
+  An explicit mode adds `appliedWeatherRanking` only to a scored `ok` response.
+  `ignore_weather` adds each opportunity's score basis and omits its inactive
+  weather score components. Weather lookup and raw weather output stay active
+  in every mode. A weather-only request omits all hard-preference metadata.
   The server orders all eligible finalized opportunities before taking the
   ten-result product limit. Errors use the documented `400 invalid_request`,
   `413 request_too_large`, and `415 unsupported_media_type` shapes.
@@ -278,6 +285,8 @@ and [hosted-alpha functional tests](../backend/src/test/java/dev/moonservice/bac
   geocoding or weather. The service does not store a request body, preference,
   availability value, or user profile, and does not put those values in a URL,
   cookie, application or access log, analytics event, or shared cache.
+  It also does not send, store, log, or cache `weatherRanking`, or add it to a
+  provider or cache key.
 - **Exposure:** available on the ordinary listener. Hosted alpha allows this
   exact `POST` in addition to the existing bodyless `GET` and `HEAD`
   operations, and permits a body only for `POST`. It applies the same whole-site

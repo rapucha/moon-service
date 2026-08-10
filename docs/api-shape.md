@@ -252,9 +252,10 @@ Safety rules:
 ## Product Preference POST
 
 `POST /api/opportunities` is the anonymous same-origin product route for one
-request-scoped version 1 preference search. It uses the same location
-resolution, live weather lookup, Moon-window generation, scoring, selected
-order, and result limit as `GET /api/opportunities`.
+request-scoped search. It accepts optional version 1 hard preferences and an
+optional weather-ranking mode. It uses the same location resolution, live
+weather lookup, Moon-window generation, scoring, selected order, and result
+limit as `GET /api/opportunities`.
 
 The product and direct routes remain distinct:
 
@@ -268,11 +269,12 @@ The product and direct routes remain distinct:
 ### Request
 
 The top-level JSON object must contain exactly one usable `q` or `locationId`.
-It may also contain `preferences`:
+It may also contain `weatherRanking`, `preferences`, or both:
 
 ```json
 {
   "q": "Prague",
+  "weatherRanking": "prefer_clear",
   "preferences": {
     "version": 1,
     "altitudeDegrees": { "minimum": 2, "maximum": 15 },
@@ -287,9 +289,33 @@ It may also contain `preferences`:
 The route applies the existing normalization and limits to `q` and
 `locationId`. It rejects a missing, blank, oversized, or unsupported-control
 value. It also rejects a request that contains both lookup fields or neither
-one. A field outside `q`, `locationId`, and `preferences` is an unknown
-top-level field and makes the request invalid. In particular, `order` belongs
-in the query and is invalid in this JSON object.
+one. A field outside `q`, `locationId`, `weatherRanking`, and `preferences` is
+an unknown top-level field and makes the request invalid. In particular,
+`order` belongs in the query and is invalid in this JSON object.
+
+`weatherRanking` is separate from the hard `preferences` object. When present,
+it must be a JSON string with exactly one of these values:
+
+| Value | Ranking behavior |
+| --- | --- |
+| `balanced` | Use the default mix of Moon, light, weather, and forecast confidence. |
+| `prefer_clear` | Give clearer skies a stronger weather score while keeping every score component active. |
+| `ignore_weather` | Exclude weather and forecast confidence from the score, then normalize the remaining components to 0–100. |
+
+When `weatherRanking` is absent, the server uses `balanced`. Product GET and
+product POST without this field keep the existing balanced candidates, scores,
+order, and response shape. Explicit `balanced` produces the same result but
+adds the applied-mode response field described below.
+
+Changing the mode does not change candidate intervals, `startsAt`,
+`suggestedAt`, `endsAt`, active hard filters, excluded-sample counts, empty
+reasons, or preference-impact diagnostics. The selected `order` keeps its
+existing behavior. `best_match` ranks by the selected mode's score. `soonest`
+keeps chronological order and uses that score to break ties between equal
+times. Weather is fetched and returned in every mode. Weather lookup failure
+keeps the existing
+`temporarily_unavailable` behavior. The exact scoring behavior is defined in
+[Weather-Ranking Modes](opportunity-evaluation-contract.md#weather-ranking-modes).
 
 When `preferences` is present, `version` is required and must be `1`. Every
 filter is optional:
@@ -352,8 +378,11 @@ Every validation error uses the existing opportunity error fields `status`,
 | `413` | `request_too_large` | The raw body exceeds 16,384 bytes, whether its length is known or streamed. |
 | `415` | `unsupported_media_type` | `Content-Type` is missing or is not `application/json`. |
 
-An error message or log must not contain a raw preference value or request
-body. Invalid requests must not call the location or weather provider.
+If `weatherRanking` is not a string or one of the three supported values, the
+server returns `400 invalid_request`. It validates the field before geocoding,
+ephemeris calculation, or weather lookup. The error response and logs must not
+echo the supplied mode, a raw preference value, or the request body. Invalid
+requests must not call the location or weather provider.
 
 ### Unknown preference fields
 
@@ -404,6 +433,37 @@ When `preferences` is present, the successful response adds:
   "additionalIgnoredPreferenceFieldCount": 0
 }
 ```
+
+When the request explicitly contains `weatherRanking` and scoring returns
+`status: "ok"`, the response also adds the selected value:
+
+```json
+{
+  "appliedWeatherRanking": "prefer_clear"
+}
+```
+
+The response omits `appliedWeatherRanking` when the request omits the field. It
+also omits it from `ambiguous_location`, `location_not_found`,
+`temporarily_unavailable`, and every error response.
+
+Under `ignore_weather`, every returned opportunity omits `weatherFit` and
+`forecastConfidence` from `components` and adds:
+
+```json
+{
+  "scoreBasis": {
+    "componentPoints": 54,
+    "componentMaximum": 70,
+    "excludedComponents": ["weatherFit", "forecastConfidence"]
+  }
+}
+```
+
+`componentPoints` is an integer sum of the active components. The omitted
+weather fields are inactive, not zero. Raw weather facts remain present on the
+opportunity. The other modes keep the existing five-component shape and omit
+`scoreBasis`.
 
 `normalizedActiveFilters` contains every active filter and its normalized
 value. `excludedSampleCount` counts candidate samples rejected by one or more
@@ -522,8 +582,10 @@ other provider request. A complete enter-and-exit event between five-minute
 samples can be missed.
 
 When `preferences` is absent, the response omits all preference-only metadata,
-including ignored-field fields and azimuth masks, so the GET and
-preference-free response shape remains unchanged.
+including `appliedPreferenceVersion`, normalized filters, excluded-sample
+counts, ignored-field metadata, preference `emptyReason`, `preferenceImpact`,
+and azimuth masks. A request with only `weatherRanking` follows this same
+non-hard-preference path.
 
 ### Privacy, caches, and hosted alpha
 
@@ -532,11 +594,11 @@ location state, provider failure, or hosted-alpha rejection, must contain
 `Cache-Control: no-store`.
 
 The service may send `q` or `locationId` through the current location flow. It
-must not send a preference field to a geocoding or weather provider. It must
-not put a preference in a URL, cookie, access log, application log,
-server-side profile, analytics event, or shared cache. The server must not
-permanently store the body, a preference, an availability window, or a personal
-profile.
+must not send a preference or `weatherRanking` to a geocoding or weather
+provider. It must not add the mode to provider or cache keys, or put it in a
+URL, cookie, access log, application log, server-side profile, analytics event,
+or shared cache. The server must not permanently store the body, a preference,
+the mode, an availability window, or a personal profile.
 
 Hosted alpha allows a bounded JSON body only for this exact product POST, the
 separately specified planning POST, and the feedback submission route. It
@@ -579,8 +641,10 @@ The browser must copy the normalized canonical `locationId` from a completed
 ordinary response. Every existing version 1 hard-preference field is optional
 and keeps the
 validation and semantics defined under [Product Preference POST](#product-preference-post).
-The route does not accept `q`, coordinates, timezone, a horizon, a result
-limit, a mode, or another lookup field. Unknown top-level fields are invalid.
+The route does not accept `q`, `weatherRanking`, coordinates, timezone, a
+horizon, a result limit, or another lookup field. Unknown top-level fields are
+invalid. In particular, it rejects product weather-ranking modes rather than
+ignoring them.
 Unknown members below the supported `preferences` object keep the existing
 bounded JSON Pointer warning and aggregate-only logging rules.
 

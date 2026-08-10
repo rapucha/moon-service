@@ -34,7 +34,7 @@ final class ProductRequestParser {
     private static final int BODY_LIMIT_BYTES = 16_384;
     private static final int IGNORED_FIELD_LIMIT = 20;
     private static final int LOCATION_ID_LIMIT = 100;
-    private static final Set<String> OPPORTUNITY_FIELDS = Set.of("q", "locationId", "preferences");
+    private static final Set<String> OPPORTUNITY_FIELDS = Set.of("q", "locationId", "preferences", "weatherRanking");
     private static final Set<String> PLANNING_FIELDS = Set.of("locationId", "preferences");
 
     private ProductRequestParser() {
@@ -58,7 +58,8 @@ final class ProductRequestParser {
                 query,
                 locationId,
                 parsedPreferences.preferences(),
-                parsedPreferences.ignoredFields());
+                parsedPreferences.ignoredFields(),
+                ProductWeatherRanking.parseOptional(root));
     }
 
     static PlanningRequest parsePlanning(HttpServletRequest request) {
@@ -382,7 +383,7 @@ final class ProductRequestParser {
     }
 
     record OpportunityRequest(String query, String locationId, OpportunityPreferences preferences,
-                              IgnoredFields ignoredFields) {
+                              IgnoredFields ignoredFields, ProductWeatherRanking weatherRanking) {
     }
 
     record PlanningRequest(String locationId, OpportunityPreferences preferences,
