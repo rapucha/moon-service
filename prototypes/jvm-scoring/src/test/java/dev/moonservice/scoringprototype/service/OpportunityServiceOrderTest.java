@@ -9,6 +9,7 @@ import dev.moonservice.scoringprototype.input.OpportunityPreferences.AltitudeRan
 import dev.moonservice.scoringprototype.input.PrototypeConfig;
 import dev.moonservice.scoringprototype.scoring.ComponentScores;
 import dev.moonservice.scoringprototype.scoring.ScoredWindow;
+import dev.moonservice.scoringprototype.scoring.WeatherRanking;
 import dev.moonservice.scoringprototype.window.MoonWindow;
 import org.junit.jupiter.api.Test;
 
@@ -20,6 +21,7 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Optional;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import static dev.moonservice.scoringprototype.service.OpportunityService.ResultOrder.BEST_MATCH;
 import static dev.moonservice.scoringprototype.service.OpportunityService.ResultOrder.SOONEST;
@@ -31,8 +33,12 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class OpportunityServiceOrderTest {
     private static final LocalDate START = LocalDate.parse("2026-06-29");
     private static final WeatherFixture WEATHER = WeatherFixture.PRAGUE_PARTLY_CLOUDY;
+    private static final WeatherFixture CLEAR_WEATHER = new WeatherFixture(
+            0, 0, 0, 0, 5, 0.0, 20000, 2, 1.0);
     private static final OpportunityService.WindowAdjustment KEEP_WINDOW =
             (window, samples) -> Optional.of(window);
+    private static final OpportunityService.WindowAdjustment NORMALIZE_SUGGESTED =
+            (window, samples) -> Optional.of(withSuggested(window, sample(window.suggested().instant())));
 
     @Test
     void appliesSoonestAcrossEveryEligibleWindowBeforeTheLimit() {
@@ -57,6 +63,70 @@ class OpportunityServiceOrderTest {
                 config(1), ignored -> WEATHER, KEEP_WINDOW, SOONEST);
 
         assertEquals(List.of(soonest.opportunities().getFirst()), limited.opportunities());
+    }
+
+    @Test
+    void weatherRankingChangesFinalScoreOrderWithoutChangingOrdinaryWindows() {
+        OpportunityService service = new OpportunityService();
+        PrototypeResult omittedBalanced = service.evaluate(
+                config(100), sourceOrderWeather(), NORMALIZE_SUGGESTED, BEST_MATCH);
+        PrototypeResult explicitBalanced = service.evaluate(
+                config(100),
+                sourceOrderWeather(),
+                NORMALIZE_SUGGESTED,
+                BEST_MATCH,
+                WeatherRanking.BALANCED);
+        PrototypeResult preferClear = service.evaluate(
+                config(100),
+                sourceOrderWeather(),
+                NORMALIZE_SUGGESTED,
+                BEST_MATCH,
+                WeatherRanking.PREFER_CLEAR);
+
+        assertEquals(omittedBalanced, explicitBalanced);
+        assertTrue(explicitBalanced.opportunities().size() > 1);
+        assertEquals(35, explicitBalanced.opportunities().getFirst().weather().cloudCoverPercent());
+        assertEquals(0, preferClear.opportunities().getFirst().weather().cloudCoverPercent());
+        assertDescendingScores(explicitBalanced.opportunities());
+        assertDescendingScores(preferClear.opportunities());
+        assertEquals(windowsById(explicitBalanced), windowsById(preferClear));
+    }
+
+    @Test
+    void ignoreWeatherFlowsThroughHardPreferencesWithoutChangingFilteredWindows() {
+        OpportunityService service = new OpportunityService();
+        PrototypeConfig fullConfig = config(100);
+        OpportunityPreferences preferences = new OpportunityPreferences(
+                1, new AltitudeRange(10.0, 12.0), null, null, null, null);
+        OpportunityService.PreferenceEvaluation balanced = service.evaluate(
+                fullConfig,
+                ignored -> WEATHER,
+                preferences,
+                fullConfig.start(),
+                BEST_MATCH,
+                WeatherRanking.BALANCED);
+        OpportunityService.PreferenceEvaluation ignoreWeather = service.evaluate(
+                fullConfig,
+                ignored -> WEATHER,
+                preferences,
+                fullConfig.start(),
+                BEST_MATCH,
+                WeatherRanking.IGNORE_WEATHER);
+
+        assertTrue(balanced.result().opportunities().size() > 1);
+        assertEquals(
+                balanced.appliedPreferenceVersion(), ignoreWeather.appliedPreferenceVersion());
+        assertEquals(
+                balanced.normalizedActiveFilters(), ignoreWeather.normalizedActiveFilters());
+        assertEquals(balanced.excludedSampleCount(), ignoreWeather.excludedSampleCount());
+        assertEquals(windowsById(balanced.result()), windowsById(ignoreWeather.result()));
+        assertTrue(balanced.result().opportunities().stream()
+                .allMatch(item -> item.components().weatherFit() != null));
+        assertTrue(ignoreWeather.result().opportunities().stream().allMatch(item ->
+                item.components().weatherFit() == null
+                        && item.components().forecastConfidence() == null
+                        && item.components().componentMaximum() == 70));
+        assertDescendingScores(ignoreWeather.result().opportunities());
     }
 
     @Test
@@ -193,11 +263,48 @@ class OpportunityServiceOrderTest {
                 endsAt,
                 List.of(start, suggested, end),
                 List.of(start, suggested, end));
-        return new ScoredWindow(window, WEATHER, new ComponentScores(score, 0, 0, 0, 0));
+        return new ScoredWindow(
+                window,
+                WEATHER,
+                new ComponentScores(score, 0, 0, 0, 0, 100, List.of()));
     }
 
     private static MoonSample sample(Instant instant) {
         return new MoonSample(instant, 5.0, 100.0, 50.0, 90.0, 0.0, -8.0, 200.0);
+    }
+
+    private static MoonWindow withSuggested(MoonWindow window, MoonSample suggested) {
+        return new MoonWindow(
+                window.location(),
+                window.kind(),
+                window.passStartsAt(),
+                window.passEndsAt(),
+                window.startsAt(),
+                window.start(),
+                suggested,
+                window.end(),
+                window.endsAt(),
+                window.passPathSamples(),
+                window.pathSamples());
+    }
+
+    private static WindowWeatherProvider sourceOrderWeather() {
+        AtomicInteger index = new AtomicInteger();
+        return ignored -> index.getAndIncrement() == 0 ? CLEAR_WEATHER : WEATHER;
+    }
+
+    private static List<MoonWindow> windowsById(PrototypeResult result) {
+        return result.opportunities().stream()
+                .map(ScoredWindow::window)
+                .sorted(Comparator.comparing(MoonWindow::id))
+                .toList();
+    }
+
+    private static void assertDescendingScores(List<ScoredWindow> opportunities) {
+        for (int index = 1; index < opportunities.size(); index++) {
+            assertTrue(opportunities.get(index - 1).components().total()
+                    >= opportunities.get(index).components().total());
+        }
     }
 
     private static void assertChronological(List<ScoredWindow> opportunities) {

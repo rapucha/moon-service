@@ -81,8 +81,19 @@ public final class ResponseFormatter {
         componentsNode.put("moonAltitudeFit", components.moonAltitudeFit());
         componentsNode.put("sunLightFit", components.sunLightFit());
         componentsNode.put("moonIlluminationFit", components.moonIlluminationFit());
-        componentsNode.put("weatherFit", components.weatherFit());
-        componentsNode.put("forecastConfidence", components.forecastConfidence());
+        if (components.weatherFit() != null) {
+            componentsNode.put("weatherFit", components.weatherFit());
+        }
+        if (components.forecastConfidence() != null) {
+            componentsNode.put("forecastConfidence", components.forecastConfidence());
+        }
+        if (!components.excludedComponents().isEmpty()) {
+            ObjectNode scoreBasis = opportunity.putObject("scoreBasis");
+            scoreBasis.put("componentPoints", components.componentPoints());
+            scoreBasis.put("componentMaximum", components.componentMaximum());
+            ArrayNode exclusions = scoreBasis.putArray("excludedComponents");
+            components.excludedComponents().forEach(exclusions::add);
+        }
 
         ObjectNode moon = opportunity.putObject("moon");
         moon.put("altitudeDegrees", round3(window.suggested().moonAltitudeDegrees()));

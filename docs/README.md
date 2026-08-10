@@ -21,6 +21,7 @@ Start Here
   - `deployment/raspberry-pi/README.md`
 - Domain decisions:
   - `docs/scoring-model.md`
+  - `docs/opportunity-evaluation-contract.md`
   - `docs/ephemeris-research.md`
   - `docs/weather-provider-research.md`
   - `docs/geocoding-research.md`
@@ -48,6 +49,9 @@ Current Canonical API Location
 
 Documentation Ownership
 - Human-owned docs hold product and API truth.
+- `docs/scoring-model.md` explains the scoring goals and product judgment.
+- `docs/opportunity-evaluation-contract.md` records the exact current rules,
+  formulas, constants, hard filters, ordering, and score basis.
 - AI-agent docs hold operating procedures, context-loading workflows,
   guardrails, and checklists.
 - Agent docs should link to canonical docs rather than duplicate or redefine
