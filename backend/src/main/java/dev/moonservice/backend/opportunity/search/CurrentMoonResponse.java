@@ -2,6 +2,7 @@ package dev.moonservice.backend.opportunity.search;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
 import dev.moonservice.scoringprototype.ephemeris.MoonSample;
+import dev.moonservice.scoringprototype.input.OpportunityPreferences.NamedPhase;
 import dev.moonservice.scoringprototype.scoring.ScoringModel;
 import dev.moonservice.scoringprototype.window.CurrentMoonCalculator;
 
@@ -130,7 +131,7 @@ public record CurrentMoonResponse(
                 round3(sample.moonPhaseAngleDegrees()),
                 round3(sample.brightLimbTiltDegrees()),
                 round3(sample.northPoleTiltDegrees()),
-                phaseName(sample.moonPhaseAngleDegrees()));
+                NamedPhase.fromPhaseAngleDegrees(sample.moonPhaseAngleDegrees()).wireValue());
     }
 
     private static OpportunitySearchResponse.Sun sun(MoonSample sample) {
@@ -155,32 +156,6 @@ public record CurrentMoonResponse(
                 round3(sample.sunAzimuthDegrees()),
                 ScoringModel.lightBucket(sample.sunAltitudeDegrees()),
                 role);
-    }
-
-    private static String phaseName(double phaseAngleDegrees) {
-        double angle = ((phaseAngleDegrees % 360.0) + 360.0) % 360.0;
-        if (angle < 22.5 || angle >= 337.5) {
-            return "new_moon";
-        }
-        if (angle < 67.5) {
-            return "waxing_crescent";
-        }
-        if (angle < 112.5) {
-            return "first_quarter";
-        }
-        if (angle < 157.5) {
-            return "waxing_gibbous";
-        }
-        if (angle < 202.5) {
-            return "full_moon";
-        }
-        if (angle < 247.5) {
-            return "waning_gibbous";
-        }
-        if (angle < 292.5) {
-            return "last_quarter";
-        }
-        return "waning_crescent";
     }
 
     private static double round3(double value) {
