@@ -4,6 +4,7 @@ import dev.moonservice.scoringprototype.ephemeris.MoonSample;
 import dev.moonservice.scoringprototype.fixture.WeatherFixture;
 import dev.moonservice.scoringprototype.window.MoonWindow;
 
+import java.util.Objects;
 import java.util.Optional;
 
 public final class ScoringModel {
@@ -31,13 +32,27 @@ public final class ScoringModel {
     }
 
     public static ComponentScores scoreWindow(MoonWindow window, WeatherFixture weather) {
-        return new ComponentScores(
-                scoreMoonAltitude(window.suggested().moonAltitudeDegrees()),
-                scoreSunLight(window.suggested().sunAltitudeDegrees()),
-                scoreIllumination(window.suggested().moonIlluminationPercent()),
-                scoreWeather(weather),
-                scoreConfidence(weather.forecastAgeHours())
-        );
+        return scoreWindow(window, weather, WeatherRanking.BALANCED);
+    }
+
+    public static ComponentScores scoreWindow(
+            MoonWindow window,
+            WeatherFixture weather,
+            WeatherRanking weatherRanking
+    ) {
+        Objects.requireNonNull(weatherRanking, "weatherRanking");
+        int moonAltitudeFit = scoreMoonAltitude(window.suggested().moonAltitudeDegrees());
+        int sunLightFit = scoreSunLight(window.suggested().sunAltitudeDegrees());
+        int moonIlluminationFit = scoreIllumination(window.suggested().moonIlluminationPercent());
+        if (!weatherRanking.includesWeatherScores()) {
+            return ComponentScores.withoutWeather(moonAltitudeFit, sunLightFit, moonIlluminationFit);
+        }
+        return ComponentScores.weatherAware(
+                moonAltitudeFit,
+                sunLightFit,
+                moonIlluminationFit,
+                scoreWeather(weather, weatherRanking),
+                scoreConfidence(weather.forecastAgeHours()));
     }
 
     public static int scoreMoonAltitude(double altitude) {
@@ -95,9 +110,25 @@ public final class ScoringModel {
     }
 
     public static int scoreWeather(WeatherFixture weather) {
-        int cloudScore = Math.max(0, 13 - Math.toIntExact(Math.round(Math.abs(weather.cloudCoverPercent() - 35) / 5.0)));
+        return scoreWeather(weather, WeatherRanking.BALANCED);
+    }
+
+    private static int scoreWeather(WeatherFixture weather, WeatherRanking weatherRanking) {
+        // Aggregate cloud cover contributes up to 13 points; WeatherRanking selects
+        // its preferred value. The low-, mid-, and high-cloud fields are not scored.
+        int cloudScore = weatherRanking.cloudScore(weather.cloudCoverPercent());
+
+        // Precipitation probability contributes up to 7 points. Start at 7 for 0%,
+        // deduct one point per rounded 5-percentage-point step, and floor at zero.
+        // Precipitation amount does not contribute to this score. Weather code is
+        // used for the factual summary, not for weatherFit.
         int precipScore = Math.max(0, 7 - Math.toIntExact(Math.round(weather.precipitationProbabilityPercent() / 5.0)));
+
+        // Visibility contributes 5 points at 20 km or more, 4 from 15 km up to
+        // 20 km, and 2 below 15 km. There is no interpolation between bands.
         int visibilityScore = weather.visibilityMeters() >= 20000 ? 5 : weather.visibilityMeters() >= 15000 ? 4 : 2;
+
+        // The cap enforces the weather component's 25-point allocation: 13 + 7 + 5.
         return Math.min(25, cloudScore + precipScore + visibilityScore);
     }
 

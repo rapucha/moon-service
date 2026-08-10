@@ -1,14 +1,20 @@
 package dev.moonservice.scoringprototype;
 
 import dev.moonservice.scoringprototype.ephemeris.MoonSample;
+import dev.moonservice.scoringprototype.fixture.Locations;
 import dev.moonservice.scoringprototype.fixture.WeatherFixture;
+import dev.moonservice.scoringprototype.scoring.ComponentScores;
 import dev.moonservice.scoringprototype.scoring.ScoringModel;
+import dev.moonservice.scoringprototype.scoring.WeatherRanking;
+import dev.moonservice.scoringprototype.window.MoonWindow;
 import org.junit.jupiter.api.Test;
 
 import java.time.Instant;
+import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class ScoringModelTest {
@@ -49,6 +55,65 @@ class ScoringModelTest {
         assertEquals(24, ScoringModel.scoreWeather(WeatherFixture.PRAGUE_PARTLY_CLOUDY));
         assertEquals("partly cloudy", ScoringModel.weatherSummary(WeatherFixture.PRAGUE_PARTLY_CLOUDY));
         assertEquals(5, ScoringModel.scoreConfidence(1.0));
+    }
+
+    @Test
+    void preferClearMovesTheCloudOptimumWithoutChangingTheWeatherAllocation() {
+        MoonWindow window = scoringWindow();
+        WeatherFixture clear = weather(0, 1.0);
+        WeatherFixture partlyCloudy = weather(35, 1.0);
+
+        ComponentScores balancedClear =
+                ScoringModel.scoreWindow(window, clear, WeatherRanking.BALANCED);
+        ComponentScores balancedPartlyCloudy =
+                ScoringModel.scoreWindow(window, partlyCloudy, WeatherRanking.BALANCED);
+        ComponentScores preferClearClear =
+                ScoringModel.scoreWindow(window, clear, WeatherRanking.PREFER_CLEAR);
+        ComponentScores preferClearPartlyCloudy =
+                ScoringModel.scoreWindow(window, partlyCloudy, WeatherRanking.PREFER_CLEAR);
+
+        assertEquals(18, balancedClear.weatherFit());
+        assertEquals(25, balancedPartlyCloudy.weatherFit());
+        assertEquals(25, preferClearClear.weatherFit());
+        assertEquals(18, preferClearPartlyCloudy.weatherFit());
+        assertTrue(balancedPartlyCloudy.total() > balancedClear.total());
+        assertTrue(preferClearClear.total() > preferClearPartlyCloudy.total());
+        assertEquals(100, preferClearClear.componentMaximum());
+        assertEquals(List.of(), preferClearClear.excludedComponents());
+    }
+
+    @Test
+    void ignoreWeatherNormalizesTheMoonAndLightBasisAndIsWeatherIndependent() {
+        MoonWindow window = scoringWindow();
+
+        ComponentScores clear =
+                ScoringModel.scoreWindow(window, weather(0, 1.0), WeatherRanking.IGNORE_WEATHER);
+        ComponentScores staleOvercast =
+                ScoringModel.scoreWindow(window, weather(100, 48.0), WeatherRanking.IGNORE_WEATHER);
+        ComponentScores perfect = ScoringModel.scoreWindow(
+                scoringWindow(1.0, 100.0, 0.0),
+                weather(100, 48.0),
+                WeatherRanking.IGNORE_WEATHER);
+
+        assertEquals(clear, staleOvercast);
+        assertEquals(48, clear.componentPoints());
+        assertEquals(70, clear.componentMaximum());
+        assertEquals(69, clear.total());
+        assertNull(clear.weatherFit());
+        assertNull(clear.forecastConfidence());
+        assertEquals(List.of("weatherFit", "forecastConfidence"), clear.excludedComponents());
+        assertEquals(70, perfect.componentPoints());
+        assertEquals(100, perfect.total());
+    }
+
+    @Test
+    void omittedWeatherRankingIsExactlyBalanced() {
+        MoonWindow window = scoringWindow();
+
+        assertEquals(
+                ScoringModel.scoreWindow(
+                        window, WeatherFixture.PRAGUE_PARTLY_CLOUDY, WeatherRanking.BALANCED),
+                ScoringModel.scoreWindow(window, WeatherFixture.PRAGUE_PARTLY_CLOUDY));
     }
 
     @Test
@@ -132,5 +197,42 @@ class ScoringModelTest {
                 sunAltitude,
                 sunAzimuth
         );
+    }
+
+    private static MoonWindow scoringWindow() {
+        return scoringWindow(9.0, 50.0, -8.0);
+    }
+
+    private static MoonWindow scoringWindow(
+            double moonAltitude,
+            double illumination,
+            double sunAltitude
+    ) {
+        MoonSample sample = sample(moonAltitude, illumination, sunAltitude);
+        return new MoonWindow(
+                Locations.PRAGUE,
+                "moonrise_low",
+                sample.instant(),
+                sample.instant(),
+                sample.instant(),
+                sample,
+                sample,
+                sample,
+                sample.instant(),
+                List.of(sample),
+                List.of(sample));
+    }
+
+    private static WeatherFixture weather(int cloudCoverPercent, double forecastAgeHours) {
+        return new WeatherFixture(
+                cloudCoverPercent,
+                cloudCoverPercent,
+                0,
+                0,
+                0,
+                0.0,
+                20000,
+                2,
+                forecastAgeHours);
     }
 }

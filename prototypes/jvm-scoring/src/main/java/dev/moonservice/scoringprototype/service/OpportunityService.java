@@ -8,6 +8,7 @@ import dev.moonservice.scoringprototype.scoring.ComponentScores;
 import dev.moonservice.scoringprototype.scoring.RejectedWindow;
 import dev.moonservice.scoringprototype.scoring.ScoredWindow;
 import dev.moonservice.scoringprototype.scoring.ScoringModel;
+import dev.moonservice.scoringprototype.scoring.WeatherRanking;
 import dev.moonservice.scoringprototype.window.MoonWindow;
 import dev.moonservice.scoringprototype.window.OpportunityHardFilter;
 import dev.moonservice.scoringprototype.window.WindowGenerator;
@@ -95,6 +96,17 @@ public final class OpportunityService {
             WindowAdjustment windowAdjustment,
             ResultOrder order
     ) {
+        return evaluate(config, weatherProvider, windowAdjustment, order, WeatherRanking.BALANCED);
+    }
+
+    public PrototypeResult evaluate(
+            PrototypeConfig config,
+            WindowWeatherProvider weatherProvider,
+            WindowAdjustment windowAdjustment,
+            ResultOrder order,
+            WeatherRanking weatherRanking
+    ) {
+        Objects.requireNonNull(weatherRanking, "weatherRanking");
         WindowGenerator.SampleProvider samples = instant -> sampler.sampleAt(config.location(), instant);
         List<MoonWindow> windows = windowGenerator.findWindows(config, samples);
         List<ScoredWindow> scored = new ArrayList<>();
@@ -110,7 +122,7 @@ public final class OpportunityService {
                     continue;
                 }
                 WeatherFixture weather = weatherProvider.weatherFor(adjustedWindow);
-                ComponentScores components = ScoringModel.scoreWindow(adjustedWindow, weather);
+                ComponentScores components = ScoringModel.scoreWindow(adjustedWindow, weather, weatherRanking);
                 scored.add(new ScoredWindow(adjustedWindow, weather, components));
             }
         }
@@ -139,6 +151,19 @@ public final class OpportunityService {
             Instant notBefore,
             ResultOrder order
     ) {
+        return evaluate(
+                config, weatherProvider, preferences, notBefore, order, WeatherRanking.BALANCED);
+    }
+
+    public PreferenceEvaluation evaluate(
+            PrototypeConfig config,
+            WindowWeatherProvider weatherProvider,
+            OpportunityPreferences preferences,
+            Instant notBefore,
+            ResultOrder order,
+            WeatherRanking weatherRanking
+    ) {
+        Objects.requireNonNull(weatherRanking, "weatherRanking");
         if (!preferences.active()) {
             PrototypeResult result = evaluate(
                     config,
@@ -146,7 +171,8 @@ public final class OpportunityService {
                     (window, samples) -> window.startsAt().isAfter(notBefore)
                             ? Optional.of(window)
                             : WindowGenerator.withSuggestedAtOrAfter(window, samples, notBefore),
-                    order);
+                    order,
+                    weatherRanking);
             return new PreferenceEvaluation(result, preferences.version(), Map.of(), 0, false, Map.of());
         }
 
@@ -162,7 +188,12 @@ public final class OpportunityService {
                 preferences,
                 notBefore);
         PrototypeResult result = score(
-                config, weatherProvider, completeWindows.size(), filtered.windows(), order);
+                config,
+                weatherProvider,
+                completeWindows.size(),
+                filtered.windows(),
+                order,
+                weatherRanking);
         Set<String> returnedPassIds = result.opportunities().stream()
                 .map(item -> item.window().passId())
                 .collect(Collectors.toSet());
@@ -186,7 +217,8 @@ public final class OpportunityService {
             WindowWeatherProvider weatherProvider,
             int candidateWindowsEvaluated,
             List<MoonWindow> windows,
-            ResultOrder order
+            ResultOrder order,
+            WeatherRanking weatherRanking
     ) {
         List<ScoredWindow> scored = new ArrayList<>();
         List<RejectedWindow> rejected = new ArrayList<>();
@@ -197,7 +229,10 @@ public final class OpportunityService {
                 continue;
             }
             WeatherFixture weather = weatherProvider.weatherFor(window);
-            scored.add(new ScoredWindow(window, weather, ScoringModel.scoreWindow(window, weather)));
+            scored.add(new ScoredWindow(
+                    window,
+                    weather,
+                    ScoringModel.scoreWindow(window, weather, weatherRanking)));
         }
         scored.sort(comparator(order));
         if (scored.size() > config.limit()) {
