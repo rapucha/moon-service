@@ -43,19 +43,40 @@ class OpportunitySearchController {
         Order order = Order.fromProductQuery(rawOrder);
         ProductRequestParser.OpportunityRequest productRequest =
                 ProductRequestParser.parseOpportunity(request);
-        ProductRequestParser.IgnoredFields ignoredFields = productRequest.ignoredFields();
-        OpportunityResponse response = productRequest.preferences() == null
-                ? opportunitySearchService.search(productRequest.query(), productRequest.locationId(), order)
-                : opportunitySearchService.search(
-                        productRequest.query(),
-                        productRequest.locationId(),
-                        order,
-                        productRequest.preferences(),
-                        ignoredFields.paths(),
-                        ignoredFields.count());
+        OpportunityResponse response = searchProductRequest(productRequest, order);
         return ResponseEntity.status(httpStatusFor(response))
                 .header(HttpHeaders.CACHE_CONTROL, "no-store")
                 .body(response);
+    }
+
+    private OpportunityResponse searchProductRequest(
+            ProductRequestParser.OpportunityRequest request,
+            Order order
+    ) {
+        ProductWeatherRanking weatherRanking = request.weatherRanking();
+        if (request.preferences() == null) {
+            return weatherRanking == null
+                    ? opportunitySearchService.search(request.query(), request.locationId(), order)
+                    : opportunitySearchService.search(
+                            request.query(), request.locationId(), order, weatherRanking.scoringValue());
+        }
+        ProductRequestParser.IgnoredFields ignoredFields = request.ignoredFields();
+        return weatherRanking == null
+                ? opportunitySearchService.search(
+                        request.query(),
+                        request.locationId(),
+                        order,
+                        request.preferences(),
+                        ignoredFields.paths(),
+                        ignoredFields.count())
+                : opportunitySearchService.search(
+                        request.query(),
+                        request.locationId(),
+                        order,
+                        request.preferences(),
+                        ignoredFields.paths(),
+                        ignoredFields.count(),
+                        weatherRanking.scoringValue());
     }
 
     @PostMapping("/api/opportunities/search")

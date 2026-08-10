@@ -26,6 +26,7 @@ import dev.moonservice.scoringprototype.input.OpportunityPreferences.AltitudeRan
 import dev.moonservice.scoringprototype.input.OpportunityPreferences.AzimuthPreference;
 import dev.moonservice.scoringprototype.input.OpportunityPreferences.DegreeRange;
 import dev.moonservice.scoringprototype.scoring.ScoringModel;
+import dev.moonservice.scoringprototype.scoring.WeatherRanking;
 import org.junit.jupiter.api.Test;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
@@ -61,7 +62,7 @@ class ScoringOpportunitySearchEngineTest {
         moonNode.putNull("brightLimbTiltDegrees");
         moonNode.putNull("northPoleTiltDegrees");
         moonNode.put("phaseName", "full_moon");
-        Method moonMapper = ScoringOpportunitySearchEngine.class.getDeclaredMethod("moon", JsonNode.class);
+        Method moonMapper = PrototypeOpportunityResponseMapper.class.getDeclaredMethod("moon", JsonNode.class);
         moonMapper.setAccessible(true);
 
         OpportunitySearchResponse.Moon moon = (OpportunitySearchResponse.Moon) moonMapper.invoke(null, moonNode);
@@ -83,7 +84,8 @@ class ScoringOpportunitySearchEngineTest {
         pointNode.put("sunAzimuthDegrees", 210.0);
         pointNode.put("lightBucket", "civil_twilight");
         pointNode.put("role", "path");
-        Method pointMapper = ScoringOpportunitySearchEngine.class.getDeclaredMethod("moonPathPoint", JsonNode.class);
+        Method pointMapper =
+                PrototypeOpportunityResponseMapper.class.getDeclaredMethod("moonPathPoint", JsonNode.class);
         pointMapper.setAccessible(true);
 
         OpportunitySearchResponse.MoonPathPoint point =
@@ -257,6 +259,57 @@ class ScoringOpportunitySearchEngineTest {
         assertEquals(ordinary.opportunities(), typed.opportunities());
         assertEquals(ordinary.rejected(), typed.rejected());
         assertEquals(ordinary.messages(), typed.messages());
+    }
+
+    @Test
+    void appliesRequestWeatherRankingToOrdinaryAndActivePreferenceSearches() {
+        OpportunitySearchEngine engine = engineWithPartlyCloudyWeather();
+        OpportunitySearchRequest balancedRequest =
+                new OpportunitySearchRequest("prague-cz", "2026-06-29", 7, 12.0, 100, BEST_MATCH);
+        OpportunitySearchRequest preferClearRequest =
+                balancedRequest.withWeatherRanking(WeatherRanking.PREFER_CLEAR);
+        OpportunitySearchRequest ignoreWeatherRequest =
+                balancedRequest.withWeatherRanking(WeatherRanking.IGNORE_WEATHER);
+        Instant notBefore = Instant.parse("2026-06-29T00:00:00Z");
+
+        OpportunitySearchResponse balanced = engine.search(prague(), balancedRequest, notBefore);
+        OpportunitySearchResponse preferClear = engine.search(prague(), preferClearRequest, notBefore);
+        OpportunitySearchResponse ignoreWeather = engine.search(prague(), ignoreWeatherRequest, notBefore);
+
+        assertFalse(balanced.opportunities().isEmpty());
+        assertEquals(opportunityKeys(balanced), opportunityKeys(preferClear));
+        assertEquals(opportunityKeys(balanced), opportunityKeys(ignoreWeather));
+        assertNotNull(balanced.opportunities().getFirst().components().weatherFit());
+        assertNotNull(preferClear.opportunities().getFirst().components().weatherFit());
+        assertFalse(balanced.opportunities().getFirst().components().weatherFit()
+                .equals(preferClear.opportunities().getFirst().components().weatherFit()));
+        assertWeatherComponentsExcluded(ignoreWeather);
+        assertNull(ignoreWeather.appliedWeatherRanking());
+
+        OpportunityPreferences activePreferences = new OpportunityPreferences(
+                1,
+                new AltitudeRange(10.0, 12.0),
+                null,
+                null,
+                null,
+                null);
+        PreferenceSearchResult balancedPreferences = engine.search(
+                prague(), balancedRequest, notBefore, activePreferences);
+        PreferenceSearchResult ignoreWeatherPreferences = engine.search(
+                prague(), ignoreWeatherRequest, notBefore, activePreferences);
+
+        assertEquals(
+                balancedPreferences.normalizedActiveFilters(),
+                ignoreWeatherPreferences.normalizedActiveFilters());
+        assertEquals(
+                balancedPreferences.excludedSampleCount(),
+                ignoreWeatherPreferences.excludedSampleCount());
+        assertEquals(
+                opportunityKeys(balancedPreferences.response()),
+                opportunityKeys(ignoreWeatherPreferences.response()));
+        assertFalse(ignoreWeatherPreferences.response().opportunities().isEmpty());
+        assertWeatherComponentsExcluded(ignoreWeatherPreferences.response());
+        assertNull(ignoreWeatherPreferences.response().appliedWeatherRanking());
     }
 
     @Test
@@ -485,6 +538,26 @@ class ScoringOpportunitySearchEngineTest {
         assertTrue(response.rejected().stream()
                 .allMatch(window -> window.moonIlluminationPercent()
                         < ScoringModel.NEAR_CONJUNCTION_MAX_ILLUMINATION_PERCENT));
+    }
+
+    private static List<String> opportunityKeys(OpportunitySearchResponse response) {
+        return response.opportunities().stream()
+                .map(opportunity -> opportunity.id() + "@" + opportunity.suggestedAt())
+                .toList();
+    }
+
+    private static void assertWeatherComponentsExcluded(OpportunitySearchResponse response) {
+        for (OpportunitySearchResponse.Opportunity opportunity : response.opportunities()) {
+            assertNull(opportunity.components().weatherFit());
+            assertNull(opportunity.components().forecastConfidence());
+            assertNotNull(opportunity.weather());
+            assertNotNull(opportunity.scoreBasis());
+            assertTrue(opportunity.scoreBasis().componentPoints() >= 0);
+            assertEquals(70, opportunity.scoreBasis().componentMaximum());
+            assertEquals(
+                    List.of("weatherFit", "forecastConfidence"),
+                    opportunity.scoreBasis().excludedComponents());
+        }
     }
 
     private static HourlyWeather toHourlyWeather(Instant startsAt, WeatherFixture weather) {

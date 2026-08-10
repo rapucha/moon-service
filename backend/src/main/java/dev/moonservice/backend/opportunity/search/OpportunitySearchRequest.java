@@ -1,6 +1,7 @@
 package dev.moonservice.backend.opportunity.search;
 
 import dev.moonservice.backend.opportunity.InvalidOpportunitySearchRequestException;
+import dev.moonservice.scoringprototype.scoring.WeatherRanking;
 import tools.jackson.databind.JsonNode;
 
 import java.time.Instant;
@@ -16,7 +17,8 @@ public record OpportunitySearchRequest(
         int forecastHorizonDays,
         double maxMoonAltitudeDegrees,
         int limit,
-        Order order
+        Order order,
+        WeatherRanking weatherRanking
 ) {
     private static final Pattern ISO_LOCAL_DATE = Pattern.compile("\\d{4}-\\d{2}-\\d{2}");
     private static final Pattern UTC_INSTANT = Pattern.compile("\\d{4}-\\d{2}-\\d{2}T.+Z");
@@ -35,11 +37,31 @@ public record OpportunitySearchRequest(
                 forecastHorizonDays,
                 maxMoonAltitudeDegrees,
                 limit,
-                order);
+                order,
+                WeatherRanking.BALANCED);
+    }
+
+    public OpportunitySearchRequest(
+            String locationId,
+            LocalDate startDate,
+            int forecastHorizonDays,
+            double maxMoonAltitudeDegrees,
+            int limit,
+            Order order
+    ) {
+        this(
+                locationId,
+                startDate,
+                forecastHorizonDays,
+                maxMoonAltitudeDegrees,
+                limit,
+                order,
+                WeatherRanking.BALANCED);
     }
 
     public OpportunitySearchRequest {
         Objects.requireNonNull(order, "order");
+        Objects.requireNonNull(weatherRanking, "weatherRanking");
     }
 
     public static OpportunitySearchRequest fromJson(JsonNode root) {
@@ -58,6 +80,17 @@ public record OpportunitySearchRequest(
 
     public String start() {
         return startDate.toString();
+    }
+
+    public OpportunitySearchRequest withWeatherRanking(WeatherRanking value) {
+        return new OpportunitySearchRequest(
+                locationId,
+                startDate,
+                forecastHorizonDays,
+                maxMoonAltitudeDegrees,
+                limit,
+                order,
+                Objects.requireNonNull(value, "value"));
     }
 
     public enum Order {
