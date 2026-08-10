@@ -15,17 +15,14 @@ import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalTime;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.NavigableMap;
 import java.util.Objects;
 import java.util.Set;
-import java.util.TreeMap;
 import java.util.TreeSet;
 import java.util.function.Predicate;
 
@@ -33,19 +30,6 @@ public final class OpportunityHardFilter {
     private static final Duration SAMPLE_STEP = Duration.ofMinutes(5);
     private static final Duration REFINEMENT_TOLERANCE = Duration.ofSeconds(1);
     private static final Duration KIND_SAMPLE_OFFSET = Duration.ofMinutes(1);
-    // Keys are inclusive. NEW_MOON appears at both ends because its sector crosses 0°.
-    private static final NavigableMap<Double, NamedPhase> PHASE_BY_START_ANGLE =
-            Collections.unmodifiableNavigableMap(new TreeMap<>(Map.ofEntries(
-                    Map.entry(0.0, NamedPhase.NEW_MOON),
-                    Map.entry(22.5, NamedPhase.WAXING_CRESCENT),
-                    Map.entry(67.5, NamedPhase.FIRST_QUARTER),
-                    Map.entry(112.5, NamedPhase.WAXING_GIBBOUS),
-                    Map.entry(157.5, NamedPhase.FULL_MOON),
-                    Map.entry(202.5, NamedPhase.WANING_GIBBOUS),
-                    Map.entry(247.5, NamedPhase.LAST_QUARTER),
-                    Map.entry(292.5, NamedPhase.WANING_CRESCENT),
-                    Map.entry(337.5, NamedPhase.NEW_MOON)
-            )));
 
     @FunctionalInterface
     public interface LunarRadiusProvider {
@@ -148,7 +132,7 @@ public final class OpportunityHardFilter {
         if (preferences.time() != null && !matchesTime(location, sample, preferences)) {
             return false;
         }
-        NamedPhase phase = namedPhase(sample.moonPhaseAngleDegrees());
+        NamedPhase phase = NamedPhase.fromPhaseAngleDegrees(sample.moonPhaseAngleDegrees());
         if (preferences.namedPhases() != null && !preferences.namedPhases().contains(phase)) {
             return false;
         }
@@ -362,10 +346,6 @@ public final class OpportunityHardFilter {
         double altitude = suggested.moonAltitudeDegrees();
         String band = altitude <= 12.0 ? "low" : altitude <= 40.0 ? "context" : "high_context";
         return trend + "_" + band;
-    }
-
-    private static NamedPhase namedPhase(double angle) {
-        return PHASE_BY_START_ANGLE.floorEntry(normalize(angle)).getValue();
     }
 
     private static List<BearingInterval> segments(DegreeRange range) {

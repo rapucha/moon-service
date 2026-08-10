@@ -227,7 +227,7 @@ public final class MoonPlanningService {
                         suggested.moonPhaseAngleDegrees(),
                         suggested.brightLimbTiltDegrees(),
                         suggested.northPoleTiltDegrees(),
-                        namedPhase(suggested.moonPhaseAngleDegrees()).wireValue()),
+                        NamedPhase.fromPhaseAngleDegrees(suggested.moonPhaseAngleDegrees()).wireValue()),
                 new MoonPlanningResponse.Sun(
                         suggested.sunAltitudeDegrees(),
                         suggested.sunAzimuthDegrees(),
@@ -300,32 +300,6 @@ public final class MoonPlanningService {
             return "end";
         }
         return "path";
-    }
-
-    private static NamedPhase namedPhase(double rawAngle) {
-        double angle = ((rawAngle % 360.0) + 360.0) % 360.0;
-        if (angle < 22.5 || angle >= 337.5) {
-            return NamedPhase.NEW_MOON;
-        }
-        if (angle < 67.5) {
-            return NamedPhase.WAXING_CRESCENT;
-        }
-        if (angle < 112.5) {
-            return NamedPhase.FIRST_QUARTER;
-        }
-        if (angle < 157.5) {
-            return NamedPhase.WAXING_GIBBOUS;
-        }
-        if (angle < 202.5) {
-            return NamedPhase.FULL_MOON;
-        }
-        if (angle < 247.5) {
-            return NamedPhase.WANING_GIBBOUS;
-        }
-        if (angle < 292.5) {
-            return NamedPhase.LAST_QUARTER;
-        }
-        return NamedPhase.WANING_CRESCENT;
     }
 
     private static MoonPlanningResponse.Location responseLocation(ResolvedLocation location) {

@@ -6,6 +6,7 @@ import tools.jackson.databind.node.ObjectNode;
 import dev.moonservice.scoringprototype.ephemeris.MoonSample;
 import dev.moonservice.scoringprototype.fixture.Location;
 import dev.moonservice.scoringprototype.fixture.WeatherFixture;
+import dev.moonservice.scoringprototype.input.OpportunityPreferences.NamedPhase;
 import dev.moonservice.scoringprototype.input.PrototypeConfig;
 import dev.moonservice.scoringprototype.scoring.ComponentScores;
 import dev.moonservice.scoringprototype.scoring.RejectedWindow;
@@ -100,7 +101,8 @@ public final class ResponseFormatter {
         } else {
             moon.put("northPoleTiltDegrees", round3(northPoleTiltDegrees));
         }
-        moon.put("phaseName", phaseName(window.suggested()));
+        moon.put("phaseName", NamedPhase.fromPhaseAngleDegrees(
+                window.suggested().moonPhaseAngleDegrees()).wireValue());
 
         writeMoonPath(opportunity, window);
 
@@ -201,32 +203,6 @@ public final class ResponseFormatter {
         );
     }
 
-    private static String phaseName(MoonSample sample) {
-        double angle = normalizeDegrees(sample.moonPhaseAngleDegrees());
-        if (angle < 22.5 || angle >= 337.5) {
-            return "new_moon";
-        }
-        if (angle < 67.5) {
-            return "waxing_crescent";
-        }
-        if (angle < 112.5) {
-            return "first_quarter";
-        }
-        if (angle < 157.5) {
-            return "waxing_gibbous";
-        }
-        if (angle < 202.5) {
-            return "full_moon";
-        }
-        if (angle < 247.5) {
-            return "waning_gibbous";
-        }
-        if (angle < 292.5) {
-            return "last_quarter";
-        }
-        return "waning_crescent";
-    }
-
     private static String roleFor(MoonWindow window, MoonSample sample) {
         if (sample.instant().equals(window.suggested().instant())) {
             return "suggested";
@@ -248,11 +224,6 @@ public final class ResponseFormatter {
             return "end";
         }
         return "path";
-    }
-
-    private static double normalizeDegrees(double value) {
-        double normalized = value % 360.0;
-        return normalized < 0.0 ? normalized + 360.0 : normalized;
     }
 
     private static void writeRejected(ObjectNode parent, List<RejectedWindow> rejectedWindows) {

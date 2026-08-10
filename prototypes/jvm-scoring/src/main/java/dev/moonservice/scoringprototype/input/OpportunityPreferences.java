@@ -231,6 +231,32 @@ public record OpportunityPreferences(
             this.wireValue = wireValue;
         }
 
+        public static NamedPhase fromPhaseAngleDegrees(double phaseAngleDegrees) {
+            double angle = OpportunityPreferences.normalize(phaseAngleDegrees);
+            if (angle < 22.5 || angle >= 337.5) {
+                return NEW_MOON;
+            }
+            if (angle < 67.5) {
+                return WAXING_CRESCENT;
+            }
+            if (angle < 112.5) {
+                return FIRST_QUARTER;
+            }
+            if (angle < 157.5) {
+                return WAXING_GIBBOUS;
+            }
+            if (angle < 202.5) {
+                return FULL_MOON;
+            }
+            if (angle < 247.5) {
+                return WANING_GIBBOUS;
+            }
+            if (angle < 292.5) {
+                return LAST_QUARTER;
+            }
+            return WANING_CRESCENT;
+        }
+
         public String wireValue() {
             return wireValue;
         }
