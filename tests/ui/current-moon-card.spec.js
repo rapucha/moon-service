@@ -20,6 +20,13 @@ const ACTIVE_SAMPLES = [
   point("2026-07-05T05:40:00Z", 0, 248, 230, 305, 70, -3, 330, "civil_twilight", "end")
 ];
 
+const NEXT_PASS_SAMPLES = [
+  point("2026-07-04T10:00:31Z", 0, 88, 48, 24, 12, -1, 65, "civil_twilight", "start"),
+  point("2026-07-04T12:00:00Z", 21, 130, 54, 30, 14, 18, 110, "daylight", "path"),
+  point("2026-07-04T14:00:00Z", 25, 190, 62, 38, 16, 11, 186, "daylight", "path"),
+  point("2026-07-04T16:00:00Z", 0, 250, 70, 44, 18, -3, 258, "civil_twilight", "end")
+];
+
 const ACTIVE_CURRENT_MOON = {
   horizonState: "above_or_on_horizon",
   moon: {
@@ -65,6 +72,18 @@ const BELOW_HORIZON_CURRENT_MOON = {
     altitudeDegrees: -12.4,
     azimuthDegrees: 42,
     lightBucket: "night"
+  },
+  nextRiseBoundary: { status: "found", at: "2026-07-04T10:00:31Z" },
+  nextPass: {
+    startBoundary: { status: "found", at: "2026-07-04T10:00:31Z" },
+    endBoundary: { status: "found", at: "2026-07-04T16:00:00Z" },
+    representedStartsAt: "2026-07-04T10:00:31Z",
+    representedEndsAt: "2026-07-04T16:00:00Z",
+    path: {
+      start: clone(NEXT_PASS_SAMPLES[0]),
+      end: clone(NEXT_PASS_SAMPLES.at(-1)),
+      samples: clone(NEXT_PASS_SAMPLES)
+    }
   },
   activePass: null
 };
@@ -225,7 +244,8 @@ test("keeps empty recovery beside a collapsed below-horizon sky snapshot", async
   const card = page.locator("details#current-moon-card");
   await expect(card).not.toHaveAttribute("open", "");
   await expect(card).toBeVisible();
-  await expect(card.locator(":scope > summary")).toHaveText("Moon now — Below horizon");
+  await expect(card.locator(":scope > summary"))
+    .toHaveText("Moon now — Below horizon · Rises in 6 hr 21 min");
   await expect(page.locator(".summary-count").first())
     .toHaveText("0 ranked Moon passes · 0 candidate windows");
   await expect(page.locator(".moon-pass-card, .opportunity-list")).toHaveCount(0);
@@ -248,15 +268,25 @@ test("keeps empty recovery beside a collapsed below-horizon sky snapshot", async
     /illumination|bright.limb|north.pole|modelled horizon|sun altitude|sun azimuth|ambient light/i
   );
   await expect(card).not.toContainText("3%");
-  await expect(card.locator(".moon-path-panel")).toHaveCount(0);
+  const upcomingPath = card.locator(".moon-path-panel");
+  await expect(upcomingPath).toBeVisible();
+  await expect(upcomingPath).toContainText("Upcoming Moon path");
+  await expect(upcomingPath).not.toContainText("Moon path at Now");
+  await expect(upcomingPath.getByText("Sun pass", { exact: true })).toHaveCount(0);
+  await expect(upcomingPath.locator(".sun-altitude-chart")).toHaveCount(0);
+  expect(await upcomingPath.locator(".light-band").count()).toBeGreaterThan(0);
+  await expect(upcomingPath.locator(".moon-sample-marker.is-now")).toHaveCount(0);
   await expect(card.getByText("Active Moon pass", { exact: true })).toHaveCount(0);
   await expect(card.getByText("Moonrise", { exact: true })).toHaveCount(0);
   await expect(card.getByText("Moonset", { exact: true })).toHaveCount(0);
-  await expect(card).not.toContainText(/next rise|continuous visibility/i);
+  await expect(card).not.toContainText(/continuous visibility/i);
   expect(await card.innerText()).not.toMatch(/Suggested|Best|Alternative/i);
 
-  await expect(card.locator(".sky-picture-details")).toHaveCount(0);
-  const dome = card.locator(".sky-dome-chart");
+  const domeDetails = card.locator(".sky-picture-details")
+    .filter({ hasText: "Sky dome at snapshot time" });
+  await expect(domeDetails).toHaveCount(1);
+  await domeDetails.locator("summary").click();
+  const dome = domeDetails.locator(".sky-dome-chart");
   await expect(dome).toBeVisible();
   await expect(dome).toHaveAccessibleName(new RegExp(
     "Sun and Moon sky position at snapshot time " + escapeRegExp(
@@ -284,6 +314,39 @@ test("keeps empty recovery beside a collapsed below-horizon sky snapshot", async
     .toHaveAttribute("href", /^data:image\/png;base64,/);
   await expectNoTechnicalAsOf(card);
   await expectUsableWidth(page, card);
+});
+
+test("uses accepted below-horizon rise copy without another request", async ({ page }) => {
+  const response = belowHorizonEmptyResponse();
+  response.currentMoon.nextRiseBoundary = {
+    status: "found", at: "2026-07-04T03:40:59Z"
+  };
+  response.currentMoon.nextPass = null;
+  const calls = await captureProductCalls(page, () => response);
+
+  await page.goto("/search?locationId=moon-service-3067696");
+  await waitForCalls(calls, 1);
+  await expect(page.locator("#current-moon-card > summary"))
+    .toHaveText("Moon now — Below horizon · Rises in less than 1 min");
+  expect(calls).toHaveLength(1);
+
+  response.currentMoon.nextRiseBoundary = { status: "not_found_within_range" };
+  await page.goto("/search?locationId=moon-service-3067696&order=soonest");
+  await waitForCalls(calls, 2);
+  await expect(page.locator("#current-moon-card > summary"))
+    .toHaveText("Moon now — Below horizon · Rise not found within 26 hours");
+  expect(calls).toHaveLength(2);
+
+  response.currentMoon.nextRiseBoundary = {
+    status: "found", at: "2026-07-05T05:40:00Z"
+  };
+  await page.goto("/search?locationId=moon-service-3067696&order=score");
+  await waitForCalls(calls, 3);
+  await expect(page.locator("#current-moon-card > summary"))
+    .toHaveText("Moon now — Below horizon · Rises in 26 hr");
+  await page.locator("#current-moon-card > summary").click();
+  await expect(page.locator("#current-moon-card .moon-path-panel")).toHaveCount(0);
+  expect(calls).toHaveLength(3);
 });
 
 test("uses place-local time with a numeric UTC offset across location timezones", async ({ page }) => {

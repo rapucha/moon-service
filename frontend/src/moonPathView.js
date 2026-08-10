@@ -44,44 +44,7 @@ export function moonPathPanel(opportunity, timezone, countryCode, chartContext) 
     null);
 }
 
-export function currentMoonPathPanel(
-  currentMoon,
-  timezone,
-  countryCode,
-  chartContext,
-  currentSkyDome,
-  footerContent
-) {
-  var path = (currentMoon.activePass || {}).path || {};
-  return renderMoonPathPanel(
-    {
-      moon: currentMoon.moon || {},
-      moonPath: {
-        description: "Altitude over time across the active Moon pass at Now",
-        chartSubject: "active Moon pass at Now",
-        hideSummary: true,
-        start: path.start,
-        now: path.now,
-        end: path.end,
-        samples: path.samples
-      }
-    },
-    timezone,
-    countryCode,
-    chartContext,
-    "Moon path at Now",
-    "active Moon pass at Now",
-    false,
-    function () {
-      return expandablePicture(
-        "Sky dome at snapshot time",
-        "Sun and Moon positions at the response snapshot",
-        currentSkyDome);
-    },
-    footerContent);
-}
-
-function renderMoonPathPanel(
+export function renderMoonPathPanel(
   opportunity,
   timezone,
   countryCode,
@@ -162,7 +125,7 @@ function moonPathPoint(label, point, timezone, countryCode) {
       element("span", {}, "Az " + degrees(point.azimuthDegrees))));
 }
 
-function expandablePicture(label, description, content) {
+export function expandablePicture(label, description, content) {
   if (!content) {
     return null;
   }
