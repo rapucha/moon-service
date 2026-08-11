@@ -4,7 +4,7 @@ import { element } from "./dom.js";
 import { candidateMeta, formatDateTime } from "./format.js";
 import { moonPassCard } from "./opportunityCard.js";
 import { fact } from "./terms.js";
-
+import { weatherRankingFromResponse } from "./weatherRankingPreference.js";
 var UTC_INSTANT_PATTERN = /^(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2})(?:\.(\d{1,9}))?Z$/;
 var IMPACT_FILTERS = [
   { key: "altitudeDegrees", label: "Moon altitude" },
@@ -73,7 +73,7 @@ export function createResponseView(results, callbacks) {
           element("p", {}, "Top-ranked forecast candidates will appear here with Moon position, ambient light, weather, and caveats.")),
         element("dl", { className: "intro-grid" },
           fact("Location", "City or town"),
-          fact("Storage", "Recent searches and hard limits in this browser"),
+          fact("Storage", "Recent searches and preferences in this browser"),
           fact("Output", "Shareable result page")))
     );
   }
@@ -116,7 +116,8 @@ export function createResponseView(results, callbacks) {
       children.push(emptyOpportunities(payload));
     } else {
       var chartContext = {
-        mobileReferenceDurationMs: maxOpportunityDurationMs(opportunities)
+        mobileReferenceDurationMs: maxOpportunityDurationMs(opportunities),
+        weatherRanking: weatherRankingFromResponse(payload)
       };
       children.push(element("div", { className: "opportunity-list" },
         groups.map(function (group, index) {
@@ -379,7 +380,7 @@ function preferenceImpactDetails(payload) {
   }));
   var baseline = impact.unfilteredOpportunityCount;
   return element("div", { className: "preference-impact" },
-    element("p", {}, "Without preferences: " + baseline
+    element("p", {}, "Without hard limits: " + baseline
       + (baseline === 1 ? " opportunity." : " opportunities.")),
     element("dl", { className: "detail-grid" },
       rows.map(function (row) {
@@ -395,7 +396,7 @@ function preferenceImpactDetails(payload) {
             element("span", {}, row.next)
           ]));
       })),
-    element("p", {}, "Each preference is evaluated by itself with the others off."));
+    element("p", {}, "Each hard limit is evaluated by itself with the other hard limits off."));
 }
 
 function theoreticalMatchText(item, location) {

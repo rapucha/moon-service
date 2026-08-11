@@ -420,11 +420,13 @@ change. Browser back and forward keep it visible only when the target history
 entry has the same reorderable lookup.
 
 The browser sends selected order as a query parameter through both product
-transports. A preference-free search uses `GET /api/opportunities`. A search
-with at least one active hard preference uses `POST /api/opportunities`; its
-JSON body remains limited to the lookup and preferences. Empty and unsupported
-present URL values reach the server unchanged and follow its invalid-request
-flow.
+transports. A search with no active hard preference and the default weather
+ranking uses `GET /api/opportunities`. A search with at least one active hard
+preference or a non-default weather ranking uses `POST /api/opportunities`.
+The POST body contains the lookup, includes `preferences` only when a hard
+preference is active, and includes `weatherRanking` only for a non-default
+choice. Empty and unsupported present URL values reach the server unchanged
+and follow its invalid-request flow.
 
 `order=soonest` remains in the page URL and generated share links. An omitted
 order is canonical Best match. An explicit `order=best_match` reaches the
@@ -450,11 +452,15 @@ receiving browser applies its own saved preferences, if any.
 
 ## Opportunity Preferences
 
-The accepted option A places the preference editor, labeled `Limits`, in the
-existing desktop sidebar. On mobile, the same editor uses a compact native
-`details` disclosure with the same summary label. Active state and
-`Reset all preferences` remain inside this editor. The results region does not
-repeat them in an active-limit summary or removable filter chips.
+The preference editor, labeled `Preferences`, stays in the existing desktop
+sidebar. On mobile, it uses a compact native `details` disclosure with the same
+summary label. Active state and `Reset all preferences` remain inside this
+editor. The results region does not repeat them in removable filter chips.
+The editor uses the control labels directly, without extra topic headings. Its
+intro says `Limits rule out results. Weather can change which result comes
+first.` The Apply button says `Use these limits and weather choice`. The
+disclosure summary reports the hard-limit count and any non-default weather
+choice separately.
 
 The editor exposes these hard filters:
 
@@ -501,6 +507,19 @@ The editor exposes these hard filters:
   `315°`. When active, it sends exactly one inclusive `45°`-wide normalized
   range in `brightLimbOrientationDegrees`; the range may cross `0°`.
   Neighboring possible ranges share one endpoint and cover the complete circle.
+
+The native `Weather in ranking` radio group has a visible legend and offers
+exactly these choices:
+
+- `Moon Service recommendation` is `balanced`, the default. It keeps the
+  current mix of Moon, light, weather, and forecast confidence. Its short help
+  says that Moon Service puts low-Moon results with useful light and promising
+  weather first because that is what the service is built to find.
+- `Prefer clear skies` is `prefer_clear`. It gives clearer skies more weight
+  when scoring and ranking but does not remove opportunities.
+- `Don't use weather in ranking` is `ignore_weather`. It excludes weather and
+  forecast confidence from scoring and ranking but keeps the raw forecast
+  visible.
 
 The local-clock preference uses one `From` and `Until` pair of 24-hour `HH:mm`
 text fields. It has no add-window or remove-window control and does not use a
@@ -612,10 +631,12 @@ non-Full shapes. With Full selected alone, the checkbox is disabled, its dial
 is hidden, and the editor explains that Full has no useful bright-limb
 direction.
 
-These controls remove candidates that fall outside the limits. They do not
-adjust scores or change the order of candidates that remain. With no active
-filter, Search keeps its preference-free request and current default results.
-The detailed request and filtering rules remain in
+The hard-limit controls remove candidates that fall outside the limits. They
+do not adjust scores or change the order of candidates that remain. Weather
+ranking does not change candidate intervals, hard-limit diagnostics, or the
+suggested time inside an opportunity. With no active hard limit and the default
+weather ranking, Search keeps its GET request and current default results. The
+detailed request, ranking, and filtering rules remain in
 [the product preference API contract](api-shape.md#product-preference-post) and
 [the scoring model](scoring-model.md#version-1-hard-preferences).
 
@@ -624,10 +645,11 @@ changing the others. Reset removes every active filter and removes the stored
 preference object when browser storage accepts the removal. If removal fails,
 the current page uses reset state in memory and reports the storage failure.
 The location-timezone and share-privacy explanations stay with the
-relevant controls in `Limits`. When preferences are active, the share
+relevant controls in `Preferences`. When preferences are active, the share
 explanation says that the link contains the location and may contain order,
 never contains preferences, and lets a receiving browser apply its own saved
-preferences, if any.
+preferences, if any. Reset also applies `Moon Service recommendation` and
+removes its stored value. Feeds and calendar links remain unpersonalized.
 
 Result-specific messages remain near the results without recreating an active
 preference summary:
@@ -637,10 +659,10 @@ preference summary:
 
 - If active filters remove every candidate, a closed native `No match`
   disclosure says that no opportunities were found in the response's forecast
-  horizon. Its body says that the preferences caused the result; it does not
+  horizon. Its body says that the hard limits caused the result; it does not
   describe this state as an astronomy, location, or weather failure.
 - A valid `preferenceImpact` reports the distinct live opportunities available
-  with no preferences before ranking and the result limit inside that
+  with no hard limits before ranking and the result limit inside that
   disclosure. A definition-list row for every active filter reports the count
   when that filter acts alone, the reduction from the shared baseline, and its
   next bounded theoretical match without weather. It marks every filter tied
@@ -663,12 +685,19 @@ preference summary:
   discards it and says that the saved preferences could not be used.
 - If browser storage is unavailable, the browser says that preferences will
   last only for the current page while search continues.
+- If a stored weather-ranking value is unsupported, the browser uses
+  `balanced`, removes the value when possible, and shows the existing
+  unsupported-format notice.
+- A weather-ranking read failure uses `balanced` for that page load and shows
+  the existing storage notice. A write or removal failure keeps the newly
+  applied or reset choice in page memory and shows the same notice. A failed
+  removal may leave the older value for a later load.
 - The browser does not expose the server's internal excluded-sample count.
 
-The browser keeps one versioned preference state for the editor, storage,
-reset behavior, and result explanations. It derives the active count and
-ordinary and planning request state from that stored editor state. It stores supported state
-under `moonService.opportunityPreferences.v1`. Version 1 storage retains only
+The browser keeps one versioned hard-preference state for the editor, storage,
+reset behavior, and result explanations. It derives the active hard-limit count
+and ordinary and planning request state from that stored editor state. It stores
+supported state under `moonService.opportunityPreferences.v1`. Version 1 storage retains only
 the supported `altitudeDegrees`, `time`, `azimuthDegrees`, `namedPhases`, and
 `brightLimbOrientationDegrees` fields. Local-clock state stores one
 `time.window` object. The former plural `time.windows` shape is unsupported and
@@ -690,6 +719,15 @@ planning requests. Selecting any non-Full shape re-enables the same snapped
 target. The browser discards other malformed or unsupported stored state
 rather than sending it. If `localStorage` is blocked or unavailable, it keeps
 the state in page memory and lets search continue.
+
+Weather ranking uses the separate key `moonService.weatherRanking.v1`. The
+browser stores the raw string `prefer_clear` or `ignore_weather` only while
+that non-default choice is applied. Absence means `balanced`; the browser does
+not store `balanced`. An applied non-default value adds top-level
+`weatherRanking` only to the product POST request. A hard-preference POST in
+the default mode omits it. The planning request always contains only the live
+hard-preference snapshot and never contains `weatherRanking`.
+
 Applying the form retains valid values from a disabled altitude, direction, or
 availability editor on the current page so re-enabling that control restores
 the user's draft. Those disabled values remain absent from the request and
@@ -715,7 +753,11 @@ Every preference input has a visible label. Related choices use `fieldset` and
 keyboard interaction and exposes its name, value, and instructions to
 assistive technology. Distinct sector labels, not color alone, identify the
 included and blocked compass handles. The native disclosure, editor, and reset
-action work from the keyboard in a logical order.
+action work from the keyboard in a logical order. The weather choices are
+native radio inputs with associated labels and a visible legend. Arrow-key
+movement does not apply the choice or start a lookup. Apply stores the choice;
+Reset applies the default. Both actions start a lookup and keep the existing
+disclosure and focus behavior.
 
 The schematic uses joined included-sector endpoints only as internal
 full-compass state and prevents uncontained blocked sectors while a handle
@@ -863,6 +905,12 @@ returned suggested time while its highest-score recommendation remains `Best`.
 The card title should state whether there is one or multiple candidate windows
 in that Moon pass. The page-level summary states the Moon-pass count and total
 candidate-window count, and uses `ranked` only in Best match.
+Every displayed score identifies its active weather-ranking mode with the
+matching label: `Moon Service recommendation`, `Prefer clear skies`, or `Don't
+use weather in ranking`. Under `ignore_weather`, the score explanation says
+that weather and forecast confidence are excluded. Score details omit those
+inactive component rows instead of showing zero-valued contributions. The
+recommendation card still shows its raw sky or forecast fact.
 The full pass start and end should be
 shown as lower-priority Moon pass context below the recommendation cards, with
 exact dates and a short location timezone label. Each recommendation card should show a

@@ -52,7 +52,7 @@
     </section>
 
     <div class="content-grid">
-      <aside class="side-column" aria-label="Lookup context and hard limits">
+      <aside class="side-column" aria-label="Lookup context and preferences">
         <details id="recent-searches" class="side-panel recent-panel">
           <summary id="recent-title">Recent searches</summary>
           <div class="panel-heading">
@@ -65,20 +65,22 @@
 
         <details id="opportunity-preferences" class="side-panel preference-panel">
           <summary>
-            <span>Limits</span>
-            <span id="preference-count">None active</span>
+            <span>Preferences</span>
+            <span id="preference-count">
+              <span id="hard-preference-count">None active</span><span id="weather-ranking-summary" hidden></span>
+            </span>
           </summary>
           <div class="preference-body">
             <div class="preference-heading">
               <div>
-                <h2>Limits</h2>
+                <h2>Preferences</h2>
               </div>
               <button id="preference-reset" type="button" class="preference-reset">
                 Reset all
                 <span class="visually-hidden"> preferences</span>
               </button>
             </div>
-            <p class="preference-intro">Exclude results you cannot photograph. Limits do not adjust scores.</p>
+            <p class="preference-intro">Limits rule out results. Weather can change which result comes first.</p>
 
             <form id="preference-form" novalidate>
               <section class="preference-group preference-angular-group">
@@ -325,12 +327,22 @@
                 </div>
               </fieldset>
 
+              <fieldset class="preference-group preference-time-group preference-weather-group">
+                <legend>Weather in ranking</legend>
+                <div class="preference-mode-choices">
+                  <label class="preference-choice"><input type="radio" name="weather-ranking" value="balanced" aria-label="Moon Service recommendation" aria-describedby="moon-service-recommendation-help"> <span>Moon Service recommendation <span tabindex="0" role="note" title="Puts low-Moon results with useful light and promising weather first. That is what Moon Service is built to find." aria-label="About Moon Service recommendation: Puts low-Moon results with useful light and promising weather first. That is what Moon Service is built to find.">ⓘ</span></span></label>
+                  <label class="preference-choice"><input type="radio" name="weather-ranking" value="prefer_clear"> <span>Prefer clear skies</span></label>
+                  <label class="preference-choice"><input type="radio" name="weather-ranking" value="ignore_weather"> <span>Don't use weather in ranking</span></label>
+                </div>
+                <span id="moon-service-recommendation-help" class="visually-hidden">Puts low-Moon results with useful light and promising weather first. That is what Moon Service is built to find.</span>
+              </fieldset>
+
               <div class="preference-context-note">
                 <p id="preference-timezone-note" hidden></p>
                 <p>Share links include the location and may include the selected order. They never include preferences. Another browser uses its own saved preferences, if any.</p>
               </div>
               <p id="preference-form-status" class="preference-form-status" role="status" aria-live="polite"></p>
-              <button type="submit" class="preference-apply">Use these limits</button>
+              <button type="submit" class="preference-apply">Use these limits and weather choice</button>
             </form>
           </div>
         </details>

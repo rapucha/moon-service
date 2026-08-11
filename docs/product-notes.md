@@ -157,6 +157,8 @@ now.
 
 ## Browser Opportunity Preference Boundary
 
+The browser labels its editor `Preferences`. It shows the existing hard controls
+and `Weather in ranking` directly, without extra topic headings.
 The browser may keep version 1 opportunity preferences in `localStorage` under
 `moonService.opportunityPreferences.v1`. It may store an optional
 `altitudeDegrees` range; one `time` availability mode using one local-clock window
@@ -165,6 +167,19 @@ included sector, a blocked sector, or both; a `namedPhases` value that is an
 exact union of the browser's New / very thin, Crescent, Half, Gibbous, and Full
 Moon-shape groups; and one
 `brightLimbOrientationDegrees` range.
+
+The `Weather in ranking` radio group offers exactly `Moon Service
+recommendation`, `Prefer clear skies`, and `Don't use weather in ranking`.
+Their request values are `balanced`, `prefer_clear`, and `ignore_weather`.
+Prefer-clear changes scoring and ranking but does not filter opportunities.
+Ignore-weather excludes weather and forecast confidence from scoring and
+ranking but keeps the raw forecast visible.
+
+The browser stores only a non-default raw string under the separate key
+`moonService.weatherRanking.v1`. It stores `prefer_clear` or `ignore_weather`.
+Absence means `balanced`, and the browser does not store `balanced`. The
+disclosure summary reports the active hard-limit count separately from any
+non-default weather choice.
 
 Local-clock state stores `time.window`. Stored state that uses the former
 plural `time.windows` shape is unsupported and follows the normal discard
@@ -198,22 +213,32 @@ state. Version 1 ranges written with the earlier `20°` width migrate to the
 nearest current axis and width. It does not store a separate target field or a
 user-configurable tolerance.
 
-For each search with active preferences, the browser sends these values to the
-Moon Service server in the existing product POST body. The server uses them as
-hard limits for that search. It must not permanently store the request body or
-preferences, add them to a server-side profile, cookie, or analytics event, or
-put them in a URL, access log, application log, or shared cache.
+With no active hard preference and the default weather ranking, the browser
+uses product GET. It uses product POST when any hard preference or non-default
+weather choice is active. The body includes `preferences` only for active hard
+preferences and top-level `weatherRanking` only for `prefer_clear` or
+`ignore_weather`. Planning requests contain only the current hard-preference
+snapshot and never contain `weatherRanking`. The server uses hard preferences
+as limits and the weather choice only for scoring and ranking. It must not
+permanently store the request body or preferences, add them to a server-side
+profile, cookie, or analytics event, or put them in a URL, access log,
+application log, or shared cache.
 
 Search order is request state. The browser puts `order=soonest` in the page URL
 and generated share links, and omits the default `best_match` order. It does
 not store order in an account, cookie, server profile, or `localStorage` entry.
 
 Share links contain the location and may contain order. They contain no
-preference value. A browser opening a share link applies its own saved
-preferences, if any. Resetting all preferences removes the version 1 object
-when browser storage accepts the removal. If removal fails, the current page
-uses reset state in memory and reports that it cannot save preferences; the
-stored value may remain for a later page load. If `localStorage` is blocked or
+preference value. Feeds and calendar links also contain no preference value. A
+browser opening a share link applies its own saved preferences, if any.
+Resetting all preferences removes the version 1 object and the weather-ranking
+value when browser storage accepts both removals, and uses `balanced` in memory.
+A weather-ranking read failure uses `balanced` for that load and shows the
+storage notice. An unsupported value does the same, is removed when possible,
+and shows the unsupported-format notice. A failed write
+keeps the newly applied choice in memory. A failed removal keeps `balanced`
+in memory and may leave the older value for a later load.
+Both show the storage notice. If `localStorage` is blocked or
 unavailable, the browser keeps preferences only in page memory and search
 continues. There is no server preference profile or cross-device sync.
 

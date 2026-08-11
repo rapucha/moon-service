@@ -69,7 +69,7 @@ const EMPTY_PREFERENCE_RESULT = {
  * }} ApiCall
  */
 
-test("uses GET by default and keeps the limits disclosure responsive", async ({ page }, testInfo) => {
+test("uses GET by default and keeps the preferences disclosure responsive", async ({ page }, testInfo) => {
   const calls = await captureApiCalls(page);
 
   await page.goto("/search?q=Prague");
@@ -88,7 +88,7 @@ test("uses GET by default and keeps the limits disclosure responsive", async ({ 
   const isMobile = testInfo.project.name === "mobile";
 
   await expect(details).toHaveJSProperty("open", !isMobile);
-  await expect(summary).toContainText(/Limits\s*None active/);
+  await expect(summary).toContainText(/Preferences\s*None active/);
 
   if (isMobile) {
     await expect(summary).toBeVisible();
@@ -129,7 +129,7 @@ test("keeps focus in an invalid clock field without requesting", async ({ page }
   await openPreferences(page);
 
   const status = page.locator("#preference-form-status");
-  const apply = page.getByRole("button", { name: "Use these limits" });
+  const apply = page.getByRole("button", { name: "Use these limits and weather choice" });
   await page.getByRole("radio", { name: "Local clock window" }).check();
   const start = page.getByLabel("Local clock window start");
   await start.fill("22:30");
@@ -176,7 +176,7 @@ test("posts, stores, and restores altitude and one cross-midnight clock window",
   await page.getByRole("radio", { name: "Local clock window" }).check();
   await page.getByLabel("Local clock window start").fill("22:30");
   await page.getByLabel("Local clock window end").fill("02:15");
-  await page.getByRole("button", { name: "Use these limits" }).click();
+  await page.getByRole("button", { name: "Use these limits and weather choice" }).click();
 
   await waitForCallCount(calls, 1);
   expect(calls[0].method).toBe("POST");
@@ -229,7 +229,7 @@ test("switches, removes the time-and-light group in its control, and resets", as
   await expect(page.getByLabel("Golden hour")).toBeChecked();
   await page.getByLabel("Civil twilight").check();
   await page.getByLabel("Night").check();
-  await page.getByRole("button", { name: "Use these limits" }).click();
+  await page.getByRole("button", { name: "Use these limits and weather choice" }).click();
 
   await waitForCallCount(calls, 1);
   expect(calls[0].method).toBe("POST");
@@ -242,7 +242,7 @@ test("switches, removes the time-and-light group in its control, and resets", as
 
   await openPreferences(page);
   await page.getByLabel("No time limit").check();
-  await page.getByRole("button", { name: "Use these limits" }).click();
+  await page.getByRole("button", { name: "Use these limits and weather choice" }).click();
 
   await waitForCallCount(calls, 2);
   expect(calls[1].method).toBe("POST");
@@ -455,7 +455,7 @@ test("keeps preferences in page memory when browser storage blocks writes", asyn
   await page.getByLabel("Limit Moon altitude").check();
   await page.getByRole("slider", { name: "Minimum Moon altitude" }).focus();
   await page.keyboard.press("ArrowUp");
-  await page.getByRole("button", { name: "Use these limits" }).click();
+  await page.getByRole("button", { name: "Use these limits and weather choice" }).click();
 
   await waitForCallCount(calls, 1);
   expect(calls[0].body).toEqual({
@@ -509,7 +509,7 @@ test("renders server preference metadata as safe text without changing the share
   await expect(noMatch).toHaveJSProperty("open", false);
   await expect(noMatch.locator("summary")).toContainText("No match — No opportunities found in the next 13 days");
   await noMatch.locator("summary").click();
-  await expect(impactDetails).toContainText("Without preferences: 1 opportunity.");
+  await expect(impactDetails).toContainText("Without hard limits: 1 opportunity.");
   const rows = impactDetails.locator(".detail-grid > div");
   await expect(rows).toHaveCount(5);
   await expect(rows).toContainText([
@@ -519,7 +519,7 @@ test("renders server preference metadata as safe text without changing the share
     /Moon shape\s*1 opportunity · 0 fewer\s*No theoretical match/,
     /Bright-limb orientation\s*1 opportunity · 0 fewer\s*No theoretical match/
   ]);
-  await expect(impactDetails).toContainText("Each preference is evaluated by itself with the others off.");
+  await expect(impactDetails).toContainText("Each hard limit is evaluated by itself with the other hard limits off.");
   await expect(page.locator("#preference-ignored-notice")).toContainText(
     "The server ignored 3 unsupported preference fields."
   );
@@ -566,10 +566,10 @@ test("documents local preference storage, request use, and preference-free shari
 
   const privacy = page.locator("#privacy-and-providers");
   await expect(privacy).toContainText(
-    "Moon altitude, availability, included and blocked compass sectors, selected Moon shapes, and bright-limb orientation preferences are stored in this browser."
+    "Moon altitude, availability, included and blocked compass sectors, selected Moon shapes, bright-limb orientation, and a non-default weather-ranking choice are stored in this browser."
   );
   await expect(privacy).toContainText(
-    "Each search with active preferences sends them to the Moon Service server for that search only."
+    "Each search with active hard limits or a non-default weather-ranking choice sends them to the Moon Service server for that search only."
   );
   await expect(privacy).toContainText(
     "The server does not permanently store them"
