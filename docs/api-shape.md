@@ -781,10 +781,13 @@ All shown members are required and non-null except
 `moon.brightLimbTiltDegrees`, `moon.northPoleTiltDegrees`, and either tilt in a
 Moon-pass path point, which may be JSON `null`.
 `normalizedActiveFilters` is an object, and all three ignored-field warning
-members remain present when empty or zero. All timestamps are RFC 3339 UTC
-strings. IDs, kinds, display names, timezones, country codes, phase names, and
-light buckets are strings. Degree, illumination, and phase-angle values are
-finite JSON numbers. Horizon, version, and warning counts are integers.
+members remain present when empty or zero. All timestamps are precise RFC 3339
+UTC strings. The browser shows ordinary planning times rounded to the
+nearest minute, but it must use the response instants for validation, ordering,
+and path geometry. IDs, kinds, display names, timezones, country codes, phase
+names, and light buckets are strings. Degree, illumination, and phase-angle
+values are finite JSON numbers. Horizon, version, and warning counts are
+integers.
 `location.kind` is `real_location`, `location.id` is the normalized canonical
 request ID, and the window timezone equals the location timezone.
 
@@ -1007,6 +1010,16 @@ Response rules:
   caller-supplied `limit`. The product `order` query is not part of that direct
   fixture contract.
 - `startsAt` and `endsAt` define the useful opportunity window.
+- The API serializes ordinary opportunity bounds, `suggestedAt`, Moon-pass
+  bounds, `azimuthMatchIntervals`, and `preferenceImpact.nextMatchAt` as
+  precise RFC 3339 instants. It does not apply the browser's nearest-minute
+  display rule to response values.
+- With active preferences, the server first finds precise matching fragments.
+  It may join consecutive fragments only when they belong to the same physical
+  Moon pass, their natural source-window coverage touches or overlaps, and the
+  precise gap is no more than ten minutes. A grouped practical envelope may
+  contain that short mismatch. Clients must not treat the envelope or its
+  `moonPath` as proof of a continuous preference match.
 - `moonPass` identifies the physical Moon pass that contains the opportunity.
   Clients may use `moonPass.id` to group ascending and descending
   recommendations from the same pass. Therefore, ten raw candidates may render
@@ -1016,8 +1029,12 @@ Response rules:
   current flat response repeats this bounded pass path on each opportunity. A
   grouped client can then draw one continuous pass chart. Follow-up #53 can
   remove that duplication if the API becomes pass-centric.
-- `suggestedAt` is optional. It only identifies a representative time inside
-  the window for sorting, links, or display.
+- `suggestedAt` is optional in the public shape. When present, it identifies a
+  precise representative time inside the window for sorting, links, or
+  display. With active preferences, it must lie in a retained matching fragment
+  and satisfy the live `notBefore` cutoff. The ten-minute grouping rule does
+  not relax the live cutoff, search horizon, physical Moon-pass identity, or
+  thin-crescent near-conjunction rejection.
 - `moon` describes the Moon at `suggestedAt`; keep this field as the compact
   suggested-time summary for compatibility.
 - `moon.phaseAngleDegrees` uses the astronomical lunar phase angle: `0` is new
@@ -2103,10 +2120,16 @@ eventMatch:
   caveat
 ```
 
-Do not present event-aware matches as exact minute-level predictions. Flights,
-transport schedules, and other recurring events can be delayed, early,
-rerouted, or cancelled. If the system does not use a live event provider, the
-response text must say that the event timing is approximate.
+Do not present an approximate recurring-event source as an exact prediction.
+Flights, transport schedules, and other recurring events can be delayed,
+early, rerouted, or cancelled. If the system does not use a live event
+provider, the response text must say that the event timing is approximate.
+
+Event occurrence, expected, uncertainty, and overlap windows keep their own
+timing rules. The ordinary ten-minute grouping rule must not widen or replace
+them. Eclipse contacts, phases, maximum, local visibility, and safety need the
+separate event contract tracked by
+[#80](https://github.com/rapucha/moon-service/issues/80).
 
 Public RSS/Atom or `.ics` links may be acceptable when a URL encodes a
 canonical, nonpersonal event pattern. Personal saved event subscriptions
@@ -2124,6 +2147,8 @@ RSS/Atom:
 - Suitable for city or region feeds and best-upcoming feeds.
 - Do not include fictional reports.
 - Do not include private user preferences.
+- Preserve the precise ordinary opportunity instants from the API. Browser
+  display rounding does not change feed timestamps.
 
 `.ics`:
 
@@ -2137,6 +2162,12 @@ RSS/Atom:
   `/o/prague-cz-2026-06-29T1920Z.ics`, should include the title, time window,
   location display name, summary, and a note about local horizon
   obstruction.
+- For an ordinary opportunity, normalize `DTSTART` and `DTEND` outward to
+  whole-minute bounds under the decision in
+  [#253](https://github.com/rapucha/moon-service/issues/253). This does not
+  change the precise source instants in the API or RSS/Atom output.
+- Recurring events and eclipses need their event-specific calendar timing
+  rules before export.
 - Do not generate `.ics` for fictional reports.
 
 ## Privacy And Storage Rules
