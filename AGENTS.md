@@ -224,6 +224,11 @@ complete. It changes publication timing only. Every gate and trigger under
   another local review and acceptance.
 - The owner may explicitly waive the phase or its acceptance pause for one
   named task. Do not infer the waiver or carry it to another task.
+- After an accepted change that is major and durable, check only the relevant tracked
+  Serena memories before final staged review. The same pull request may correct
+  or remove an existing memory without another owner instruction only when the
+  accepted change made that memory false or materially incomplete. New memories
+  and all other memory edits still require explicit owner instruction.
 - After acceptance or an explicit publication instruction, stage the complete
   candidate and follow the existing implementation-review,
   sensitive-information, push, pull-request, CI, and human-review rules. No
