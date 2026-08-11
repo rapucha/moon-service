@@ -7,7 +7,7 @@ import {
   createMoonAppearanceControls,
   normalizeMoonAppearancePreferences
 } from "./moonAppearanceControls.js";
-
+import { createWeatherRankingPreference } from "./weatherRankingPreference.js";
 var STORAGE_KEY = "moonService.opportunityPreferences.v1";
 var VERSION = 1;
 var CLOCK_PATTERN = /^(?:[01]\d|2[0-3]):[0-5]\d$/;
@@ -24,10 +24,16 @@ export function createOpportunityPreferences(options) {
   var clockEnd = /** @type {HTMLInputElement} */ (form.querySelector("[data-clock-end]"));
   var lightEditor = form.querySelector("#preference-light-editor");
   var formStatus = form.querySelector("#preference-form-status");
+  var storageNotice = "";
+  var weatherRanking = createWeatherRankingPreference(form, function (notice) {
+    storageNotice = notice;
+  });
   var angularControls = createAngularPreferenceControls(form);
   var appearanceControls = createMoonAppearanceControls(form);
   var storage = getStorage();
-  var storageNotice = storage ? "" : MEMORY_ONLY_NOTICE;
+  if (!storage) {
+    storageNotice = MEMORY_ONLY_NOTICE;
+  }
   var state = emptyState();
   var response = null;
 
@@ -48,10 +54,15 @@ export function createOpportunityPreferences(options) {
 
   function requestFor(request, signal) {
     var active = activePreferences(state);
-    if (activeFilterCount(active) === 0) {
+    var activeCount = activeFilterCount(active);
+    if (activeCount === 0 && !weatherRanking.isNonDefault()) {
       return null;
     }
-    var body = { preferences: active };
+    var body = /** @type {Record<string, any>} */ ({});
+    if (activeCount > 0) {
+      body.preferences = active;
+    }
+    weatherRanking.decorateRequest(body);
     var locationKey = request.locationId ? "locationId" : "q";
     body[locationKey] = request[locationKey];
     return {
@@ -151,12 +162,14 @@ export function createOpportunityPreferences(options) {
       return;
     }
     formStatus.textContent = "";
+    weatherRanking.apply();
     commit(parsed.state, true);
   }
 
   function renderForm() {
     angularControls.render(state);
     appearanceControls.render(state);
+    weatherRanking.render();
     var mode = state.time ? state.time.mode : "none";
     form.querySelector("[name='preference-time-mode'][value='" + mode + "']").checked = true;
     var window = mode === "local_clock"
@@ -189,12 +202,14 @@ export function createOpportunityPreferences(options) {
       ? ignoredText(response)
       : "");
     var total = activeFilterCount(activePreferences(state));
-    details.querySelector("#preference-count").textContent =
+    details.querySelector("#hard-preference-count").textContent =
       total === 0 ? "None active" : total + " active";
+    weatherRanking.renderSummary(details.querySelector("#weather-ranking-summary"));
   }
 
   function resetAll() {
     formStatus.textContent = "";
+    weatherRanking.reset();
     commit(emptyState(), false);
     if (narrowLayout.matches) {
       details.querySelector("summary").focus();

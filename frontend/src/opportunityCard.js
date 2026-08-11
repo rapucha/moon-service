@@ -7,23 +7,25 @@ import {
 } from "./format.js";
 import { moonPathPanel } from "./moonPathView.js";
 import { scoreBlock, scoreDetails } from "./scoreView.js";
+import { weatherRankingLabel } from "./weatherRankingPreference.js";
 
 export function moonPassCard(pass, entries, index, timezone, countryCode, chartContext, soonest, passCount) {
   var primaryEntry = entries.find(function (entry) { return entry.isBest; }) || entries[0];
   var primary = primaryEntry.opportunity;
+  var weatherRanking = chartContext.weatherRanking;
 
   return element("article", { className: "opportunity-card moon-pass-card" + (index === 0 ? " is-primary" : "") },
     element("header", { className: "opportunity-header" },
       element("div", { className: "opportunity-title" },
         element("p", { className: "rank-label" }, passOrderLabel(index, soonest, passCount)),
         element("h3", {}, passSummaryText(entries.length))),
-      scoreBlock(primary.score)
+      scoreBlock(primary.score, weatherRanking)
     ),
-    passRecommendations(entries, timezone, countryCode, soonest),
+    passRecommendations(entries, timezone, countryCode, soonest, weatherRanking),
     passIntervalContext(pass, primary, timezone, countryCode),
     moonPathPanel(moonPassPathOpportunity(pass, entries, primary), timezone, countryCode, chartContext),
     opportunityActions(primary),
-    scoreDetails(primary.components || {})
+    scoreDetails(primary.components || {}, weatherRanking)
   );
 }
 
@@ -157,15 +159,15 @@ function passIntervalContext(pass, primary, timezone, countryCode) {
       element("dd", {}, title)));
 }
 
-function passRecommendations(entries, timezone, countryCode, soonest) {
+function passRecommendations(entries, timezone, countryCode, soonest, weatherRanking) {
   var className = "pass-choices" + (entries.length === 1 ? " is-single" : "");
   return element("section", { className: className, ariaLabel: "Recommendations in this Moon pass" },
     entries.map(function (entry) {
-      return passRecommendation(entry, entry.isBest, timezone, countryCode, soonest);
+      return passRecommendation(entry, entry.isBest, timezone, countryCode, soonest, weatherRanking);
     }));
 }
 
-function passRecommendation(entry, isBest, timezone, countryCode, soonest) {
+function passRecommendation(entry, isBest, timezone, countryCode, soonest, weatherRanking) {
   var opportunity = entry.opportunity;
   var rawRank = entry.index + 1;
   var moon = opportunity.moon || {};
@@ -178,7 +180,8 @@ function passRecommendation(entry, isBest, timezone, countryCode, soonest) {
       element("div", {},
         element("div", { className: "choice-meta" },
           element("span", { className: "choice-badge" + (isBest ? " is-best" : " is-alt") }, isBest ? "Best" : "Alternative"),
-          element("span", { className: "choice-rank" }, candidateRankText(rawRank, opportunity.score, soonest))),
+          element("span", { className: "choice-rank" }, candidateRankText(rawRank, opportunity.score, soonest)),
+          element("span", { className: "choice-score-basis score-label" }, weatherRankingLabel(weatherRanking))),
         element("h4", {}, formatDateTimeWithZone(opportunity.suggestedAt, timezone, countryCode))),
       element("span", { className: "pass-choice-kind" }, recommendationLabel(opportunity.windowKind))),
     element("dl", { className: "pass-metric-grid" },
