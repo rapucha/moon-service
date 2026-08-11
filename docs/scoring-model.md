@@ -49,6 +49,10 @@ an active hard limit.
 | User-set time, ambient-light, phase, or bright-limb range | A hard filter when the user sets it. |
 | Moon altitude, ambient light, illumination, weather, and forecast age | Ranking inputs for times that remain. The selected weather mode decides whether weather takes part. |
 
+A hard filter identifies precise matching fragments. The service may later put
+nearby fragments in one practical envelope under the ordinary grouping rule.
+The tolerated gap does not become a match.
+
 This distinction matters for a hill or building. If the user knows that the
 Moon is hidden below a certain altitude or in a certain direction, the user can
 set a hard limit. The service removes those times instead of merely lowering
@@ -67,7 +71,8 @@ window so the photographer can choose a precise moment inside it.
 Each result also has a `suggestedAt` time. That time is a practical starting
 point, not a promise of perfect alignment or the best possible exposure. The
 current selection favors Moon-altitude fit and sunlight fit. Illumination and
-weather affect the later ranking, not the choice of minute inside the window.
+weather affect the later ranking, not the choice of precise instant inside the
+window.
 
 Active hard preferences can split a natural window into matching parts. The
 service may group nearby parts into one practical envelope, while keeping the
@@ -75,10 +80,22 @@ suggested time inside a part that really matches. The
 [opportunity evaluation contract](opportunity-evaluation-contract.md) defines
 the exact boundaries, grouping, ordering, and tie-break rules.
 
+For this grouping rule, nearby means fragments from the same physical Moon
+pass with continuous natural source-window coverage and no more than ten
+minutes of active-preference mismatch between them. The tolerance changes only
+the practical envelope. It does not round timestamps or relax live
+`notBefore`, search-horizon bounds, Moon-pass identity, or near-Sun safety.
+
+The API and RSS/Atom feeds keep precise opportunity instants. The browser shows
+ordinary opportunity times rounded to the nearest minute. Event occurrence,
+uncertainty, overlap, eclipse phase, maximum, visibility, and safety times keep
+their own timing rules instead of using the ordinary ten-minute tolerance.
+
 ## Version 1 Hard Preferences
 
-Version 1 preferences are request-scoped hard filters. They remove unusable
-times before ranking. They do not change scoring weights.
+Version 1 preferences are request-scoped hard filters. They identify precise
+matching fragments before grouping and ranking. They do not change scoring
+weights.
 
 See [Version 1 hard preferences in the opportunity evaluation
 contract](opportunity-evaluation-contract.md#version-1-hard-preferences) for
@@ -329,6 +346,8 @@ component does not distinguish a near-term forecast from a later one.
 
 Eclipses need a separate event path with safety and phase-timing rules. The
 ordinary near-conjunction filter must not be weakened to make eclipses fit.
+Eclipse contacts, phases, maximum, local visibility, and safety do not use the
+ordinary ten-minute grouping rule.
 Issue [#80](https://github.com/rapucha/moon-service/issues/80) tracks that work.
 
 These limits are acceptable for a discovery tool, but the product must not
@@ -358,6 +377,10 @@ the source.
 
 Without a live provider, the product must describe such a result as an expected
 overlap, not a confirmed sighting.
+
+The event's expected time, uncertainty window, and overlap window stay
+event-owned. The ordinary ten-minute grouping rule must not widen or replace
+them.
 
 The first version could stay request-scoped, shareable by URL, or available as
 a public feed or calendar when the pattern is not personal. Saving personal

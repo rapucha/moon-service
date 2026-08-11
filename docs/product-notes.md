@@ -98,6 +98,30 @@ Out of scope for the first MVP:
 - Email alerts.
 - Paid subscriptions.
 
+## Opportunity Timing
+
+Moon Service keeps four timing ideas separate:
+
+- **Calculation precision:** Astronomy calculations, interval intersections,
+  ordering, live eligibility, API responses, and RSS/Atom feeds keep precise
+  instants.
+- **Display resolution:** The browser shows ordinary opportunity times rounded
+  to the nearest minute. This does not change stored or serialized instants.
+- **Event uncertainty:** A recurring event may have an expected time, an
+  uncertainty window, an overlap window, and a confidence level. An eclipse
+  may have precise contacts, phases, maximum, local visibility, and safety
+  bounds. Each event owns its timing rules.
+- **Grouping tolerance:** The service may join precise matching fragments into
+  one ordinary practical envelope only when they belong to the same physical
+  Moon pass, their natural source-window coverage is continuous, and each
+  active-preference mismatch gap is no more than ten minutes.
+
+Ten minutes is not timestamp rounding or event uncertainty. A practical
+envelope may contain a short preference mismatch, but `suggestedAt` must still
+be a precise matching instant that passes the live cutoff. Search-horizon
+bounds, Moon-pass identity, and near-Sun safety stay strict. The product does
+not add a generic reminder to arrive early.
+
 ## Recurring Event Direction
 
 Some photography opportunities depend on both the Moon and a subject that may
@@ -219,10 +243,12 @@ weather choice is active. The body includes `preferences` only for active hard
 preferences and top-level `weatherRanking` only for `prefer_clear` or
 `ignore_weather`. Planning requests contain only the current hard-preference
 snapshot and never contain `weatherRanking`. The server uses hard preferences
-as limits and the weather choice only for scoring and ranking. It must not
-permanently store the request body or preferences, add them to a server-side
-profile, cookie, or analytics event, or put them in a URL, access log,
-application log, or shared cache.
+as hard filters to find precise matching fragments. It may join nearby
+fragments only under the ordinary timing rule above. The server uses the
+weather choice only for scoring and ranking. It must not permanently store the
+request body or preferences, add them to a server-side profile, cookie, or
+analytics event, or put them in a URL, access log, application log, or shared
+cache.
 
 Search order is request state. The browser puts `order=soonest` in the page URL
 and generated share links, and omits the default `best_match` order. It does

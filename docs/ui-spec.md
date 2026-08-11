@@ -33,7 +33,7 @@ is worth planning around.
 The UI should answer:
 
 - where the opportunity is;
-- when the useful window starts, peaks, and ends;
+- when the useful window starts, its suggested moment, and when it ends;
 - where the Moon is in altitude and azimuth;
 - what the light and weather context is;
 - why the opportunity was ranked highly;
@@ -84,6 +84,18 @@ terrain horizon, obstruction, and shooting-position limitations.
   helpers so future localization does not require rewriting card structure.
 - Display instants in the opportunity location's timezone. The 12-hour or
   24-hour clock convention should follow the user's browser locale settings.
+- Show ordinary opportunity start, suggested, and end times rounded to the
+  nearest minute. Use this display rule for ranked and planning cards. This is
+  display only. Keep the precise response instants for sorting, response
+  validation, diagnostic intervals, and chart geometry. Do not rewrite IDs.
+- The ten-minute rule groups nearby matching fragments into one ordinary
+  practical envelope. It is not display rounding. The envelope may contain a
+  short preference mismatch, while `suggestedAt` stays at a precise matching
+  instant. The UI must not present the full envelope as a continuous
+  preference match.
+- Event occurrence, uncertainty, overlap, eclipse phase, maximum, visibility,
+  and safety times need their own display contracts. They do not use the
+  ordinary ten-minute grouping rule.
 - Ranked and planning card window and suggested-time labels should include the
   location's short timezone label when available, so comparisons with UTC-based
   ephemeris tools are less ambiguous. The Current Moon Card instead uses the
