@@ -8,6 +8,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -17,19 +18,26 @@ import org.springframework.boot.test.system.OutputCaptureExtension;
 import org.springframework.boot.webtestclient.autoconfigure.AutoConfigureWebTestClient;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Primary;
+import org.springframework.core.io.ClassPathResource;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.reactive.server.WebTestClient;
 import org.mockito.Mockito;
 import reactor.core.publisher.Flux;
 
+import java.io.File;
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.time.Clock;
 import java.time.Instant;
 import java.util.HexFormat;
+import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.stream.Stream;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -82,32 +90,23 @@ class HostedAlphaSurfaceFunctionalTest {
     }
 
     @ParameterizedTest
-    @ValueSource(strings = {
-            "/about.html", "/index.html", "/angularPreferenceControls.js",
-            "/angularPreferencePreview.css", "/angularPreferencePreview.js",
-            "/angularPreferenceRules.js", "/api.js", "/app.js", "/cameraFramingPreview.css",
-            "/cameraFramingPreview.js", "/camera-preview/level-0.webp",
-            "/camera-preview/level-1.webp", "/camera-preview/level-2.webp",
-            "/camera-preview/level-3.webp", "/camera-preview/level-4.webp",
-            "/camera-preview/level-5.webp", "/cameraReferenceScene.js",
-            "/cameraSetup.js", "/currentMoonCard.js", "/dom.js", "/format.js",
-            "/highResolutionMoonRenderer.js",
-            "/favicon.svg", "/moonAppearanceControls.js",
-            "/moonAppearancePreview.css", "/moonPreferenceControls.css", "/styles.css",
-            "/sun-marker-aperture-flare.svg", "/moon-textures/lroc_color_2k.jpg",
-            "/terms.js", "/types.js",
-            "/moonPathLightBands.js", "/moonPathSilhouetteSymbols.js", "/moonPathSilhouettes.js",
-            "/moonPathView.js", "/moonPhaseView.js", "/moonTexture.js", "/opportunityCard.js",
-            "/opportunityPreferences.css", "/opportunityPreferences.js",
-            "/planningView.js", "/recentSearches.js", "/responseView.js", "/scoreView.js",
-            "/skyDomeView.js"
-    })
-    void servesExactCurrentStaticAssetInventory(String path) {
+    @MethodSource("packagedStaticPaths")
+    void servesPackagedStaticFiles(String path) {
         webTestClient.get()
                 .uri(path)
                 .exchange()
                 .expectStatus().isOk()
                 .expectHeader().valueEquals("X-Content-Type-Options", "nosniff");
+    }
+
+    @Test
+    void servesWeatherRankingPreferenceAsJavaScript() {
+        webTestClient.get()
+                .uri("/weatherRankingPreference.js")
+                .exchange()
+                .expectStatus().isOk()
+                .expectHeader().valueEquals("X-Content-Type-Options", "nosniff")
+                .expectHeader().contentTypeCompatibleWith("text/javascript");
     }
 
     @ParameterizedTest
@@ -446,6 +445,18 @@ class HostedAlphaSurfaceFunctionalTest {
         return """
                 {"locationId":"private-planning-location","preferences":{"version":1}}
                 """;
+    }
+
+    private static List<String> packagedStaticPaths() throws IOException {
+        Path staticRoot = new ClassPathResource("static").getFile().toPath();
+        try (Stream<Path> paths = Files.walk(staticRoot)) {
+            return paths
+                    .filter(Files::isRegularFile)
+                    .map(staticRoot::relativize)
+                    .map(path -> "/" + path.toString().replace(File.separatorChar, '/'))
+                    .sorted()
+                    .toList();
+        }
     }
 
     private static void expectProductError(

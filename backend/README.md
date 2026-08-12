@@ -482,8 +482,9 @@ backing HTML files, the exact static files tracked by the current build,
 `/api/opportunities`, `/readyz`, exact `/admin/status`, and the feedback
 capability route. It also allows `POST /api/opportunities` for a bounded
 preference body and only `POST` for the feedback submission route. Adding a
-static file does not publish it automatically; update the explicit allowlist
-and test inventory. Every other `/admin/**` path, the fixture endpoint,
+static file does not publish it automatically. Add its exact path to the
+allowlist. The functional test finds packaged static files and fails if the
+filter blocks one. Every other `/admin/**` path, the fixture endpoint,
 `/healthz`, and every unapproved path returns `404`, even with the admin token.
 An unapproved method on an approved path returns `405` with the path-specific
 `Allow` value; a framed `GET` or `HEAD` body returns `400` before authentication.
