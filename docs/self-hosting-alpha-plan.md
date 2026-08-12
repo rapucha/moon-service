@@ -65,9 +65,11 @@ timer rearming and exact GitHub deployment confirmation are follow-up
   survive Pod rescheduling or SD-card replacement.
 - Avoid running Postgres on SD cards until there is a clear product need and a
   tested off-card backup/restore routine.
-- Keep public RSS/Atom and `.ics` generation stateless or cache-backed at first.
-  Add a database when private feeds, saved locations, alert subscriptions,
-  durable counters, or durable cache state require it.
+- Keep the public Atom feed in a bounded process cache: at most 1,000 location
+  states, refreshed after one hour, with concurrent requests for one location
+  sharing the refresh. Do not persist this state. Add a database only when
+  private feeds, saved locations, alerts, durable counters, or durable cache
+  state require it.
 
 ### Calibration feedback may be lost
 
@@ -396,7 +398,7 @@ Exit criteria met:
 - Dependency failure returns `temporarily_unavailable`, not an empty opportunity
   list.
 
-## Phase 4: RSS And Calendar Without A Database
+## Phase 4: Atom And Later Calendar Work Without A Database
 
 Goal: ship low-friction feed/calendar behavior without forcing persistence too
 early.
@@ -404,17 +406,25 @@ early.
 No database is required for these first cases:
 
 - One-off `.ics` export for a single opportunity.
-- Public RSS/Atom feed for a canonical public location.
+- The public Atom feed for a canonical public location, tracked by #289.
 - Public `.ics` calendar feed for a canonical public location.
 
 The implementation should be deterministic:
 
-- Use stable canonical location IDs.
-- Generate stable event/feed IDs from location ID plus opportunity start time.
-- Use HTTP cache headers to reduce repeated work.
-- Recompute or process-cache public feeds from canonical inputs.
-- Avoid private exact-coordinate feed URLs until the privacy and storage model is
-  explicit.
+- Use the current opaque canonical location ID in
+  `GET` or `HEAD /feeds/atom?locationId=<canonical-id>`.
+- Generate deterministic feed and entry IDs from that location ID and the
+  precise opportunity start time.
+- Keep exact Atom XML and comparison state for at most 1,000 locations in one
+  process. Refresh after one hour and share concurrent same-location work.
+- Send a strong ETag and `Cache-Control: public, max-age=900`; do not send
+  `Last-Modified`. The cache is lost on restart or size eviction.
+- Keep application request logs free of the query string. Moon Service and the
+  feed reader still learn the location named by the feed.
+
+Hosted whole-site and provider admission run before the feed cache. A cached
+request can still receive `429`. The feed adds no account, subscriber mapping,
+saved subscription, push channel, database record, or disk state.
 
 Database triggers:
 
@@ -433,6 +443,11 @@ Exit criteria:
 - Event IDs remain stable across backend restarts.
 - A later database can replace cache/storage seams without changing public feed
   URLs.
+
+Deploy the Atom change through the existing image pipeline. After deployment,
+check one normal feed request and one conditional request on the public host.
+Keep the revision-aware readiness check and automatic known-good rollback
+unchanged.
 
 ## Phase 5: Future Database Boundary
 

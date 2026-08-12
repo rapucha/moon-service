@@ -2,7 +2,7 @@
 
 This is the first real backend module for Moon Service. It promotes the tested
 Spring HTTP contract out of `prototypes/` while keeping durable/shared caches,
-feeds, and calendar exports deliberately out of scope.
+RSS and calendar exports deliberately out of scope.
 
 ## Current Scope
 
@@ -14,6 +14,8 @@ feeds, and calendar exports deliberately out of scope.
   preferences.
 - Browser lookup page at `/search?q=Praha`, using GET without active hard
   preferences and the product POST when at least one is active.
+- Public Atom feed at `GET /feeds/atom?locationId=<canonical-id>`, with matching
+  bodyless `HEAD` support and a discovery link on a loaded real-location result.
 - `POST /api/opportunities/search` using the same JSON request body as the scoring
   prototype fixture.
 - Disabled-by-default calibration feedback capability at
@@ -47,8 +49,9 @@ feeds, and calendar exports deliberately out of scope.
   requests.
 
 Durable persistence is limited to the disabled-by-default calibration-feedback
-repository described below. Durable/shared caches, accounts, cookies, feeds,
-calendar generation, and deployment configuration remain out of scope.
+repository described below. Durable/shared caches, accounts, cookies, RSS,
+calendar generation, and deployment configuration remain out of scope. Public
+Atom feed state is bounded, process-local, and rebuildable.
 Missing or unknown `moon.location.resolver` or `moon.weather.provider` values
 fail startup; the runtime backend does not include fixture provider modes.
 
@@ -79,6 +82,40 @@ windows by default. The browser groups windows from the same physical Moon pass,
 so it may show fewer than ten pass cards. This broader result set is provisional
 while scoring is evaluated under issue #33; the direct fixture endpoint below
 continues to honor its explicit caller-supplied `limit`.
+
+## Public Atom Feed
+
+`GET /feeds/atom?locationId=<canonical-id>` returns UTF-8 Atom 1.0 as
+`application/atom+xml`. The current URL uses the opaque provider-tied canonical
+ID; #288 tracks a later friendly URL. A feed reader polls this route. Moon
+Service creates no account, subscriber mapping, saved subscription, push
+channel, or durable feed record.
+
+The feed contains up to ten ordinary opportunities from the current seven-day
+search, ordered by `soonest`, with balanced weather and no browser preferences
+or score cutoff. Each opportunity is one entry with stable IDs, useful precise
+times, coarse weather and confidence, short Moon and light facts, and a live
+result link. It omits volatile exact scores and weather values, `checkedAt`, and
+`published`. A meaningful displayed change advances Atom `updated`.
+
+The process keeps at most 1,000 location feed states. A state stays fresh for
+one hour, and concurrent same-location requests share one refresh. Restart,
+size eviction, removal, and later reappearance can make an entry look updated
+again. Nothing is stored on disk or in a database.
+
+Success sends `Cache-Control: public, max-age=900` and a strong ETag; matching
+`If-None-Match` returns `304`. There is no `Last-Modified`. Errors are
+`no-store`: invalid input is `400`, unknown location is `404`, provider or
+ambiguity failure is `503`, and hosted admission can return `429`. A failed
+hourly refresh returns `503` instead of serving old XML as a success.
+
+Application request logs omit the query string. Moon Service receives the
+location ID, and the feed reader learns the location named in the response.
+
+> This feed shows Moon Service's current recommendations. Your feed app may
+> keep old entries after Moon Service stops listing them. A missing entry does
+> not prove that an opportunity was cancelled. Open the live result before you
+> go because weather and recommendations can change.
 
 ## Runtime Configuration
 
@@ -322,6 +359,10 @@ backend location ID. A preference-free example is
 `/search?locationId=moon-service-3067696`; an active preference does not change
 that URL.
 
+A loaded real-location result also shows `Atom feed`. The browser builds
+`/feeds/atom?locationId=<canonical-id>` with only that ID. It does not copy the
+search text, result order, preferences, or weather-ranking choice.
+
 The page uses two optional browser `localStorage` entries.
 `moonService.recentSearches.v1` keeps up to five display names, location IDs,
 and timezones. `moonService.opportunityPreferences.v1` keeps only the supported
@@ -479,8 +520,8 @@ policy to every request reaching that application instance.
 
 The enabled policy allows `GET` and `HEAD` for `/`, `/search`, `/about`, their
 backing HTML files, the exact static files tracked by the current build,
-`/api/opportunities`, `/readyz`, exact `/admin/status`, and the feedback
-capability route. It also allows `POST /api/opportunities` for a bounded
+`/api/opportunities`, `/feeds/atom`, `/readyz`, exact `/admin/status`, and the
+feedback capability route. It also allows `POST /api/opportunities` for a bounded
 preference body and only `POST` for the feedback submission route. Adding a
 static file does not publish it automatically. Add its exact path to the
 allowlist. The functional test finds packaged static files and fails if the
@@ -517,7 +558,9 @@ hosted security headers.
 
 Exact `GET`, `HEAD`, and `POST` requests to `/api/opportunities` also require
 one provider token and one of two concurrent provider-operation permits before
-controller or provider work.
+controller or provider work. Exact `GET` and `HEAD /feeds/atom` use the same
+admission before the feed-cache lookup, so a cached feed request can receive
+`429`.
 The fixture POST, static files, admin status, and readiness do not consume those
 two resources. A rejection returns HTTP `429`, canonical `rate_limited` JSON,
 and a numeric `Retry-After` hint. The Docker carve-out is only bodyless
@@ -677,10 +720,10 @@ finish.
 
 For the current Raspberry Pi self-hosting plan, treat SD-card-backed nodes as
 rebuildable. Do not add a local Postgres deployment, durable shared cache, or
-long-retention logs only to support alpha hosting. Public RSS/Atom and `.ics`
-outputs should start deterministic and stateless; add Postgres later when
-private feeds, saved locations, alert subscriptions, durable provider counters,
-or durable cache state require it.
+long-retention logs only to support alpha hosting. The public Atom feed uses
+deterministic output and bounded process state. Add Postgres later when private
+feeds, saved locations, alert subscriptions, durable provider counters, or
+durable cache state require it. RSS and `.ics` remain later work.
 
 The current planning boundary is documented in
 `docs/self-hosting-alpha-plan.md`.

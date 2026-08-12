@@ -183,6 +183,18 @@ class HostedAlphaSurfaceFunctionalTest {
                 .expectHeader().contentTypeCompatibleWith(MediaType.APPLICATION_JSON));
     }
 
+    @ParameterizedTest
+    @ValueSource(strings = {"GET", "HEAD"})
+    void exposesExactAtomFeed(String method) {
+        advanceProviderRefill();
+
+        expectHostedHeaders(webTestClient.method(HttpMethod.valueOf(method))
+                .uri("/feeds/atom")
+                .exchange()
+                .expectStatus().isBadRequest()
+                .expectHeader().valueEquals("Cache-Control", "no-store"));
+    }
+
     @Test
     void exposesPlanningPostWithoutCorsAndAllowsItsFramedBody() {
         advanceProviderRefill();
@@ -258,6 +270,10 @@ class HostedAlphaSurfaceFunctionalTest {
             expectRateLimited(webTestClient.get().uri("/api/opportunities?q=Prague").exchange(), false);
             expectRateLimited(productPost("{}", MediaType.APPLICATION_JSON), true);
             expectRateLimited(planningPost(validPlanningBody()), true);
+            expectRateLimited(webTestClient.get()
+                    .uri("/feeds/atom?locationId=private-feed-location").exchange(), true);
+            expectHeadRateLimited(webTestClient.head()
+                    .uri("/feeds/atom?locationId=private-feed-location").exchange(), true);
         }
         assertProviderCalls(geocodingCalls, weatherCalls);
     }
@@ -273,6 +289,10 @@ class HostedAlphaSurfaceFunctionalTest {
             expectRateLimited(webTestClient.get().uri("/api/opportunities?q=Prague").exchange(), false);
             expectRateLimited(productPost("{}", MediaType.APPLICATION_JSON), true);
             expectRateLimited(planningPost(validPlanningBody()), true);
+            expectRateLimited(webTestClient.get()
+                    .uri("/feeds/atom?locationId=private-feed-location").exchange(), true);
+            expectHeadRateLimited(webTestClient.head()
+                    .uri("/feeds/atom?locationId=private-feed-location").exchange(), true);
         } finally {
             CLOCK_FROZEN.set(false);
             CLOCK_SECONDS.incrementAndGet();
@@ -307,6 +327,7 @@ class HostedAlphaSurfaceFunctionalTest {
             "/api/opportunities/", "/api/opportunities/search", "/api/unknown",
             "/api/opportunities/planning/", "/api/opportunities/Planning",
             "/api/opportunities/planning;other", "/PlanningView.js",
+            "/feeds/atom/", "/feeds/Atom", "/feeds/atom/other",
             "/error", "/healthz", "/unknown"
     })
     void hidesUnapprovedPaths(String path) {
@@ -362,6 +383,17 @@ class HostedAlphaSurfaceFunctionalTest {
     }
 
     @ParameterizedTest
+    @ValueSource(strings = {"POST", "PUT", "PATCH", "DELETE", "OPTIONS"})
+    void allowsOnlyGetAndHeadOnExactAtomFeed(String method) {
+        expectHostedHeaders(webTestClient.method(HttpMethod.valueOf(method))
+                .uri("/feeds/atom")
+                .exchange()
+                .expectStatus().isEqualTo(405)
+                .expectHeader().valueEquals("Allow", "GET, HEAD")
+                .expectHeader().valueEquals("Cache-Control", "no-store"));
+    }
+
+    @ParameterizedTest
     @ValueSource(strings = {"GET", "HEAD", "PUT", "PATCH", "DELETE", "OPTIONS"})
     void allowsOnlyPostOnExactPlanningPath(String method) {
         expectHostedHeaders(webTestClient.method(HttpMethod.valueOf(method))
@@ -381,14 +413,17 @@ class HostedAlphaSurfaceFunctionalTest {
     }
 
     @Test
-    void rejectsBodyOnApprovedGet() {
-        expectHostedHeaders(webTestClient.method(HttpMethod.GET)
-                .uri("/admin/status")
-                .contentType(MediaType.APPLICATION_JSON)
-                .bodyValue("{}")
-                .exchange()
-                .expectStatus().isBadRequest()
-                .expectHeader().valueEquals("Cache-Control", "no-store"));
+    void rejectsBodyOnApprovedGets() {
+        for (String path : List.of("/admin/status", "/feeds/atom")) {
+            advanceProviderRefill();
+            expectHostedHeaders(webTestClient.method(HttpMethod.GET)
+                    .uri(path)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .bodyValue("{}")
+                    .exchange()
+                    .expectStatus().isBadRequest()
+                    .expectHeader().valueEquals("Cache-Control", "no-store"));
+        }
     }
 
     @Test
@@ -419,12 +454,21 @@ class HostedAlphaSurfaceFunctionalTest {
                 .exchange()
                 .expectStatus().isBadRequest();
 
+        advanceProviderRefill();
+        webTestClient.get()
+                .uri(uriBuilder -> uriBuilder.path("/feeds/atom")
+                        .queryParam("locationId", "private-feed-location-marker-" + "x".repeat(101))
+                        .build())
+                .exchange()
+                .expectStatus().isBadRequest();
+
         assertThat(output)
                 .doesNotContain("forwarded-identity-marker.invalid")
                 .doesNotContain("planning-forwarded-marker.invalid")
                 .doesNotContain(ADMIN_TOKEN)
                 .doesNotContain("private-body-marker")
-                .doesNotContain("private-planning-marker");
+                .doesNotContain("private-planning-marker")
+                .doesNotContain("private-feed-location-marker");
     }
 
     private WebTestClient.ResponseSpec productPost(String body, MediaType contentType) {
@@ -479,6 +523,18 @@ class HostedAlphaSurfaceFunctionalTest {
         }
         expectHostedHeaders(checked);
         checked.expectBody().jsonPath("$.status").isEqualTo("rate_limited");
+    }
+
+    private static void expectHeadRateLimited(WebTestClient.ResponseSpec response, boolean noStore) {
+        WebTestClient.ResponseSpec checked = response.expectStatus().isEqualTo(429)
+                .expectHeader().exists("Retry-After")
+                .expectHeader().contentTypeCompatibleWith(MediaType.APPLICATION_JSON)
+                .expectHeader().exists("Content-Length");
+        if (noStore) {
+            checked.expectHeader().valueEquals("Cache-Control", "no-store");
+        }
+        expectHostedHeaders(checked);
+        checked.expectBody().isEmpty();
     }
 
     private static void advanceProviderRefill() {

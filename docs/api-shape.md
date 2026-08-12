@@ -19,12 +19,20 @@ server.
 
 ## Public UX
 
-Recommended first routes:
+Current public browser and Atom feed routes:
 
 ```text
 /search?q=Praha
-/l/prague-cz
-/feeds/prague-cz.atom
+/search?locationId=moon-service-3067696
+/feeds/atom?locationId=moon-service-3067696
+```
+
+The first feed URL uses the current opaque, provider-tied canonical location
+ID. A provider change may require a new subscription URL. Issue
+[#288](https://github.com/rapucha/moon-service/issues/288) tracks the later
+friendly-URL decision. Calendar routes remain planned under #16:
+
+```text
 /calendars/prague-cz.ics
 /o/prague-cz-2026-06-29T1920Z.ics
 ```
@@ -1505,8 +1513,7 @@ instead describes weather across the opportunity window:
   ],
   "links": {
     "self": "/search?q=Praha",
-    "location": "/l/prague-cz",
-    "atom": "/feeds/prague-cz.atom"
+    "location": "/l/prague-cz"
   },
   "messages": [
     {
@@ -2138,19 +2145,93 @@ delivery, retention, and deletion before implementation.
 
 ## Feed And Calendar Rules
 
-Implementation tracking:
+The first feed is tracked by
+[#289](https://github.com/rapucha/moon-service/issues/289), the first child of
 [#16](https://github.com/rapucha/moon-service/issues/16).
 
-RSS/Atom:
+### Public Atom feed
 
-- Only for real public opportunities.
-- Suitable for city or region feeds and best-upcoming feeds.
-- Do not include fictional reports.
-- Do not include private user preferences.
-- Preserve the precise ordinary opportunity instants from the API. Browser
-  display rounding does not change feed timestamps.
+- `GET /feeds/atom?locationId=<canonical-id>` returns UTF-8 Atom 1.0 as
+  `application/atom+xml`. Spring serves matching bodyless `HEAD` requests.
+- The URL contains only the current opaque canonical location ID. It contains
+  no search text, result order, preferences, or weather-ranking choice.
+- The browser builds this URL after it loads a real location. The opportunity
+  JSON does not return an Atom link.
+- A feed reader polls Moon Service. Moon Service creates no account, subscriber
+  mapping, saved subscription, push channel, or durable location record.
 
-`.ics`:
+The feed asks the current seven-day search for up to ten ordinary opportunities.
+It uses `soonest`, balanced weather, no preferences, and no score cutoff. Each
+opportunity is one entry, ordered by precise `suggestedAt` and then entry ID.
+The feed excludes fictional reports, current-Moon cards, recurring events, and
+eclipses.
+
+The document includes the Atom namespace, a location title, feed ID, `updated`,
+`Moon Service` author, and a same-origin self link. Each entry has a same-origin
+alternate link to `/search?locationId=<canonical-id>`. A location with no
+current opportunities returns `200` with a valid empty feed.
+
+Each entry title uses local `suggestedAt` with `uuuu-MM-dd HH:mm z` and
+`Locale.ENGLISH`, followed by ` — Moon opportunity near <location>`. Its summary
+gives the precise start, suggested, and end times, timezone, coarse confidence
+and weather labels, short Moon and light facts, the local-horizon caveat, and a
+warning to open the live result. The entry also has a live-result link. It omits
+exact scores, exact weather values, the full ranking reason, `checkedAt`, and
+`published`.
+
+Feed and entry IDs are deterministic lowercase `urn:uuid` values made with
+`UUID.nameUUIDFromBytes` and UTF-8 input. The feed input is
+`moon-service.atom.feed.v1\n<canonical-id>`. The entry input is
+`moon-service.atom.entry.v1\n<canonical-id>\n<startsAt>`, with precise
+`Instant.toString()` time. Here `\n` means one line-feed byte.
+
+Atom `updated` changes only when displayed content changes. New entries use the
+search response's `generatedAt`; unchanged entries keep their old value. The
+feed value changes when its displayed feed fields, ordered entry list, or a
+displayed entry changes.
+
+When an entry leaves the current ten, the feed removes it and its comparison
+state. If the same ID later returns, it is new again. The feed sends no Atom
+deleted-entry tombstone.
+
+Moon Service keeps up to 1,000 feed states in each process. A state stays fresh
+for one hour, and concurrent requests for the same location share one refresh.
+The state and its change times are not stored on disk or in a database. Restart,
+cache eviction, removal, and later reappearance can make an entry look updated
+again even though its deterministic ID stays the same.
+
+Render the XML deterministically. Successful feeds send
+`Cache-Control: public, max-age=900` and a strong `ETag` from the exact XML
+bytes. A matching `If-None-Match` returns a bodyless `304`. There is no
+`Last-Modified`.
+
+Errors send `Cache-Control: no-store`. A missing, blank, over-100-character, or
+disallowed control- or formatting-character `locationId` is invalid input and
+returns `400`. An unknown canonical ID returns `404`, provider failure or
+unexpected ambiguity returns `503`, and hosted admission can return `429` with
+`Retry-After`. Error bodies do not echo the ID or provider details. A failed
+hourly refresh returns `503` and does not serve the old XML as a success. It
+keeps the old state only for later comparison, and the next admitted request
+retries.
+
+Hosted alpha allows only `GET` and `HEAD` on the exact `/feeds/atom` path.
+Whole-site and provider admission run before the feed cache, so even a cached
+request can receive `429`.
+
+The location ID stays out of application request logs because those logs keep
+the path, not the query string. Moon Service receives the location ID, and the
+feed response names the location, so the feed reader also learns it.
+
+> This feed shows Moon Service's current recommendations. Your feed app may
+> keep old entries after Moon Service stops listing them. A missing entry does
+> not prove that an opportunity was cancelled. Open the live result before you
+> go because weather and recommendations can change.
+
+This is a discovery feed, not a guaranteed alert or cancellation channel. The
+feed reader chooses when to poll and may show older data.
+
+RSS, calendar feeds, and individual `.ics` downloads remain later work under
+#16. The planned `.ics` rules are:
 
 - Dynamic public calendar feeds may be generated on demand for canonical real
   locations, such as `/calendars/prague-cz.ics`.
