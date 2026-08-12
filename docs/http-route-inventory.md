@@ -4,8 +4,8 @@ This is the canonical inventory of HTTP operations explicitly mapped by Moon
 Service controllers. It records who uses each route, why it exists, and how its
 exposure differs between the ordinary application and hosted-alpha mode.
 
-The route universe is the twelve mappings declared by `WebPageController`,
-`OpportunitySearchController`, `MoonPlanningController`,
+The route universe is the thirteen mappings declared by `WebPageController`,
+`AtomFeedController`, `OpportunitySearchController`, `MoonPlanningController`,
 `CalibrationFeedbackController`, `HealthController`, and
 `AdminStatusController`. Spring's implicit `HEAD`
 handling, `/error`, exception handlers, and static-resource serving are
@@ -19,6 +19,7 @@ Open-Meteo URLs are provider dependencies, not Moon Service routes.
 | `GET /` | Web entry page; current product route | Web browser | Allowlisted; whole-site bound |
 | `GET /search` | Lookup and share page; current product route | Web browser | Allowlisted; whole-site bound |
 | `GET /about` | Product/privacy information page | Web browser | Allowlisted; whole-site bound |
+| `GET /feeds/atom` | Public Atom feed for one canonical location | Feed reader, through the browser link | Allowlisted; site and provider bounds |
 | `GET /api/opportunities` | Location-to-opportunity product API | Browser `app.js` | Allowlisted; site and search bounds |
 | `POST /api/opportunities` | Request-scoped preference product API | Browser `app.js` through `opportunityPreferences.js` | Allowlisted POST; site and provider bounds |
 | `POST /api/opportunities/planning` | Weather-free next-date planning API | Browser `app.js` through `opportunityPreferences.js` | Allowlisted POST; site and provider bounds |
@@ -58,7 +59,9 @@ Open-Meteo URLs are provider dependencies, not Moon Service routes.
   valid. A refusal returns to `HostedAlphaResourceLimitFilter`, which maps it to
   `429`; an accepted permit is released when downstream handling finishes. The
   exact planning POST uses the same resources after whole-site admission. Those
-  resources also wrap feedback location resolution as described below;
+  resources also apply to exact `GET` or `HEAD /feeds/atom` before its feed
+  cache lookup. A cached feed request can therefore receive `429`. They also
+  wrap feedback location resolution as described below;
   they do not apply to pages, static files, admin status, readiness, or the
   fixture POST route.
 - Whole-site bypasses are the bodyless `GET /readyz` whose connector reports a
@@ -181,6 +184,23 @@ and [hosted-alpha functional tests](../backend/src/test/java/dev/moonservice/bac
   [page](../frontend/src/about.html).
 
 ## Product and prototype APIs
+
+### `GET /feeds/atom`
+
+- **Handler:** `AtomFeedController`; Spring also serves matching bodyless
+  `HEAD` requests.
+- **Purpose/lifecycle:** current public Atom feed for one canonical location.
+- **Production invocation:** the result page builds the URL after it loads a
+  real location, and a feed reader then polls it.
+- **Authentication/data:** none. The query contains only `locationId`. The
+  route creates no account, subscriber record, saved subscription, or durable
+  feed state. Application request logs omit the query string.
+- **Exposure:** exact `GET` and `HEAD /feeds/atom` are allowlisted in hosted
+  alpha. Whole-site and provider admission run before the process feed cache,
+  so a cached request can receive `429`.
+- **References:** [controller](../backend/src/main/java/dev/moonservice/backend/web/AtomFeedController.java),
+  [service](../backend/src/main/java/dev/moonservice/backend/web/AtomFeedService.java),
+  [Atom contract](api-shape.md#public-atom-feed).
 
 ### `GET /api/opportunities`
 
@@ -543,7 +563,7 @@ and [hosted-alpha functional tests](../backend/src/test/java/dev/moonservice/bac
   inventory.
 - `/error` is Spring Boot's internal error-dispatch path, not an application
   controller mapping. `/test/slow` exists only in `GracefulShutdownTest`.
-- `/l/{location}`, `/feeds/*.atom`, `/calendars/*.ics`, and `/o/*.ics` are
+- `/l/{location}`, `/calendars/*.ics`, and `/o/*.ics` are
   design/roadmap shapes, not implemented routes. Opportunity JSON currently
   carries reserved `/o/*.ics` strings, but no controller serves them and the
   browser does not expose a calendar action without an `icsReady` signal.

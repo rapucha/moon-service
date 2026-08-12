@@ -16,8 +16,10 @@ phase, and bright-limb preference controls tracked by
 calibration-feedback interaction tracked by
 [#33](https://github.com/rapucha/moon-service/issues/33), and the
 next-matching-date recovery tracked by
-[#233](https://github.com/rapucha/moon-service/issues/233). Broader visual
-design, feeds, calendar export pages, account flows, and native apps are out of
+[#233](https://github.com/rapucha/moon-service/issues/233), and Atom feed
+discovery tracked by
+[#289](https://github.com/rapucha/moon-service/issues/289). Broader visual
+design, RSS, calendar export pages, account flows, and native apps are out of
 scope for this document until they become active product work.
 
 If implementation and this document disagree, treat the disagreement as a
@@ -461,6 +463,24 @@ Order exists only in page request state and the URL. The browser creates no
 order account, cookie, server profile, or `localStorage` entry. Share links
 contain the location and may contain order, but never contain preferences. A
 receiving browser applies its own saved preferences, if any.
+
+## Atom Feed Discovery
+
+After a successful real-location lookup, the resolved-result header shows a
+plain link labeled `Atom feed` beside the sharing controls. The link stays
+hidden until the page has a loaded `status: "ok"`,
+`location.kind: "real_location"` result with a canonical location ID. It does
+not appear for the initial page, an ambiguous or missing location, a fictional
+result, a failed request, or the separate planning result.
+
+The browser builds
+`/feeds/atom?locationId=<percent-encoded-canonical-id>`. The URL contains only
+that ID. It does not copy the search text, result order, hard preferences, or
+weather-ranking choice. The API response does not need to supply a feed link.
+
+The user adds this public URL to a feed reader. The reader polls Moon Service;
+the browser does not create an account, save a server-side subscription, or
+register a push channel. The feed is not personalized by browser preferences.
 
 ## Opportunity Preferences
 

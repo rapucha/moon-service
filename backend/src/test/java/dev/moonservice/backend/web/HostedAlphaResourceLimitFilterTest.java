@@ -81,6 +81,39 @@ class HostedAlphaResourceLimitFilterTest {
     }
 
     @Test
+    void appliesWholeSiteBeforeProviderAdmissionToAtomFeedAndPreventsCachingRefusals() throws Exception {
+        MutableClock clock = new MutableClock();
+        HostedAlphaProviderAdmission providerAdmission = mock(HostedAlphaProviderAdmission.class);
+        HostedAlphaProviderAdmission.Admission accepted = admission(true, 0L);
+        HostedAlphaProviderAdmission.Admission rejected = admission(false, 37L);
+        when(providerAdmission.tryAcquire()).thenReturn(accepted, rejected);
+        HostedAlphaResourceLimitFilter filter = filter(
+                properties(1, Duration.ofSeconds(1), 10, Duration.ofMinutes(1), 2),
+                clock,
+                providerAdmission,
+                true);
+
+        assertThat(exchange(filter, feedRequest("GET")).getStatus()).isEqualTo(200);
+        verify(accepted).close();
+
+        MockHttpServletResponse wholeSiteLimited = exchange(filter, feedRequest("GET"));
+        assertRateLimited(wholeSiteLimited, 1L);
+        assertThat(wholeSiteLimited.getHeader("Cache-Control")).isEqualTo("no-store");
+        verify(providerAdmission, times(1)).tryAcquire();
+
+        clock.advance(Duration.ofSeconds(1));
+        MockHttpServletResponse providerLimited = exchange(filter, feedRequest("HEAD"));
+        assertThat(providerLimited.getStatus()).isEqualTo(429);
+        assertThat(providerLimited.getHeader("Retry-After")).isEqualTo("37");
+        assertThat(providerLimited.getContentType()).isEqualTo("application/json");
+        assertThat(providerLimited.getContentLength()).isPositive();
+        assertThat(providerLimited.getHeader("Cache-Control")).isEqualTo("no-store");
+        assertThat(providerLimited.getContentAsByteArray()).isEmpty();
+        verify(providerAdmission, times(2)).tryAcquire();
+        verify(rejected).close();
+    }
+
+    @Test
     void countsEveryAdminAttemptBeforePolicyAndPreservesDockerReadiness() throws Exception {
         MutableClock clock = new MutableClock();
         HostedAlphaResourceLimitFilter filter = filter(
@@ -194,6 +227,10 @@ class HostedAlphaResourceLimitFilterTest {
     }
     private static MockHttpServletRequest opportunityRequest() {
         return request("GET", "/api/opportunities");
+    }
+
+    private static MockHttpServletRequest feedRequest(String method) {
+        return request(method, "/feeds/atom");
     }
 
     private static MockHttpServletRequest request(String method, String path) {

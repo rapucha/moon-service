@@ -6,11 +6,11 @@ responsive opportunity UI are implemented. Phase 4 infrastructure is complete:
 the tested application deploys automatically to the Raspberry Pi and the
 bounded tester-alpha Funnel is enabled. Follow-up #158 preserves the postponed
 household-impact measurement without blocking the alpha. The current product
-focus is to show enough ranked candidates for human evaluation, calibrate the
-provisional scoring model with photographers under
-[#33](https://github.com/rapucha/moon-service/issues/33), and then complete
+focus is to start
 public feeds and calendar exports under
 [#16](https://github.com/rapucha/moon-service/issues/16).
+Its first child is [#289](https://github.com/rapucha/moon-service/issues/289):
+the public Atom feed. Calibration under #33 remains a longer project.
 
 ## Phase 0: Planning Baseline
 
@@ -103,7 +103,7 @@ Tasks:
 - Display details for each opportunity.
 - Provide a shareable result URL.
 - Add clear privacy copy for geocoding, weather lookup, coordinate rounding, and backend logs.
-- Provide RSS/Atom feed output for public opportunities.
+- Implement the public Atom feed in #289. RSS has not been accepted.
 - Provide dynamic public `.ics` calendar feeds for canonical real locations.
 - Provide `.ics` export for individual opportunities.
 
@@ -222,8 +222,8 @@ preserving explicit caller control on the direct scoring contract. This is a
 discovery safeguard, not a scoring calibration.
 
 The next product step is the remaining runtime work in
-[#165](https://github.com/rapucha/moon-service/issues/165): implement the
-disabled-by-default capability and submission routes from the reduced contract.
+[#289](https://github.com/rapucha/moon-service/issues/289): add the first public
+Atom feed and its browser discovery link.
 
 The completed foundations are:
 
@@ -265,11 +265,13 @@ If it supports no behavior change, record provisional acceptance, calibration
 gaps, and remaining uncertainty before closing #33. The parent remains open
 through collection and corpus curation.
 
-After the core recommendations prove useful, complete public feeds and
+Current work on public feeds and
 calendar exports under
-[#16](https://github.com/rapucha/moon-service/issues/16). The JitPack dependency
-decision and safeguards required before public deployment are recorded in
+[#16](https://github.com/rapucha/moon-service/issues/16) starts with the Atom
+feed in #289. The JitPack dependency decision and safeguards required before
+public deployment are recorded in
 [#17](https://github.com/rapucha/moon-service/issues/17).
+RSS is not accepted, and calendar exports remain later.
 
 ## Implemented Backend And Prototype History
 

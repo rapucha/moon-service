@@ -5,6 +5,10 @@ export function apiPathFor(request) {
   return orderedPath(path, request.order);
 }
 
+export function atomPathFor(locationId) {
+  return "/feeds/atom?locationId=" + encodeURIComponent(locationId);
+}
+
 export function preferenceApiPathFor(request) {
   return orderedPath("/api/opportunities", request.order);
 }

@@ -25,6 +25,9 @@ test("renders ten ranked candidates as responsive pass groups", async ({ page })
   await expect(page.locator(".summary-count")).toHaveText(
     "5 ranked Moon passes · 10 candidate windows"
   );
+  await expect(page.getByRole("link", { name: "Atom feed" })).toHaveAttribute(
+    "href", "/feeds/atom?locationId=moon-service-3067696"
+  );
   await expect(page.locator(".rank-label")).toHaveText([
     "Best match",
     "Option 2",

@@ -24,6 +24,7 @@ import java.util.Set;
 public final class HostedAlphaSurfaceFilter extends OncePerRequestFilter {
     private static final String OPPORTUNITY_PATH = "/api/opportunities";
     private static final String PLANNING_PATH = "/api/opportunities/planning";
+    private static final String ATOM_FEED_PATH = "/feeds/atom";
     static final String FEEDBACK_CAPABILITY_PATH = "/api/calibration-feedback/v1/capability";
     static final String FEEDBACK_SUBMISSIONS_PATH = "/api/calibration-feedback/v1/submissions";
     static final String CONTENT_SECURITY_POLICY = "default-src 'none'; base-uri 'none'; "
@@ -36,6 +37,7 @@ public final class HostedAlphaSurfaceFilter extends OncePerRequestFilter {
     private static final Set<String> APPROVED_PATHS = Set.of(
             "/", "/about", "/about.html", "/index.html", "/search",
             "/admin/status", OPPORTUNITY_PATH, PLANNING_PATH, "/readyz",
+            ATOM_FEED_PATH,
             FEEDBACK_CAPABILITY_PATH, FEEDBACK_SUBMISSIONS_PATH,
             "/angularPreferenceControls.js", "/angularPreferencePreview.css",
             "/angularPreferencePreview.js", "/angularPreferenceRules.js",
@@ -94,11 +96,13 @@ public final class HostedAlphaSurfaceFilter extends OncePerRequestFilter {
         }
         List<String> allowedMethods = allowedMethods(path);
         if (!allowedMethods.contains(request.getMethod())) {
+            preventAtomErrorCaching(path, response);
             response.setHeader("Allow", String.join(", ", allowedMethods));
             reject(response, HttpServletResponse.SC_METHOD_NOT_ALLOWED);
             return;
         }
         if (!allowsFramedBody(request.getMethod(), path) && hasFramedBody(request)) {
+            preventAtomErrorCaching(path, response);
             reject(response, HttpServletResponse.SC_BAD_REQUEST);
             return;
         }
@@ -144,6 +148,12 @@ public final class HostedAlphaSurfaceFilter extends OncePerRequestFilter {
 
     private static boolean hasFramedBody(HttpServletRequest request) {
         return request.getContentLengthLong() > 0 || request.getHeader("Transfer-Encoding") != null;
+    }
+
+    private static void preventAtomErrorCaching(String path, HttpServletResponse response) {
+        if (ATOM_FEED_PATH.equals(path)) {
+            response.setHeader("Cache-Control", "no-store");
+        }
     }
 
     static String applicationPath(HttpServletRequest request) {

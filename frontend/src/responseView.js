@@ -1,4 +1,4 @@
-import { sharePathFor } from "./api.js";
+import { atomPathFor, sharePathFor } from "./api.js";
 import { createCurrentMoonView } from "./currentMoonCard.js";
 import { element } from "./dom.js";
 import { candidateMeta, formatDateTime } from "./format.js";
@@ -194,6 +194,8 @@ export function createResponseView(results, callbacks) {
     var location = payload.location || {};
     var sharePath = sharePathFor(request);
     var shareUrl = window.location.origin + sharePath;
+    var atomLink = location.kind === "real_location" && location.id
+      ? element("a", { href: atomPathFor(location.id) }, "Atom feed") : null;
     var passNoun = soonest ? "Moon pass" : "ranked Moon pass";
     var passText = passCount + " " + passNoun + (passCount === 1 ? "" : "es");
     var candidateText = candidateCount === 1 ? "1 candidate window" : candidateCount + " candidate windows";
@@ -206,7 +208,7 @@ export function createResponseView(results, callbacks) {
           element("p", { className: "summary-count" }, passText + " · " + candidateText)),
         element("div", { className: "share-tools" },
           element("button", { type: "button", className: "copy-button", "data-share-url": shareUrl }, "Copy link"),
-          element("a", { href: sharePath }, "Open share link"))
+          element("a", { href: sharePath }, "Open share link"), atomLink)
       ));
   }
 
