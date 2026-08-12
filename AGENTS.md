@@ -564,6 +564,15 @@ For documentation-only changes, verify with:
 git diff --check
 ```
 
+For GitHub Actions workflow changes, use the actionlint version pinned in
+`.github/workflows/lint-github-actions.yml`. Confirm the local binary matches
+that version, then run:
+
+```bash
+actionlint -version
+actionlint -shellcheck= -pyflakes=
+```
+
 For backend code changes, include the focused module tests below.
 
 For the current JVM ephemeris/scoring prototype, after fetching the documented
