@@ -1,0 +1,5 @@
+paths:
+  .github/workflows/publish-pr-preview.yml:
+    ignore:
+      # actionlint v1.7.12 does not support queue yet: https://github.com/rhysd/actionlint/issues/657
+      - '^unexpected key "queue" for "concurrency" section\. expected one of "cancel-in-progress", "group"$'
