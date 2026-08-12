@@ -14,8 +14,9 @@
     "curve:corpus": "node scripts/build_moon_pass_curve_corpus.mjs",
     "ui:curve-corpus": "playwright test tests/ui/moon-pass-curve-corpus.spec.js --project=desktop",
     "ui:smoke": "playwright test",
+    "ui:hosted-alpha": "MOON_SERVICE_PLAYWRIGHT_HOSTED_ALPHA=true playwright test tests/ui/hosted-alpha-surface.spec.js --project=desktop --ignore-snapshots",
     "frontend:check": "npm run silhouettes:check && npm run light-bands:check && tsc -p tsconfig.frontend.json && eslint frontend/src/*.js frontend/generated/*.js tests/ui/**/*.js scripts/*.mjs playwright.config.js eslint.config.js && playwright test",
-    "frontend:ci": "npm run frontend:check -- --ignore-snapshots"
+    "frontend:ci": "npm run frontend:check -- --ignore-snapshots && npm run ui:hosted-alpha"
   },
   "engines": {
     "node": ">=18.19"

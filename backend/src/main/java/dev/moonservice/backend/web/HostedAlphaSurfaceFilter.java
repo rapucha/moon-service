@@ -54,7 +54,7 @@ public final class HostedAlphaSurfaceFilter extends OncePerRequestFilter {
             "/moonPathView.js", "/moonPhaseView.js", "/moonTexture.js", "/opportunityCard.js",
             "/opportunityPreferences.css", "/opportunityPreferences.js",
             "/planningView.js", "/recentSearches.js", "/responseView.js", "/scoreView.js",
-            "/skyDomeView.js"
+            "/skyDomeView.js", "/weatherRankingPreference.js"
     );
     private static final Set<String> FORWARDED_IDENTITY_HEADERS = Set.of(
             "cf-connecting-ip", "forwarded", "true-client-ip", "x-client-ip", "x-forwarded-for", "x-real-ip",
