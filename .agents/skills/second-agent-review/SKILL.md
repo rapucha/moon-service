@@ -147,10 +147,15 @@ Check scope before implementation quality:
    unchanged.
 7. Flag manifest, lock, workflow, provider, account, network, runtime, build, or
    test dependencies that lack explicit source authority.
-8. Then prioritize concrete bugs, behavior regressions, public contract drift,
+8. If the accepted change is major and durable, check only the relevant tracked
+   Serena memories. Report a normal finding when that change made an existing
+   memory false or materially incomplete and the staged result does not correct
+   or remove it. Also report a normal finding when a memory edit is unrelated
+   to the accepted work or lacks authority.
+9. Then prioritize concrete bugs, behavior regressions, public contract drift,
    missing or weak tests, privacy/security/provider risks, UI/layout risks,
    documentation mismatches, and validation gaps.
-9. Review changed agent-authored prose against the target project's canonical
+10. Review changed agent-authored prose against the target project's canonical
    writing guide. For Moon Service, read
    `docs/ai-agent/plain-technical-writing.md`. Flag wording only when a simpler
    version keeps the same meaning, and suggest that version. Preserve exact
