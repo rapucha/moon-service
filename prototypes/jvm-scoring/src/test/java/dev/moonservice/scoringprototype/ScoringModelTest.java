@@ -12,6 +12,16 @@ import org.junit.jupiter.api.Test;
 import java.time.Instant;
 import java.util.List;
 
+import static dev.moonservice.scoringprototype.scoring.ScoringModel.WeatherCodeKind.CLEAR;
+import static dev.moonservice.scoringprototype.scoring.ScoringModel.WeatherCodeKind.FOG;
+import static dev.moonservice.scoringprototype.scoring.ScoringModel.WeatherCodeKind.MOSTLY_CLEAR;
+import static dev.moonservice.scoringprototype.scoring.ScoringModel.WeatherCodeKind.OTHER_PRECIPITATION;
+import static dev.moonservice.scoringprototype.scoring.ScoringModel.WeatherCodeKind.OVERCAST;
+import static dev.moonservice.scoringprototype.scoring.ScoringModel.WeatherCodeKind.PARTLY_CLOUDY;
+import static dev.moonservice.scoringprototype.scoring.ScoringModel.WeatherCodeKind.RAIN;
+import static dev.moonservice.scoringprototype.scoring.ScoringModel.WeatherCodeKind.SNOW;
+import static dev.moonservice.scoringprototype.scoring.ScoringModel.WeatherCodeKind.STORM;
+import static dev.moonservice.scoringprototype.scoring.ScoringModel.WeatherCodeKind.UNKNOWN;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
@@ -135,6 +145,43 @@ class ScoringModelTest {
     }
 
     @Test
+    void classifiesEveryNamedWeatherCode() {
+        assertWeatherCodeKind(CLEAR, 0);
+        assertWeatherCodeKind(MOSTLY_CLEAR, 1);
+        assertWeatherCodeKind(PARTLY_CLOUDY, 2);
+        assertWeatherCodeKind(OVERCAST, 3);
+        assertWeatherCodeKind(FOG, 45, 48);
+        assertWeatherCodeKind(RAIN, 51, 53, 55, 56, 57, 61, 63, 65, 66, 67, 80, 81, 82);
+        assertWeatherCodeKind(SNOW, 71, 73, 75, 77, 85, 86);
+        assertWeatherCodeKind(STORM, 95, 96, 99);
+    }
+
+    @Test
+    void classifiesUnlistedWeatherCodeBoundaries() {
+        assertWeatherCodeKind(UNKNOWN, 4, 44, 49);
+        assertWeatherCodeKind(OTHER_PRECIPITATION, 50, 100);
+    }
+
+    @Test
+    void preservesWeatherSegmentKindPrecedenceAndOutput() {
+        assertWeatherSegment("precipitation_risk", 51, 100, 1000);
+        assertWeatherSegment("precipitation_risk", 71, 100, 1000);
+        assertWeatherSegment("precipitation_risk", 95, 100, 1000);
+        assertWeatherSegment("precipitation_risk", 50, 100, 1000);
+        assertWeatherSegment("poor_visibility", 45, 100, 20000);
+        assertWeatherSegment("poor_visibility", 0, 100, 4999);
+        assertWeatherSegment("overcast", 3, 0, 20000);
+        assertWeatherSegment("overcast", 0, 85, 20000);
+        assertWeatherSegment("mostly_cloudy", 0, 65, 20000);
+        assertWeatherSegment("partly_cloudy", 2, 0, 20000);
+        assertWeatherSegment("partly_cloudy", 0, 25, 20000);
+        assertWeatherSegment("mostly_clear", 1, 0, 20000);
+        assertWeatherSegment("mostly_clear", 0, 10, 20000);
+        assertWeatherSegment("clear", 0, 0, 20000);
+        assertWeatherSegment("mixed", 49, 0, 20000);
+    }
+
+    @Test
     void returnsExposureBalanceVocabularyFromPythonContract() {
         assertEquals(
                 "moon_detail_easy_foreground_supported",
@@ -234,5 +281,31 @@ class ScoringModelTest {
                 20000,
                 2,
                 forecastAgeHours);
+    }
+
+    private static void assertWeatherCodeKind(ScoringModel.WeatherCodeKind expected, int... weatherCodes) {
+        for (int weatherCode : weatherCodes) {
+            assertEquals(expected, ScoringModel.weatherCodeKind(weatherCode), "weather code " + weatherCode);
+        }
+    }
+
+    private static void assertWeatherSegment(
+            String expected,
+            int weatherCode,
+            int cloudCoverPercent,
+            int visibilityMeters
+    ) {
+        WeatherFixture weather = new WeatherFixture(
+                cloudCoverPercent,
+                cloudCoverPercent,
+                cloudCoverPercent,
+                cloudCoverPercent,
+                0,
+                0.0,
+                visibilityMeters,
+                weatherCode,
+                1.0);
+
+        assertEquals(expected, ScoringModel.weatherSegmentKind(weather));
     }
 }

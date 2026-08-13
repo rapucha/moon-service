@@ -93,15 +93,63 @@ channel, or durable feed record.
 
 The feed contains up to ten ordinary opportunities from the current seven-day
 search, ordered by `soonest`, with balanced weather and no browser preferences
-or score cutoff. Each opportunity is one entry with stable IDs, useful precise
-times, coarse weather and confidence, short Moon and light facts, and a live
-result link. It omits volatile exact scores and weather values, `checkedAt`, and
-`published`. A meaningful displayed change advances Atom `updated`.
+or score cutoff. Each opportunity is one entry with stable IDs and a complete
+plain-text summary. The summary gives useful precise times, coarse weather and
+confidence, short Moon and light facts, a horizon caveat, and a live-result
+reminder. It stays useful when a reader removes rich content or pictures.
 
-The process keeps at most 1,000 location feed states. A state stays fresh for
-one hour, and concurrent same-location requests share one refresh. Restart,
-size eviction, removal, and later reappearance can make an entry look updated
-again. Nothing is stored on disk or in a database.
+Each entry also has simple XHTML split into `When`, `Conditions`, and
+`Before you go`. It embeds one regular `640` by `160` PNG as a
+`data:image/png;base64,...` URL. The picture reuses the tracked NASA LROC Moon
+texture. It needs no remote picture or new tracked asset.
+
+The large Moon uses the suggested-time phase and orientation. Its sky matches
+that sample's real daylight, golden-hour, civil-twilight, nautical-twilight, or
+night light bucket. The path shows real light-bucket segments, small textured
+Moon samples, and only the suggested local time on its x-axis. The larger
+suggested Moon does not overlap an ordinary sample. The renderer draws no Moon
+ring and no brighter strip along the bucket shading.
+
+The opportunity's existing `weather.segmentKind` selects a restrained clear,
+cloudy, fog, precipitation, or mixed overlay on the large Moon scene. For
+precipitation risk, the shared `ScoringModel.weatherCodeKind(int)`
+classification selects rain, snow, or storm artwork. Its
+`OTHER_PRECIPITATION` result selects mixed artwork. There is no separate weather
+icon. Rain and storm strokes stay in the lowest third of the Moon, and cloudy
+weather still leaves enough texture visible to read the scene.
+Every useful fact also appears as text. The feed uses no CSS, JavaScript, table,
+or `srcset`. A feed reader may remove the XHTML or picture, so this rich view is
+optional.
+
+This presentation change does not change the feed route, location-only input,
+IDs, ordering, polling model, one-hour freshness, public response cache, strong
+ETag, bodyless `HEAD` and `304` behavior, or no-account privacy rules.
+
+`Before you go` warns about eye safety for New Moon and for waxing or waning
+crescents at `10%` illumination or less. It says: Do not ever search for the
+Moon near the Sun through binoculars, a telescope, or a camera's optical viewfinder.
+Brighter crescents and other phases do not get this warning.
+
+Entries omit volatile exact scores and weather values, `checkedAt`, and
+`published`. A meaningful text or visible-picture change advances Atom
+`updated`. Whole-degree phase and orientation, final integer path pixels, and
+final weather overlays and light categories keep visually unchanged pictures
+stable.
+Tests record full one-entry and maximum ten-entry response sizes, including the
+embedded pictures. The validated results are:
+
+- one-entry fixture: `57,503 bytes`;
+- maximum ten-entry fixture: `605,908 bytes`.
+
+A maximum fixture over `1.5 MiB` stops publication for a new owner-approved
+plan. This is a pre-publication checkpoint, not a runtime rejection limit.
+
+The process-local feed-state cache has a `96 MiB` weight bound. Each value is
+weighted by its exact cached XML byte length. A state stays fresh for one hour,
+and concurrent same-location requests share one refresh. A value heavier than
+the bound is served without being retained. Restart, weight eviction, removal,
+and later reappearance can make an entry look updated again. Nothing is stored
+on disk or in a database.
 
 Success sends `Cache-Control: public, max-age=900` and a strong ETag; matching
 `If-None-Match` returns `304`. There is no `Last-Modified`. Errors are
