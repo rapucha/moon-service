@@ -47,6 +47,7 @@ class AtomFeedRichContentTest {
                 72.0,
                 241.0,
                 18.0,
+                "precipitation_risk",
                 61,
                 "light rain")));
         String serialized = new String(xml, StandardCharsets.UTF_8);
@@ -116,16 +117,19 @@ class AtomFeedRichContentTest {
     }
 
     @Test
-    void stableVisibleModelIgnoresSubPixelAndSameWeatherCategoryChanges() {
+    void stableVisibleModelIgnoresSubPixelAndSameWeatherOverlayChanges() {
         OpportunitySearchResponse.Opportunity first = opportunity(
                 Instant.parse("2026-08-14T02:05:00Z"),
-                "waxing_crescent", 7.01, 72.1, 241.1, 18.1, 61, "rain possible");
+                "waxing_crescent", 7.01, 72.1, 241.1, 18.1,
+                "overcast", 0, "cloudy");
         OpportunitySearchResponse.Opportunity visuallySame = opportunity(
                 Instant.parse("2026-08-14T02:05:00Z"),
-                "waxing_crescent", 7.02, 72.4, 241.4, 18.4, 82, "rain possible");
+                "waxing_crescent", 7.02, 72.4, 241.4, 18.4,
+                "partly_cloudy", 2, "cloudy");
         OpportunitySearchResponse.Opportunity differentWeatherPicture = opportunity(
                 Instant.parse("2026-08-14T02:05:00Z"),
-                "waxing_crescent", 7.02, 72.4, 241.4, 18.4, 0, "rain possible");
+                "waxing_crescent", 7.02, 72.4, 241.4, 18.4,
+                "poor_visibility", 0, "cloudy");
 
         assertEquals(displayed(first), displayed(visuallySame));
         assertNotEquals(displayed(first), displayed(differentWeatherPicture));
@@ -135,6 +139,12 @@ class AtomFeedRichContentTest {
     void maximumFeedStaysBelowThePublicationCheckpoint() {
         List<OpportunitySearchResponse.Opportunity> opportunities = new ArrayList<>();
         Instant firstStart = Instant.parse("2026-08-14T02:05:00Z");
+        int[] weatherCodes = {0, 2, 45, 61, 71, 95, 4, 1, 82, 86};
+        String[] segmentKinds = {
+                "clear", "partly_cloudy", "poor_visibility", "precipitation_risk",
+                "precipitation_risk", "precipitation_risk", "mixed", "mostly_clear",
+                "precipitation_risk", "precipitation_risk"
+        };
         for (int index = 0; index < 10; index++) {
             opportunities.add(opportunity(
                     firstStart.plus(index, ChronoUnit.DAYS),
@@ -143,7 +153,8 @@ class AtomFeedRichContentTest {
                     72.0 + index,
                     241.0 + index,
                     18.0 + index,
-                    new int[]{0, 2, 45, 61, 71, 95, 4, 1, 82, 86}[index],
+                    segmentKinds[index],
+                    weatherCodes[index],
                     "forecast condition " + index));
         }
 
@@ -160,7 +171,8 @@ class AtomFeedRichContentTest {
     void cacheRecordsTheExactRetainedXmlWeight() throws Exception {
         OpportunitySearchResponse.Opportunity opportunity = opportunity(
                 Instant.parse("2026-08-14T02:05:00Z"),
-                "waxing_crescent", 7.0, 72.0, 241.0, 18.0, 0, "clear");
+                "waxing_crescent", 7.0, 72.0, 241.0, 18.0,
+                "clear", 0, "clear");
         OpportunitySearchService search = mock(OpportunitySearchService.class);
         when(search.search(null, LOCATION_ID, OpportunitySearchRequest.Order.SOONEST))
                 .thenReturn(response(List.of(opportunity)));
@@ -180,13 +192,16 @@ class AtomFeedRichContentTest {
     void refreshUsesOnlyVisibleQuantizedTextAndPictureChanges() throws Exception {
         OpportunitySearchResponse.Opportunity first = opportunity(
                 Instant.parse("2026-08-14T02:05:00Z"),
-                "waxing_crescent", 7.01, 72.1, 241.1, 18.1, 61, "rain possible");
+                "waxing_crescent", 7.01, 72.1, 241.1, 18.1,
+                "precipitation_risk", 61, "rain possible");
         OpportunitySearchResponse.Opportunity visuallySame = opportunity(
                 Instant.parse("2026-08-14T02:05:00Z"),
-                "waxing_crescent", 7.02, 72.4, 241.4, 18.4, 82, "rain possible");
+                "waxing_crescent", 7.02, 72.4, 241.4, 18.4,
+                "precipitation_risk", 82, "rain possible");
         OpportunitySearchResponse.Opportunity changedWeather = opportunity(
                 Instant.parse("2026-08-14T02:05:00Z"),
-                "waxing_crescent", 7.02, 72.4, 241.4, 18.4, 0, "rain possible");
+                "waxing_crescent", 7.02, 72.4, 241.4, 18.4,
+                "overcast", 0, "rain possible");
         Instant firstRefresh = Instant.parse("2026-08-12T18:30:00Z");
         Instant secondRefresh = firstRefresh.plus(2, ChronoUnit.HOURS);
         Instant thirdRefresh = secondRefresh.plus(2, ChronoUnit.HOURS);
@@ -218,7 +233,7 @@ class AtomFeedRichContentTest {
     ) {
         return displayed(opportunity(
                 Instant.parse("2026-08-14T02:05:00Z"),
-                phase, illumination, 72.0, 241.0, 18.0, 0, "clear"));
+                phase, illumination, 72.0, 241.0, 18.0, "clear", 0, "clear"));
     }
 
     private static AtomFeedDocumentRenderer.DisplayedEntry displayed(
@@ -273,6 +288,7 @@ class AtomFeedRichContentTest {
             double phaseAngle,
             Double brightLimb,
             Double northPole,
+            String weatherSegmentKind,
             int weatherCode,
             String weatherSummary
     ) {
@@ -295,7 +311,7 @@ class AtomFeedRichContentTest {
                         List.of(startPoint, suggestedPoint, endPoint)),
                 new OpportunitySearchResponse.Sun(-5.0, 72.0, "civil_twilight"),
                 new OpportunitySearchResponse.Weather(
-                        "hourly", "window", 20, 30, 10, 10, 10,
+                        "hourly", weatherSegmentKind, 20, 30, 10, 10, 10,
                         20, 0.2, 10_000, weatherCode, weatherSummary),
                 null, "private ranking reason", Map.of());
     }

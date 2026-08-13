@@ -23,6 +23,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class AtomEntryPreviewRendererTest {
@@ -54,23 +55,30 @@ class AtomEntryPreviewRendererTest {
     }
 
     @Test
-    void mapsEveryWeatherCodeAndDrawsDistinctWeather() {
-        assertCodes(AtomEntryPreviewRenderer.WeatherCategory.CLEAR, 0, 1);
-        assertCodes(AtomEntryPreviewRenderer.WeatherCategory.CLOUDY, 2, 3);
-        assertCodes(AtomEntryPreviewRenderer.WeatherCategory.FOG, 45, 48);
-        assertCodes(AtomEntryPreviewRenderer.WeatherCategory.RAIN,
-                51, 53, 55, 56, 57, 61, 63, 65, 66, 67, 80, 81, 82);
-        assertCodes(AtomEntryPreviewRenderer.WeatherCategory.SNOW, 71, 73, 75, 77, 85, 86);
-        assertCodes(AtomEntryPreviewRenderer.WeatherCategory.STORM, 95, 96, 99);
-        assertCodes(AtomEntryPreviewRenderer.WeatherCategory.MIXED, -1, 4, 44, 100);
+    void mapsExistingWeatherResultAndDrawsDistinctOverlays() {
+        assertOverlay(AtomEntryPreviewRenderer.WeatherOverlay.CLEAR, "clear", 0);
+        assertOverlay(AtomEntryPreviewRenderer.WeatherOverlay.CLEAR, "mostly_clear", 1);
+        assertOverlay(AtomEntryPreviewRenderer.WeatherOverlay.CLOUDY, "partly_cloudy", 2);
+        assertOverlay(AtomEntryPreviewRenderer.WeatherOverlay.CLOUDY, "mostly_cloudy", 0);
+        assertOverlay(AtomEntryPreviewRenderer.WeatherOverlay.CLOUDY, "overcast", 0);
+        assertOverlay(AtomEntryPreviewRenderer.WeatherOverlay.FOG, "poor_visibility", 0);
+        assertOverlay(AtomEntryPreviewRenderer.WeatherOverlay.MIXED, "mixed", 0);
+        assertOverlay(AtomEntryPreviewRenderer.WeatherOverlay.RAIN, "precipitation_risk", 61);
+        assertOverlay(AtomEntryPreviewRenderer.WeatherOverlay.SNOW, "precipitation_risk", 71);
+        assertOverlay(AtomEntryPreviewRenderer.WeatherOverlay.STORM, "precipitation_risk", 95);
+        assertOverlay(AtomEntryPreviewRenderer.WeatherOverlay.MIXED, "precipitation_risk", 50);
+        assertThrows(IllegalArgumentException.class,
+                () -> AtomEntryPreviewRenderer.WeatherOverlay.from(weather("precipitation_risk", 0)));
+        assertThrows(IllegalArgumentException.class,
+                () -> AtomEntryPreviewRenderer.WeatherOverlay.from(weather("unsupported", 0)));
 
         AtomEntryPreviewRenderer.Preview base = preview(0, CIVIL_TWILIGHT);
         Set<Integer> imageHashes = new HashSet<>();
-        for (AtomEntryPreviewRenderer.WeatherCategory weather
-                : AtomEntryPreviewRenderer.WeatherCategory.values()) {
-            imageHashes.add(Arrays.hashCode(AtomEntryPreviewRenderer.render(withWeather(base, weather))));
+        for (AtomEntryPreviewRenderer.WeatherOverlay overlay
+                : AtomEntryPreviewRenderer.WeatherOverlay.values()) {
+            imageHashes.add(Arrays.hashCode(AtomEntryPreviewRenderer.render(withWeather(base, overlay))));
         }
-        assertEquals(AtomEntryPreviewRenderer.WeatherCategory.values().length, imageHashes.size());
+        assertEquals(AtomEntryPreviewRenderer.WeatherOverlay.values().length, imageHashes.size());
     }
 
     @Test
@@ -268,13 +276,13 @@ class AtomEntryPreviewRendererTest {
     @Test
     void cloudsAreObviousAndRainStrokesStayLow() throws Exception {
         AtomEntryPreviewRenderer.Preview base = preview(0, CIVIL_TWILIGHT);
-        BufferedImage clear = image(withWeather(base, AtomEntryPreviewRenderer.WeatherCategory.CLEAR));
-        BufferedImage cloudy = image(withWeather(base, AtomEntryPreviewRenderer.WeatherCategory.CLOUDY));
+        BufferedImage clear = image(withWeather(base, AtomEntryPreviewRenderer.WeatherOverlay.CLEAR));
+        BufferedImage cloudy = image(withWeather(base, AtomEntryPreviewRenderer.WeatherOverlay.CLOUDY));
         int cloudChanges = differences(clear, cloudy, 0, 150, 30, 130)[0];
         assertTrue(cloudChanges > 3_000, "Overcast weather should visibly obscure the Moon scene.");
 
-        BufferedImage rain = image(withWeather(base, AtomEntryPreviewRenderer.WeatherCategory.RAIN));
-        BufferedImage mixed = image(withWeather(base, AtomEntryPreviewRenderer.WeatherCategory.MIXED));
+        BufferedImage rain = image(withWeather(base, AtomEntryPreviewRenderer.WeatherOverlay.RAIN));
+        BufferedImage mixed = image(withWeather(base, AtomEntryPreviewRenderer.WeatherOverlay.MIXED));
         int[] rainDifferences = differences(rain, mixed, 0, 150, 0, 159);
         assertTrue(rainDifferences[0] > 0);
         assertTrue(rainDifferences[1] >= 96 && rainDifferences[2] <= 126,
@@ -314,7 +322,7 @@ class AtomEntryPreviewRendererTest {
 
     private static AtomEntryPreviewRenderer.Preview withWeather(
             AtomEntryPreviewRenderer.Preview preview,
-            AtomEntryPreviewRenderer.WeatherCategory weather
+            AtomEntryPreviewRenderer.WeatherOverlay weather
     ) {
         return new AtomEntryPreviewRenderer.Preview(
                 preview.mainMoon(), preview.curve(), preview.markers(), preview.suggested(),
@@ -347,14 +355,21 @@ class AtomEntryPreviewRendererTest {
                 .orElseThrow();
     }
 
-    private static void assertCodes(
-            AtomEntryPreviewRenderer.WeatherCategory expected,
+    private static void assertOverlay(
+            AtomEntryPreviewRenderer.WeatherOverlay expected,
+            String segmentKind,
             int... codes
     ) {
         for (int code : codes) {
-            assertEquals(expected, AtomEntryPreviewRenderer.WeatherCategory.fromCode(code),
-                    () -> "Unexpected category for WMO code " + code);
+            assertEquals(expected, AtomEntryPreviewRenderer.WeatherOverlay.from(weather(segmentKind, code)),
+                    () -> "Unexpected overlay for " + segmentKind + " and WMO code " + code);
         }
+    }
+
+    private static OpportunitySearchResponse.Weather weather(String segmentKind, int weatherCode) {
+        return new OpportunitySearchResponse.Weather(
+                "hourly", segmentKind, 20, 30, 10, 10, 10,
+                20, .2, 10_000, weatherCode, "forecast");
     }
 
     private static OpportunitySearchResponse.Opportunity opportunity(
@@ -405,9 +420,7 @@ class AtomEntryPreviewRendererTest {
                 new OpportunitySearchResponse.MoonPath(
                         points.getFirst(), suggested, points.getLast(), points),
                 new OpportunitySearchResponse.Sun(-5.0, 72.0, buckets.get(4)),
-                new OpportunitySearchResponse.Weather(
-                        "hourly", "window", 20, 30, 10, 10, 10,
-                        20, .2, 10_000, weatherCode, "forecast"),
+                weather(weatherCode >= 50 ? "precipitation_risk" : "clear", weatherCode),
                 null, "reason", Map.of());
     }
 }

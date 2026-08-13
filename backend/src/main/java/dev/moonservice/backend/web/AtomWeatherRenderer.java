@@ -90,32 +90,31 @@ final class AtomWeatherRenderer {
     }
 
     /*
-     * Composes one category-specific overlay. CLEAR intentionally draws
-     * nothing. MIXED is the fallback assigned to every unrecognized WMO code,
-     * so it uses restrained clouds and rain without claiming a named condition.
+     * Composes one selected overlay. CLEAR intentionally draws nothing. MIXED
+     * uses restrained clouds and rain without claiming a named condition.
      */
-    static void draw(Graphics2D graphics, AtomEntryPreviewRenderer.WeatherCategory weather) {
-        if (weather == AtomEntryPreviewRenderer.WeatherCategory.CLEAR) {
+    static void draw(Graphics2D graphics, AtomEntryPreviewRenderer.WeatherOverlay weather) {
+        if (weather == AtomEntryPreviewRenderer.WeatherOverlay.CLEAR) {
             return;
         }
-        if (weather == AtomEntryPreviewRenderer.WeatherCategory.FOG) {
+        if (weather == AtomEntryPreviewRenderer.WeatherOverlay.FOG) {
             drawFog(graphics);
             return;
         }
-        float opacity = weather == AtomEntryPreviewRenderer.WeatherCategory.CLOUDY
+        float opacity = weather == AtomEntryPreviewRenderer.WeatherOverlay.CLOUDY
                 ? CLOUDY_OPACITY
-                : weather == AtomEntryPreviewRenderer.WeatherCategory.STORM
+                : weather == AtomEntryPreviewRenderer.WeatherOverlay.STORM
                         ? STORM_OPACITY
                         : PRECIPITATION_OPACITY;
         drawClouds(graphics, opacity);
-        if (weather == AtomEntryPreviewRenderer.WeatherCategory.RAIN
-                || weather == AtomEntryPreviewRenderer.WeatherCategory.STORM
-                || weather == AtomEntryPreviewRenderer.WeatherCategory.MIXED) {
+        if (weather == AtomEntryPreviewRenderer.WeatherOverlay.RAIN
+                || weather == AtomEntryPreviewRenderer.WeatherOverlay.STORM
+                || weather == AtomEntryPreviewRenderer.WeatherOverlay.MIXED) {
             drawRain(graphics, weather);
-        } else if (weather == AtomEntryPreviewRenderer.WeatherCategory.SNOW) {
+        } else if (weather == AtomEntryPreviewRenderer.WeatherOverlay.SNOW) {
             drawSnow(graphics);
         }
-        if (weather == AtomEntryPreviewRenderer.WeatherCategory.STORM) {
+        if (weather == AtomEntryPreviewRenderer.WeatherOverlay.STORM) {
             graphics.setColor(LIGHTNING_COLOR);
             graphics.setStroke(new BasicStroke(LIGHTNING_STROKE_PIXELS));
             for (int index = 1; index < LIGHTNING_PATH.length; index++) {
@@ -174,19 +173,18 @@ final class AtomWeatherRenderer {
 
     /*
      * Draws low slanted strokes under the cloud layer. MIXED deliberately uses
-     * fewer, thinner strokes because it represents the unrecognized-code
-     * fallback rather than a definite rain report.
+     * fewer, thinner strokes so the picture does not claim definite rain.
      */
     private static void drawRain(
             Graphics2D graphics,
-            AtomEntryPreviewRenderer.WeatherCategory weather
+            AtomEntryPreviewRenderer.WeatherOverlay weather
     ) {
-        int[] offsets = weather == AtomEntryPreviewRenderer.WeatherCategory.MIXED
+        int[] offsets = weather == AtomEntryPreviewRenderer.WeatherOverlay.MIXED
                 ? MIXED_RAIN_X : RAIN_X;
-        graphics.setColor(weather == AtomEntryPreviewRenderer.WeatherCategory.STORM
+        graphics.setColor(weather == AtomEntryPreviewRenderer.WeatherOverlay.STORM
                 ? STORM_RAIN_COLOR : RAIN_COLOR);
         graphics.setStroke(new BasicStroke(
-                weather == AtomEntryPreviewRenderer.WeatherCategory.MIXED
+                weather == AtomEntryPreviewRenderer.WeatherOverlay.MIXED
                         ? MIXED_RAIN_STROKE_PIXELS : RAIN_STROKE_PIXELS));
         for (int index = 0; index < offsets.length; index++) {
             int x = offsets[index];

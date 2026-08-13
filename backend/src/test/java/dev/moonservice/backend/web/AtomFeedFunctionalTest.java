@@ -455,7 +455,7 @@ class AtomFeedFunctionalTest {
                 moonPath(startsAt, suggestedAt, endsAt, altitude, lightBucket),
                 new OpportunitySearchResponse.Sun(-5.0, 72.0, lightBucket),
                 new OpportunitySearchResponse.Weather(
-                        "hourly", "window", 63, 71, 30, 44, 51,
+                        "hourly", "partly_cloudy", 63, 71, 30, 44, 51,
                         27, 0.4, 10_000, 2, weatherSummary),
                 null,
                 "Exact score and provider details must not appear.",

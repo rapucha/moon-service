@@ -110,12 +110,15 @@ Moon samples, and only the suggested local time on its x-axis. The larger
 suggested Moon does not overlap an ordinary sample. The renderer draws no Moon
 ring and no brighter strip along the bucket shading.
 
-The numeric WMO weather code selects a restrained clear, cloudy, fog, rain,
-snow, storm, or mixed overlay on the large Moon scene. There is no separate
-weather icon. Rain and storm strokes stay in the lowest third of the Moon, and
-cloudy weather still leaves enough texture visible to read the scene. Every
-useful fact also appears as text. The feed uses no CSS, JavaScript, table, or
-`srcset`. A feed reader may remove the XHTML or picture, so this rich view is
+The opportunity's existing `weather.segmentKind` selects a restrained clear,
+cloudy, fog, precipitation, or mixed overlay on the large Moon scene. For
+precipitation risk, the shared `ScoringModel.weatherCodeKind(int)`
+classification selects rain, snow, or storm artwork. Its
+`OTHER_PRECIPITATION` result selects mixed artwork. There is no separate weather
+icon. Rain and storm strokes stay in the lowest third of the Moon, and cloudy
+weather still leaves enough texture visible to read the scene.
+Every useful fact also appears as text. The feed uses no CSS, JavaScript, table,
+or `srcset`. A feed reader may remove the XHTML or picture, so this rich view is
 optional.
 
 This presentation change does not change the feed route, location-only input,
@@ -130,7 +133,8 @@ Brighter crescents and other phases do not get this warning.
 Entries omit volatile exact scores and weather values, `checkedAt`, and
 `published`. A meaningful text or visible-picture change advances Atom
 `updated`. Whole-degree phase and orientation, final integer path pixels, and
-final weather and light categories keep visually unchanged pictures stable.
+final weather overlays and light categories keep visually unchanged pictures
+stable.
 Tests record full one-entry and maximum ten-entry response sizes, including the
 embedded pictures. The validated results are:
 

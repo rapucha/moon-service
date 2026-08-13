@@ -12,6 +12,19 @@ public final class ScoringModel {
     public static final double NEAR_CONJUNCTION_MAX_ILLUMINATION_PERCENT = 1.0;
     public static final double NEAR_CONJUNCTION_MIN_SEPARATION_DEGREES = 8.0;
 
+    public enum WeatherCodeKind {
+        CLEAR,
+        MOSTLY_CLEAR,
+        PARTLY_CLOUDY,
+        OVERCAST,
+        FOG,
+        RAIN,
+        SNOW,
+        STORM,
+        OTHER_PRECIPITATION,
+        UNKNOWN
+    }
+
     private ScoringModel() {
     }
 
@@ -168,27 +181,46 @@ public final class ScoringModel {
         };
     }
 
+    public static WeatherCodeKind weatherCodeKind(int weatherCode) {
+        return switch (weatherCode) {
+            case 0 -> WeatherCodeKind.CLEAR;
+            case 1 -> WeatherCodeKind.MOSTLY_CLEAR;
+            case 2 -> WeatherCodeKind.PARTLY_CLOUDY;
+            case 3 -> WeatherCodeKind.OVERCAST;
+            case 45, 48 -> WeatherCodeKind.FOG;
+            case 51, 53, 55, 56, 57, 61, 63, 65, 66, 67, 80, 81, 82 -> WeatherCodeKind.RAIN;
+            case 71, 73, 75, 77, 85, 86 -> WeatherCodeKind.SNOW;
+            case 95, 96, 99 -> WeatherCodeKind.STORM;
+            default -> weatherCode >= 50
+                    ? WeatherCodeKind.OTHER_PRECIPITATION
+                    : WeatherCodeKind.UNKNOWN;
+        };
+    }
+
     public static String weatherSegmentKind(WeatherFixture weather) {
-        int weatherCode = weather.weatherCode();
-        if (weatherCode >= 50) {
+        WeatherCodeKind weatherCodeKind = weatherCodeKind(weather.weatherCode());
+        if (weatherCodeKind == WeatherCodeKind.RAIN
+                || weatherCodeKind == WeatherCodeKind.SNOW
+                || weatherCodeKind == WeatherCodeKind.STORM
+                || weatherCodeKind == WeatherCodeKind.OTHER_PRECIPITATION) {
             return "precipitation_risk";
         }
-        if (weatherCode == 45 || weatherCode == 48 || weather.visibilityMeters() < 5000) {
+        if (weatherCodeKind == WeatherCodeKind.FOG || weather.visibilityMeters() < 5000) {
             return "poor_visibility";
         }
-        if (weatherCode == 3 || weather.cloudCoverPercent() >= 85) {
+        if (weatherCodeKind == WeatherCodeKind.OVERCAST || weather.cloudCoverPercent() >= 85) {
             return "overcast";
         }
         if (weather.cloudCoverPercent() >= 65) {
             return "mostly_cloudy";
         }
-        if (weatherCode == 2 || weather.cloudCoverPercent() >= 25) {
+        if (weatherCodeKind == WeatherCodeKind.PARTLY_CLOUDY || weather.cloudCoverPercent() >= 25) {
             return "partly_cloudy";
         }
-        if (weatherCode == 1 || weather.cloudCoverPercent() >= 10) {
+        if (weatherCodeKind == WeatherCodeKind.MOSTLY_CLEAR || weather.cloudCoverPercent() >= 10) {
             return "mostly_clear";
         }
-        if (weatherCode == 0) {
+        if (weatherCodeKind == WeatherCodeKind.CLEAR) {
             return "clear";
         }
         return "mixed";

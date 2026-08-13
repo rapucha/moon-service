@@ -2215,23 +2215,26 @@ It uses a built-in bitmap digit set so the picture stays deterministic across
 machines. That time also remains in the entry text.
 
 Weather appears as a restrained overlay on the large Moon scene, not as a
-separate icon. The numeric WMO weather code selects these visual categories:
+separate icon. The existing `weather.segmentKind` selects the broad overlay:
 
-- clear (`0`, `1`): no overlay;
-- cloudy (`2`, `3`): several soft cloud masses that clearly obscure part of
-  the Moon;
-- fog (`45`, `48`): soft horizontal fog layers;
-- rain (`51`, `53`, `55`, `56`, `57`, `61`, `63`, `65`, `66`, `67`, `80`,
-  `81`, `82`): clouds and low slanted rain strokes;
-- snow (`71`, `73`, `75`, `77`, `85`, `86`): clouds and small snow points;
-- storm (`95`, `96`, `99`): darker clouds, low rain strokes, and a restrained
-  flash; and
-- mixed: clouds and a few low rain strokes for any other integer.
+- `clear` or `mostly_clear`: no overlay;
+- `partly_cloudy`, `mostly_cloudy`, or `overcast`: several soft cloud masses
+  that clearly obscure part of the Moon;
+- `poor_visibility`: soft horizontal fog layers;
+- `mixed`: clouds and a few low rain strokes; and
+- `precipitation_risk`: use the backend's shared WMO classification to choose
+  the precipitation overlay.
+
+For `precipitation_risk`, `ScoringModel.weatherCodeKind(int)` provides the
+shared classification. Its rain, snow, and storm kinds select the matching
+artwork. `OTHER_PRECIPITATION` selects the mixed overlay. A non-precipitation
+kind paired with `precipitation_risk` is an internal error.
 
 Rain and storm strokes stay in the Moon's lowest third. The texture remains
 visible enough for the scene to read as a Moon opportunity. The renderer does
-not derive weather from the free-form summary. Every useful fact also appears
-in the summary and XHTML text.
+not derive weather from the free-form summary. It compares the final overlay,
+not raw weather inputs, when deciding whether the picture changed. Every useful
+fact also appears in the summary and XHTML text.
 
 A feed reader may remove the XHTML or embedded picture, or may show only the
 summary. Rich content is an optional enhancement, not a promise that every

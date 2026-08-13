@@ -2,6 +2,7 @@ package dev.moonservice.backend.web;
 
 import dev.moonservice.backend.opportunity.search.OpportunitySearchResponse;
 import dev.moonservice.scoringprototype.input.OpportunityPreferences.AmbientLight;
+import dev.moonservice.scoringprototype.scoring.ScoringModel.WeatherCodeKind;
 
 import javax.imageio.ImageIO;
 import java.awt.BasicStroke;
@@ -21,6 +22,8 @@ import java.util.Comparator;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Objects;
+
+import static dev.moonservice.scoringprototype.scoring.ScoringModel.weatherCodeKind;
 
 /**
  * Builds the Atom preview PNG that {@link AtomFeedDocumentRenderer} embeds in
@@ -145,7 +148,7 @@ final class AtomEntryPreviewRenderer {
                 markers,
                 suggested,
                 ambientLight(moonPath.suggested().lightBucket()),
-                WeatherCategory.fromCode(opportunity.weather().weatherCode()),
+                WeatherOverlay.from(opportunity.weather()),
                 time);
     }
 
@@ -400,7 +403,7 @@ final class AtomEntryPreviewRenderer {
             List<MoonMarker> markers,
             MoonMarker suggested,
             AmbientLight sky,
-            WeatherCategory weather,
+            WeatherOverlay weather,
             String suggestedTime
     ) {
         Preview {
@@ -419,19 +422,35 @@ final class AtomEntryPreviewRenderer {
     private record LightPalette(Color skyTop, Color skyBottom, Color band) {
     }
 
-    /** Coarse WMO groups select artwork; unlisted provider codes use the mixed fallback. */
-    enum WeatherCategory {
+    /**
+     * Atom-only artwork selected from the opportunity's existing weather result.
+     * The WMO code refines precipitation; it does not classify the broad condition again.
+     */
+    enum WeatherOverlay {
         CLEAR, CLOUDY, FOG, RAIN, SNOW, STORM, MIXED;
 
-        static WeatherCategory fromCode(int code) {
-            return switch (code) {
-                case 0, 1 -> CLEAR;
-                case 2, 3 -> CLOUDY;
-                case 45, 48 -> FOG;
-                case 51, 53, 55, 56, 57, 61, 63, 65, 66, 67, 80, 81, 82 -> RAIN;
-                case 71, 73, 75, 77, 85, 86 -> SNOW;
-                case 95, 96, 99 -> STORM;
-                default -> MIXED;
+        static WeatherOverlay from(OpportunitySearchResponse.Weather weather) {
+            return switch (weather.segmentKind()) {
+                case "clear", "mostly_clear" -> CLEAR;
+                case "partly_cloudy", "mostly_cloudy", "overcast" -> CLOUDY;
+                case "poor_visibility" -> FOG;
+                case "precipitation_risk" -> precipitation(weather.weatherCode());
+                case "mixed" -> MIXED;
+                default -> throw new IllegalArgumentException(
+                        "Unknown weather segment kind: " + weather.segmentKind());
+            };
+        }
+
+        private static WeatherOverlay precipitation(int code) {
+            WeatherCodeKind kind = weatherCodeKind(code);
+            return switch (kind) {
+                case RAIN -> RAIN;
+                case SNOW -> SNOW;
+                case STORM -> STORM;
+                case OTHER_PRECIPITATION -> MIXED;
+                default -> throw new IllegalArgumentException(
+                        "Weather segment precipitation_risk requires a precipitation WMO code, but code "
+                                + code + " is " + kind);
             };
         }
     }
