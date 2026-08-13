@@ -1,6 +1,7 @@
 package dev.moonservice.backend.web;
 
 import dev.moonservice.backend.opportunity.search.OpportunitySearchResponse;
+import dev.moonservice.scoringprototype.input.OpportunityPreferences.AmbientLight;
 import org.junit.jupiter.api.Test;
 
 import javax.imageio.ImageIO;
@@ -75,11 +76,9 @@ class AtomEntryPreviewRendererTest {
     @Test
     void supportsAllSkiesAndRealLightSegments() throws Exception {
         Set<Integer> skyPixels = new HashSet<>();
-        for (AtomEntryPreviewRenderer.LightBucket bucket
-                : AtomEntryPreviewRenderer.LightBucket.values()) {
-            String value = bucket.name().toLowerCase(java.util.Locale.ROOT);
-            AtomEntryPreviewRenderer.Preview preview = preview(0, value);
-            assertEquals(bucket, preview.sky());
+        for (AmbientLight light : AmbientLight.values()) {
+            AtomEntryPreviewRenderer.Preview preview = preview(0, light.wireValue());
+            assertEquals(light, preview.sky());
             BufferedImage image = image(preview);
             skyPixels.add(image.getRGB(155, 5));
         }
@@ -90,11 +89,11 @@ class AtomEntryPreviewRendererTest {
                 "nautical_twilight", "civil_twilight", "golden_hour", "daylight");
         AtomEntryPreviewRenderer.Preview mixed = AtomEntryPreviewRenderer.preview(
                 opportunity(0, buckets, .1, .01, 241.1, 18.1), "Europe/Prague");
-        List<AtomEntryPreviewRenderer.LightBucket> actualBuckets = mixed.curve().stream()
+        List<AmbientLight> actualBuckets = mixed.curve().stream()
                 .map(AtomEntryPreviewRenderer.CurvePoint::light)
                 .toList();
         assertEquals(buckets.subList(0, buckets.size() - 1).stream()
-                        .map(AtomEntryPreviewRenderer.LightBucket::from).toList(),
+                        .map(AtomEntryPreviewRendererTest::ambientLight).toList(),
                 actualBuckets.subList(0, actualBuckets.size() - 1));
         assertNull(actualBuckets.getLast());
 
@@ -339,6 +338,13 @@ class AtomEntryPreviewRendererTest {
 
     private static List<String> repeated(String value) {
         return java.util.Collections.nCopies(9, value);
+    }
+
+    private static AmbientLight ambientLight(String wireValue) {
+        return Arrays.stream(AmbientLight.values())
+                .filter(light -> light.wireValue().equals(wireValue))
+                .findFirst()
+                .orElseThrow();
     }
 
     private static void assertCodes(

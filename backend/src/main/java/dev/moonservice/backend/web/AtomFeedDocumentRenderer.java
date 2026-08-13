@@ -16,9 +16,18 @@ import java.util.List;
 import java.util.Locale;
 import java.util.UUID;
 
+/**
+ * Converts search results into stable display values and serializes those
+ * values as Atom XML. {@link AtomFeedService} owns refresh and cache state and
+ * calls this renderer; this renderer calls {@link AtomEntryPreviewRenderer}
+ * for the image embedded in each entry. Keeping presentation here lets the
+ * service compare complete visible values before choosing Atom timestamps.
+ */
 final class AtomFeedDocumentRenderer {
     private static final String ATOM_NAMESPACE = "http://www.w3.org/2005/Atom";
     private static final String XHTML_NAMESPACE = "http://www.w3.org/1999/xhtml";
+    private static final String FEED_ID_SEED_PREFIX = "moon-service.atom.feed.v1\n";
+    private static final String ENTRY_ID_SEED_PREFIX = "moon-service.atom.entry.v1\n";
     private static final String AUTHOR = "Moon Service";
     private static final String HORIZON_CAVEAT =
             "Local hills, buildings, or trees may affect exact visibility near the horizon.";
@@ -28,6 +37,7 @@ final class AtomFeedDocumentRenderer {
     private static final String EYE_SAFETY_REMAINDER =
             "search for the Moon near the Sun through binoculars, a telescope,"
                     + " or a camera's optical viewfinder.";
+    private static final double EYE_SAFETY_MAX_ILLUMINATION_PERCENT = 10.0;
     private static final DateTimeFormatter TITLE_TIME =
             DateTimeFormatter.ofPattern("uuuu-MM-dd HH:mm z", Locale.ENGLISH);
 
@@ -35,11 +45,16 @@ final class AtomFeedDocumentRenderer {
     }
 
     static FeedMetadata metadata(OpportunitySearchResponse.Location location) {
+        /*
+         * Canonical IDs make feed identity stable across host names and
+         * display-name changes. Only the query value is encoded; relative
+         * links let each deployment supply its own public origin.
+         */
         String canonicalId = location.id();
         String encodedId = UriUtils.encodeQueryParam(canonicalId, StandardCharsets.UTF_8);
         return new FeedMetadata(
                 "Moon opportunities near " + location.displayName(),
-                atomId("moon-service.atom.feed.v1\n" + canonicalId),
+                atomId(FEED_ID_SEED_PREFIX + canonicalId),
                 AUTHOR,
                 "/feeds/atom?locationId=" + encodedId);
     }
@@ -48,6 +63,12 @@ final class AtomFeedDocumentRenderer {
             OpportunitySearchResponse.Location location,
             OpportunitySearchResponse.Opportunity opportunity
     ) {
+        /*
+         * The title is local for quick reading; the section timestamps stay
+         * precise instants. Entry identity combines the canonical location and
+         * window start, so a recommendation refresh can update the same entry.
+         * The alternate result URL follows the same relative-link rule.
+         */
         String canonicalId = location.id();
         String encodedId = UriUtils.encodeQueryParam(canonicalId, StandardCharsets.UTF_8);
         String title = TITLE_TIME.format(Instant.parse(opportunity.suggestedAt())
@@ -88,7 +109,7 @@ final class AtomFeedDocumentRenderer {
         String previewAlt = "Visual preview: " + phase + " Moon, Moon path, and "
                 + plainLabel(preview.weather().name()) + " weather.";
         return new DisplayedEntry(
-                atomId("moon-service.atom.entry.v1\n" + canonicalId + "\n" + opportunity.startsAt()),
+                atomId(ENTRY_ID_SEED_PREFIX + canonicalId + "\n" + opportunity.startsAt()),
                 title,
                 summary,
                 "/search?locationId=" + encodedId,
@@ -106,6 +127,7 @@ final class AtomFeedDocumentRenderer {
             List<EntrySnapshot> entries,
             String feedUpdated
     ) {
+        /* StAX supplies XML escaping while fixed element order gives the ETag one repeatable input. */
         ByteArrayOutputStream output = new ByteArrayOutputStream();
         try {
             XMLStreamWriter xml = XMLOutputFactory.newFactory()
@@ -150,6 +172,11 @@ final class AtomFeedDocumentRenderer {
 
     private static void writeXhtmlContent(XMLStreamWriter xml, DisplayedEntry entry)
             throws XMLStreamException {
+        /*
+         * Atom XHTML content requires exactly one XHTML div wrapper. The PNG
+         * is a self-contained data URL, so a feed reader need not fetch a
+         * second Moon Service route; all useful facts remain in text too.
+         */
         xml.writeStartElement("content");
         xml.writeAttribute("type", "xhtml");
         xhtmlRoot(xml);
@@ -228,8 +255,9 @@ final class AtomFeedDocumentRenderer {
     }
 
     private static boolean needsEyeSafetyWarning(String phaseName, double illuminationPercent) {
+        /* Product rule: warn for New Moon and for either crescent when illumination is at most 10%. */
         return "new_moon".equals(phaseName)
-                || illuminationPercent <= 10.0
+                || illuminationPercent <= EYE_SAFETY_MAX_ILLUMINATION_PERCENT
                 && ("waxing_crescent".equals(phaseName) || "waning_crescent".equals(phaseName));
     }
 
@@ -238,6 +266,11 @@ final class AtomFeedDocumentRenderer {
     }
 
     private static String requireXmlText(String value) {
+        /*
+         * StAX escapes markup characters but can still write code points that
+         * XML 1.0 forbids. These ranges are the XML 1.0 Char production, so a
+         * rejected provider/display value cannot make the whole feed malformed.
+         */
         boolean valid = value.codePoints().allMatch(codePoint ->
                 codePoint == 0x9
                         || codePoint == 0xA
@@ -253,14 +286,17 @@ final class AtomFeedDocumentRenderer {
     }
 
     private static String atomId(String input) {
+        /* Name-based UUIDs provide repeatable absolute Atom IRIs; they are identifiers, not secrets. */
         return "urn:uuid:" + UUID.nameUUIDFromBytes(input.getBytes(StandardCharsets.UTF_8));
     }
 
     private static String oneDecimal(double value) {
+        // Force a dot decimal separator so rendered bytes do not depend on the server locale.
         return String.format(Locale.ENGLISH, "%.1f", value);
     }
 
     private static String plainLabel(String value) {
+        // Response wire labels use lower_snake_case; feed prose uses lower-case words.
         return value.replace('_', ' ').toLowerCase(Locale.ENGLISH);
     }
 
@@ -270,6 +306,7 @@ final class AtomFeedDocumentRenderer {
     record EntrySnapshot(DisplayedEntry displayed, String updated) {
     }
 
+    /** Complete display snapshot whose record equality controls the entry's {@code updated} timestamp. */
     record DisplayedEntry(
             String id,
             String title,
@@ -284,6 +321,7 @@ final class AtomFeedDocumentRenderer {
             String previewAlt
     ) {
         DisplayedEntry {
+            // Defensive copies keep the snapshot immutable after it enters the cache.
             when = List.copyOf(when);
             conditions = List.copyOf(conditions);
             before = List.copyOf(before);

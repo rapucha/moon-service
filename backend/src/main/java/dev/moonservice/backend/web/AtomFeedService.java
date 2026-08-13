@@ -25,10 +25,26 @@ import java.util.concurrent.CompletionException;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
+/**
+ * Controller-facing coordinator for public Atom feeds. The classes form a
+ * composition pipeline, not an inheritance hierarchy:
+ * {@link AtomFeedController} calls this service, this service asks
+ * {@link AtomFeedDocumentRenderer} for stable display snapshots and XML, and
+ * that renderer uses {@link AtomEntryPreviewRenderer} for entry images. The
+ * preview renderer delegates Moon discs to {@link AtomMoonRenderer} and
+ * weather artwork to {@link AtomWeatherRenderer}.
+ *
+ * <p>This class owns the parts that are not presentation: opportunity search,
+ * the one-hour freshness window, per-cached-location single-flight refresh
+ * work, stable Atom update times, strong ETags, and the bounded process cache.
+ */
 @Service
 final class AtomFeedService {
     private static final int MAX_LOCATION_ID_CODE_POINTS = 100;
+    private static final int MAX_FEED_ENTRIES = 10;
+    /* Caffeine weighs exact serialized XML bytes; object overhead is not part of this limit. */
     private static final long MAX_CACHE_WEIGHT_BYTES = 96L * 1024 * 1024;
+    /* A stale entry triggers a new search/render; it is not deleted on this timer. */
     private static final Duration FRESHNESS = Duration.ofHours(1);
 
     private final OpportunitySearchService opportunitySearchService;
@@ -52,20 +68,24 @@ final class AtomFeedService {
                     clock.instant(),
                     previous -> refresh(locationId, previous));
         } catch (RuntimeException | Error failure) {
+            // A first failed load has no useful cached value, so do not retain its zero-weight state.
             if (state.cachedXmlBytes() == 0) {
                 states.asMap().remove(locationId, state);
             }
             throw failure;
         }
         /*
-         * FeedState is mutable, so inserting it again makes Caffeine weigh the
-         * XML produced by this refresh instead of its initial empty state.
+         * FeedState is mutable. Inserting it again after current() makes
+         * Caffeine weigh its current XML rather than the zero-byte state first
+         * inserted for this location. It works whether this caller performed
+         * the refresh or waited for another caller's refresh.
          */
         states.put(locationId, state);
         return new AtomFeed(snapshot.xml(), snapshot.etag());
     }
 
     private FeedSnapshot refresh(String locationId, FeedSnapshot previous) {
+        /* Use the shared canonical seven-day search defaults, with SOONEST ordering for the feed. */
         OpportunityResponse response;
         try {
             response = opportunitySearchService.search(
@@ -94,16 +114,18 @@ final class AtomFeedService {
                         .comparing((AtomFeedDocumentRenderer.DisplayedEntry entry) ->
                                 Instant.parse(entry.suggestedAt()))
                         .thenComparing(AtomFeedDocumentRenderer.DisplayedEntry::id))
-                .limit(10)
+                .limit(MAX_FEED_ENTRIES)
                 .toList();
 
         Map<String, AtomFeedDocumentRenderer.EntrySnapshot> previousEntries = previous == null
                 ? Map.of()
                 : previous.entries().stream().collect(Collectors.toMap(
                         entry -> entry.displayed().id(), Function.identity()));
+        // Match by stable Atom ID so unchanged surviving entries keep their own updated values.
         List<AtomFeedDocumentRenderer.EntrySnapshot> entries = displayedEntries.stream()
                 .map(displayed -> entrySnapshot(displayed, previousEntries.get(displayed.id()), generatedAt))
                 .toList();
+        // The feed-level timestamp advances only when its visible metadata or ordered entries change.
         String feedUpdated = previous == null
                 || !metadata.equals(previous.metadata())
                 || !entries.equals(previous.entries())
@@ -125,6 +147,7 @@ final class AtomFeedService {
             AtomFeedDocumentRenderer.EntrySnapshot previous,
             String generatedAt
     ) {
+        /* A stable entry ID plus equal visible values keeps that entry's old Atom timestamp. */
         String updated = previous != null && previous.displayed().equals(displayed)
                 ? previous.updated()
                 : generatedAt;
@@ -132,6 +155,7 @@ final class AtomFeedService {
     }
 
     private static String etag(byte[] xml) {
+        /* Hash the exact serialized representation so this is a strong ETag, not a freshness token. */
         try {
             byte[] digest = MessageDigest.getInstance("SHA-256").digest(xml);
             return "\"" + HexFormat.of().formatHex(digest) + "\"";
@@ -229,6 +253,12 @@ final class AtomFeedService {
         }
     }
 
+    /**
+     * Mutable state shared by callers for one canonical location ID. A volatile
+     * snapshot makes fresh reads lock-free. When stale, one caller owns the
+     * load and the others join the same future; different location IDs use
+     * different states and can refresh in parallel.
+     */
     private static final class FeedState {
         private volatile FeedSnapshot snapshot;
         private CompletableFuture<FeedSnapshot> refresh;
@@ -242,6 +272,7 @@ final class AtomFeedService {
                 Instant now,
                 Function<FeedSnapshot, FeedSnapshot> loader
         ) {
+            // Fast path for the common fresh-cache case.
             FeedSnapshot visible = snapshot;
             if (visible != null && now.isBefore(visible.staleAt())) {
                 return visible;
@@ -251,11 +282,13 @@ final class AtomFeedService {
             FeedSnapshot previous = null;
             boolean ownsRefresh = false;
             synchronized (this) {
+                // Recheck after taking the monitor because another caller may have just refreshed.
                 visible = snapshot;
                 if (visible != null && now.isBefore(visible.staleAt())) {
                     return visible;
                 }
                 if (refresh == null) {
+                    // Publish the future before doing slow provider work outside the monitor.
                     refresh = new CompletableFuture<>();
                     previous = visible;
                     ownsRefresh = true;
@@ -266,6 +299,7 @@ final class AtomFeedService {
             if (ownsRefresh) {
                 completeRefresh(work, loader, previous);
             }
+            // Both the owner and followers observe the same result or failure.
             return completedValue(work);
         }
 
@@ -277,12 +311,14 @@ final class AtomFeedService {
             try {
                 FeedSnapshot next = loader.apply(previous);
                 synchronized (this) {
+                    // Install the complete immutable snapshot before releasing waiting callers.
                     snapshot = next;
                     work.complete(next);
                     refresh = null;
                 }
             } catch (Throwable failure) {
                 synchronized (this) {
+                    // Keep any previous snapshot, but let every current caller see this failure.
                     work.completeExceptionally(failure);
                     refresh = null;
                 }
@@ -304,6 +340,7 @@ final class AtomFeedService {
         }
     }
 
+    /** Complete snapshot bundle used for visible-change comparison, cache delivery, and ETag response. */
     private record FeedSnapshot(
             AtomFeedDocumentRenderer.FeedMetadata metadata,
             List<AtomFeedDocumentRenderer.EntrySnapshot> entries,
