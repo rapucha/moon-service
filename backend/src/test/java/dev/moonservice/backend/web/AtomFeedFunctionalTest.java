@@ -74,7 +74,7 @@ class AtomFeedFunctionalTest {
                 "medium", "partly cloudy", 7.2, 83.7, "civil_twilight");
         OpportunitySearchResponse.Opportunity earlier = opportunity(
                 "2026-08-14T02:05:00Z", "2026-08-14T02:25:00Z", "2026-08-14T02:55:00Z",
-                "high", "mostly clear", 5.5, 84.2, "blue_hour");
+                "high", "mostly clear", 5.5, 84.2, "civil_twilight");
         OpportunitySearchService search = searchService();
         whenSearch(search).thenReturn(response(
                 GENERATED_1, canonicalId, "Prague & <Old Town>", List.of(later, earlier)));
@@ -118,7 +118,7 @@ class AtomFeedFunctionalTest {
         assertTrue(summary.contains("Weather: mostly clear"));
         assertTrue(summary.contains("Moon altitude: 5.5 degrees"));
         assertTrue(summary.contains("Moon illumination: 84.2%"));
-        assertTrue(summary.contains("Ambient light: blue hour"));
+        assertTrue(summary.contains("Ambient light: civil twilight"));
         assertTrue(summary.contains("Local hills, buildings, or trees"));
         assertTrue(summary.contains("Open the live result before leaving"));
         assertFalse(summary.contains("cloud cover"));
@@ -168,7 +168,7 @@ class AtomFeedFunctionalTest {
         OpportunitySearchResponse.Opportunity first = standardOpportunity("mostly clear");
         OpportunitySearchResponse.Opportunity second = opportunity(
                 "2026-08-15T02:05:00Z", "2026-08-15T02:25:00Z", "2026-08-15T02:55:00Z",
-                "medium", "cloudy", 6.1, 82.0, "blue_hour");
+                "medium", "cloudy", 6.1, 82.0, "civil_twilight");
         OpportunitySearchService search = searchService();
         whenSearch(search).thenReturn(
                 response(GENERATED_1, LOCATION_ID, "Prague", List.of(first, second)),
@@ -317,7 +317,7 @@ class AtomFeedFunctionalTest {
         OpportunitySearchResponse.Opportunity first = standardOpportunity("mostly clear");
         OpportunitySearchResponse.Opportunity second = opportunity(
                 "2026-08-15T02:05:00Z", "2026-08-15T02:25:00Z", "2026-08-15T02:55:00Z",
-                "medium", "cloudy", 6.1, 82.0, "blue_hour");
+                "medium", "cloudy", 6.1, 82.0, "civil_twilight");
         OpportunitySearchService search = searchService();
         whenSearch(search).thenReturn(
                 response(GENERATED_1, LOCATION_ID, "Prague", List.of(first, second)),
@@ -425,7 +425,7 @@ class AtomFeedFunctionalTest {
     private static OpportunitySearchResponse.Opportunity standardOpportunity(String weatherSummary) {
         return opportunity(
                 "2026-08-14T02:05:00Z", "2026-08-14T02:25:00Z", "2026-08-14T02:55:00Z",
-                "high", weatherSummary, 5.5, 84.2, "blue_hour");
+                "high", weatherSummary, 5.5, 84.2, "civil_twilight");
     }
 
     private static OpportunitySearchResponse.Opportunity opportunity(
@@ -451,8 +451,8 @@ class AtomFeedFunctionalTest {
                 null,
                 null,
                 new OpportunitySearchResponse.Moon(
-                        altitude, 91.0, illumination, 162.0, null, null, "waxing gibbous"),
-                null,
+                        altitude, 91.0, illumination, 162.0, null, null, "waxing_gibbous"),
+                moonPath(startsAt, suggestedAt, endsAt, altitude, lightBucket),
                 new OpportunitySearchResponse.Sun(-5.0, 72.0, lightBucket),
                 new OpportunitySearchResponse.Weather(
                         "hourly", "window", 63, 71, 30, 44, 51,
@@ -460,6 +460,34 @@ class AtomFeedFunctionalTest {
                 null,
                 "Exact score and provider details must not appear.",
                 Map.of());
+    }
+
+    private static OpportunitySearchResponse.MoonPath moonPath(
+            String startsAt,
+            String suggestedAt,
+            String endsAt,
+            double suggestedAltitude,
+            String lightBucket
+    ) {
+        OpportunitySearchResponse.MoonPathPoint start = pathPoint(
+                startsAt, suggestedAltitude - 2.0, lightBucket, "start");
+        OpportunitySearchResponse.MoonPathPoint suggested = pathPoint(
+                suggestedAt, suggestedAltitude, lightBucket, "suggested");
+        OpportunitySearchResponse.MoonPathPoint end = pathPoint(
+                endsAt, suggestedAltitude - 3.0, lightBucket, "end");
+        return new OpportunitySearchResponse.MoonPath(
+                start, suggested, end, List.of(start, suggested, end));
+    }
+
+    private static OpportunitySearchResponse.MoonPathPoint pathPoint(
+            String at,
+            double altitude,
+            String lightBucket,
+            String role
+    ) {
+        return new OpportunitySearchResponse.MoonPathPoint(
+                at, altitude, 91.0, 162.0, null, null,
+                -5.0, 72.0, lightBucket, role);
     }
 
     private static Document parse(byte[] xml) throws Exception {

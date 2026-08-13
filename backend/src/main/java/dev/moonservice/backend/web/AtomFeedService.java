@@ -9,27 +9,17 @@ import dev.moonservice.backend.opportunity.search.OpportunitySearchRequest;
 import dev.moonservice.backend.opportunity.search.OpportunitySearchResponse;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
-import org.springframework.web.util.UriUtils;
 
-import javax.xml.stream.XMLOutputFactory;
-import javax.xml.stream.XMLStreamException;
-import javax.xml.stream.XMLStreamWriter;
-import java.io.ByteArrayOutputStream;
-import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
-import java.time.ZoneId;
-import java.time.format.DateTimeFormatter;
 import java.util.Comparator;
 import java.util.HexFormat;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
-import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import java.util.function.Function;
@@ -37,22 +27,15 @@ import java.util.stream.Collectors;
 
 @Service
 final class AtomFeedService {
-    private static final String ATOM_NAMESPACE = "http://www.w3.org/2005/Atom";
-    private static final String AUTHOR = "Moon Service";
-    private static final String HORIZON_CAVEAT =
-            "Local hills, buildings, or trees may affect exact visibility near the horizon.";
-    private static final String LIVE_RESULT_WARNING =
-            "Open the live result before leaving because forecasts and recommendations can change.";
     private static final int MAX_LOCATION_ID_CODE_POINTS = 100;
-    private static final int MAX_STATES = 1_000;
+    private static final long MAX_CACHE_WEIGHT_BYTES = 96L * 1024 * 1024;
     private static final Duration FRESHNESS = Duration.ofHours(1);
-    private static final DateTimeFormatter TITLE_TIME =
-            DateTimeFormatter.ofPattern("uuuu-MM-dd HH:mm z", Locale.ENGLISH);
 
     private final OpportunitySearchService opportunitySearchService;
     private final Clock clock;
     private final Cache<String, FeedState> states = Caffeine.newBuilder()
-            .maximumSize(MAX_STATES)
+            .<String, FeedState>weigher((locationId, state) -> state.cachedXmlBytes())
+            .maximumWeight(MAX_CACHE_WEIGHT_BYTES)
             .build();
 
     AtomFeedService(OpportunitySearchService opportunitySearchService, Clock clock) {
@@ -63,9 +46,22 @@ final class AtomFeedService {
     AtomFeed feed(String rawLocationId) {
         String locationId = normalizeLocationId(rawLocationId);
         FeedState state = states.get(locationId, ignored -> new FeedState());
-        FeedSnapshot snapshot = state.current(
-                clock.instant(),
-                previous -> refresh(locationId, previous));
+        FeedSnapshot snapshot;
+        try {
+            snapshot = state.current(
+                    clock.instant(),
+                    previous -> refresh(locationId, previous));
+        } catch (RuntimeException | Error failure) {
+            if (state.cachedXmlBytes() == 0) {
+                states.asMap().remove(locationId, state);
+            }
+            throw failure;
+        }
+        /*
+         * FeedState is mutable, so inserting it again makes Caffeine weigh the
+         * XML produced by this refresh instead of its initial empty state.
+         */
+        states.put(locationId, state);
         return new AtomFeed(snapshot.xml(), snapshot.etag());
     }
 
@@ -90,20 +86,22 @@ final class AtomFeedService {
         }
 
         String generatedAt = Instant.parse(success.generatedAt()).toString();
-        FeedMetadata metadata = metadata(success.location());
-        List<DisplayedEntry> displayedEntries = success.opportunities().stream()
-                .map(opportunity -> displayedEntry(success.location(), opportunity))
+        AtomFeedDocumentRenderer.FeedMetadata metadata =
+                AtomFeedDocumentRenderer.metadata(success.location());
+        List<AtomFeedDocumentRenderer.DisplayedEntry> displayedEntries = success.opportunities().stream()
+                .map(opportunity -> AtomFeedDocumentRenderer.displayedEntry(success.location(), opportunity))
                 .sorted(Comparator
-                        .comparing((DisplayedEntry entry) -> Instant.parse(entry.suggestedAt()))
-                        .thenComparing(DisplayedEntry::id))
+                        .comparing((AtomFeedDocumentRenderer.DisplayedEntry entry) ->
+                                Instant.parse(entry.suggestedAt()))
+                        .thenComparing(AtomFeedDocumentRenderer.DisplayedEntry::id))
                 .limit(10)
                 .toList();
 
-        Map<String, EntrySnapshot> previousEntries = previous == null
+        Map<String, AtomFeedDocumentRenderer.EntrySnapshot> previousEntries = previous == null
                 ? Map.of()
                 : previous.entries().stream().collect(Collectors.toMap(
                         entry -> entry.displayed().id(), Function.identity()));
-        List<EntrySnapshot> entries = displayedEntries.stream()
+        List<AtomFeedDocumentRenderer.EntrySnapshot> entries = displayedEntries.stream()
                 .map(displayed -> entrySnapshot(displayed, previousEntries.get(displayed.id()), generatedAt))
                 .toList();
         String feedUpdated = previous == null
@@ -112,7 +110,7 @@ final class AtomFeedService {
                 ? generatedAt
                 : previous.feedUpdated();
 
-        byte[] xml = render(metadata, entries, feedUpdated);
+        byte[] xml = AtomFeedDocumentRenderer.render(metadata, entries, feedUpdated);
         return new FeedSnapshot(
                 metadata,
                 entries,
@@ -122,127 +120,15 @@ final class AtomFeedService {
                 etag(xml));
     }
 
-    private static FeedMetadata metadata(OpportunitySearchResponse.Location location) {
-        String canonicalId = location.id();
-        String encodedId = UriUtils.encodeQueryParam(canonicalId, StandardCharsets.UTF_8);
-        return new FeedMetadata(
-                "Moon opportunities near " + location.displayName(),
-                atomId("moon-service.atom.feed.v1\n" + canonicalId),
-                AUTHOR,
-                "/feeds/atom?locationId=" + encodedId);
-    }
-
-    private static DisplayedEntry displayedEntry(
-            OpportunitySearchResponse.Location location,
-            OpportunitySearchResponse.Opportunity opportunity
-    ) {
-        String canonicalId = location.id();
-        String encodedId = UriUtils.encodeQueryParam(canonicalId, StandardCharsets.UTF_8);
-        String title = TITLE_TIME.format(Instant.parse(opportunity.suggestedAt())
-                        .atZone(ZoneId.of(location.timezone())))
-                + " — Moon opportunity near " + location.displayName();
-        String summary = "Starts: " + opportunity.startsAt() + "\n"
-                + "Suggested: " + opportunity.suggestedAt() + "\n"
-                + "Ends: " + opportunity.endsAt() + "\n"
-                + "Timezone: " + location.timezone() + "\n"
-                + "Confidence: " + plainLabel(opportunity.confidence()) + "\n"
-                + "Weather: " + opportunity.weather().summary() + "\n"
-                + "Moon altitude: " + oneDecimal(opportunity.moon().altitudeDegrees()) + " degrees\n"
-                + "Moon illumination: " + oneDecimal(opportunity.moon().illuminationPercent()) + "%\n"
-                + "Ambient light: " + plainLabel(opportunity.sun().lightBucket()) + "\n"
-                + HORIZON_CAVEAT + "\n"
-                + LIVE_RESULT_WARNING;
-        return new DisplayedEntry(
-                atomId("moon-service.atom.entry.v1\n" + canonicalId + "\n" + opportunity.startsAt()),
-                title,
-                summary,
-                "/search?locationId=" + encodedId,
-                opportunity.suggestedAt());
-    }
-
-    private static EntrySnapshot entrySnapshot(
-            DisplayedEntry displayed,
-            EntrySnapshot previous,
+    private static AtomFeedDocumentRenderer.EntrySnapshot entrySnapshot(
+            AtomFeedDocumentRenderer.DisplayedEntry displayed,
+            AtomFeedDocumentRenderer.EntrySnapshot previous,
             String generatedAt
     ) {
         String updated = previous != null && previous.displayed().equals(displayed)
                 ? previous.updated()
                 : generatedAt;
-        return new EntrySnapshot(displayed, updated);
-    }
-
-    private static byte[] render(
-            FeedMetadata metadata,
-            List<EntrySnapshot> entries,
-            String feedUpdated
-    ) {
-        ByteArrayOutputStream output = new ByteArrayOutputStream();
-        try {
-            XMLStreamWriter xml = XMLOutputFactory.newFactory()
-                    .createXMLStreamWriter(output, StandardCharsets.UTF_8.name());
-            xml.writeStartDocument(StandardCharsets.UTF_8.name(), "1.0");
-            xml.writeStartElement("feed");
-            xml.writeDefaultNamespace(ATOM_NAMESPACE);
-            textElement(xml, "title", metadata.title());
-            textElement(xml, "id", metadata.id());
-            textElement(xml, "updated", feedUpdated);
-            xml.writeStartElement("author");
-            textElement(xml, "name", metadata.author());
-            xml.writeEndElement();
-            link(xml, "self", metadata.selfUrl(), "application/atom+xml");
-            for (EntrySnapshot entry : entries) {
-                xml.writeStartElement("entry");
-                textElement(xml, "id", entry.displayed().id());
-                textElement(xml, "title", entry.displayed().title());
-                textElement(xml, "updated", entry.updated());
-                link(xml, "alternate", entry.displayed().alternateUrl(), "text/html");
-                xml.writeStartElement("summary");
-                xml.writeAttribute("type", "text");
-                xml.writeCharacters(requireXmlText(entry.displayed().summary()));
-                xml.writeEndElement();
-                xml.writeEndElement();
-            }
-            xml.writeEndElement();
-            xml.writeEndDocument();
-            xml.close();
-        } catch (XMLStreamException ex) {
-            throw new IllegalStateException("Could not render Atom XML.", ex);
-        }
-        return output.toByteArray();
-    }
-
-    private static void textElement(XMLStreamWriter xml, String name, String value)
-            throws XMLStreamException {
-        xml.writeStartElement(name);
-        xml.writeCharacters(requireXmlText(value));
-        xml.writeEndElement();
-    }
-
-    private static void link(XMLStreamWriter xml, String rel, String href, String type)
-            throws XMLStreamException {
-        xml.writeEmptyElement("link");
-        xml.writeAttribute("rel", requireXmlText(rel));
-        xml.writeAttribute("href", requireXmlText(href));
-        xml.writeAttribute("type", requireXmlText(type));
-    }
-
-    private static String requireXmlText(String value) {
-        boolean valid = value.codePoints().allMatch(codePoint ->
-                codePoint == 0x9
-                        || codePoint == 0xA
-                        || codePoint == 0xD
-                        || codePoint >= 0x20 && codePoint <= 0xD7FF
-                        || codePoint >= 0xE000 && codePoint <= 0xFFFD
-                        || codePoint >= 0x10000 && codePoint <= 0x10FFFF);
-        if (!valid) {
-            throw new IllegalArgumentException(
-                    "Atom text contains a character that XML 1.0 cannot represent.");
-        }
-        return value;
-    }
-
-    private static String atomId(String input) {
-        return "urn:uuid:" + UUID.nameUUIDFromBytes(input.getBytes(StandardCharsets.UTF_8));
+        return new AtomFeedDocumentRenderer.EntrySnapshot(displayed, updated);
     }
 
     private static String etag(byte[] xml) {
@@ -252,14 +138,6 @@ final class AtomFeedService {
         } catch (NoSuchAlgorithmException ex) {
             throw new IllegalStateException("SHA-256 is not available.", ex);
         }
-    }
-
-    private static String oneDecimal(double value) {
-        return String.format(Locale.ENGLISH, "%.1f", value);
-    }
-
-    private static String plainLabel(String value) {
-        return value.replace('_', ' ');
     }
 
     private static String normalizeLocationId(String rawLocationId) {
@@ -355,6 +233,11 @@ final class AtomFeedService {
         private volatile FeedSnapshot snapshot;
         private CompletableFuture<FeedSnapshot> refresh;
 
+        int cachedXmlBytes() {
+            FeedSnapshot visible = snapshot;
+            return visible == null ? 0 : visible.xml().length;
+        }
+
         FeedSnapshot current(
                 Instant now,
                 Function<FeedSnapshot, FeedSnapshot> loader
@@ -422,27 +305,12 @@ final class AtomFeedService {
     }
 
     private record FeedSnapshot(
-            FeedMetadata metadata,
-            List<EntrySnapshot> entries,
+            AtomFeedDocumentRenderer.FeedMetadata metadata,
+            List<AtomFeedDocumentRenderer.EntrySnapshot> entries,
             String feedUpdated,
             Instant staleAt,
             byte[] xml,
             String etag
-    ) {
-    }
-
-    private record FeedMetadata(String title, String id, String author, String selfUrl) {
-    }
-
-    private record EntrySnapshot(DisplayedEntry displayed, String updated) {
-    }
-
-    private record DisplayedEntry(
-            String id,
-            String title,
-            String summary,
-            String alternateUrl,
-            String suggestedAt
     ) {
     }
 }

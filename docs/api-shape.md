@@ -2172,12 +2172,82 @@ alternate link to `/search?locationId=<canonical-id>`. A location with no
 current opportunities returns `200` with a valid empty feed.
 
 Each entry title uses local `suggestedAt` with `uuuu-MM-dd HH:mm z` and
-`Locale.ENGLISH`, followed by ` — Moon opportunity near <location>`. Its summary
-gives the precise start, suggested, and end times, timezone, coarse confidence
-and weather labels, short Moon and light facts, the local-horizon caveat, and a
-warning to open the live result. The entry also has a live-result link. It omits
-exact scores, exact weather values, the full ranking reason, `checkedAt`, and
-`published`.
+`Locale.ENGLISH`, followed by ` — Moon opportunity near <location>`. Each entry
+has a non-empty Atom `summary` with `type="text"`. The summary gives the precise
+start, suggested, and end times, timezone, coarse confidence and weather labels,
+short Moon and light facts, the local-horizon caveat, and a reminder to open the
+live result. It is the complete fallback when a reader does not show rich
+content, and it stays readable if a reader collapses line breaks. The entry also
+has a live-result link. It omits exact scores, exact weather values, the full
+ranking reason, `checkedAt`, and `published`.
+
+Each entry also includes non-empty `content` with `type="xhtml"`. It uses one
+XHTML `div` and repeats the useful text under three bold section labels:
+
+- `When`: suggested time, opportunity window, timezone, and Moon altitude;
+- `Conditions`: phase, illumination, confidence, weather summary, and ambient
+  light; and
+- `Before you go`: the live-result reminder, horizon caveat, and any thin-Moon
+  eye-safety warning.
+
+The XHTML uses only paragraphs, bold text, line breaks, and one image. It has no
+CSS, JavaScript, table, `srcset`, or remote asset. The image is one embedded
+regular `640` by `160` PNG in a `data:image/png;base64,...` URL. It has declared
+width and height and short useful alt text. The renderer reuses the tracked
+NASA LROC texture at `assets/moon-textures/lroc_color_2k.jpg`; it does not add a
+network request or another tracked image.
+
+The picture shows the suggested-time Moon phase and orientation without a glow
+or ring. If bright-limb tilt is absent, it uses the existing
+location-independent phase orientation. If north-pole tilt is absent, it uses
+the existing canonical north-up texture. It does not invent either tilt. Its
+large scene uses the suggested Moon-path sample's real light bucket: daylight,
+golden hour, civil twilight, nautical twilight, or night. It shows stars only
+during nautical twilight and night. A dark, simple foreground does not claim
+to show the location's real horizon.
+
+The altitude-over-time curve is drawn over the real light-bucket segments from
+the Moon-path samples. The bucket shading has no separate brighter strip. Small
+textured Moons mark the start, quarter points, and end of the path. The larger
+suggested Moon is drawn last, and any ordinary marker that would overlap it is
+omitted. The path labels only the suggested local `HH:mm` time on its x-axis.
+It uses a built-in bitmap digit set so the picture stays deterministic across
+machines. That time also remains in the entry text.
+
+Weather appears as a restrained overlay on the large Moon scene, not as a
+separate icon. The numeric WMO weather code selects these visual categories:
+
+- clear (`0`, `1`): no overlay;
+- cloudy (`2`, `3`): several soft cloud masses that clearly obscure part of
+  the Moon;
+- fog (`45`, `48`): soft horizontal fog layers;
+- rain (`51`, `53`, `55`, `56`, `57`, `61`, `63`, `65`, `66`, `67`, `80`,
+  `81`, `82`): clouds and low slanted rain strokes;
+- snow (`71`, `73`, `75`, `77`, `85`, `86`): clouds and small snow points;
+- storm (`95`, `96`, `99`): darker clouds, low rain strokes, and a restrained
+  flash; and
+- mixed: clouds and a few low rain strokes for any other integer.
+
+Rain and storm strokes stay in the Moon's lowest third. The texture remains
+visible enough for the scene to read as a Moon opportunity. The renderer does
+not derive weather from the free-form summary. Every useful fact also appears
+in the summary and XHTML text.
+
+A feed reader may remove the XHTML or embedded picture, or may show only the
+summary. Rich content is an optional enhancement, not a promise that every
+reader will show the same layout. The complete text fallback must still say
+when to go, what conditions to expect, and what to check before leaving.
+
+Rich entry content does not change the route, location-only input, feed or
+entry IDs, ordering, one-hour freshness, 15-minute public response cache, ETag,
+bodyless `HEAD` and `304` behavior, or the no-account privacy model.
+
+`Before you go` includes this warning when the phase is `new_moon`, or when it
+is `waxing_crescent` or `waning_crescent` with illumination of `10%` or less:
+`🚨 Eye safety: Do not ever search for the Moon near the Sun through binoculars,
+a telescope, or a camera's optical viewfinder.` The XHTML makes `🚨 Eye safety:`
+and `ever` bold. The plain summary includes the same warning without styling.
+Brighter crescents and other phases do not get this warning.
 
 Feed and entry IDs are deterministic lowercase `urn:uuid` values made with
 `UUID.nameUUIDFromBytes` and UTF-8 input. The feed input is
@@ -2188,15 +2258,21 @@ Feed and entry IDs are deterministic lowercase `urn:uuid` values made with
 Atom `updated` changes only when displayed content changes. New entries use the
 search response's `generatedAt`; unchanged entries keep their old value. The
 feed value changes when its displayed feed fields, ordered entry list, or a
-displayed entry changes.
+displayed entry changes. This includes a changed section or visibly changed
+picture. The picture model rounds Moon phase and orientation to the nearest
+whole degree. It compares Moon-path geometry after conversion to final integer
+pixels and compares weather and light through their final visual categories.
+These rules keep a visually unchanged picture stable across a refresh.
 
 When an entry leaves the current ten, the feed removes it and its comparison
 state. If the same ID later returns, it is new again. The feed sends no Atom
 deleted-entry tombstone.
 
-Moon Service keeps up to 1,000 feed states in each process. A state stays fresh
-for one hour, and concurrent requests for the same location share one refresh.
-The state and its change times are not stored on disk or in a database. Restart,
+Moon Service gives its process-local feed-state cache a `96 MiB` weight bound.
+Each value's weight is its exact cached XML byte length. A state stays fresh for
+one hour, and concurrent requests for the same location share one refresh. A
+single feed that is heavier than the bound is served but not retained. The
+state and its change times are not stored on disk or in a database. Restart,
 cache eviction, removal, and later reappearance can make an entry look updated
 again even though its deterministic ID stays the same.
 
@@ -2204,6 +2280,17 @@ Render the XML deterministically. Successful feeds send
 `Cache-Control: public, max-age=900` and a strong `ETag` from the exact XML
 bytes. A matching `If-None-Match` returns a bodyless `304`. There is no
 `Last-Modified`.
+
+Tests record the complete byte size of one-entry and maximum ten-entry feeds,
+including XHTML and embedded pictures. The validated sizes are:
+
+- one-entry fixture: `57,503 bytes`;
+- maximum ten-entry fixture: `605,908 bytes`.
+
+A maximum fixture over `1.5 MiB` stops publication so the owner can approve a
+new plan. This is a pre-publication review checkpoint, not a runtime response
+limit. The server does not reject a valid feed, remove pictures, truncate
+content, or add a size setting because of this checkpoint.
 
 Errors send `Cache-Control: no-store`. A missing, blank, over-100-character, or
 disallowed control- or formatting-character `locationId` is invalid input and

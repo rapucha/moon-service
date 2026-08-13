@@ -65,11 +65,11 @@ timer rearming and exact GitHub deployment confirmation are follow-up
   survive Pod rescheduling or SD-card replacement.
 - Avoid running Postgres on SD cards until there is a clear product need and a
   tested off-card backup/restore routine.
-- Keep the public Atom feed in a bounded process cache: at most 1,000 location
-  states, refreshed after one hour, with concurrent requests for one location
-  sharing the refresh. Do not persist this state. Add a database only when
-  private feeds, saved locations, alerts, durable counters, or durable cache
-  state require it.
+- Keep the public Atom feed in a bounded process cache: up to 96 MiB of exact
+  cached XML bytes, refreshed after one hour, with concurrent requests for one
+  location sharing the refresh. Do not persist this state. Add a database only
+  when private feeds, saved locations, alerts, durable counters, or durable
+  cache state require it.
 
 ### Calibration feedback may be lost
 
@@ -415,10 +415,11 @@ The implementation should be deterministic:
   `GET` or `HEAD /feeds/atom?locationId=<canonical-id>`.
 - Generate deterministic feed and entry IDs from that location ID and the
   precise opportunity start time.
-- Keep exact Atom XML and comparison state for at most 1,000 locations in one
-  process. Refresh after one hour and share concurrent same-location work.
+- Keep exact Atom XML and comparison state in one process, with a 96 MiB bound
+  based on the exact cached XML byte length. Refresh after one hour and share
+  concurrent same-location work.
 - Send a strong ETag and `Cache-Control: public, max-age=900`; do not send
-  `Last-Modified`. The cache is lost on restart or size eviction.
+  `Last-Modified`. The cache is lost on restart or weight eviction.
 - Keep application request logs free of the query string. Moon Service and the
   feed reader still learn the location named by the feed.
 
