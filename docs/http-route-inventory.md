@@ -113,9 +113,9 @@ Open-Meteo URLs are provider dependencies, not Moon Service routes.
   the individual export may also carry selected order. Moon Service request
   logging omits those query strings, but browsers, feed and calendar clients,
   copied-link recipients, Funnel, and infrastructure that records the full
-  request target can see them. The only preference-related application log
-  is the documented aggregate event with the version, unknown field count, and
-  truncation state.
+  request target can see them. Preference-related application logging is
+  limited to the documented ignored-field aggregate event and the sanitized
+  filtered-link invariant event described under `POST /api/opportunities`.
 
 Implementation authority: [request logging](../backend/src/main/java/dev/moonservice/backend/observability/RequestLoggingFilter.java),
 [hosted resource-limit filter](../backend/src/main/java/dev/moonservice/backend/web/HostedAlphaResourceLimitFilter.java),
@@ -384,6 +384,14 @@ and [hosted-alpha functional tests](../backend/src/test/java/dev/moonservice/bac
   ten-result product limit. Each ordinary opportunity carries a complete
   backend-generated `links.ics` URL that reproduces the resolved location,
   selected order, effective weather ranking, and active hard preferences.
+  After final response assembly, applied filtered state also requires root
+  `links.atomWithFilters` to be a non-blank string. Applied filtered state means
+  that `normalizedActiveFilters` is non-empty or `appliedWeatherRanking` is
+  `prefer_clear` or `ignore_weather`. A missing, non-string, or blank link
+  replaces the inconsistent successful response with `503
+  temporarily_unavailable`, `Cache-Control: no-store`, and the exact generic
+  message `Opportunity lookup is temporarily unavailable.` Valid filtered,
+  all-off, other non-`ok` POST, and GET behavior remain unchanged.
   Errors use the documented `400 invalid_request`,
   `413 request_too_large`, and `415 unsupported_media_type` shapes.
   Invalid-order responses and every other response use
@@ -397,7 +405,13 @@ and [hosted-alpha functional tests](../backend/src/test/java/dev/moonservice/bac
   Atom URLs are the deliberate exceptions: they can carry applied preferences
   and non-default weather so the exports are reusable. The individual link can
   also carry selected order. Moon Service request logging omits their query
-  strings.
+  strings. When the filtered-link invariant fails, the backend writes one
+  `ERROR` application-log event with fixed code
+  `filtered_atom_link_invariant_failed`. The validated current request ID is
+  its sole explicit dynamic value. The event contains no location, query, URL,
+  preference, filter, weather data, request body, user-agent value, IP address,
+  or other user data. It uses only the existing bounded application-log
+  retention and adds no log destination, metric, or storage.
 - **Exposure:** available on the ordinary listener. Hosted alpha allows this
   exact `POST` in addition to the existing bodyless `GET` and `HEAD`
   operations, and permits a body only for `POST`. It applies the same whole-site

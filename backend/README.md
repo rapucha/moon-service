@@ -660,6 +660,24 @@ sends a safe `X-Request-Id`, the backend reuses it; otherwise it generates one.
 The request log records method, path, status, duration, and request ID. It uses
 the route path only, not the raw query string, so location queries such as
 `q=...` are not written to application logs by this filter.
+
+After the backend assembles a successful `POST /api/opportunities` response,
+applied filtered state requires root `links.atomWithFilters` to be a non-blank
+string. Applied filtered state means that `normalizedActiveFilters` is
+non-empty or `appliedWeatherRanking` is `prefer_clear` or `ignore_weather`. If
+the link is missing or unusable, the backend returns `503
+temporarily_unavailable` with `Cache-Control: no-store` and the exact message
+`Opportunity lookup is temporarily unavailable.` instead of returning the
+inconsistent successful response. This check does not change a valid filtered
+response, an all-off response, another non-`ok` POST response, or GET behavior.
+
+The backend also writes one `ERROR` application-log event with the fixed code
+`filtered_atom_link_invariant_failed`. The validated current request ID is the
+event's sole explicit dynamic value. The event must not include a location,
+query, URL, preference, filter, weather data, request body, user-agent value,
+IP address, or other user data. It uses only the existing bounded
+application-log retention and adds no log destination, metric, or storage.
+
 Preference-aware calendar URLs can still be visible to browsers, copied-link
 recipients, calendar clients, Funnel, and other infrastructure that records the
 full request target.

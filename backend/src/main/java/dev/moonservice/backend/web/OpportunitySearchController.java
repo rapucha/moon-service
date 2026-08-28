@@ -4,7 +4,11 @@ import dev.moonservice.backend.opportunity.OpportunitySearchService;
 import dev.moonservice.backend.opportunity.search.OpportunityResponse;
 import dev.moonservice.backend.opportunity.search.OpportunitySearchRequest.Order;
 import dev.moonservice.backend.opportunity.search.OpportunitySearchResponse;
+import dev.moonservice.backend.opportunity.search.OpportunityStatusResponse;
 import jakarta.servlet.http.HttpServletRequest;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.slf4j.MDC;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
@@ -18,6 +22,7 @@ import tools.jackson.databind.JsonNode;
 
 @RestController
 class OpportunitySearchController {
+    private static final Logger LOGGER = LoggerFactory.getLogger(OpportunitySearchController.class);
     private final OpportunitySearchService opportunitySearchService;
 
     OpportunitySearchController(OpportunitySearchService opportunitySearchService) {
@@ -52,9 +57,7 @@ class OpportunitySearchController {
                 productRequest.weatherRanking(),
                 productRequest.preferences());
         response = withFilteredAtomLink(response, productRequest);
-        return ResponseEntity.status(httpStatusFor(response))
-                .header(HttpHeaders.CACHE_CONTROL, "no-store")
-                .body(response);
+        return finalProductResponse(response);
     }
 
     private OpportunityResponse searchProductRequest(
@@ -111,6 +114,34 @@ class OpportunitySearchController {
                 hasAppliedNondefaultWeather ? weatherRanking : null,
                 hasActivePreferences ? request.preferences() : null);
         return response.withFilteredAtomLink("/feeds/atom" + query);
+    }
+
+    static ResponseEntity<OpportunityResponse> finalProductResponse(OpportunityResponse source) {
+        OpportunityResponse response = hasMissingFilteredAtomLink(source)
+                ? filteredAtomLinkInvariantFailure()
+                : source;
+        return ResponseEntity.status(httpStatusFor(response))
+                .header(HttpHeaders.CACHE_CONTROL, "no-store")
+                .body(response);
+    }
+
+    private static boolean hasMissingFilteredAtomLink(OpportunityResponse source) {
+        if (!(source instanceof OpportunitySearchResponse response)
+                || !"ok".equals(response.status())) {
+            return false;
+        }
+        boolean filtered = (response.normalizedActiveFilters() != null
+                && !response.normalizedActiveFilters().isEmpty())
+                || "prefer_clear".equals(response.appliedWeatherRanking())
+                || "ignore_weather".equals(response.appliedWeatherRanking());
+        String atomLink = response.links() == null ? null : response.links().atomWithFilters();
+        return filtered && (atomLink == null || atomLink.isBlank());
+    }
+
+    private static OpportunityResponse filteredAtomLinkInvariantFailure() {
+        LOGGER.error("filtered_atom_link_invariant_failed requestId={}", MDC.get("requestId"));
+        return OpportunityStatusResponse.temporarilyUnavailable(
+                "Opportunity lookup is temporarily unavailable.");
     }
 
     @PostMapping("/api/opportunities/search")
