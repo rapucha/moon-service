@@ -77,7 +77,7 @@ public final class HostedAlphaSurfaceFilter extends OncePerRequestFilter {
             FilterChain filterChain
     ) throws ServletException, IOException {
         String path = applicationPath(request);
-        if (isProductPost(request.getMethod(), path)) {
+        if (isProductPost(request.getMethod(), path) || isCalendarRequestPath(path)) {
             response.setHeader("Cache-Control", "no-store");
         }
         if (!enabled) {
@@ -90,19 +90,19 @@ public final class HostedAlphaSurfaceFilter extends OncePerRequestFilter {
         if (path.equals("/admin/status") || isFeedbackPath(path)) {
             response.setHeader("Cache-Control", "no-store");
         }
-        if (!APPROVED_PATHS.contains(path)) {
+        if (!APPROVED_PATHS.contains(path) && !isCalendarEventPath(path)) {
             reject(response, HttpServletResponse.SC_NOT_FOUND);
             return;
         }
         List<String> allowedMethods = allowedMethods(path);
         if (!allowedMethods.contains(request.getMethod())) {
-            preventAtomErrorCaching(path, response);
+            preventPublicLinkErrorCaching(path, response);
             response.setHeader("Allow", String.join(", ", allowedMethods));
             reject(response, HttpServletResponse.SC_METHOD_NOT_ALLOWED);
             return;
         }
         if (!allowsFramedBody(request.getMethod(), path) && hasFramedBody(request)) {
-            preventAtomErrorCaching(path, response);
+            preventPublicLinkErrorCaching(path, response);
             reject(response, HttpServletResponse.SC_BAD_REQUEST);
             return;
         }
@@ -150,10 +150,22 @@ public final class HostedAlphaSurfaceFilter extends OncePerRequestFilter {
         return request.getContentLengthLong() > 0 || request.getHeader("Transfer-Encoding") != null;
     }
 
-    private static void preventAtomErrorCaching(String path, HttpServletResponse response) {
-        if (ATOM_FEED_PATH.equals(path)) {
+    private static void preventPublicLinkErrorCaching(String path, HttpServletResponse response) {
+        if (ATOM_FEED_PATH.equals(path) || isCalendarRequestPath(path)) {
             response.setHeader("Cache-Control", "no-store");
         }
+    }
+
+    static boolean isCalendarEventPath(String path) {
+        if (!isCalendarRequestPath(path) || !path.endsWith(".ics")) {
+            return false;
+        }
+        String opportunityId = path.substring("/o/".length(), path.length() - ".ics".length());
+        return opportunityId.indexOf('/') < 0;
+    }
+
+    private static boolean isCalendarRequestPath(String path) {
+        return path.equals("/o") || path.startsWith("/o/");
     }
 
     static String applicationPath(HttpServletRequest request) {
