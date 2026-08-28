@@ -16,11 +16,13 @@ phase, and bright-limb preference controls tracked by
 calibration-feedback interaction tracked by
 [#33](https://github.com/rapucha/moon-service/issues/33), and the
 next-matching-date recovery tracked by
-[#233](https://github.com/rapucha/moon-service/issues/233), and Atom feed
-discovery tracked by
-[#289](https://github.com/rapucha/moon-service/issues/289). Broader visual
-design, RSS, calendar export pages, account flows, and native apps are out of
-scope for this document until they become active product work.
+[#233](https://github.com/rapucha/moon-service/issues/233), Atom feed discovery
+tracked by [#289](https://github.com/rapucha/moon-service/issues/289), and the
+individual calendar and preference-filtered Atom actions tracked by
+[#295](https://github.com/rapucha/moon-service/issues/295) and
+[#297](https://github.com/rapucha/moon-service/issues/297). Broader visual
+design, RSS, standalone calendar export pages, account flows, and native apps
+are out of scope for this document until they become active product work.
 
 If implementation and this document disagree, treat the disagreement as a
 product decision to resolve. Do not silently encode new UI behavior only in
@@ -151,7 +153,8 @@ The frontend module split is intended to keep future UI changes manageable:
   and Moon-dial presentation;
 - `responseView.js`: response states, result rendering, and Current Moon Card
   placement;
-- `opportunityCard.js`: opportunity card layout;
+- `opportunityCard.js`: opportunity card layout and the shared
+  preference-bearing-link notice;
 - `currentMoonCard.js`: current Moon disclosure, status, and active-path
   adaptation;
 - `moonPathView.js`: Moon path and separate Sun pass views;
@@ -466,21 +469,57 @@ receiving browser applies its own saved preferences, if any.
 
 ## Atom Feed Discovery
 
-After a successful real-location lookup, the resolved-result header shows a
-plain link labeled `Atom feed` beside the sharing controls. The link stays
-hidden until the page has a loaded `status: "ok"`,
+After a successful real-location lookup, the resolved-result header shows at
+most one normal same-origin anchor labeled `Atom feed` beside the sharing
+controls. The action stays hidden until the page has a loaded `status: "ok"`,
 `location.kind: "real_location"` result with a canonical location ID. It does
 not appear for the initial page, an ambiguous or missing location, a fictional
 result, a failed request, or the separate planning result.
 
-The browser builds
-`/feeds/atom?locationId=<percent-encoded-canonical-id>`. The URL contains only
-that ID. It does not copy the search text, result order, hard preferences, or
-weather-ranking choice. The API response does not need to supply a feed link.
+Applied response metadata selects the action's state. A non-empty
+`normalizedActiveFilters` object or an `appliedWeatherRanking` of
+`prefer_clear` or `ignore_weather` selects filtered state. In that state, a
+non-blank root `links.atomWithFilters` string becomes the anchor's `href`
+unchanged. An absent, non-string, or blank value produces no Atom action. The
+browser does not guess, weaken, reconstruct, or substitute the all-off URL.
 
-The user adds this public URL to a feed reader. The reader polls Moon Service;
-the browser does not create an account, save a server-side subscription, or
-register a push channel. The feed is not personalized by browser preferences.
+Otherwise, the response is all-off. The browser builds
+`/feeds/atom?locationId=<percent-encoded-canonical-id>`, containing only that
+ID, and ignores a stray `links.atomWithFilters`. It never renders both URL forms
+or a separate `Atom feed with these filters` label. It treats a selected
+backend URL as opaque and does not serialize preferences, weather ranking, or
+another filtered value. Atom remains fixed to `soonest`; the displayed result
+order does not become a feed input, and alternate links inside entries remain
+location-only.
+
+The user adds the displayed public URL to a feed reader. The reader polls Moon
+Service; the browser does not create an account, save a server-side
+subscription, or register a push channel.
+
+## Preference-bearing Link Disclosure
+
+When applied response metadata contains at least one normalized hard preference
+or a non-default applied weather ranking, and the result renders at least one
+usable preference-bearing calendar action or the filtered `Atom feed` action,
+show this notice once before the opportunity list:
+
+> This link contains your selected location and photography filters. Anyone
+> with the link can see them, including your preferred observation times and
+> viewing direction (altitude and azimuth). Do not share it if those details
+> are private.
+
+The notice is visible without a modal, hover, expandable disclosure, or
+confirmation step. It has one stable element ID. Every usable
+preference-bearing `Download calendar event` anchor and the `Atom feed` anchor
+in filtered state reference that ID through `aria-describedby`. The all-off
+Atom anchor does not. The browser derives the condition from applied response
+metadata, not by parsing a URL. An all-off response, or a result with no usable
+preference-bearing action, has no notice. A filtered result with an unusable
+Atom link has no Atom action but keeps a notice still required by a usable
+calendar action.
+
+These actions use normal same-tab navigation. They add no account, token,
+analytics, cookie, profile, subscription state, or `localStorage` key.
 
 ## Opportunity Preferences
 
@@ -681,7 +720,9 @@ relevant controls in `Preferences`. When preferences are active, the share
 explanation says that the link contains the location and may contain order,
 never contains preferences, and lets a receiving browser apply its own saved
 preferences, if any. Reset also applies `Moon Service recommendation` and
-removes its stored value. Feeds and calendar links remain unpersonalized.
+removes its stored value. The page and share links remain unpersonalized.
+Backend-generated filtered Atom and individual calendar links may contain
+applied preferences and follow the result-level disclosure above.
 
 Result-specific messages remain near the results without recreating an active
 preference summary:
@@ -918,7 +959,15 @@ The card should include:
 - Sun altitude and light bucket;
 - weather summary and relevant forecast risk;
 - exposure balance text;
-- `.ics` action when available.
+- a `Download calendar event` action for every usable ordinary recommendation.
+
+For every displayed ordinary recommendation whose `links.ics` is a non-blank
+string, render one normal same-origin anchor labeled `Download calendar event`.
+Treat the backend URL as opaque and use it unchanged. Do not read or declare
+`links.icsReady`, build a calendar in JavaScript, fetch a blob, or replace the
+anchor with a POST action, token, or saved snapshot. An absent, non-string, or
+blank value produces no action. Current-Moon cards, fictional reports, planning
+results, recurring-event matches, and eclipses do not receive this action.
 
 Cards should avoid hiding the main decision behind decoration. The primary
 information is time, Moon position, light, weather, and reasoning. Each

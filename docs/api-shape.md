@@ -2173,10 +2173,15 @@ backend support is tracked by
   same route accepts optional canonical `weatherRanking` and Version 1
   `preferences` values in that order. It accepts no `order`, search text,
   coordinates, account ID, token, or arbitrary user text.
-- The browser continues to build the location-only URL. A successful product
-  POST with an applied hard filter or non-default weather mode also returns a
-  backend-generated root `links.atomWithFilters`; browser discovery remains
-  hidden until its separate UI change.
+- The browser shows at most one action labeled `Atom feed`. Applied response
+  metadata selects its state: a non-empty `normalizedActiveFilters` object or an
+  `appliedWeatherRanking` of `prefer_clear` or `ignore_weather` is filtered.
+  That state uses root `links.atomWithFilters` unchanged only when it is a
+  non-blank string. An absent, non-string, or blank value produces no Atom
+  action and no all-off substitute. Otherwise, the browser builds the existing
+  location-only URL and ignores a stray filtered member. It never shows both
+  forms or the label `Atom feed with these filters`, and it does not serialize
+  or reconstruct a filtered URL. Both backend URL forms remain valid.
 - A feed reader polls Moon Service. Moon Service creates no account, subscriber
   mapping, saved subscription, push channel, or durable location record.
 
@@ -2472,9 +2477,30 @@ admission before location or weather work.
 The route creates no account, token, saved snapshot, new cache, or durable
 record. Moon Service application logs omit query strings, but browsers,
 copied-link recipients, calendar clients, Funnel, and other request-target logs
-may see the preference-bearing URL. Product links are actionable, but the
-current browser still hides them behind its old `icsReady` gate until the
-ordered browser change renders link presence.
+may see the preference-bearing URL. For every displayed ordinary recommendation
+whose `links.ics` is a non-blank string, the browser shows `Download calendar
+event` with the backend string unchanged. It does not read or declare
+`links.icsReady`. An absent, non-string, or blank value produces no action, and
+nonordinary results do not receive one.
+
+When applied response metadata contains at least one normalized hard preference
+or a non-default weather ranking, and at least one usable preference-bearing
+calendar action or the filtered `Atom feed` action is present, the browser shows
+this warning once before the opportunity list:
+
+> This link contains your selected location and photography filters. Anyone
+> with the link can see them, including your preferred observation times and
+> viewing direction (altitude and azimuth). Do not share it if those details
+> are private.
+
+The notice has one stable element ID. Every usable preference-bearing calendar
+action and the `Atom feed` action in filtered state reference it through
+`aria-describedby`;
+the all-off Atom action does not. An unusable filtered Atom value hides that
+action without removing a notice still required by a calendar action. The
+browser uses response metadata rather than URL parsing for the condition. It
+uses normal same-tab anchor navigation and adds no account, token, saved
+subscription, analytics, cookie, profile, or browser storage for either action.
 
 ### Later feed and calendar work
 

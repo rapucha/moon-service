@@ -10,11 +10,14 @@ Atom feed was delivered by
 [#289](https://github.com/rapucha/moon-service/issues/289). Issue
 [#294](https://github.com/rapucha/moon-service/issues/294) delivered the
 stateless preference-aware backend export for one `.ics` event, and
-[#296](https://github.com/rapucha/moon-service/issues/296) adds the same
-preference and weather contract to Atom. Browser discovery for these backend
-links and later subscribable calendars remain separate work under tracking
-parent [#16](https://github.com/rapucha/moon-service/issues/16). Calibration
-under #33 remains a longer project.
+[#296](https://github.com/rapucha/moon-service/issues/296) delivered the same
+preference and weather contract to Atom. Issues
+[#295](https://github.com/rapucha/moon-service/issues/295) and
+[#297](https://github.com/rapucha/moon-service/issues/297) deliver browser
+discovery for those backend links. Later subscribable calendars
+remain under tracking parent
+[#16](https://github.com/rapucha/moon-service/issues/16). Calibration under #33
+remains a longer project.
 
 ## Phase 0: Planning Baseline
 
@@ -97,8 +100,8 @@ Exit criteria:
 
 Status: in progress. The anonymous lookup loop, location-only and filtered Atom
 backend, and individual `.ics` backend export are implemented. Empirical
-ranking validation, browser discovery for the preference-bearing export links,
-and subscribable calendar feeds remain.
+ranking validation and subscribable calendar feeds remain. Issues #295 and #297
+add browser discovery for the preference-bearing export links.
 
 Goal: make the simplest useful public loop work.
 
@@ -110,10 +113,12 @@ Tasks:
 - Provide a shareable result URL.
 - Add clear privacy copy for geocoding, weather lookup, coordinate rounding, and backend logs.
 - Use the location-only Atom feed delivered in #289 and the preference-filtered
-  backend feed delivered in #296. Browser discovery of the filtered link stays
-  in its separate UI child. RSS has not been accepted.
+  backend feed delivered in #296. Expose one contextual `Atom feed` action
+  through #297: applied metadata selects the exact filtered URL or the
+  location-only all-off URL, and an unusable filtered value produces no Atom
+  action. RSS has not been accepted.
 - Provide the stateless preference-aware individual `.ics` backend export in
-  #294, followed by its ordered browser activation child.
+  #294 and expose every usable ordinary product link through #295.
 - Provide dynamic public `.ics` calendar feeds for canonical real locations
   later.
 
@@ -232,9 +237,9 @@ preserving explicit caller control on the direct scoring contract. This is a
 discovery safeguard, not a scoring calibration.
 
 The current feed/calendar backend steps are complete: #294 delivered the
-stateless preference-aware individual `.ics` route and #296 delivers the
-preference-filtered Atom route and complete product links. Browser actions stay
-hidden until their separately reviewed UI work consumes those links.
+stateless preference-aware individual `.ics` route and #296 delivered the
+preference-filtered Atom route and complete product links. Issues #295 and #297
+implement the browser actions and their shared privacy disclosure.
 
 The completed foundations are:
 
@@ -279,10 +284,11 @@ through collection and corpus curation.
 Public feed and calendar-export work remains tracked under
 [#16](https://github.com/rapucha/moon-service/issues/16). Issue #289 delivered
 the location-only Atom feed. Issue #294 delivered the stateless
-preference-aware individual `.ics` route, and #296 adds preference-filtered Atom
-while keeping the location-only contract. The current browser exposes neither
-preference-bearing backend link pending separate UI work. RSS and subscribable
-calendar feeds remain later. The JitPack dependency decision and safeguards required before
+preference-aware individual `.ics` route, and #296 delivered preference-filtered
+Atom while keeping the location-only contract. Issues #295 and #297 add browser
+discovery for those preference-bearing backend links without changing the
+location-only feed. RSS and subscribable calendar feeds remain later. The
+JitPack dependency decision and safeguards required before
 public deployment are recorded in
 [#17](https://github.com/rapucha/moon-service/issues/17).
 

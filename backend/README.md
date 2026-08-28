@@ -16,11 +16,11 @@ RSS and subscribable calendar feeds deliberately out of scope.
   preferences and the product POST when at least one is active.
 - Public Atom feed at `GET /feeds/atom?locationId=<canonical-id>`, with optional
   canonical preference/weather filters, matching bodyless `HEAD` support, and
-  backend-owned filtered links that await their separate browser change.
+  backend-owned filtered links consumed unchanged by the browser contract.
 - Stateless individual iCalendar export at
   `GET /o/<opportunity-id>.ics?locationId=<canonical-id>`, with matching
   bodyless `HEAD` support and complete backend-owned links on ordinary product
-  results. The browser action remains hidden until its ordered UI change.
+  results. Browser calendar actions use link presence, not `icsReady`.
 - `POST /api/opportunities/search` using the same JSON request body as the scoring
   prototype fixture.
 - Disabled-by-default calibration feedback capability at
@@ -181,7 +181,9 @@ returns `503` instead of serving old XML as a success.
 
 Successful filtered product POST responses include the backend-generated root
 `links.atomWithFilters` when a hard filter or non-default weather mode was
-applied. The browser does not expose that link until its separate UI change.
+applied. Applied response metadata selects the state of the browser's one
+contextual `Atom feed` action. In filtered state, the browser uses that string
+unchanged as the action's `href`.
 
 Application request logs omit the query string. A filtered URL can disclose the
 location, preferred observation hours, and viewing direction to feed readers,
@@ -474,15 +476,43 @@ backend location ID. A preference-free example is
 `/search?locationId=moon-service-3067696`; an active preference does not change
 that URL.
 
-A loaded real-location result also shows `Atom feed`. The browser builds
-`/feeds/atom?locationId=<canonical-id>` with only that ID. It does not copy the
-search text, result order, preferences, or weather-ranking choice.
+A loaded real-location result shows at most one `Atom feed` action. A non-empty
+`normalizedActiveFilters` object or an `appliedWeatherRanking` of
+`prefer_clear` or `ignore_weather` selects filtered state. In that state, a
+non-blank root `links.atomWithFilters` string becomes the action's `href`
+unchanged. An absent, non-string, or blank value produces no Atom action; the
+browser does not substitute the all-off feed.
 
-The same response now contains complete backend-generated individual `.ics`
-links. They may include the applied order, weather ranking, and hard
-preferences. The current browser still requires the absent `icsReady` signal,
-so it does not expose those links until the ordered browser child replaces that
-gate with link-presence handling.
+Otherwise, the result is all-off and the browser builds
+`/feeds/atom?locationId=<canonical-id>` with only that ID. It ignores a stray
+`links.atomWithFilters` rather than changing state. The browser never shows both
+forms or a separate `Atom feed with these filters` label. It does not copy the
+search text or result order or reconstruct preferences, weather ranking, or a
+filtered URL.
+
+Every displayed ordinary recommendation with a non-blank `links.ics` string
+shows `Download calendar event` with that backend string unchanged. An absent,
+non-string, or blank value produces no action. The browser does not read or
+declare `icsReady`, serialize a calendar, or fetch calendar bytes before normal
+same-tab navigation. Nonordinary results do not receive the action.
+
+When applied response metadata contains at least one normalized hard preference
+or a non-default weather ranking, and at least one usable preference-bearing
+calendar action or the filtered `Atom feed` action is present, the page shows
+this warning once before the opportunity list:
+
+> This link contains your selected location and photography filters. Anyone
+> with the link can see them, including your preferred observation times and
+> viewing direction (altitude and azimuth). Do not share it if those details
+> are private.
+
+The warning has one stable element ID. Every usable preference-bearing calendar
+action and the `Atom feed` action in filtered state reference it through
+`aria-describedby`;
+the all-off Atom action does not. A missing filtered Atom action does not remove
+a warning still required by a calendar action. The browser decides from
+response metadata rather than URL parsing. These actions add no account, token,
+subscription state, analytics, cookie, profile, or `localStorage` key.
 
 The page uses two optional browser `localStorage` entries.
 `moonService.recentSearches.v1` keeps up to five display names, location IDs,

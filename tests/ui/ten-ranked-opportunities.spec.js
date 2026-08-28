@@ -6,13 +6,18 @@ const sourceFixture = JSON.parse(readFileSync(
   "utf8"
 ));
 const fixture = tenCandidateFixture(sourceFixture);
+const displayedCandidateIndexes = [5, 0, 6, 1, 7, 2, 8, 3, 9, 4];
 
 test.beforeEach(async ({ page }) => {
   await page.route("**/api/opportunities**", async route => {
+    const locationId = new URL(route.request().url()).searchParams.get("locationId");
+    const response = locationId === "invalid-calendar-links"
+      ? invalidCalendarFixture(sourceFixture)
+      : fixture;
     await route.fulfill({
       status: 200,
       contentType: "application/json",
-      body: JSON.stringify(fixture)
+      body: JSON.stringify(response)
     });
   });
 });
@@ -25,9 +30,9 @@ test("renders ten ranked candidates as responsive pass groups", async ({ page })
   await expect(page.locator(".summary-count")).toHaveText(
     "5 ranked Moon passes · 10 candidate windows"
   );
-  await expect(page.getByRole("link", { name: "Atom feed" })).toHaveAttribute(
-    "href", "/feeds/atom?locationId=moon-service-3067696"
-  );
+  const atomLink = page.getByRole("link", { name: "Atom feed", exact: true });
+  await expect(atomLink).toHaveCount(1);
+  await expect(atomLink).toHaveAttribute("href", "/feeds/atom?locationId=moon-service-3067696");
   await expect(page.locator(".rank-label")).toHaveText([
     "Best match",
     "Option 2",
@@ -55,6 +60,18 @@ test("renders ten ranked candidates as responsive pass groups", async ({ page })
   await expect(page.locator(".choice-badge.is-alt")).toHaveCount(5);
   await expect(page.locator(".pass-photo-hint")).toHaveCount(10);
   await expect(page.locator(".pass-choice-explanation")).toHaveCount(10);
+  const calendarLinks = page.getByRole("link", { name: "Download calendar event" });
+  await expect(calendarLinks).toHaveCount(10);
+  await expect(page.locator(".pass-choice-card").getByRole(
+    "link", { name: "Download calendar event" }
+  )).toHaveCount(10);
+  expect(await calendarLinks.evaluateAll(links => links.map(link => link.getAttribute("href"))))
+    .toEqual(displayedCandidateIndexes.map(index => fixture.opportunities[index].links.ics));
+  expect(await page.locator(".pass-choice-card").evaluateAll(cards => cards.map(card =>
+    card.querySelectorAll("a").length
+  ))).toEqual(Array(10).fill(1));
+  await calendarLinks.first().focus();
+  await expect(calendarLinks.first()).toBeFocused();
   await expect(page.locator(".pass-choice-card").first()).toContainText("clear");
   await expect(page.locator(".pass-choice-card").first()).toContainText(
     "foreground light is limited"
@@ -80,6 +97,13 @@ test("renders ten ranked candidates as responsive pass groups", async ({ page })
   expect(horizontalOverflow).toBeLessThanOrEqual(1);
 });
 
+test("omits calendar actions for absent, non-string, and blank links", async ({ page }) => {
+  await page.goto("/search?locationId=invalid-calendar-links");
+
+  await expect(page.locator(".pass-choice-card")).toHaveCount(3);
+  await expect(page.getByRole("link", { name: "Download calendar event" })).toHaveCount(0);
+});
+
 function tenCandidateFixture(source) {
   const opportunities = Array.from({ length: 10 }, function (_, index) {
     const passIndex = index % 5;
@@ -88,6 +112,10 @@ function tenCandidateFixture(source) {
     opportunity.id = "ten-candidate-" + (index + 1);
     opportunity.score = 90 - index;
     opportunity.moonPass.id = "ten-candidate-pass-" + (passIndex + 1);
+    opportunity.links = {
+      ics: "/o/backend-calendar-" + (index + 17)
+        + ".ics?opaque=server-owned%2Fcandidate-" + (index + 1)
+    };
     return opportunity;
   });
 
@@ -95,4 +123,12 @@ function tenCandidateFixture(source) {
     candidateWindowsEvaluated: 24,
     opportunities: opportunities
   });
+}
+
+function invalidCalendarFixture(source) {
+  const response = JSON.parse(JSON.stringify(source));
+  delete response.opportunities[0].links.ics;
+  response.opportunities[1].links.ics = 42;
+  response.opportunities[2].links.ics = " \t ";
+  return response;
 }

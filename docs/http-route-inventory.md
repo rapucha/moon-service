@@ -20,8 +20,8 @@ Open-Meteo URLs are provider dependencies, not Moon Service routes.
 | `GET /` | Web entry page; current product route | Web browser | Allowlisted; whole-site bound |
 | `GET /search` | Lookup and share page; current product route | Web browser | Allowlisted; whole-site bound |
 | `GET /about` | Product/privacy information page | Web browser | Allowlisted; whole-site bound |
-| `GET /feeds/atom` | Public Atom feed for one canonical location, with optional hard preferences and weather ranking | Feed reader; current browser exposes only the location-only link | Allowlisted; site and provider bounds |
-| `GET /o/{opportunityId}.ics` | Stateless individual iCalendar export | Product API link; browser action remains hidden | Allowlisted for valid paths; site and provider bounds |
+| `GET /feeds/atom` | Public Atom feed for one canonical location, with optional hard preferences and weather ranking | Feed reader; browser exposes one contextual action for the applied state | Allowlisted; site and provider bounds |
+| `GET /o/{opportunityId}.ics` | Stateless individual iCalendar export | Browser action for each usable ordinary product link | Allowlisted for valid paths; site and provider bounds |
 | `GET /api/opportunities` | Location-to-opportunity product API | Browser `app.js` | Allowlisted; site and search bounds |
 | `POST /api/opportunities` | Request-scoped preference product API | Browser `app.js` through `opportunityPreferences.js` | Allowlisted POST; site and provider bounds |
 | `POST /api/opportunities/planning` | Weather-free next-date planning API | Browser `app.js` through `opportunityPreferences.js` | Allowlisted POST; site and provider bounds |
@@ -205,11 +205,12 @@ and [hosted-alpha functional tests](../backend/src/test/java/dev/moonservice/bac
 - **Purpose/lifecycle:** current public Atom feed for one canonical location.
   The same route can apply canonical Version 1 hard preferences and
   non-default weather ranking while keeping fixed `soonest` order.
-- **Production invocation:** the result page builds the location-only URL after
-  it loads a real location, and a feed reader then polls it. Successful
-  filtered product POST responses also contain a backend-generated
-  `links.atomWithFilters`; the browser does not expose it until its separate UI
-  change.
+- **Production invocation:** the result page exposes at most one `Atom feed`
+  action after it loads a real location, and a feed reader then polls the
+  selected URL. Applied response metadata selects the state. All-off uses the
+  browser-built location-only URL and ignores a stray filtered member. Filtered
+  state uses a non-blank backend `links.atomWithFilters` string unchanged; an
+  unusable value produces no Atom action. Both backend URL forms remain valid.
 - **Authentication/data:** none. The query requires `locationId` and may contain
   canonical `weatherRanking` and `preferences`. Unknown preference-object
   members are ignored, while duplicate or unknown query parameters and invalid
@@ -238,9 +239,11 @@ and [hosted-alpha functional tests](../backend/src/test/java/dev/moonservice/bac
   an application `400`, not an accidental framework `404`.
 - **Purpose/lifecycle:** current anonymous, stateless export of one ordinary
   opportunity as one iCalendar event. Product GET and preference POST responses
-  supply the complete reusable URL. The existing browser does not yet render
-  the action; its ordered browser child will use link presence instead of an
-  `icsReady` flag.
+  supply the complete reusable URL.
+- **Production invocation:** the browser renders `Download calendar event` for
+  every displayed ordinary recommendation with a non-blank `links.ics` string
+  and uses that string unchanged. It does not read or declare an `icsReady`
+  flag.
 - **Request:** the opaque path ID is bounded and must not be blank or contain
   control characters. `locationId` is required. Optional `order`,
   `weatherRanking`, and percent-encoded Version 1 `preferences` reproduce the
@@ -653,8 +656,8 @@ and [hosted-alpha functional tests](../backend/src/test/java/dev/moonservice/bac
   controller mapping. `/test/slow` exists only in `GracefulShutdownTest`.
 - `/l/{location}` and `/calendars/*.ics` are design/roadmap shapes, not
   implemented routes. Individual `/o/*.ics` exports are implemented and product
-  responses carry complete URLs, but the current browser still hides its
-  calendar action pending the ordered browser child.
+  responses carry complete URLs that the browser uses for ordinary calendar
+  actions.
 - There are no Actuator, OpenAPI, Swagger UI, or Spring REST Docs endpoints.
 
 ## Maintenance rule
