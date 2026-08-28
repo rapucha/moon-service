@@ -135,8 +135,9 @@ Meanings:
 - `invalid_request`: the input is missing, empty after trimming, too long,
   malformed, or unsupported.
 - `temporarily_unavailable`: the current backend could not complete the
-  geocoding or weather lookup. The target contract may use the same state when
-  another required dependency fails.
+  geocoding or weather lookup, or it detected a missing filtered Atom link in
+  an otherwise successful final product response. The target contract may use
+  the same state when another required dependency fails.
 - `rate_limited`: the request was valid, but the client or service exceeded an
   application-level rate limit.
 - `request_too_large`: the product preference POST exceeded its raw-body
@@ -398,6 +399,28 @@ server returns `400 invalid_request`. It validates the field before geocoding,
 ephemeris calculation, or weather lookup. The error response and logs must not
 echo the supplied mode, a raw preference value, or the request body. Invalid
 requests must not call the location or weather provider.
+
+After final response assembly, a successful product POST with applied filtered
+state must contain root `links.atomWithFilters` as a non-blank string. Applied
+filtered state means that `normalizedActiveFilters` is non-empty or
+`appliedWeatherRanking` is `prefer_clear` or `ignore_weather`. If that link is
+absent, not a string, or blank, the server must replace the inconsistent
+successful response with `503 temporarily_unavailable`, `Cache-Control:
+no-store`, and this exact generic message:
+
+```text
+Opportunity lookup is temporarily unavailable.
+```
+
+The server writes one `ERROR` application-log event with fixed code
+`filtered_atom_link_invariant_failed`. The validated current request ID is its
+sole explicit dynamic value. The event must not contain a location, query,
+URL, preference, filter, weather data, request body, user-agent value, IP
+address, or other user data. It uses only the existing bounded application-log
+retention and adds no log destination, metric, or storage.
+
+The check does not change a valid filtered response, an all-off response,
+another non-`ok` product POST response, or GET behavior.
 
 ### Unknown preference fields
 
