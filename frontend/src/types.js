@@ -79,7 +79,6 @@
 /**
  * @typedef {Object} OpportunityLinks
  * @property {string} ics
- * @property {boolean=} icsReady
  */
 
 /**

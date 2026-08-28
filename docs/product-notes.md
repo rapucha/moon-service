@@ -70,13 +70,13 @@ In scope:
 - Score opportunities using Moon geometry, Sun state, and weather.
 - Present ranked opportunities.
 - Provide a shareable result page.
-- Provide a public Atom feed for a canonical real location. The backend also
-  supports reusable filtered URLs with current hard preferences and weather
-  ranking; browser discovery remains a separate UI change. RSS remains
+- Provide a public Atom feed for a canonical real location. The browser shows
+  one contextual `Atom feed` action: applied response metadata selects the
+  backend-generated filtered URL or the location-only all-off URL. RSS remains
   unaccepted.
 - Provide a stateless, preference-aware `.ics` export for an individual event.
-  The backend route and complete product links are current; browser activation
-  is the ordered next child. Each event embeds the opportunity's Moon phase and
+  Every displayed ordinary recommendation with a usable backend link offers
+  its own calendar download. Each event embeds the opportunity's Moon phase and
   orientation with RFC 7986 `IMAGE`. A calendar client may ignore the image, so
   the ordinary event fields must remain useful without it.
 - Add dynamic public `.ics` calendar feeds for canonical real locations later.
@@ -267,16 +267,44 @@ not store order in an account, cookie, server profile, or `localStorage` entry.
 
 Share links contain the location and may contain order. They contain no
 preference value. A browser opening a share link applies its own saved
-preferences, if any. The location-only Atom URL remains current and unfiltered.
-The backend also accepts a canonical filtered Atom URL with non-default weather
-ranking, active hard preferences, or both. Successful filtered product POST
-responses contain that opaque URL as `links.atomWithFilters`. The current browser
-continues to expose only the location-only feed pending its separate UI change.
+preferences, if any. For a loaded real-location result, the browser shows at
+most one action labeled `Atom feed`. A non-empty `normalizedActiveFilters`
+object or an `appliedWeatherRanking` of `prefer_clear` or `ignore_weather`
+selects filtered state. A non-blank root `links.atomWithFilters` string then
+supplies the action's backend URL unchanged. If that value is absent,
+non-string, or blank, the filtered result has no Atom action and does not
+silently substitute an all-off feed.
+
+Otherwise, the response is all-off and the action uses the current
+location-only Atom URL. The browser ignores a stray `links.atomWithFilters` in
+that state. It never shows a second Atom action or the label `Atom feed with
+these filters`.
 
 A backend-generated individual `.ics` URL carries the canonical location,
 selected order, non-default weather ranking, and active hard preferences so
-reopening it can reproduce the same public search. Both filtered Atom and
-individual-export URLs create no server profile or durable state, but browsers,
+reopening it can reproduce the same public search. Every displayed ordinary
+recommendation with a non-blank `links.ics` string shows `Download calendar
+event` with that backend URL unchanged. The browser does not require
+`links.icsReady` or serialize a calendar. It treats every response-supplied URL
+as opaque.
+
+When applied response metadata reports at least one normalized hard preference
+or non-default weather ranking, and at least one usable preference-bearing
+calendar action or the filtered `Atom feed` action is present, the browser shows
+this warning once before the opportunity list:
+
+> This link contains your selected location and photography filters. Anyone
+> with the link can see them, including your preferred observation times and
+> viewing direction (altitude and azimuth). Do not share it if those details
+> are private.
+
+Every usable preference-bearing calendar action and the `Atom feed` action in
+filtered state reference the one warning through its stable element ID. The
+all-off Atom action does not. A missing filtered Atom action does not remove a
+warning still required by a calendar action. The browser uses response metadata
+rather than parsing a URL to decide whether the warning is required. Both
+filtered Atom and individual-export URLs create no server profile or durable
+state, but browsers,
 feed and calendar clients, copied-link recipients, Funnel, and systems that log
 the full request target may see the encoded filters. These can reveal preferred
 observation hours and altitude or azimuth viewing direction. Moon Service

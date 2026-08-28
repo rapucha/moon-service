@@ -12,6 +12,10 @@ const ALTITUDE_PREFERENCES = {
   version: 1,
   altitudeDegrees: { minimum: 11, maximum: 30 }
 };
+const UNFILTERED_ATOM_HREF = "/feeds/atom?locationId=moon-service-3067696";
+const FILTERED_ATOM_HREF = "/feeds/atom?opaque=server-owned%2Fdo-not-rebuild";
+const PREFERENCE_WARNING_ID = "preference-link-warning";
+const PREFERENCE_WARNING_TEXT = "This link contains your selected location and photography filters. Anyone with the link can see them, including your preferred observation times and viewing direction (altitude and azimuth). Do not share it if those details are private.";
 
 test("uses balanced GET without storing a weather choice and fits both layouts", async ({ page }) => {
   const calls = await captureApiCalls(page);
@@ -34,11 +38,29 @@ test("uses balanced GET without storing a weather choice and fits both layouts",
   expect(await storedWeather(page)).toBeNull();
   await expect(page.getByText("Limits rule out results. Weather can change which result comes first.")).toBeVisible();
   await expect(page.getByRole("group", { name: "Weather in ranking" })).toBeVisible();
+  await expectUnfilteredAtom(page);
+  await expect(page.locator("#" + PREFERENCE_WARNING_ID)).toHaveCount(0);
+  const calendarDescriptions = await page.getByRole(
+    "link", { name: "Download calendar event", exact: true }
+  ).evaluateAll(links => links.map(link => link.getAttribute("aria-describedby")));
+  expect(calendarDescriptions).toEqual(Array(fixture.opportunities.length).fill(null));
 
   const horizontalOverflow = await page.evaluate(() =>
     document.documentElement.scrollWidth - document.documentElement.clientWidth
   );
   expect(horizontalOverflow).toBeLessThanOrEqual(1);
+});
+
+test("ignores a stray filtered Atom link when applied metadata selects all-off", async ({ page }) => {
+  const calls = await captureApiCalls(page, call => successfulResponse(call, {
+    links: { atomWithFilters: FILTERED_ATOM_HREF }
+  }));
+
+  await page.goto("/search?q=Prague");
+  await waitForCallCount(calls, 1);
+
+  await expectUnfilteredAtom(page);
+  await expect(page.locator("#" + PREFERENCE_WARNING_ID)).toHaveCount(0);
 });
 
 test("loads a saved weather choice and keeps soonest in the POST", async ({ page }) => {
@@ -185,6 +207,7 @@ test("applies and stores a weather-only choice without changing the share URL", 
   await expect(page).toHaveURL("/search?q=Prague");
   await expect(page.getByRole("link", { name: "Open share link" }))
     .toHaveAttribute("href", "/search?q=Prague");
+  await expectPreferenceBearingActions(page, FILTERED_ATOM_HREF);
 });
 
 test("keeps hard limits separate and omits balanced from their POST", async ({ page }) => {
@@ -207,6 +230,7 @@ test("keeps hard limits separate and omits balanced from their POST", async ({ p
   });
   await expect(page.locator("#hard-preference-count")).toHaveText("1 active");
   await expect(page.locator("#weather-ranking-summary")).toHaveText(" · Prefer clear skies");
+  await expectPreferenceBearingActions(page, FILTERED_ATOM_HREF);
 
   await openPreferences(page);
   await page.getByRole("radio", { name: "Moon Service recommendation" }).check();
@@ -218,6 +242,74 @@ test("keeps hard limits separate and omits balanced from their POST", async ({ p
   expect(await storedWeather(page)).toBeNull();
   await expect(page.locator("#hard-preference-count")).toHaveText("1 active");
   await expect(page.locator("#weather-ranking-summary")).toBeHidden();
+  await expectPreferenceBearingActions(page, FILTERED_ATOM_HREF);
+});
+
+const invalidFilteredAtomCases = [
+  { name: "absent", value: undefined },
+  { name: "non-string", value: 42 },
+  { name: "blank", value: " \t " }
+];
+
+for (const scenario of invalidFilteredAtomCases) {
+  test("keeps the calendar warning when filtered Atom data is " + scenario.name, async ({ page }) => {
+    await preloadWeather(page, "prefer_clear");
+    const calls = await captureApiCalls(page, call => {
+      const payload = successfulResponse(call);
+      if (scenario.value === undefined) {
+        delete payload.links;
+      } else {
+        payload.links = { atomWithFilters: scenario.value };
+      }
+      return payload;
+    });
+
+    await page.goto("/search?q=Prague");
+    await waitForCallCount(calls, 1);
+
+    await expectPreferenceBearingActions(page, null);
+  });
+}
+
+test("keeps the filtered Atom warning without calendar actions", async ({ page }) => {
+  await preloadWeather(page, "prefer_clear");
+  const calls = await captureApiCalls(page, call => {
+    const payload = successfulResponse(call);
+    payload.opportunities.forEach(opportunity => delete opportunity.links.ics);
+    return payload;
+  });
+
+  await page.goto("/search?q=Prague");
+  await waitForCallCount(calls, 1);
+
+  const atom = page.getByRole("link", { name: "Atom feed", exact: true });
+  await expect(atom).toHaveAttribute("href", FILTERED_ATOM_HREF);
+  await expect(atom).toHaveAttribute("aria-describedby", PREFERENCE_WARNING_ID);
+  await expect(page.locator("#" + PREFERENCE_WARNING_ID)).toHaveText(PREFERENCE_WARNING_TEXT);
+  await expect(page.getByRole("link", { name: "Download calendar event" })).toHaveCount(0);
+  await expectNoOldFilteredAtomLabel(page);
+});
+
+test("omits the warning when applied metadata has no usable action", async ({ page }) => {
+  await preloadWeather(page, "prefer_clear");
+  const calls = await captureApiCalls(page, call => {
+    const payload = successfulResponse(call);
+    payload.links = { atomWithFilters: " \t " };
+    delete payload.opportunities[0].links.ics;
+    payload.opportunities[1].links.ics = 42;
+    payload.opportunities[2].links.ics = " \t ";
+    return payload;
+  });
+
+  await page.goto("/search?q=Prague");
+  await waitForCallCount(calls, 1);
+
+  await expect(page.getByRole("link", { name: "Atom feed", exact: true })).toHaveCount(0);
+  await expectNoOldFilteredAtomLabel(page);
+  await expect(page.getByRole(
+    "link", { name: "Download calendar event", exact: true }
+  )).toHaveCount(0);
+  await expect(page.locator("#" + PREFERENCE_WARNING_ID)).toHaveCount(0);
 });
 
 test("leaves weather ranking out of planning requests", async ({ page }) => {
@@ -336,6 +428,9 @@ function successfulResponse(call, overrides = {}) {
     payload.ignoredPreferenceFieldCount = 0;
     payload.additionalIgnoredPreferenceFieldCount = 0;
   }
+  if (mode === "prefer_clear" || mode === "ignore_weather" || call.body?.preferences) {
+    payload.links = { atomWithFilters: FILTERED_ATOM_HREF };
+  }
   return Object.assign(payload, overrides);
 }
 
@@ -345,6 +440,56 @@ function clone(value) {
 
 async function waitForCallCount(calls, count) {
   await expect.poll(() => calls.length).toBe(count);
+}
+
+async function expectUnfilteredAtom(page) {
+  const unfiltered = page.getByRole("link", { name: "Atom feed", exact: true });
+  await expect(unfiltered).toHaveCount(1);
+  await expect(unfiltered).toHaveAttribute("href", UNFILTERED_ATOM_HREF);
+  await expect(unfiltered).not.toHaveAttribute("aria-describedby", PREFERENCE_WARNING_ID);
+  await expectNoOldFilteredAtomLabel(page);
+}
+
+async function expectPreferenceBearingActions(page, filteredHref) {
+  const warning = page.locator("#" + PREFERENCE_WARNING_ID);
+  await expect(warning).toHaveCount(1);
+  await expect(warning).toBeVisible();
+  await expect(warning).toHaveText(PREFERENCE_WARNING_TEXT);
+
+  const calendarLinks = page.getByRole(
+    "link", { name: "Download calendar event", exact: true }
+  );
+  await expect(calendarLinks).toHaveCount(fixture.opportunities.length);
+  expect(await calendarLinks.evaluateAll(links => links.map(
+    link => link.getAttribute("aria-describedby")
+  ))).toEqual(Array(fixture.opportunities.length).fill(PREFERENCE_WARNING_ID));
+
+  const atom = page.getByRole("link", { name: "Atom feed", exact: true });
+  if (filteredHref === null) {
+    await expect(atom).toHaveCount(0);
+  } else {
+    await expect(atom).toHaveCount(1);
+    await expect(atom).toHaveAttribute("href", filteredHref);
+    await expect(atom).toHaveAttribute("aria-describedby", PREFERENCE_WARNING_ID);
+    await atom.focus();
+    await expect(atom).toBeFocused();
+  }
+  await expectNoOldFilteredAtomLabel(page);
+  await calendarLinks.first().focus();
+  await expect(calendarLinks.first()).toBeFocused();
+
+  expect(await page.evaluate(warningId => {
+    const notice = document.getElementById(warningId);
+    const list = document.querySelector(".opportunity-list");
+    return Boolean(notice && list
+      && (notice.compareDocumentPosition(list) & Node.DOCUMENT_POSITION_FOLLOWING));
+  }, PREFERENCE_WARNING_ID)).toBe(true);
+}
+
+async function expectNoOldFilteredAtomLabel(page) {
+  await expect(page.getByRole(
+    "link", { name: "Atom feed with these filters", exact: true }
+  )).toHaveCount(0);
 }
 
 async function openPreferences(page) {

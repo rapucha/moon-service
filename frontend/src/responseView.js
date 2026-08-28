@@ -1,8 +1,8 @@
-import { atomPathFor, sharePathFor } from "./api.js";
+import { sharePathFor } from "./api.js";
 import { createCurrentMoonView } from "./currentMoonCard.js";
 import { element } from "./dom.js";
 import { candidateMeta, formatDateTime } from "./format.js";
-import { moonPassCard } from "./opportunityCard.js";
+import { moonPassCard, preferenceBearingActionContext } from "./opportunityCard.js";
 import { fact } from "./terms.js";
 import { weatherRankingFromResponse } from "./weatherRankingPreference.js";
 var UTC_INSTANT_PATTERN = /^(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2})(?:\.(\d{1,9}))?Z$/;
@@ -102,8 +102,10 @@ export function createResponseView(results, callbacks) {
     var soonest = request.order === "soonest";
     var groups = opportunityGroups(opportunities, soonest);
     var currentMoonCard = createCurrentMoonView(payload, timezone, countryCode);
+    var preferenceActions = preferenceBearingActionContext(payload);
     var children = [
-      resultSummary(payload, request, groups.length, opportunities.length, soonest)
+      resultSummary(payload, request, groups.length, opportunities.length, soonest, preferenceActions),
+      preferenceActions.notice
     ];
     if (currentMoonCard) children.push(currentMoonCard);
 
@@ -117,7 +119,8 @@ export function createResponseView(results, callbacks) {
     } else {
       var chartContext = {
         mobileReferenceDurationMs: maxOpportunityDurationMs(opportunities),
-        weatherRanking: weatherRankingFromResponse(payload)
+        weatherRanking: weatherRankingFromResponse(payload),
+        preferenceActions: preferenceActions
       };
       children.push(element("div", { className: "opportunity-list" },
         groups.map(function (group, index) {
@@ -190,12 +193,10 @@ export function createResponseView(results, callbacks) {
     }, 0);
   }
 
-  function resultSummary(payload, request, passCount, candidateCount, soonest) {
+  function resultSummary(payload, request, passCount, candidateCount, soonest, preferenceActions) {
     var location = payload.location || {};
     var sharePath = sharePathFor(request);
     var shareUrl = window.location.origin + sharePath;
-    var atomLink = location.kind === "real_location" && location.id
-      ? element("a", { href: atomPathFor(location.id) }, "Atom feed") : null;
     var passNoun = soonest ? "Moon pass" : "ranked Moon pass";
     var passText = passCount + " " + passNoun + (passCount === 1 ? "" : "es");
     var candidateText = candidateCount === 1 ? "1 candidate window" : candidateCount + " candidate windows";
@@ -208,7 +209,7 @@ export function createResponseView(results, callbacks) {
           element("p", { className: "summary-count" }, passText + " · " + candidateText)),
         element("div", { className: "share-tools" },
           element("button", { type: "button", className: "copy-button", "data-share-url": shareUrl }, "Copy link"),
-          element("a", { href: sharePath }, "Open share link"), atomLink)
+          element("a", { href: sharePath }, "Open share link"), preferenceActions.atomLink)
       ));
   }
 

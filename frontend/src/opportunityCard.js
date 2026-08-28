@@ -1,3 +1,4 @@
+import { atomPathFor } from "./api.js";
 import { element } from "./dom.js";
 import {
   degrees,
@@ -8,6 +9,40 @@ import {
 import { moonPathPanel } from "./moonPathView.js";
 import { scoreBlock, scoreDetails } from "./scoreView.js";
 import { weatherRankingLabel } from "./weatherRankingPreference.js";
+
+var PREFERENCE_LINK_WARNING_ID = "preference-link-warning";
+var PREFERENCE_LINK_WARNING = "This link contains your selected location and photography filters. Anyone "
+  + "with the link can see them, including your preferred observation times and viewing direction "
+  + "(altitude and azimuth). Do not share it if those details are private.";
+
+export function preferenceBearingActionContext(payload) {
+  var realLocation = payload?.location?.kind === "real_location";
+  var opportunities = Array.isArray(payload?.opportunities) ? payload.opportunities : [];
+  var filtered = hasAppliedPreferenceMetadata(payload);
+  var filteredAtomPath = filtered && realLocation
+    ? usableLink(payload?.links?.atomWithFilters) : null;
+  var atomPath = realLocation && payload.location.id
+    ? (filtered ? filteredAtomPath : atomPathFor(payload.location.id)) : null;
+  var hasCalendarPath = realLocation && opportunities.some(function (opportunity) {
+    return Boolean(usableLink((opportunity.links || {}).ics));
+  });
+  var descriptionId = filtered && (filteredAtomPath || hasCalendarPath)
+    ? PREFERENCE_LINK_WARNING_ID : null;
+
+  return {
+    atomLink: atomPath
+      ? element("a", {
+        href: atomPath,
+        "aria-describedby": filteredAtomPath ? descriptionId : null
+      }, "Atom feed")
+      : null,
+    calendarActionsEnabled: realLocation,
+    descriptionId: descriptionId,
+    notice: descriptionId
+      ? element("p", { id: descriptionId, className: "preference-notice warning" }, PREFERENCE_LINK_WARNING)
+      : null
+  };
+}
 
 export function moonPassCard(pass, entries, index, timezone, countryCode, chartContext, soonest, passCount) {
   var primaryEntry = entries.find(function (entry) { return entry.isBest; }) || entries[0];
@@ -21,10 +56,9 @@ export function moonPassCard(pass, entries, index, timezone, countryCode, chartC
         element("h3", {}, passSummaryText(entries.length))),
       scoreBlock(primary.score, weatherRanking)
     ),
-    passRecommendations(entries, timezone, countryCode, soonest, weatherRanking),
+    passRecommendations(entries, timezone, countryCode, soonest, weatherRanking, chartContext.preferenceActions),
     passIntervalContext(pass, primary, timezone, countryCode),
     moonPathPanel(moonPassPathOpportunity(pass, entries, primary), timezone, countryCode, chartContext),
-    opportunityActions(primary),
     scoreDetails(primary.components || {}, weatherRanking)
   );
 }
@@ -159,15 +193,15 @@ function passIntervalContext(pass, primary, timezone, countryCode) {
       element("dd", {}, title)));
 }
 
-function passRecommendations(entries, timezone, countryCode, soonest, weatherRanking) {
+function passRecommendations(entries, timezone, countryCode, soonest, weatherRanking, preferenceActions) {
   var className = "pass-choices" + (entries.length === 1 ? " is-single" : "");
   return element("section", { className: className, ariaLabel: "Recommendations in this Moon pass" },
     entries.map(function (entry) {
-      return passRecommendation(entry, entry.isBest, timezone, countryCode, soonest, weatherRanking);
+      return passRecommendation(entry, entry.isBest, timezone, countryCode, soonest, weatherRanking, preferenceActions);
     }));
 }
 
-function passRecommendation(entry, isBest, timezone, countryCode, soonest, weatherRanking) {
+function passRecommendation(entry, isBest, timezone, countryCode, soonest, weatherRanking, preferenceActions) {
   var opportunity = entry.opportunity;
   var rawRank = entry.index + 1;
   var moon = opportunity.moon || {};
@@ -204,7 +238,8 @@ function passRecommendation(entry, isBest, timezone, countryCode, soonest, weath
           ? "Why this candidate scored this way"
           : "Why this candidate ranked here"),
         element("p", {}, opportunity.reason))
-      : null);
+      : null,
+    opportunityActions(opportunity, preferenceActions));
 }
 
 function candidateRankText(rank, score, soonest) {
@@ -280,16 +315,29 @@ function roleClass(role) {
   return String(role || "unknown").replace(/[^a-z0-9_-]/gi, "").toLowerCase() || "unknown";
 }
 
-function opportunityActions(opportunity) {
-  var links = opportunity.links || {};
-  var actions = [];
-
-  if (links.ics && links.icsReady === true) {
-    actions.push(element("a", { className: "secondary-action", href: links.ics }, "Download calendar event"));
-  }
-
-  if (actions.length === 0) {
+function opportunityActions(opportunity, preferenceActions) {
+  if (!preferenceActions?.calendarActionsEnabled) {
     return null;
   }
-  return element("div", { className: "opportunity-actions" }, actions);
+  var icsPath = usableLink((opportunity.links || {}).ics);
+  return icsPath
+    ? element("div", { className: "opportunity-actions" },
+      element("a", {
+        className: "secondary-action",
+        href: icsPath,
+        "aria-describedby": preferenceActions.descriptionId
+      }, "Download calendar event"))
+    : null;
+}
+
+function hasAppliedPreferenceMetadata(payload) {
+  var filters = payload?.normalizedActiveFilters;
+  return filters !== null && typeof filters === "object" && !Array.isArray(filters)
+      && Object.keys(filters).length > 0
+    || payload?.appliedWeatherRanking === "prefer_clear"
+    || payload?.appliedWeatherRanking === "ignore_weather";
+}
+
+function usableLink(value) {
+  return typeof value === "string" && value.trim() ? value : null;
 }
