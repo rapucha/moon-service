@@ -283,7 +283,10 @@ class HostedAlphaSurfaceFunctionalTest {
             expectRateLimited(productPost("{}", MediaType.APPLICATION_JSON), true);
             expectRateLimited(planningPost(validPlanningBody()), true);
             expectRateLimited(webTestClient.get()
-                    .uri("/feeds/atom?locationId=private-feed-location").exchange(), true);
+                    .uri("/feeds/atom?locationId=private-feed-location"
+                            + "&preferences=%7B%22version%22%3A1%2C%22namedPhases%22%3A"
+                            + "%5B%22full_moon%22%5D%7D")
+                    .exchange(), true);
             expectHeadRateLimited(webTestClient.head()
                     .uri("/feeds/atom?locationId=private-feed-location").exchange(), true);
             expectRateLimited(webTestClient.get()

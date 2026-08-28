@@ -14,8 +14,9 @@ RSS and subscribable calendar feeds deliberately out of scope.
   preferences.
 - Browser lookup page at `/search?q=Praha`, using GET without active hard
   preferences and the product POST when at least one is active.
-- Public Atom feed at `GET /feeds/atom?locationId=<canonical-id>`, with matching
-  bodyless `HEAD` support and a discovery link on a loaded real-location result.
+- Public Atom feed at `GET /feeds/atom?locationId=<canonical-id>`, with optional
+  canonical preference/weather filters, matching bodyless `HEAD` support, and
+  backend-owned filtered links that await their separate browser change.
 - Stateless individual iCalendar export at
   `GET /o/<opportunity-id>.ics?locationId=<canonical-id>`, with matching
   bodyless `HEAD` support and complete backend-owned links on ordinary product
@@ -92,13 +93,22 @@ continues to honor its explicit caller-supplied `limit`.
 
 `GET /feeds/atom?locationId=<canonical-id>` returns UTF-8 Atom 1.0 as
 `application/atom+xml`. The current URL uses the opaque provider-tied canonical
-ID; #288 tracks a later friendly URL. A feed reader polls this route. Moon
+ID; #288 tracks a later friendly URL. The same route accepts canonical optional
+`weatherRanking` and Version 1 `preferences` query values. Atom always uses
+`soonest`; it accepts no `order` input. A feed reader polls this route. Moon
 Service creates no account, subscriber mapping, saved subscription, push
 channel, or durable feed record.
 
+Filtered URLs use the calendar export codec and the fixed field order
+`locationId`, `weatherRanking`, `preferences`. Default balanced weather and an
+inactive preference object are omitted. Unknown members inside the Version 1
+object are ignored and omitted from canonical output; duplicate or unknown URL
+query parameters and invalid recognized values get `400` before provider work.
+
 The feed contains up to ten ordinary opportunities from the current seven-day
-search, ordered by `soonest`, with balanced weather and no browser preferences
-or score cutoff. Each opportunity is one entry with stable IDs and a complete
+search, ordered by `soonest`, with the URL's weather ranking and hard
+preferences and no score cutoff. The location-only URL keeps balanced weather
+and no hard preferences. Each opportunity is one entry with stable IDs and a complete
 plain-text summary. The summary gives useful precise times, coarse weather and
 confidence, short Moon and light facts, a horizon caveat, and a live-result
 reminder. It stays useful when a reader removes rich content or pictures.
@@ -126,9 +136,10 @@ Every useful fact also appears as text. The feed uses no CSS, JavaScript, table,
 or `srcset`. A feed reader may remove the XHTML or picture, so this rich view is
 optional.
 
-This presentation change does not change the feed route, location-only input,
-IDs, ordering, polling model, one-hour freshness, public response cache, strong
-ETag, bodyless `HEAD` and `304` behavior, or no-account privacy rules.
+Filtered feeds keep the same entry IDs and presentation. The location-only URL
+keeps its Version 1 feed ID, self URL, XML, ordering, one-hour freshness, public
+response cache, strong ETag, bodyless `HEAD` and `304` behavior, and exact-byte
+state weight.
 
 `Before you go` warns about eye safety for New Moon and for waxing or waning
 crescents at `10%` illumination or less. It says: Do not ever search for the
@@ -149,21 +160,34 @@ embedded pictures. The validated results are:
 A maximum fixture over `1.5 MiB` stops publication for a new owner-approved
 plan. This is a pre-publication checkpoint, not a runtime rejection limit.
 
-The process-local feed-state cache has a `96 MiB` weight bound. Each value is
-weighted by its exact cached XML byte length. A state stays fresh for one hour,
-and concurrent same-location requests share one refresh. A value heavier than
-the bound is served without being retained. Restart, weight eviction, removal,
-and later reappearance can make an entry look updated again. Nothing is stored
-on disk or in a database.
+The process-local feed-state cache has a `96 MiB` weight bound. Location-only
+state is weighted by its exact cached XML byte length. Each filtered state is
+weighted by the larger of its XML size and `96 KiB`, so the cache cannot retain
+more than 1,024 tiny filtered states. Semantically equivalent normalized URLs
+share state. A state stays fresh for one hour, and concurrent requests for that
+state share one refresh. A value heavier than the bound is served without being
+retained. Restart, weight eviction, removal, and later reappearance can make an
+entry look updated again. Nothing is stored on disk or in a database.
 
-Success sends `Cache-Control: public, max-age=900` and a strong ETag; matching
-`If-None-Match` returns `304`. There is no `Last-Modified`. Errors are
-`no-store`: invalid input is `400`, unknown location is `404`, provider or
-ambiguity failure is `503`, and hosted admission can return `429`. A failed
-hourly refresh returns `503` instead of serving old XML as a success.
+Location-only success sends `Cache-Control: public, max-age=900`; filtered
+success sends `private, max-age=900`. A URL that supplies `preferences` stays
+private even if every supplied member is ignored and it reuses the unfiltered
+XML, ETag, identity, and state. Both forms send a strong ETag; matching
+`If-None-Match` returns `304`, and matching `HEAD` is bodyless. There is no
+`Last-Modified`. Errors are `no-store`: invalid input is `400`, unknown location
+is `404`, provider or ambiguity failure is `503`, and hosted admission can
+return `429`. Admission runs before feed-state lookup. A failed hourly refresh
+returns `503` instead of serving old XML as a success.
 
-Application request logs omit the query string. Moon Service receives the
-location ID, and the feed reader learns the location named in the response.
+Successful filtered product POST responses include the backend-generated root
+`links.atomWithFilters` when a hard filter or non-default weather mode was
+applied. The browser does not expose that link until its separate UI change.
+
+Application request logs omit the query string. A filtered URL can disclose the
+location, preferred observation hours, and viewing direction to feed readers,
+browser history, copied-link recipients, the public tunnel, and intermediaries
+that log full request targets. Operators must not log preference-bearing query
+strings.
 
 > This feed shows Moon Service's current recommendations. Your feed app may
 > keep old entries after Moon Service stops listing them. A missing entry does

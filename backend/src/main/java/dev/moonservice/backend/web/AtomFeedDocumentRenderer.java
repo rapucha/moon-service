@@ -27,6 +27,7 @@ final class AtomFeedDocumentRenderer {
     private static final String ATOM_NAMESPACE = "http://www.w3.org/2005/Atom";
     private static final String XHTML_NAMESPACE = "http://www.w3.org/1999/xhtml";
     private static final String FEED_ID_SEED_PREFIX = "moon-service.atom.feed.v1\n";
+    private static final String FILTERED_FEED_ID_SEED_PREFIX = "moon-service.atom.feed.v2\n";
     private static final String ENTRY_ID_SEED_PREFIX = "moon-service.atom.entry.v1\n";
     private static final String AUTHOR = "Moon Service";
     private static final String HORIZON_CAVEAT =
@@ -57,6 +58,17 @@ final class AtomFeedDocumentRenderer {
                 atomId(FEED_ID_SEED_PREFIX + canonicalId),
                 AUTHOR,
                 "/feeds/atom?locationId=" + encodedId);
+    }
+
+    static FeedMetadata filteredMetadata(
+            OpportunitySearchResponse.Location location,
+            String canonicalSelfPath
+    ) {
+        return new FeedMetadata(
+                "Moon opportunities near " + location.displayName(),
+                atomId(FILTERED_FEED_ID_SEED_PREFIX + canonicalSelfPath),
+                AUTHOR,
+                canonicalSelfPath);
     }
 
     static DisplayedEntry displayedEntry(

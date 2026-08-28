@@ -70,7 +70,9 @@ In scope:
 - Score opportunities using Moon geometry, Sun state, and weather.
 - Present ranked opportunities.
 - Provide a shareable result page.
-- Provide a public Atom feed for a canonical real location. RSS remains
+- Provide a public Atom feed for a canonical real location. The backend also
+  supports reusable filtered URLs with current hard preferences and weather
+  ranking; browser discovery remains a separate UI change. RSS remains
   unaccepted.
 - Provide a stateless, preference-aware `.ics` export for an individual event.
   The backend route and complete product links are current; browser activation
@@ -252,9 +254,12 @@ snapshot and never contain `weatherRanking`. The server uses hard preferences
 as hard filters to find precise matching fragments. It may join nearby
 fragments only under the ordinary timing rule above. The server uses the
 weather choice only for scoring and ranking. It must not permanently store the
-request body or preferences, add them to a server-side profile, cookie, or
-analytics event, or put them in a page, lookup, or share URL, application log,
-or shared cache.
+request body or preferences or add them to a server-side profile, cookie,
+analytics event, page, lookup or share URL, application log, provider cache,
+opportunity cache, weather cache, or cache shared across backend instances. The
+process-local Atom feed-state cache is the narrow exception: after a client
+opens a filtered Atom URL, it keys rebuildable state by the URL's canonical
+filtered path.
 
 Search order is request state. The browser puts `order=soonest` in the page URL
 and generated share links, and omits the default `best_match` order. It does
@@ -262,16 +267,21 @@ not store order in an account, cookie, server profile, or `localStorage` entry.
 
 Share links contain the location and may contain order. They contain no
 preference value. A browser opening a share link applies its own saved
-preferences, if any. The current Atom feed remains location-only and
-unfiltered. A backend-generated individual `.ics` URL instead carries the
-canonical location, selected order, non-default weather ranking, and active hard
-preferences so reopening it can reproduce the same public search. The browser
-treats that URL as opaque; its current calendar action remains hidden pending
-the ordered browser child. The URL creates no server profile or durable state,
-but browsers, calendar clients, copied-link recipients, Funnel, and systems that
-log the full request target may see the encoded filters, including preferred
-observation hours and viewing direction. Moon Service application logs omit the
-query string.
+preferences, if any. The location-only Atom URL remains current and unfiltered.
+The backend also accepts a canonical filtered Atom URL with non-default weather
+ranking, active hard preferences, or both. Successful filtered product POST
+responses contain that opaque URL as `links.atomWithFilters`. The current browser
+continues to expose only the location-only feed pending its separate UI change.
+
+A backend-generated individual `.ics` URL carries the canonical location,
+selected order, non-default weather ranking, and active hard preferences so
+reopening it can reproduce the same public search. Both filtered Atom and
+individual-export URLs create no server profile or durable state, but browsers,
+feed and calendar clients, copied-link recipients, Funnel, and systems that log
+the full request target may see the encoded filters. These can reveal preferred
+observation hours and altitude or azimuth viewing direction. Moon Service
+application logs omit the query string, and operators must keep these query
+strings out of access logs.
 Resetting all preferences removes the version 1 object and the weather-ranking
 value when browser storage accepts both removals, and uses `balanced` in memory.
 A weather-ranking read failure uses `balanced` for that load and shows the
