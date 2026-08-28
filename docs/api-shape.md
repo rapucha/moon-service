@@ -25,11 +25,12 @@ Current public browser, Atom feed, and individual-event routes:
 /search?q=Praha
 /search?locationId=moon-service-3067696
 /feeds/atom?locationId=moon-service-3067696
+/feeds/atom?locationId=moon-service-3067696&preferences=<canonical-v1-json>
 /o/<opportunity-id>.ics?locationId=moon-service-3067696
 ```
 
-The first feed URL uses the current opaque, provider-tied canonical location
-ID. A provider change may require a new subscription URL. Issue
+Both feed forms use the current opaque, provider-tied canonical location ID.
+A provider change may require a new subscription URL. Issue
 [#288](https://github.com/rapucha/moon-service/issues/288) tracks the later
 friendly-URL decision. Subscribable calendar routes remain planned under #16:
 
@@ -609,13 +610,15 @@ location state, provider failure, or hosted-alpha rejection, must contain
 
 The service may send `q` or `locationId` through the current location flow. It
 must not send a preference or `weatherRanking` to a geocoding or weather
-provider. It must not add the mode to provider or cache keys, page/share URLs,
-cookies, server-side profiles, analytics events, or shared caches. A successful
-response may contain the backend-generated individual `.ics` URL documented
-below; that export URL can carry normalized applied preferences and weather
-ranking. Moon Service application logs omit its query string. The server must
-not permanently store the body, a preference, the mode, an availability
-window, or a personal profile.
+provider. It must not add the mode to provider, opportunity, weather, or shared
+cache keys, page/share URLs, cookies, server-side profiles, or analytics events.
+The process-local Atom feed-state cache is the narrow exception: it keys one
+rebuildable state by the canonical filtered feed path. A successful response
+may contain the backend-generated individual `.ics` and filtered Atom URLs
+documented below; those reusable URLs can carry normalized applied preferences
+and weather ranking. Moon Service application logs omit their query strings.
+The server must not permanently store the body, a preference, the mode, an
+availability window, or a personal profile.
 
 Hosted alpha allows a bounded JSON body only for this exact product POST, the
 separately specified planning POST, and the feedback submission route. It
@@ -2147,10 +2150,10 @@ them. Eclipse contacts, phases, maximum, local visibility, and safety need the
 separate event contract tracked by
 [#80](https://github.com/rapucha/moon-service/issues/80).
 
-Public RSS/Atom links may encode a canonical location. The individual `.ics`
-link below may also encode the request-scoped order, weather ranking, and hard
-preferences needed to reproduce one ordinary result. Personal saved event
-subscriptions require the privacy and storage model to cover stored
+Public RSS/Atom links may encode a canonical location. Atom may also encode
+weather ranking and hard preferences. The individual `.ics` link below may
+add the request-scoped order needed to reproduce one ordinary result. Personal
+saved event subscriptions require the privacy and storage model to cover stored
 preferences, notification delivery, retention, and deletion before
 implementation.
 
@@ -2158,24 +2161,45 @@ implementation.
 
 The first feed is tracked by
 [#289](https://github.com/rapucha/moon-service/issues/289), the first child of
-[#16](https://github.com/rapucha/moon-service/issues/16).
+[#16](https://github.com/rapucha/moon-service/issues/16). Preference-filtered
+backend support is tracked by
+[#296](https://github.com/rapucha/moon-service/issues/296).
 
 ### Public Atom feed
 
 - `GET /feeds/atom?locationId=<canonical-id>` returns UTF-8 Atom 1.0 as
   `application/atom+xml`. Spring serves matching bodyless `HEAD` requests.
-- The URL contains only the current opaque canonical location ID. It contains
-  no search text, result order, preferences, or weather-ranking choice.
-- The browser builds this URL after it loads a real location. The opportunity
-  JSON does not return an Atom link.
+- The location-only URL contains the current opaque canonical location ID. The
+  same route accepts optional canonical `weatherRanking` and Version 1
+  `preferences` values in that order. It accepts no `order`, search text,
+  coordinates, account ID, token, or arbitrary user text.
+- The browser continues to build the location-only URL. A successful product
+  POST with an applied hard filter or non-default weather mode also returns a
+  backend-generated root `links.atomWithFilters`; browser discovery remains
+  hidden until its separate UI change.
 - A feed reader polls Moon Service. Moon Service creates no account, subscriber
   mapping, saved subscription, push channel, or durable location record.
 
-The feed asks the current seven-day search for up to ten ordinary opportunities.
-It uses `soonest`, balanced weather, no preferences, and no score cutoff. Each
-opportunity is one entry, ordered by precise `suggestedAt` and then entry ID.
-The feed excludes fictional reports, current-Moon cards, recurring events, and
-eclipses.
+The exact filtered query order is:
+
+```text
+/feeds/atom?locationId=<canonical-id>[&weatherRanking=<mode>][&preferences=<json>]
+```
+
+The query reuses the individual-export codec. Omit balanced weather and an
+inactive preference object. The Version 1 JSON uses its canonical property,
+number, range, and uppercase UTF-8 `%HH` encoding rules. Unknown members inside
+that object are ignored and omitted from canonical output. Reject duplicate or
+unknown URL parameters, malformed JSON, unsupported versions, and invalid
+recognized values with `400 invalid_request` before provider work.
+
+The feed asks the current seven-day search for up to ten ordinary opportunities
+with fixed `soonest`, the effective weather ranking, the normalized hard
+preferences, and no score cutoff. The location-only form keeps balanced weather
+and no hard preferences. Each opportunity is one entry, ordered by precise
+`suggestedAt` and then entry ID. The feed excludes fictional reports,
+current-Moon cards, recurring events, and eclipses. No match returns `200` with
+a valid empty feed.
 
 The document includes the Atom namespace, a location title, feed ID, `updated`,
 `Moon Service` author, and a same-origin self link. Each entry has a same-origin
@@ -2252,9 +2276,10 @@ summary. Rich content is an optional enhancement, not a promise that every
 reader will show the same layout. The complete text fallback must still say
 when to go, what conditions to expect, and what to check before leaving.
 
-Rich entry content does not change the route, location-only input, feed or
-entry IDs, ordering, one-hour freshness, 15-minute public response cache, ETag,
-bodyless `HEAD` and `304` behavior, or the no-account privacy model.
+Filtering does not change entry presentation or entry IDs. The location-only
+form keeps its Version 1 feed ID, self URL, XML, ordering, one-hour freshness,
+15-minute public response cache, ETag, bodyless `HEAD` and `304` behavior, and
+no-account privacy model.
 
 `Before you go` includes this warning when the phase is `new_moon`, or when it
 is `waxing_crescent` or `waning_crescent` with illumination of `10%` or less:
@@ -2268,6 +2293,15 @@ Feed and entry IDs are deterministic lowercase `urn:uuid` values made with
 `moon-service.atom.feed.v1\n<canonical-id>`. The entry input is
 `moon-service.atom.entry.v1\n<canonical-id>\n<startsAt>`, with precise
 `Instant.toString()` time. Here `\n` means one line-feed byte.
+
+A filtered feed instead uses
+`moon-service.atom.feed.v2\n<canonical-self-path>`, where the self path starts
+with `/feeds/atom?locationId=` and contains the canonical normalized query.
+Different normalized filters therefore have distinct feed identities and
+process histories. Entry IDs remain Version 1, so one ordinary opportunity has
+the same entry identity across feed views. Semantically equivalent inputs share
+one state. Explicit balanced weather with no recognized active filter reuses
+the location-only identity, self URL, XML, ETag, and state.
 
 Atom `updated` changes only when displayed content changes. New entries use the
 search response's `generatedAt`; unchanged entries keep their old value. The
@@ -2283,16 +2317,23 @@ state. If the same ID later returns, it is new again. The feed sends no Atom
 deleted-entry tombstone.
 
 Moon Service gives its process-local feed-state cache a `96 MiB` weight bound.
-Each value's weight is its exact cached XML byte length. A state stays fresh for
-one hour, and concurrent requests for the same location share one refresh. A
-single feed that is heavier than the bound is served but not retained. The
-state and its change times are not stored on disk or in a database. Restart,
-cache eviction, removal, and later reappearance can make an entry look updated
-again even though its deterministic ID stays the same.
+Location-only state keeps its exact cached XML byte weight. A filtered state is
+weighted by `max(cached XML bytes, 96 KiB)`, which limits retention to 1,024
+tiny filtered states when no other state is present. Mixed states share the
+same bound and evict normally. A state stays fresh for one hour, and concurrent
+requests for the same normalized key share one refresh. A single feed that is
+heavier than the bound is served but not retained. The state and its change
+times are not stored on disk or in a database. Restart, cache eviction, removal,
+and later reappearance can make an entry look updated again even though its
+deterministic ID stays the same.
 
-Render the XML deterministically. Successful feeds send
-`Cache-Control: public, max-age=900` and a strong `ETag` from the exact XML
-bytes. A matching `If-None-Match` returns a bodyless `304`. There is no
+Render the XML deterministically. Location-only success sends
+`Cache-Control: public, max-age=900`; filtered success sends
+`Cache-Control: private, max-age=900`. A request that supplies `preferences`
+stays private even when all members are ignored and the response reuses the
+unfiltered identity, state, XML, self URL, and ETag. Both forms send a strong
+`ETag` from the exact XML bytes. A matching `If-None-Match` returns a bodyless
+`304`; matching `HEAD` has the same success headers and no body. There is no
 `Last-Modified`.
 
 Tests record the complete byte size of one-entry and maximum ten-entry feeds,
@@ -2306,22 +2347,30 @@ new plan. This is a pre-publication review checkpoint, not a runtime response
 limit. The server does not reject a valid feed, remove pictures, truncate
 content, or add a size setting because of this checkpoint.
 
-Errors send `Cache-Control: no-store`. A missing, blank, over-100-character, or
-disallowed control- or formatting-character `locationId` is invalid input and
-returns `400`. An unknown canonical ID returns `404`, provider failure or
-unexpected ambiguity returns `503`, and hosted admission can return `429` with
-`Retry-After`. Error bodies do not echo the ID or provider details. A failed
-hourly refresh returns `503` and does not serve the old XML as a success. It
-keeps the old state only for later comparison, and the next admitted request
-retries.
+Errors send `Cache-Control: no-store`. A missing, blank, or disallowed control-
+or formatting-character `locationId` is invalid input and returns `400`. The
+deployed location-only form strips surrounding space before enforcing its
+100-code-point maximum. A request that uses the filtered-query parser, including
+explicit balanced weather or inactive preferences, enforces the same maximum on
+the raw value before stripping. Duplicate or unknown query parameters and
+malformed or invalid recognized preference/weather values also return early
+`400`. An unknown canonical ID returns `404`, provider failure or unexpected
+ambiguity returns `503`, and hosted admission can return `429` with
+`Retry-After`. Error bodies do not echo the ID, preferences, or provider details.
+A failed hourly refresh returns `503` and does not serve the old XML as a
+success. It keeps the old state only for later comparison, and the next admitted
+request retries.
 
 Hosted alpha allows only `GET` and `HEAD` on the exact `/feeds/atom` path.
 Whole-site and provider admission run before the feed cache, so even a cached
 request can receive `429`.
 
-The location ID stays out of application request logs because those logs keep
-the path, not the query string. Moon Service receives the location ID, and the
-feed response names the location, so the feed reader also learns it.
+Application request logs keep the path, not the query string. Filtered URLs can
+still be retained by feed readers, browser history, copied-link recipients, the
+public tunnel, and intermediaries that log request targets. They can reveal the
+location, preferred observation hours, and altitude or azimuth viewing
+direction. Operators must not log preference-bearing query strings. Moon
+Service adds no full-URL analytics.
 
 > This feed shows Moon Service's current recommendations. Your feed app may
 > keep old entries after Moon Service stops listing them. A missing entry does
@@ -2444,10 +2493,13 @@ ordered browser change renders link presence.
 - The server may cache geocoding, weather, and scoring data by provider,
   canonical location, rounded coordinate, and forecast time.
 - The preference POST keeps preference and availability values out of lookup,
-  page, and share URLs, cookies, server-side profiles, analytics events, and
-  shared caches. Its successful response may carry the documented
-  backend-generated individual `.ics` URL. Every response from the POST uses
-  `Cache-Control: no-store`.
+  page, and share URLs, cookies, server-side profiles, analytics events,
+  provider caches, opportunity caches, weather caches, and caches shared across
+  backend instances. A successful response may carry the documented
+  backend-generated individual `.ics` and filtered Atom URLs. After a client
+  opens a filtered Atom URL, the process-local Atom feed-state cache keys
+  rebuildable state by the URL's canonical filtered path. Every response from
+  the POST uses `Cache-Control: no-store`.
 - The browser may keep recent searches locally with `localStorage`.
 - Backend logs should avoid raw query strings and exact coordinates where
   possible.

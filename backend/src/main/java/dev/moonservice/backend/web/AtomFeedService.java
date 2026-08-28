@@ -7,6 +7,7 @@ import dev.moonservice.backend.opportunity.OpportunitySearchService;
 import dev.moonservice.backend.opportunity.search.OpportunityResponse;
 import dev.moonservice.backend.opportunity.search.OpportunitySearchRequest;
 import dev.moonservice.backend.opportunity.search.OpportunitySearchResponse;
+import dev.moonservice.scoringprototype.input.OpportunityPreferences;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 
@@ -35,22 +36,25 @@ import java.util.stream.Collectors;
  * weather artwork to {@link AtomWeatherRenderer}.
  *
  * <p>This class owns the parts that are not presentation: opportunity search,
- * the one-hour freshness window, per-cached-location single-flight refresh
+ * the one-hour freshness window, per-cached-feed single-flight refresh
  * work, stable Atom update times, strong ETags, and the bounded process cache.
  */
 @Service
 final class AtomFeedService {
     private static final int MAX_LOCATION_ID_CODE_POINTS = 100;
     private static final int MAX_FEED_ENTRIES = 10;
-    /* Caffeine weighs exact serialized XML bytes; object overhead is not part of this limit. */
+    private static final int MIN_FILTERED_CACHE_WEIGHT_BYTES = 96 * 1024;
+    /* Object overhead is not part of this limit. */
     private static final long MAX_CACHE_WEIGHT_BYTES = 96L * 1024 * 1024;
     /* A stale entry triggers a new search/render; it is not deleted on this timer. */
     private static final Duration FRESHNESS = Duration.ofHours(1);
 
     private final OpportunitySearchService opportunitySearchService;
     private final Clock clock;
-    private final Cache<String, FeedState> states = Caffeine.newBuilder()
-            .<String, FeedState>weigher((locationId, state) -> state.cachedXmlBytes())
+    private final Cache<FeedKey, FeedState> states = Caffeine.newBuilder()
+            .<FeedKey, FeedState>weigher((key, state) -> key.filtered()
+                    ? Math.max(state.cachedXmlBytes(), MIN_FILTERED_CACHE_WEIGHT_BYTES)
+                    : state.cachedXmlBytes())
             .maximumWeight(MAX_CACHE_WEIGHT_BYTES)
             .build();
 
@@ -60,38 +64,67 @@ final class AtomFeedService {
     }
 
     AtomFeed feed(String rawLocationId) {
-        String locationId = normalizeLocationId(rawLocationId);
-        FeedState state = states.get(locationId, ignored -> new FeedState());
+        return feed(FeedRequest.unfiltered(normalizeLocationId(rawLocationId)));
+    }
+
+    AtomFeed feed(PublicPreferenceQuery.CalendarRequest request) {
+        Objects.requireNonNull(request, "request");
+        return feed(FeedRequest.from(request));
+    }
+
+    private AtomFeed feed(FeedRequest request) {
+        FeedKey key = request.key();
+        FeedState state = states.get(key, ignored -> new FeedState());
         FeedSnapshot snapshot;
         try {
             snapshot = state.current(
                     clock.instant(),
-                    previous -> refresh(locationId, previous));
+                    previous -> refresh(request, previous));
         } catch (RuntimeException | Error failure) {
             // A first failed load has no useful cached value, so do not retain its zero-weight state.
             if (state.cachedXmlBytes() == 0) {
-                states.asMap().remove(locationId, state);
+                states.asMap().remove(key, state);
             }
             throw failure;
         }
         /*
          * FeedState is mutable. Inserting it again after current() makes
          * Caffeine weigh its current XML rather than the zero-byte state first
-         * inserted for this location. It works whether this caller performed
+         * inserted for this feed key. It works whether this caller performed
          * the refresh or waited for another caller's refresh.
          */
-        states.put(locationId, state);
+        states.put(key, state);
         return new AtomFeed(snapshot.xml(), snapshot.etag());
     }
 
-    private FeedSnapshot refresh(String locationId, FeedSnapshot previous) {
+    private FeedSnapshot refresh(
+            FeedRequest request,
+            FeedSnapshot previous
+    ) {
         /* Use the shared canonical seven-day search defaults, with SOONEST ordering for the feed. */
         OpportunityResponse response;
         try {
-            response = opportunitySearchService.search(
-                    null,
-                    locationId,
-                    OpportunitySearchRequest.Order.SOONEST);
+            if (request.preferences() != null) {
+                response = opportunitySearchService.search(
+                        null,
+                        request.locationId(),
+                        OpportunitySearchRequest.Order.SOONEST,
+                        request.preferences(),
+                        request.ignoredFields().paths(),
+                        request.ignoredFields().count(),
+                        request.weatherRanking().scoringValue());
+            } else if (request.weatherRanking() != ProductWeatherRanking.BALANCED) {
+                response = opportunitySearchService.search(
+                        null,
+                        request.locationId(),
+                        OpportunitySearchRequest.Order.SOONEST,
+                        request.weatherRanking().scoringValue());
+            } else {
+                response = opportunitySearchService.search(
+                        null,
+                        request.locationId(),
+                        OpportunitySearchRequest.Order.SOONEST);
+            }
         } catch (InvalidOpportunitySearchRequestException ex) {
             throw ex;
         } catch (RuntimeException ex) {
@@ -106,8 +139,10 @@ final class AtomFeedService {
         }
 
         String generatedAt = Instant.parse(success.generatedAt()).toString();
-        AtomFeedDocumentRenderer.FeedMetadata metadata =
-                AtomFeedDocumentRenderer.metadata(success.location());
+        AtomFeedDocumentRenderer.FeedMetadata metadata = request.key().filtered()
+                ? AtomFeedDocumentRenderer.filteredMetadata(
+                        success.location(), request.key().canonicalSelfPath())
+                : AtomFeedDocumentRenderer.metadata(success.location());
         List<AtomFeedDocumentRenderer.DisplayedEntry> displayedEntries = success.opportunities().stream()
                 .map(opportunity -> AtomFeedDocumentRenderer.displayedEntry(success.location(), opportunity))
                 .sorted(Comparator
@@ -220,6 +255,70 @@ final class AtomFeedService {
     record AtomFeed(byte[] xml, String etag) {
     }
 
+    private record FeedKey(String canonicalSelfPath, boolean filtered) {
+        private FeedKey {
+            Objects.requireNonNull(canonicalSelfPath, "canonicalSelfPath");
+        }
+    }
+
+    private record FeedRequest(
+            FeedKey key,
+            String locationId,
+            ProductWeatherRanking weatherRanking,
+            OpportunityPreferences preferences,
+            ProductRequestParser.IgnoredFields ignoredFields
+    ) {
+        private FeedRequest {
+            Objects.requireNonNull(key, "key");
+            Objects.requireNonNull(locationId, "locationId");
+            Objects.requireNonNull(weatherRanking, "weatherRanking");
+            Objects.requireNonNull(ignoredFields, "ignoredFields");
+        }
+
+        static FeedRequest unfiltered(String locationId) {
+            ProductWeatherRanking weatherRanking = ProductWeatherRanking.BALANCED;
+            String selfPath = canonicalSelfPath(locationId, weatherRanking, null);
+            return new FeedRequest(
+                    new FeedKey(selfPath, false),
+                    locationId,
+                    weatherRanking,
+                    null,
+                    new ProductRequestParser.IgnoredFields(List.of(), 0));
+        }
+
+        static FeedRequest from(PublicPreferenceQuery.CalendarRequest request) {
+            String locationId = normalizeLocationId(request.locationId());
+            ProductWeatherRanking weatherRanking = request.weatherRanking() == null
+                    ? ProductWeatherRanking.BALANCED
+                    : request.weatherRanking();
+            OpportunityPreferences canonicalPreferences = request.preferences();
+            if (canonicalPreferences != null && !canonicalPreferences.active()) {
+                canonicalPreferences = null;
+            }
+            String selfPath = canonicalSelfPath(locationId, weatherRanking, canonicalPreferences);
+            boolean filtered = weatherRanking != ProductWeatherRanking.BALANCED
+                    || canonicalPreferences != null;
+            return new FeedRequest(
+                    new FeedKey(selfPath, filtered),
+                    locationId,
+                    weatherRanking,
+                    canonicalPreferences,
+                    request.ignoredFields());
+        }
+
+        private static String canonicalSelfPath(
+                String locationId,
+                ProductWeatherRanking weatherRanking,
+                OpportunityPreferences preferences
+        ) {
+            return "/feeds/atom" + PublicPreferenceQuery.calendarQuery(
+                    locationId,
+                    OpportunitySearchRequest.Order.BEST_MATCH,
+                    weatherRanking,
+                    preferences);
+        }
+    }
+
     static final class FeedFailure extends RuntimeException {
         private final HttpStatus httpStatus;
         private final String status;
@@ -254,9 +353,9 @@ final class AtomFeedService {
     }
 
     /**
-     * Mutable state shared by callers for one canonical location ID. A volatile
+     * Mutable state shared by callers for one canonical feed identity. A volatile
      * snapshot makes fresh reads lock-free. When stale, one caller owns the
-     * load and the others join the same future; different location IDs use
+     * load and the others join the same future; different feed identities use
      * different states and can refresh in parallel.
      */
     private static final class FeedState {

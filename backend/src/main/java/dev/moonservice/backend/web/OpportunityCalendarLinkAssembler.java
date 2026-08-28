@@ -48,7 +48,8 @@ final class OpportunityCalendarLinkAssembler {
                 response.emptyReason(),
                 response.preferenceImpact(),
                 response.asOf(),
-                response.currentMoon());
+                response.currentMoon(),
+                response.links());
     }
 
     private static OpportunitySearchResponse.Opportunity withCalendarLink(

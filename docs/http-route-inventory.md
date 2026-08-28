@@ -20,7 +20,7 @@ Open-Meteo URLs are provider dependencies, not Moon Service routes.
 | `GET /` | Web entry page; current product route | Web browser | Allowlisted; whole-site bound |
 | `GET /search` | Lookup and share page; current product route | Web browser | Allowlisted; whole-site bound |
 | `GET /about` | Product/privacy information page | Web browser | Allowlisted; whole-site bound |
-| `GET /feeds/atom` | Public Atom feed for one canonical location | Feed reader, through the browser link | Allowlisted; site and provider bounds |
+| `GET /feeds/atom` | Public Atom feed for one canonical location, with optional hard preferences and weather ranking | Feed reader; current browser exposes only the location-only link | Allowlisted; site and provider bounds |
 | `GET /o/{opportunityId}.ics` | Stateless individual iCalendar export | Product API link; browser action remains hidden | Allowlisted for valid paths; site and provider bounds |
 | `GET /api/opportunities` | Location-to-opportunity product API | Browser `app.js` | Allowlisted; site and search bounds |
 | `POST /api/opportunities` | Request-scoped preference product API | Browser `app.js` through `opportunityPreferences.js` | Allowlisted POST; site and provider bounds |
@@ -103,13 +103,17 @@ Open-Meteo URLs are provider dependencies, not Moon Service routes.
   Resolved location data then drives an Open-Meteo weather lookup. The product
   POST never sends preferences to either provider and returns every response
   with `Cache-Control: no-store`. Preference field names and values are not
-  stored, logged, or placed in a shared cache. Page, lookup, and share URLs
-  contain no preference values. A successful product response may contain a
-  backend-generated individual-export URL carrying the canonical location,
-  selected order, non-default weather ranking, and active hard preferences.
-  Moon Service request logging omits that query string, but browsers, calendar
-  clients, copied-link recipients, Funnel, and infrastructure that records the
-  full request target can see it. The only preference-related application log
+  permanently stored, logged, or placed in a provider, opportunity, weather,
+  or cross-instance cache. The process-local Atom feed-state cache is the narrow
+  exception: after a client opens a filtered Atom URL, it keys rebuildable state
+  by the URL's canonical filtered path. Page, lookup, and share URLs contain no
+  preference values. A successful product response may contain
+  backend-generated individual-export and filtered Atom URLs carrying the
+  canonical location, non-default weather ranking, and active hard preferences;
+  the individual export may also carry selected order. Moon Service request
+  logging omits those query strings, but browsers, feed and calendar clients,
+  copied-link recipients, Funnel, and infrastructure that records the full
+  request target can see them. The only preference-related application log
   is the documented aggregate event with the version, unknown field count, and
   truncation state.
 
@@ -199,11 +203,27 @@ and [hosted-alpha functional tests](../backend/src/test/java/dev/moonservice/bac
 - **Handler:** `AtomFeedController`; Spring also serves matching bodyless
   `HEAD` requests.
 - **Purpose/lifecycle:** current public Atom feed for one canonical location.
-- **Production invocation:** the result page builds the URL after it loads a
-  real location, and a feed reader then polls it.
-- **Authentication/data:** none. The query contains only `locationId`. The
-  route creates no account, subscriber record, saved subscription, or durable
-  feed state. Application request logs omit the query string.
+  The same route can apply canonical Version 1 hard preferences and
+  non-default weather ranking while keeping fixed `soonest` order.
+- **Production invocation:** the result page builds the location-only URL after
+  it loads a real location, and a feed reader then polls it. Successful
+  filtered product POST responses also contain a backend-generated
+  `links.atomWithFilters`; the browser does not expose it until its separate UI
+  change.
+- **Authentication/data:** none. The query requires `locationId` and may contain
+  canonical `weatherRanking` and `preferences`. Unknown preference-object
+  members are ignored, while duplicate or unknown query parameters and invalid
+  recognized values fail before provider work. The route creates no account,
+  subscriber record, saved subscription, token, or durable feed state.
+  Location-only responses are public-cacheable; filtered and any
+  preference-bearing responses are private-cacheable. Application request logs
+  omit the query string. Operators must also keep preference-bearing query
+  strings out of access logs because they can reveal location, observation
+  hours, and altitude or azimuth viewing direction.
+- **State:** the existing `96 MiB` process cache keeps exact XML weight for
+  location-only state and applies a `96 KiB` minimum only to filtered state.
+  Semantically equivalent normalized requests share one state. State remains
+  rebuildable and disappears on eviction or restart.
 - **Exposure:** exact `GET` and `HEAD /feeds/atom` are allowlisted in hosted
   alpha. Whole-site and provider admission run before the process feed cache,
   so a cached request can receive `429`.
@@ -370,10 +390,11 @@ and [hosted-alpha functional tests](../backend/src/test/java/dev/moonservice/bac
   geocoding or weather. The service does not store a request body, preference,
   availability value, or user profile. Page and share URLs, cookies,
   application logs, analytics events, provider requests, and shared caches omit
-  those values. The response's backend-generated individual-export URL is the
-  deliberate exception: it can carry the applied preference and non-default
-  weather values so the export is reusable. Moon Service request logging omits
-  its query string.
+  those values. The response's backend-generated individual-export and filtered
+  Atom URLs are the deliberate exceptions: they can carry applied preferences
+  and non-default weather so the exports are reusable. The individual link can
+  also carry selected order. Moon Service request logging omits their query
+  strings.
 - **Exposure:** available on the ordinary listener. Hosted alpha allows this
   exact `POST` in addition to the existing bodyless `GET` and `HEAD`
   operations, and permits a body only for `POST`. It applies the same whole-site

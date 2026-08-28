@@ -51,6 +51,7 @@ class OpportunitySearchController {
                 order,
                 productRequest.weatherRanking(),
                 productRequest.preferences());
+        response = withFilteredAtomLink(response, productRequest);
         return ResponseEntity.status(httpStatusFor(response))
                 .header(HttpHeaders.CACHE_CONTROL, "no-store")
                 .body(response);
@@ -84,6 +85,32 @@ class OpportunitySearchController {
                         ignoredFields.paths(),
                         ignoredFields.count(),
                         weatherRanking.scoringValue());
+    }
+
+    private static OpportunityResponse withFilteredAtomLink(
+            OpportunityResponse source,
+            ProductRequestParser.OpportunityRequest request
+    ) {
+        if (!(source instanceof OpportunitySearchResponse response)
+                || !"ok".equals(response.status())) {
+            return source;
+        }
+        boolean hasActivePreferences = request.preferences() != null
+                && response.normalizedActiveFilters() != null
+                && !response.normalizedActiveFilters().isEmpty();
+        ProductWeatherRanking weatherRanking = request.weatherRanking();
+        boolean hasAppliedNondefaultWeather = weatherRanking != null
+                && weatherRanking != ProductWeatherRanking.BALANCED
+                && weatherRanking.scoringValue().wireValue().equals(response.appliedWeatherRanking());
+        if (!hasActivePreferences && !hasAppliedNondefaultWeather) {
+            return source;
+        }
+        String query = PublicPreferenceQuery.calendarQuery(
+                response.location().id(),
+                Order.BEST_MATCH,
+                hasAppliedNondefaultWeather ? weatherRanking : null,
+                hasActivePreferences ? request.preferences() : null);
+        return response.withFilteredAtomLink("/feeds/atom" + query);
     }
 
     @PostMapping("/api/opportunities/search")

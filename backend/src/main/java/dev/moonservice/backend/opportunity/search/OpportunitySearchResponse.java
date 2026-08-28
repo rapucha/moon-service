@@ -31,7 +31,8 @@ public record OpportunitySearchResponse(
         EmptyReason emptyReason,
         PreferenceImpactDetails preferenceImpact,
         String asOf,
-        CurrentMoonResponse currentMoon
+        CurrentMoonResponse currentMoon,
+        Links links
 ) implements OpportunityResponse {
     public OpportunitySearchResponse(
             String status,
@@ -49,7 +50,7 @@ public record OpportunitySearchResponse(
         this(
                 status, generatedAt, location, forecastHorizonDays, startsAt, endsAt,
                 candidateWindowsEvaluated, maxMoonAltitudeDegrees, opportunities, rejected, messages,
-                null, null, null, null, null, null, null, null, null, null, null);
+                null, null, null, null, null, null, null, null, null, null, null, null);
     }
 
     public static OpportunitySearchResponse withPreferences(
@@ -97,7 +98,8 @@ public record OpportunitySearchResponse(
                 emptyReason,
                 preferenceImpact,
                 response.asOf(),
-                response.currentMoon());
+                response.currentMoon(),
+                response.links());
     }
 
     public static OpportunitySearchResponse forProduct(
@@ -130,7 +132,35 @@ public record OpportunitySearchResponse(
                 response.emptyReason(),
                 response.preferenceImpact(),
                 capturedAt,
-                Objects.requireNonNull(currentMoon, "currentMoon"));
+                Objects.requireNonNull(currentMoon, "currentMoon"),
+                response.links());
+    }
+
+    public OpportunitySearchResponse withFilteredAtomLink(String value) {
+        return new OpportunitySearchResponse(
+                status,
+                generatedAt,
+                location,
+                forecastHorizonDays,
+                startsAt,
+                endsAt,
+                candidateWindowsEvaluated,
+                maxMoonAltitudeDegrees,
+                opportunities,
+                rejected,
+                messages,
+                appliedWeatherRanking,
+                appliedPreferenceVersion,
+                normalizedActiveFilters,
+                excludedSampleCount,
+                ignoredPreferenceFields,
+                ignoredPreferenceFieldCount,
+                additionalIgnoredPreferenceFieldCount,
+                emptyReason,
+                preferenceImpact,
+                asOf,
+                currentMoon,
+                new Links(value));
     }
 
     private static PreferenceImpactDetails preferenceImpact(
@@ -348,5 +378,8 @@ public record OpportunitySearchResponse(
             String code,
             String text
     ) {
+    }
+
+    public record Links(String atomWithFilters) {
     }
 }

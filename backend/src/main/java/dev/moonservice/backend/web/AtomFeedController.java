@@ -8,7 +8,6 @@ import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestHeader;
-import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.nio.charset.StandardCharsets;
@@ -20,7 +19,8 @@ import java.util.Objects;
 final class AtomFeedController {
     private static final MediaType ATOM_MEDIA_TYPE =
             new MediaType("application", "atom+xml", StandardCharsets.UTF_8);
-    private static final String SUCCESS_CACHE_CONTROL = "public, max-age=900";
+    private static final String PUBLIC_CACHE_CONTROL = "public, max-age=900";
+    private static final String PRIVATE_CACHE_CONTROL = "private, max-age=900";
 
     private final AtomFeedService atomFeedService;
     private final Clock clock;
@@ -32,25 +32,41 @@ final class AtomFeedController {
 
     @GetMapping(value = "/feeds/atom", produces = "application/atom+xml;charset=UTF-8")
     ResponseEntity<?> feed(
-            @RequestParam(name = "locationId", required = false) String locationId,
             @RequestHeader(name = HttpHeaders.IF_NONE_MATCH, required = false) String ifNoneMatch,
             HttpServletRequest request
     ) {
         boolean head = "HEAD".equals(request.getMethod());
         try {
-            AtomFeedService.AtomFeed feed = atomFeedService.feed(locationId);
+            if (request.getParameterMap().containsKey("order")) {
+                throw new InvalidOpportunitySearchRequestException(
+                        "order is not supported for Atom feeds.");
+            }
+            String[] locationIds = request.getParameterMap().get("locationId");
+            boolean locationOnly = request.getParameterMap().size() == 1
+                    && locationIds != null
+                    && locationIds.length == 1;
+            PublicPreferenceQuery.CalendarRequest feedRequest = locationOnly
+                    ? null
+                    : PublicPreferenceQuery.parseCalendar(request);
+            boolean privateResponse = feedRequest != null
+                    && (request.getParameterMap().containsKey("preferences")
+                    || feedRequest.weatherRanking() != null
+                    && feedRequest.weatherRanking() != ProductWeatherRanking.BALANCED);
+            AtomFeedService.AtomFeed feed = locationOnly
+                    ? atomFeedService.feed(locationIds[0])
+                    : atomFeedService.feed(feedRequest);
             if (etagMatches(ifNoneMatch, feed.etag())) {
                 return ResponseEntity.status(HttpStatus.NOT_MODIFIED)
-                        .headers(successHeaders(feed))
+                        .headers(successHeaders(feed, privateResponse))
                         .build();
             }
             if (head) {
                 return ResponseEntity.ok()
-                        .headers(successHeaders(feed))
+                        .headers(successHeaders(feed, privateResponse))
                         .build();
             }
             return ResponseEntity.ok()
-                    .headers(successHeaders(feed))
+                    .headers(successHeaders(feed, privateResponse))
                     .body(feed.xml());
         } catch (InvalidOpportunitySearchRequestException ex) {
             return error(HttpStatus.BAD_REQUEST, "invalid_request", ex.getMessage(), head);
@@ -65,10 +81,10 @@ final class AtomFeedController {
         }
     }
 
-    private HttpHeaders successHeaders(AtomFeedService.AtomFeed feed) {
+    private HttpHeaders successHeaders(AtomFeedService.AtomFeed feed, boolean privateResponse) {
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(ATOM_MEDIA_TYPE);
-        headers.setCacheControl(SUCCESS_CACHE_CONTROL);
+        headers.setCacheControl(privateResponse ? PRIVATE_CACHE_CONTROL : PUBLIC_CACHE_CONTROL);
         headers.setETag(feed.etag());
         headers.setContentLength(feed.xml().length);
         return headers;
