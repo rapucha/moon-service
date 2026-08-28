@@ -5,12 +5,13 @@ geocoding and weather path, natural Moon-window scoring, shareable results, and
 responsive opportunity UI are implemented. Phase 4 infrastructure is complete:
 the tested application deploys automatically to the Raspberry Pi and the
 bounded tester-alpha Funnel is enabled. Follow-up #158 preserves the postponed
-household-impact measurement without blocking the alpha. The current product
-focus is to start
-public feeds and calendar exports under
-[#16](https://github.com/rapucha/moon-service/issues/16).
-Its first child is [#289](https://github.com/rapucha/moon-service/issues/289):
-the public Atom feed. Calibration under #33 remains a longer project.
+household-impact measurement without blocking the alpha. The public Atom feed
+was delivered by [#289](https://github.com/rapucha/moon-service/issues/289).
+Issue [#294](https://github.com/rapucha/moon-service/issues/294) delivers the
+stateless preference-aware backend export for one `.ics` event under tracking
+parent [#16](https://github.com/rapucha/moon-service/issues/16). Its browser
+activation and later subscribable calendars remain ordered work. Calibration
+under #33 remains a longer project.
 
 ## Phase 0: Planning Baseline
 
@@ -91,8 +92,10 @@ Exit criteria:
 
 ## Phase 3: MVP App Loop
 
-Status: in progress. The anonymous lookup loop is implemented; empirical
-ranking validation plus feeds and calendar exports remain.
+Status: in progress. The anonymous lookup loop and public Atom feed are
+implemented. The individual `.ics` backend export is delivered through #294;
+empirical ranking validation, its browser activation, and subscribable calendar
+feeds remain.
 
 Goal: make the simplest useful public loop work.
 
@@ -103,9 +106,11 @@ Tasks:
 - Display details for each opportunity.
 - Provide a shareable result URL.
 - Add clear privacy copy for geocoding, weather lookup, coordinate rounding, and backend logs.
-- Implement the public Atom feed in #289. RSS has not been accepted.
-- Provide dynamic public `.ics` calendar feeds for canonical real locations.
-- Provide `.ics` export for individual opportunities.
+- Use the public Atom feed delivered in #289. RSS has not been accepted.
+- Provide the stateless preference-aware individual `.ics` backend export in
+  #294, followed by its ordered browser activation child.
+- Provide dynamic public `.ics` calendar feeds for canonical real locations
+  later.
 
 Exit criteria:
 
@@ -221,9 +226,10 @@ The anonymous web loop now returns up to ten raw ranked candidates while
 preserving explicit caller control on the direct scoring contract. This is a
 discovery safeguard, not a scoring calibration.
 
-The next product step is the remaining runtime work in
-[#289](https://github.com/rapucha/moon-service/issues/289): add the first public
-Atom feed and its browser discovery link.
+The current feed/calendar step is
+[#294](https://github.com/rapucha/moon-service/issues/294): deliver the
+stateless preference-aware individual `.ics` route and complete product links.
+The browser action remains hidden until its ordered child consumes those links.
 
 The completed foundations are:
 
@@ -265,13 +271,14 @@ If it supports no behavior change, record provisional acceptance, calibration
 gaps, and remaining uncertainty before closing #33. The parent remains open
 through collection and corpus curation.
 
-Current work on public feeds and
-calendar exports under
-[#16](https://github.com/rapucha/moon-service/issues/16) starts with the Atom
-feed in #289. The JitPack dependency decision and safeguards required before
+Public feed and calendar-export work remains tracked under
+[#16](https://github.com/rapucha/moon-service/issues/16). Issue #289 delivered
+the public Atom feed. Issue #294 delivers the stateless preference-aware
+individual `.ics` route and complete product links; the current browser action
+remains hidden pending its ordered child. RSS and subscribable calendar feeds
+remain later. The JitPack dependency decision and safeguards required before
 public deployment are recorded in
 [#17](https://github.com/rapucha/moon-service/issues/17).
-RSS is not accepted, and calendar exports remain later.
 
 ## Implemented Backend And Prototype History
 

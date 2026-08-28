@@ -19,22 +19,22 @@ server.
 
 ## Public UX
 
-Current public browser and Atom feed routes:
+Current public browser, Atom feed, and individual-event routes:
 
 ```text
 /search?q=Praha
 /search?locationId=moon-service-3067696
 /feeds/atom?locationId=moon-service-3067696
+/o/<opportunity-id>.ics?locationId=moon-service-3067696
 ```
 
 The first feed URL uses the current opaque, provider-tied canonical location
 ID. A provider change may require a new subscription URL. Issue
 [#288](https://github.com/rapucha/moon-service/issues/288) tracks the later
-friendly-URL decision. Calendar routes remain planned under #16:
+friendly-URL decision. Subscribable calendar routes remain planned under #16:
 
 ```text
 /calendars/prague-cz.ics
-/o/prague-cz-2026-06-29T1920Z.ics
 ```
 
 Implementation tracking:
@@ -54,7 +54,8 @@ GET /api/opportunities?q=Praha&lang=cs
 display and ranking.
 
 When at least one is active, the page sends request-scoped version 1
-preferences to the same-origin product API without putting them in a URL:
+preferences to the same-origin product API without putting them in the page,
+share, or lookup URL:
 
 ```http
 POST /api/opportunities
@@ -111,6 +112,7 @@ Use `status` to report the result of the whole request:
 ok
 ambiguous_location
 location_not_found
+opportunity_not_found
 invalid_request
 temporarily_unavailable
 rate_limited
@@ -127,6 +129,8 @@ Meanings:
   part of a future contract.
 - `location_not_found`: geocoding found no real location. The current backend
   has no fictional fallback.
+- `opportunity_not_found`: an individual calendar request resolved its
+  location, but the live search no longer contains the exact requested ID.
 - `invalid_request`: the input is missing, empty after trimming, too long,
   malformed, or unsupported.
 - `temporarily_unavailable`: the current backend could not complete the
@@ -150,6 +154,8 @@ HTTP status codes can stay conventional:
 
 - `200` for product states such as `ok`, `ambiguous_location`, and `location_not_found`.
 - `400` for `invalid_request`.
+- `404` for `location_not_found` or `opportunity_not_found` on the individual
+  calendar route.
 - `413` for `request_too_large`.
 - `415` for `unsupported_media_type`.
 - `429` for `rate_limited`.
@@ -603,10 +609,13 @@ location state, provider failure, or hosted-alpha rejection, must contain
 
 The service may send `q` or `locationId` through the current location flow. It
 must not send a preference or `weatherRanking` to a geocoding or weather
-provider. It must not add the mode to provider or cache keys, or put it in a
-URL, cookie, access log, application log, server-side profile, analytics event,
-or shared cache. The server must not permanently store the body, a preference,
-the mode, an availability window, or a personal profile.
+provider. It must not add the mode to provider or cache keys, page/share URLs,
+cookies, server-side profiles, analytics events, or shared caches. A successful
+response may contain the backend-generated individual `.ics` URL documented
+below; that export URL can carry normalized applied preferences and weather
+ranking. Moon Service application logs omit its query string. The server must
+not permanently store the body, a preference, the mode, an availability
+window, or a personal profile.
 
 Hosted alpha allows a bounded JSON body only for this exact product POST, the
 separately specified planning POST, and the feedback submission route. It
@@ -1495,7 +1504,7 @@ instead describes weather across the opportunity window:
       },
       "reason": "Moon is low in the southeast during a twilight window with low precipitation risk.",
       "links": {
-        "ics": "/o/prague-cz-2026-06-29T1920Z.ics"
+        "ics": "/o/prague-cz-2026-06-29T1920Z.ics?locationId=prague-cz"
       }
     }
   ],
@@ -2138,10 +2147,12 @@ them. Eclipse contacts, phases, maximum, local visibility, and safety need the
 separate event contract tracked by
 [#80](https://github.com/rapucha/moon-service/issues/80).
 
-Public RSS/Atom or `.ics` links may be acceptable when a URL encodes a
-canonical, nonpersonal event pattern. Personal saved event subscriptions
-require the privacy and storage model to cover stored preferences, notification
-delivery, retention, and deletion before implementation.
+Public RSS/Atom links may encode a canonical location. The individual `.ics`
+link below may also encode the request-scoped order, weather ranking, and hard
+preferences needed to reproduce one ordinary result. Personal saved event
+subscriptions require the privacy and storage model to cover stored
+preferences, notification delivery, retention, and deletion before
+implementation.
 
 ## Feed And Calendar Rules
 
@@ -2320,26 +2331,109 @@ feed response names the location, so the feed reader also learns it.
 This is a discovery feed, not a guaranteed alert or cancellation channel. The
 feed reader chooses when to poll and may show older data.
 
-RSS, calendar feeds, and individual `.ics` downloads remain later work under
-#16. The planned `.ics` rules are:
+### Individual iCalendar event
 
-- Dynamic public calendar feeds may be generated on demand for canonical real
-  locations, such as `/calendars/prague-cz.ics`.
-- Calendar feeds should contain a rolling window of upcoming public
-  opportunities for that location. They should use caching instead of creating
-  a feed manually for each requested city.
-- Only for real individual opportunities.
-- Individual event exports, such as
-  `/o/prague-cz-2026-06-29T1920Z.ics`, should include the title, time window,
-  location display name, summary, and a note about local horizon
-  obstruction.
-- For an ordinary opportunity, normalize `DTSTART` and `DTEND` outward to
-  whole-minute bounds under the decision in
-  [#253](https://github.com/rapucha/moon-service/issues/253). This does not
-  change the precise source instants in the API or RSS/Atom output.
-- Recurring events and eclipses need their event-specific calendar timing
-  rules before export.
-- Do not generate `.ics` for fictional reports.
+Successful product GET and preference POST responses give every ordinary
+opportunity a complete backend-generated link with this shape:
+
+```text
+GET /o/<opportunity-id>.ics?locationId=<canonical-id>[&order=soonest][&weatherRanking=<mode>][&preferences=<json>]
+```
+
+The query fields are generated in that order. `locationId` is always present.
+Omitted `order` means `best_match`; omitted `weatherRanking` means `balanced`.
+The preferences field appears only when at least one Version 1 hard preference
+is active. A free-text lookup uses the resolved `location.id`, not `q`. The
+direct fixture POST may retain its reserved bare link, and the server does not
+serve a bare-path compatibility fallback.
+
+The decoded preferences value is the existing Version 1 JSON object. Its
+canonical top-level order is `version`, `altitudeDegrees`, `azimuthDegrees`,
+`time`, `namedPhases`, and `brightLimbOrientationDegrees`. Nested order is
+`minimum` then `maximum`, `included` then `excluded`, `start` then `end`, and
+`mode` before `window` or `buckets`. Set-valued light buckets and named phases
+use their wire order. Bright-limb ranges are sorted by start and end and
+deduplicated.
+
+Canonical JSON is compact. Finite numbers use plain base-10 form without an
+exponent, plus sign, unnecessary zero, trailing fractional zero, or negative
+zero. Each query value is encoded from UTF-8 bytes: only RFC 3986 unreserved
+bytes stay literal; every other byte uses uppercase `%HH`, and space is `%20`.
+For example:
+
+```text
+{"version":1,"altitudeDegrees":{"minimum":5,"maximum":20.5}}
+%7B%22version%22%3A1%2C%22altitudeDegrees%22%3A%7B%22minimum%22%3A5%2C%22maximum%22%3A20.5%7D%7D
+```
+
+Parsing keeps the product POST's tolerance for unknown members anywhere inside
+the decoded Version 1 object and canonical output omits them. Duplicate or
+unknown URL parameters, malformed JSON, an unsupported version, and invalid
+recognized values return `400 invalid_request` before provider work.
+
+The path ID is opaque. Missing or blank IDs, IDs over 200 code points, and IDs
+with unsupported control characters return `400`. The endpoint reruns the
+existing seven-day product search with the typed location, order, weather, and
+preferences, then selects only the exact path ID. A well-formed unresolved
+location returns `404 location_not_found`; a resolved search without that ID
+returns `404 opportunity_not_found` and never substitutes another interval.
+Provider failure or unexpected ambiguity returns `503 temporarily_unavailable`.
+
+Success is UTF-8 `text/calendar;charset=UTF-8` with:
+
+```text
+Content-Disposition: attachment; filename="moon-opportunity.ics"
+Cache-Control: no-store
+```
+
+There is no ETag or `Last-Modified`. The body contains one `VCALENDAR` and one
+`VEVENT` in this order: `UID`, `DTSTAMP`, `DTSTART`, `DTEND`, `SUMMARY`,
+`LOCATION`, `DESCRIPTION`, and `IMAGE`. It uses CRLF including the final line,
+RFC 5545 TEXT escaping, and UTF-8-safe folding at 75 octets or fewer.
+
+The UID is the lowercase `urn:uuid` produced by `UUID.nameUUIDFromBytes` from
+`moon-service.ics.event.v1\n<canonical-location-id>\n<opportunity-id>` in
+UTF-8. `DTSTAMP` is the response `generatedAt` truncated to seconds. `DTSTART`
+is floored and `DTEND` is ceiled outward to whole minutes under
+[#253](https://github.com/rapucha/moon-service/issues/253). All three use UTC
+`yyyyMMdd'T'HHmmss'Z'`; no `TZID` or `VTIMEZONE` is emitted. API and Atom source
+instants remain precise.
+
+The event names the Moon photography opportunity and location. Its description
+uses three plain-text lines: suggested local date, time, and timezone; Moon
+phase with one-decimal illumination and altitude; and coarse weather.
+It excludes ambient light, source and caveat prose, coordinates, raw
+preferences, scores, provider details, and a preference-bearing source URL.
+
+Each `VEVENT` has exactly one RFC 7986 `IMAGE` after `DESCRIPTION`. It is a
+192-by-192 transparent PNG generated from the opportunity's suggested-time
+Moon phase and orientation by the existing Atom Moon renderer. The property is
+inline with `ENCODING=BASE64`, `VALUE=BINARY`, `DISPLAY=BADGE`, and
+`FMTTYPE=image/png`; it has no URI and causes no external request. Calendar
+clients may ignore `IMAGE`, so successful ordinary event import must not depend
+on displaying it.
+
+The inline image makes the current GET representation and corresponding HEAD
+`Content-Length` about 80–90 KiB. Bodyless `HEAD` has the same success headers.
+Controller errors use safe JSON for GET and an empty body for HEAD; all success,
+error, hosted rejection, and admission responses are `no-store`. Hosted alpha
+allows only valid `/o/*.ics` GET and HEAD and applies whole-site and provider
+admission before location or weather work.
+
+The route creates no account, token, saved snapshot, new cache, or durable
+record. Moon Service application logs omit query strings, but browsers,
+copied-link recipients, calendar clients, Funnel, and other request-target logs
+may see the preference-bearing URL. Product links are actionable, but the
+current browser still hides them behind its old `icsReady` gate until the
+ordered browser change renders link presence.
+
+### Later feed and calendar work
+
+- RSS and subscribable public calendar feeds remain later work under #16.
+- A later `/calendars/<location>.ics` feed may contain a rolling window of
+  ordinary public opportunities and needs its own caching contract.
+- Recurring events and eclipses need event-specific calendar timing rules.
+- Fictional reports do not receive `.ics` output.
 
 ## Privacy And Storage Rules
 
@@ -2349,9 +2443,10 @@ RSS, calendar feeds, and individual `.ics` downloads remain later work under
 - No cookies for remembering users.
 - The server may cache geocoding, weather, and scoring data by provider,
   canonical location, rounded coordinate, and forecast time.
-- The preference POST must not place a preference or availability value in a
-  URL, cookie, server-side profile, analytics event, access or application log,
-  or shared cache. Every response from that route uses
+- The preference POST keeps preference and availability values out of lookup,
+  page, and share URLs, cookies, server-side profiles, analytics events, and
+  shared caches. Its successful response may carry the documented
+  backend-generated individual `.ics` URL. Every response from the POST uses
   `Cache-Control: no-store`.
 - The browser may keep recent searches locally with `localStorage`.
 - Backend logs should avoid raw query strings and exact coordinates where
@@ -2417,9 +2512,9 @@ and [weather cache](../backend/src/main/java/dev/moonservice/backend/weather/Cac
 ## Target Internal Service Boundary
 
 Keep the target components separate even though the public API has one
-opportunity search endpoint. The current opportunity path does not implement
-the fictional lookup, feed and calendar assembly, or recurring-event search
-shown below.
+opportunity search endpoint. It now implements the public Atom feed and
+individual calendar-link assembly. It does not implement fictional lookup,
+RSS, subscribable calendar feeds, or recurring-event search.
 
 ```text
 opportunity_search
@@ -2428,7 +2523,7 @@ opportunity_search
   -> ephemeris
   -> weather
   -> scoring
-  -> feed/calendar link assembly
+  -> implemented Atom and individual-calendar assembly
 ```
 
 The coordinate-backed opportunity engine was delivered through

@@ -2,7 +2,7 @@
 
 This is the first real backend module for Moon Service. It promotes the tested
 Spring HTTP contract out of `prototypes/` while keeping durable/shared caches,
-RSS and calendar exports deliberately out of scope.
+RSS and subscribable calendar feeds deliberately out of scope.
 
 ## Current Scope
 
@@ -16,6 +16,10 @@ RSS and calendar exports deliberately out of scope.
   preferences and the product POST when at least one is active.
 - Public Atom feed at `GET /feeds/atom?locationId=<canonical-id>`, with matching
   bodyless `HEAD` support and a discovery link on a loaded real-location result.
+- Stateless individual iCalendar export at
+  `GET /o/<opportunity-id>.ics?locationId=<canonical-id>`, with matching
+  bodyless `HEAD` support and complete backend-owned links on ordinary product
+  results. The browser action remains hidden until its ordered UI change.
 - `POST /api/opportunities/search` using the same JSON request body as the scoring
   prototype fixture.
 - Disabled-by-default calibration feedback capability at
@@ -50,8 +54,9 @@ RSS and calendar exports deliberately out of scope.
 
 Durable persistence is limited to the disabled-by-default calibration-feedback
 repository described below. Durable/shared caches, accounts, cookies, RSS,
-calendar generation, and deployment configuration remain out of scope. Public
-Atom feed state is bounded, process-local, and rebuildable.
+subscribable calendar feeds, and deployment configuration remain out of scope.
+Public Atom feed state is bounded, process-local, and rebuildable. Individual
+calendar export adds no stored state.
 Missing or unknown `moon.location.resolver` or `moon.weather.provider` values
 fail startup; the runtime backend does not include fixture provider modes.
 
@@ -164,6 +169,44 @@ location ID, and the feed reader learns the location named in the response.
 > keep old entries after Moon Service stops listing them. A missing entry does
 > not prove that an opportunity was cancelled. Open the live result before you
 > go because weather and recommendations can change.
+
+## Individual iCalendar Export
+
+Successful product GET and preference POST responses give every ordinary
+opportunity a complete `links.ics` URL. The backend generates that URL from the
+resolved canonical location, selected result order, optional non-default
+weather ranking, and active normalized Version 1 hard preferences. The browser
+must treat it as opaque. The direct fixture endpoint may retain its reserved
+bare link.
+
+Opening the URL reruns the current seven-day product search and exports only
+the exact opportunity ID. A valid link whose location no longer resolves gets
+`404 location_not_found`; a resolved search that no longer contains the exact
+ID gets `404 opportunity_not_found`. The route never substitutes another or
+unfiltered interval, and the old bare path is not a compatibility fallback.
+
+Success is one UTF-8 `VEVENT` in `text/calendar`, downloaded as
+`moon-opportunity.ics` with `Cache-Control: no-store`. Times use UTC; `DTSTART`
+is floored and `DTEND` is ceiled to outward whole-minute bounds. Output uses
+CRLF, RFC 5545 TEXT escaping, UTF-8-safe line folding, and a deterministic UID.
+The operation creates no account, token, snapshot, cache, or durable record.
+
+Each event includes one inline RFC 7986 `IMAGE` after `DESCRIPTION`: a
+192-by-192 transparent PNG with `ENCODING=BASE64`, `VALUE=BINARY`,
+`DISPLAY=BADGE`, and `FMTTYPE=image/png`. It reuses the existing Atom Moon
+renderer and texture for the opportunity's phase and orientation, has no URI,
+and makes no external request. Calendar clients may ignore `IMAGE`; the event
+must still import normally. The current GET body and matching HEAD
+`Content-Length` are about 80–90 KiB. The first image render initializes the
+existing 2048-by-1024 texture, about 6 MiB decoded, and adds no cache, setting,
+asset, or runtime service.
+
+The event adapter uses pinned core iCal4j 4.3.0 for the calendar model, TEXT
+encoding, validation model, folding, and UTF-8 output. Moon Service rejects a
+generated calendar when iCal4j reports validation errors and selects the
+library's conservative 25-code-unit fold setting so arbitrary Unicode lines
+remain within the RFC 5545 75-octet limit. The redistributed backend includes
+the dependency's BSD 3-Clause notice at `META-INF/LICENSE-iCal4j.txt`.
 
 ## Runtime Configuration
 
@@ -411,6 +454,12 @@ A loaded real-location result also shows `Atom feed`. The browser builds
 `/feeds/atom?locationId=<canonical-id>` with only that ID. It does not copy the
 search text, result order, preferences, or weather-ranking choice.
 
+The same response now contains complete backend-generated individual `.ics`
+links. They may include the applied order, weather ranking, and hard
+preferences. The current browser still requires the absent `icsReady` signal,
+so it does not expose those links until the ordered browser child replaces that
+gate with link-presence handling.
+
 The page uses two optional browser `localStorage` entries.
 `moonService.recentSearches.v1` keeps up to five display names, location IDs,
 and timezones. `moonService.opportunityPreferences.v1` keeps only the supported
@@ -557,6 +606,9 @@ sends a safe `X-Request-Id`, the backend reuses it; otherwise it generates one.
 The request log records method, path, status, duration, and request ID. It uses
 the route path only, not the raw query string, so location queries such as
 `q=...` are not written to application logs by this filter.
+Preference-aware calendar URLs can still be visible to browsers, copied-link
+recipients, calendar clients, Funnel, and other infrastructure that records the
+full request target.
 
 ### Hosted-alpha application surface
 
@@ -568,9 +620,10 @@ policy to every request reaching that application instance.
 
 The enabled policy allows `GET` and `HEAD` for `/`, `/search`, `/about`, their
 backing HTML files, the exact static files tracked by the current build,
-`/api/opportunities`, `/feeds/atom`, `/readyz`, exact `/admin/status`, and the
-feedback capability route. It also allows `POST /api/opportunities` for a bounded
-preference body and only `POST` for the feedback submission route. Adding a
+`/api/opportunities`, `/feeds/atom`, valid `/o/*.ics`, `/readyz`, exact
+`/admin/status`, and the feedback capability route. It also allows
+`POST /api/opportunities` for a bounded preference body and only `POST` for the
+feedback submission route. Adding a
 static file does not publish it automatically. Add its exact path to the
 allowlist. The functional test finds packaged static files and fails if the
 filter blocks one. Every other `/admin/**` path, the fixture endpoint,
@@ -608,7 +661,8 @@ Exact `GET`, `HEAD`, and `POST` requests to `/api/opportunities` also require
 one provider token and one of two concurrent provider-operation permits before
 controller or provider work. Exact `GET` and `HEAD /feeds/atom` use the same
 admission before the feed-cache lookup, so a cached feed request can receive
-`429`.
+`429`. Valid `GET` and `HEAD /o/*.ics` also use it before their location and
+weather work.
 The fixture POST, static files, admin status, and readiness do not consume those
 two resources. A rejection returns HTTP `429`, canonical `rate_limited` JSON,
 and a numeric `Retry-After` hint. The Docker carve-out is only bodyless
@@ -771,7 +825,8 @@ rebuildable. Do not add a local Postgres deployment, durable shared cache, or
 long-retention logs only to support alpha hosting. The public Atom feed uses
 deterministic output and bounded process state. Add Postgres later when private
 feeds, saved locations, alert subscriptions, durable provider counters, or
-durable cache state require it. RSS and `.ics` remain later work.
+durable cache state require it. RSS and subscribable `.ics` feeds remain later
+work; individual `.ics` export is stateless.
 
 The current planning boundary is documented in
 `docs/self-hosting-alpha-plan.md`.

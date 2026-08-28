@@ -4,8 +4,9 @@ This is the canonical inventory of HTTP operations explicitly mapped by Moon
 Service controllers. It records who uses each route, why it exists, and how its
 exposure differs between the ordinary application and hosted-alpha mode.
 
-The route universe is the thirteen mappings declared by `WebPageController`,
-`AtomFeedController`, `OpportunitySearchController`, `MoonPlanningController`,
+The route universe is the fourteen mappings declared by `WebPageController`,
+`AtomFeedController`, `ICalendarEventController`,
+`OpportunitySearchController`, `MoonPlanningController`,
 `CalibrationFeedbackController`, `HealthController`, and
 `AdminStatusController`. Spring's implicit `HEAD`
 handling, `/error`, exception handlers, and static-resource serving are
@@ -20,6 +21,7 @@ Open-Meteo URLs are provider dependencies, not Moon Service routes.
 | `GET /search` | Lookup and share page; current product route | Web browser | Allowlisted; whole-site bound |
 | `GET /about` | Product/privacy information page | Web browser | Allowlisted; whole-site bound |
 | `GET /feeds/atom` | Public Atom feed for one canonical location | Feed reader, through the browser link | Allowlisted; site and provider bounds |
+| `GET /o/{opportunityId}.ics` | Stateless individual iCalendar export | Product API link; browser action remains hidden | Allowlisted for valid paths; site and provider bounds |
 | `GET /api/opportunities` | Location-to-opportunity product API | Browser `app.js` | Allowlisted; site and search bounds |
 | `POST /api/opportunities` | Request-scoped preference product API | Browser `app.js` through `opportunityPreferences.js` | Allowlisted POST; site and provider bounds |
 | `POST /api/opportunities/planning` | Weather-free next-date planning API | Browser `app.js` through `opportunityPreferences.js` | Allowlisted POST; site and provider bounds |
@@ -60,7 +62,8 @@ Open-Meteo URLs are provider dependencies, not Moon Service routes.
   `429`; an accepted permit is released when downstream handling finishes. The
   exact planning POST uses the same resources after whole-site admission. Those
   resources also apply to exact `GET` or `HEAD /feeds/atom` before its feed
-  cache lookup. A cached feed request can therefore receive `429`. They also
+  cache lookup and to structurally valid `GET` or `HEAD /o/*.ics` before its
+  live search. A cached feed request can therefore receive `429`. They also
   wrap feedback location resolution as described below;
   they do not apply to pages, static files, admin status, readiness, or the
   fixture POST route.
@@ -100,9 +103,15 @@ Open-Meteo URLs are provider dependencies, not Moon Service routes.
   Resolved location data then drives an Open-Meteo weather lookup. The product
   POST never sends preferences to either provider and returns every response
   with `Cache-Control: no-store`. Preference field names and values are not
-  stored, logged, or placed in a shared cache. The only preference-related
-  application log is the documented aggregate event with the version, unknown
-  field count, and truncation state.
+  stored, logged, or placed in a shared cache. Page, lookup, and share URLs
+  contain no preference values. A successful product response may contain a
+  backend-generated individual-export URL carrying the canonical location,
+  selected order, non-default weather ranking, and active hard preferences.
+  Moon Service request logging omits that query string, but browsers, calendar
+  clients, copied-link recipients, Funnel, and infrastructure that records the
+  full request target can see it. The only preference-related application log
+  is the documented aggregate event with the version, unknown field count, and
+  truncation state.
 
 Implementation authority: [request logging](../backend/src/main/java/dev/moonservice/backend/observability/RequestLoggingFilter.java),
 [hosted resource-limit filter](../backend/src/main/java/dev/moonservice/backend/web/HostedAlphaResourceLimitFilter.java),
@@ -202,6 +211,57 @@ and [hosted-alpha functional tests](../backend/src/test/java/dev/moonservice/bac
   [service](../backend/src/main/java/dev/moonservice/backend/web/AtomFeedService.java),
   [Atom contract](api-shape.md#public-atom-feed).
 
+### `GET /o/{opportunityId}.ics`
+
+- **Handler:** `ICalendarEventController`; Spring also serves matching bodyless
+  `HEAD` requests. `/o/.ics` reaches the same validation path so a missing ID is
+  an application `400`, not an accidental framework `404`.
+- **Purpose/lifecycle:** current anonymous, stateless export of one ordinary
+  opportunity as one iCalendar event. Product GET and preference POST responses
+  supply the complete reusable URL. The existing browser does not yet render
+  the action; its ordered browser child will use link presence instead of an
+  `icsReady` flag.
+- **Request:** the opaque path ID is bounded and must not be blank or contain
+  control characters. `locationId` is required. Optional `order`,
+  `weatherRanking`, and percent-encoded Version 1 `preferences` reproduce the
+  product search that supplied the result. Backend-generated links use that
+  fixed query order and omit default values. Unknown members inside the decoded
+  preference object follow product-POST tolerance; duplicate or unknown URL
+  parameters, malformed JSON, unsupported versions, and invalid known values
+  are rejected before provider work.
+- **Behavior:** the route reruns the current seven-day product search with its
+  ten-result limit and selects only the exact requested ID. An unresolved
+  canonical location is `404 location_not_found`; a resolved search without
+  the exact ID is `404 opportunity_not_found`. It never substitutes another
+  opportunity and has no bare-path fallback, snapshot token, account, durable
+  record, or separate cache.
+- **Response:** success is UTF-8 `text/calendar`, `Content-Disposition:
+  attachment; filename="moon-opportunity.ics"`, and `Cache-Control: no-store`,
+  with one deterministic UTC `VEVENT`. `DTSTART` is floored and `DTEND` ceiled
+  to whole minutes. Each event also contains one inline RFC 7986 `IMAGE`: a
+  192-by-192 transparent phase-and-orientation PNG with `ENCODING=BASE64`,
+  `VALUE=BINARY`, `DISPLAY=BADGE`, and `FMTTYPE=image/png`. It has no URI or
+  external request. Clients may ignore it, so normal event import remains
+  required. Current GET bodies and matching HEAD `Content-Length` values are
+  about 80–90 KiB. The first render initializes the existing Atom Moon texture;
+  it adds no asset, cache, setting, or runtime service. Application errors are
+  safe JSON for GET and bodyless for HEAD; hosted surface errors remain
+  bodyless. Every route response is `no-store`; there is no ETag or
+  Last-Modified validator.
+- **Authentication/data:** none. Preferences remain request-scoped and never
+  reach a provider or durable store. The public URL can reveal selected
+  observation hours, viewing direction, and other filters to browsers,
+  calendar clients, copied-link recipients, Funnel, and full request-target
+  logs. Moon Service application logs omit its query string.
+- **Exposure:** structurally valid `GET` and `HEAD /o/*.ics` are allowlisted in
+  hosted alpha. Whole-site and provider admission run before controller and
+  provider work. Other methods, framed bodies, and malformed path shapes receive
+  the existing bodyless surface responses.
+- **References:** [controller](../backend/src/main/java/dev/moonservice/backend/web/ICalendarEventController.java),
+  [renderer](../backend/src/main/java/dev/moonservice/backend/web/ICalendarEventRenderer.java),
+  [canonical query](../backend/src/main/java/dev/moonservice/backend/web/PublicPreferenceQuery.java),
+  [API contract](api-shape.md#individual-icalendar-event).
+
 ### `GET /api/opportunities`
 
 - **Handler:** `OpportunitySearchController.searchByQuery`.
@@ -240,7 +300,9 @@ and [hosted-alpha functional tests](../backend/src/test/java/dev/moonservice/bac
   opportunity remains. It applies the selected order to all eligible finalized
   opportunities before taking the ten-result product limit. Hosted-alpha
   resource admission can instead return `429` with `rate_limited`,
-  `retryAfterSeconds`, and `Retry-After` before the controller runs.
+  `retryAfterSeconds`, and `Retry-After` before the controller runs. Every
+  ordinary opportunity also carries a complete canonical `links.ics` URL using
+  the resolved location ID and selected order.
 - **Authentication/data:** anonymous. `q` is sent to Open-Meteo geocoding;
   normalized queries or location IDs and resolution results are cached in the
   current process with bounded size and status-specific TTLs. Resolved location
@@ -296,17 +358,22 @@ and [hosted-alpha functional tests](../backend/src/test/java/dev/moonservice/bac
   weather score components. Weather lookup and raw weather output stay active
   in every mode. A weather-only request omits all hard-preference metadata.
   The server orders all eligible finalized opportunities before taking the
-  ten-result product limit. Errors use the documented `400 invalid_request`,
+  ten-result product limit. Each ordinary opportunity carries a complete
+  backend-generated `links.ics` URL that reproduces the resolved location,
+  selected order, effective weather ranking, and active hard preferences.
+  Errors use the documented `400 invalid_request`,
   `413 request_too_large`, and `415 unsupported_media_type` shapes.
   Invalid-order responses and every other response use
   `Cache-Control: no-store`.
 - **Authentication/data:** anonymous and same-origin. The current location flow
   may send `q` or `locationId` upstream, but it never sends a preference to
   geocoding or weather. The service does not store a request body, preference,
-  availability value, or user profile, and does not put those values in a URL,
-  cookie, application or access log, analytics event, or shared cache.
-  It also does not send, store, log, or cache `weatherRanking`, or add it to a
-  provider or cache key.
+  availability value, or user profile. Page and share URLs, cookies,
+  application logs, analytics events, provider requests, and shared caches omit
+  those values. The response's backend-generated individual-export URL is the
+  deliberate exception: it can carry the applied preference and non-default
+  weather values so the export is reusable. Moon Service request logging omits
+  its query string.
 - **Exposure:** available on the ordinary listener. Hosted alpha allows this
   exact `POST` in addition to the existing bodyless `GET` and `HEAD`
   operations, and permits a body only for `POST`. It applies the same whole-site
@@ -563,10 +630,10 @@ and [hosted-alpha functional tests](../backend/src/test/java/dev/moonservice/bac
   inventory.
 - `/error` is Spring Boot's internal error-dispatch path, not an application
   controller mapping. `/test/slow` exists only in `GracefulShutdownTest`.
-- `/l/{location}`, `/calendars/*.ics`, and `/o/*.ics` are
-  design/roadmap shapes, not implemented routes. Opportunity JSON currently
-  carries reserved `/o/*.ics` strings, but no controller serves them and the
-  browser does not expose a calendar action without an `icsReady` signal.
+- `/l/{location}` and `/calendars/*.ics` are design/roadmap shapes, not
+  implemented routes. Individual `/o/*.ics` exports are implemented and product
+  responses carry complete URLs, but the current browser still hides its
+  calendar action pending the ordered browser child.
 - There are no Actuator, OpenAPI, Swagger UI, or Spring REST Docs endpoints.
 
 ## Maintenance rule

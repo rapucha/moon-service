@@ -98,6 +98,7 @@ final class HostedAlphaResourceLimitFilter extends OncePerRequestFilter {
         HostedAlphaSurfaceFilter.addSecurityHeaders(response);
         if (ADMIN_STATUS_PATH.equals(path)
                 || ATOM_FEED_PATH.equals(path)
+                || HostedAlphaSurfaceFilter.isCalendarEventPath(path)
                 || isProductPost(request.getMethod(), path)) {
             response.setHeader("Cache-Control", "no-store");
         }
@@ -119,7 +120,9 @@ final class HostedAlphaResourceLimitFilter extends OncePerRequestFilter {
         return (OPPORTUNITY_PATH.equals(path)
                 && ("GET".equals(method) || "HEAD".equals(method) || "POST".equals(method)))
                 || (PLANNING_PATH.equals(path) && "POST".equals(method))
-                || (ATOM_FEED_PATH.equals(path) && ("GET".equals(method) || "HEAD".equals(method)));
+                || (ATOM_FEED_PATH.equals(path) && ("GET".equals(method) || "HEAD".equals(method)))
+                || (HostedAlphaSurfaceFilter.isCalendarEventPath(path)
+                && ("GET".equals(method) || "HEAD".equals(method)));
     }
 
     private static boolean isProductPost(String method, String path) {

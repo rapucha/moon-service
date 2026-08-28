@@ -322,7 +322,7 @@ class WeatherRankingProductApiFunctionalTest {
 
     private static JsonNode withoutScoringFields(JsonNode opportunity) {
         ObjectNode copy = (ObjectNode) opportunity.deepCopy();
-        copy.remove(List.of("score", "confidence", "components", "scoreBasis"));
+        copy.remove(List.of("score", "confidence", "components", "scoreBasis", "links"));
         return copy;
     }
 

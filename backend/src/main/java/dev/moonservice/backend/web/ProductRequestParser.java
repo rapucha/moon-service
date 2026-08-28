@@ -123,7 +123,7 @@ final class ProductRequestParser {
         }
     }
 
-    private static ParsedPreferences parsePreferences(JsonNode node) {
+    static ParsedPreferences parsePreferences(JsonNode node) {
         int version = requiredInteger(node, "version");
         if (version != OpportunityPreferences.VERSION) {
             throw invalid("preferences.version must be 1.");
@@ -341,7 +341,7 @@ final class ProductRequestParser {
         return value.doubleValue();
     }
 
-    private static String normalizedLocationId(String rawLocationId) {
+    static String normalizedLocationId(String rawLocationId) {
         String locationId = rawLocationId.strip();
         if (locationId.isBlank()) {
             throw invalid("locationId must be non-empty.");
@@ -393,7 +393,7 @@ final class ProductRequestParser {
     record IgnoredFields(List<String> paths, int count) {
     }
 
-    private record ParsedPreferences(OpportunityPreferences preferences, IgnoredFields ignoredFields) {
+    record ParsedPreferences(OpportunityPreferences preferences, IgnoredFields ignoredFields) {
         private static ParsedPreferences empty() {
             return new ParsedPreferences(null, new IgnoredFields(List.of(), 0));
         }

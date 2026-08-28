@@ -260,11 +260,12 @@ Implemented shape:
 - Funnel proxies directly to `http://127.0.0.1:8080`. The existing exact
   primary-IPv4 listener remains available only to the trusted LAN.
 - Public routes are limited to the web app and its static assets, `/search`,
-  `/api/opportunities`, provider-independent `/readyz`, and exact
-  token-authenticated `/admin/status`.
+  `/api/opportunities`, `/feeds/atom`, structurally valid `/o/*.ics`,
+  provider-independent `/readyz`, and exact token-authenticated
+  `/admin/status`.
 - The prototype fixture endpoint, `POST /api/opportunities/search`, is blocked.
-  Future feed and calendar routes require their own accepted public limits
-  before they can join the hosted allowlist.
+  RSS and subscribable calendar-feed routes require their own accepted public
+  limits before they can join the hosted allowlist.
 - Every `/admin/**` route except exact authenticated `GET`/`HEAD /admin/status`
   is blocked before controller handling.
 - No raw router port forward is required for HTTP(S) when Funnel is used.
@@ -319,8 +320,9 @@ Other hosted-surface controls remain narrow:
 - Request size limits suitable for query-only endpoints.
 - Conservative timeouts so slow clients do not tie up the backend.
 - Basic security headers for browser responses.
-- Future feed and calendar routes must join an explicit shared bound before
-  public exposure; their caching and polling policy remains future work.
+- Atom and individual `.ics` requests join the explicit shared whole-site and
+  provider bounds. Future RSS and subscribable calendar routes must do the same
+  before public exposure; their caching and polling policy remains future work.
 
 ### Activation Result And Follow-Up
 
@@ -398,7 +400,7 @@ Exit criteria met:
 - Dependency failure returns `temporarily_unavailable`, not an empty opportunity
   list.
 
-## Phase 4: Atom And Later Calendar Work Without A Database
+## Phase 4: Atom And Individual iCalendar Without A Database
 
 Goal: ship low-friction feed/calendar behavior without forcing persistence too
 early.
@@ -407,7 +409,7 @@ No database is required for these first cases:
 
 - One-off `.ics` export for a single opportunity.
 - The public Atom feed for a canonical public location, tracked by #289.
-- Public `.ics` calendar feed for a canonical public location.
+- A later public `.ics` calendar feed for a canonical public location.
 
 The implementation should be deterministic:
 
@@ -427,11 +429,37 @@ Hosted whole-site and provider admission run before the feed cache. A cached
 request can still receive `429`. The feed adds no account, subscriber mapping,
 saved subscription, push channel, database record, or disk state.
 
+The individual export is also stateless:
+
+- Product GET and preference POST responses generate complete
+  `/o/<opportunity-id>.ics` URLs containing the canonical location and any
+  selected order, non-default weather ranking, and active hard preferences.
+- Opening a URL reruns the current product search and exports only the exact
+  opportunity ID. An unresolved location and a valid search whose exact result
+  has disappeared return distinct `404` responses; another event is never
+  substituted.
+- Every success and error is `Cache-Control: no-store`. Hosted whole-site and
+  provider admission run before the live search.
+- Each event embeds one inline 192-by-192 PNG. This makes current GET bodies and
+  matching HEAD `Content-Length` values about 80–90 KiB, but creates no external
+  image request. Clients may ignore the image without affecting normal import.
+- The first calendar image render initializes the existing packaged
+  2048-by-1024 Atom Moon texture, about 6 MiB decoded. The calendar path adds no
+  asset, cache, setting, or runtime service.
+- There is no signed snapshot, export cache, account, token, database record, or
+  disk state.
+
+Moon Service application logging omits query strings. The public export URL can
+still reveal selected observation hours, viewing direction, and other filters
+to browsers, copied-link recipients, calendar clients, Funnel, and any
+infrastructure that records the full request target.
+
 Database triggers:
 
 - Saved user locations.
 - Private feed tokens or revocation.
-- User-specific thresholds/preferences.
+- Saved or private user-specific thresholds/preferences. Request-scoped public
+  export preferences do not require a database.
 - Email alerts or alert delivery history.
 - Durable provider counters across restarts.
 - Durable/shared cache state across backend instances.
@@ -445,10 +473,11 @@ Exit criteria:
 - A later database can replace cache/storage seams without changing public feed
   URLs.
 
-Deploy the Atom change through the existing image pipeline. After deployment,
-check one normal feed request and one conditional request on the public host.
-Keep the revision-aware readiness check and automatic known-good rollback
-unchanged.
+Deploy Atom and individual-export changes through the existing image pipeline.
+After deployment, check one normal feed request, one conditional feed request,
+one current individual `.ics` GET and matching HEAD, and one stale individual
+`.ics` request on the public host. Keep the revision-aware readiness check and
+automatic known-good rollback unchanged.
 
 ## Phase 5: Future Database Boundary
 

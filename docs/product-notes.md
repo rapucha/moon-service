@@ -35,9 +35,9 @@ that overlap these recurring events even when their timing varies.
 ## MVP User Promise
 
 No account is required. Enter a city or location and see the next promising
-Moon opportunity. Use RSS/Atom feeds or `.ics` export to follow future
-opportunities. Add email or an installed client later only if users find
-recurring personal alerts useful.
+Moon opportunity. Use the public Atom feed to follow future recommendations or
+download one selected opportunity as an `.ics` event. Add email or an installed
+client later only if users find recurring personal alerts useful.
 
 The first useful result can include:
 
@@ -70,10 +70,14 @@ In scope:
 - Score opportunities using Moon geometry, Sun state, and weather.
 - Present ranked opportunities.
 - Provide a shareable result page.
-- Provide RSS/Atom feeds for public city/region or best-upcoming opportunities.
-- Provide dynamic public `.ics` calendar feeds for canonical real locations.
-  Generate them on demand and cache them.
-- Provide `.ics` export for individual events.
+- Provide a public Atom feed for a canonical real location. RSS remains
+  unaccepted.
+- Provide a stateless, preference-aware `.ics` export for an individual event.
+  The backend route and complete product links are current; browser activation
+  is the ordered next child. Each event embeds the opportunity's Moon phase and
+  orientation with RFC 7986 `IMAGE`. A calendar client may ignore the image, so
+  the ordinary event fields must remain useful without it.
+- Add dynamic public `.ics` calendar feeds for canonical real locations later.
 
 Tracked MVP implementation issues:
 
@@ -106,7 +110,9 @@ Moon Service keeps four timing ideas separate:
   ordering, live eligibility, API responses, and RSS/Atom feeds keep precise
   instants.
 - **Display resolution:** The browser shows ordinary opportunity times rounded
-  to the nearest minute. This does not change stored or serialized instants.
+  to the nearest minute. An individual `.ics` export floors `DTSTART` and ceils
+  `DTEND` to outward whole-minute bounds. Neither display nor export rounding
+  changes the precise API and Atom instants.
 - **Event uncertainty:** A recurring event may have an expected time, an
   uncertainty window, an overlap window, and a confidence level. An eclipse
   may have precise contacts, phases, maximum, local visibility, and safety
@@ -247,16 +253,25 @@ as hard filters to find precise matching fragments. It may join nearby
 fragments only under the ordinary timing rule above. The server uses the
 weather choice only for scoring and ranking. It must not permanently store the
 request body or preferences, add them to a server-side profile, cookie, or
-analytics event, or put them in a URL, access log, application log, or shared
-cache.
+analytics event, or put them in a page, lookup, or share URL, application log,
+or shared cache.
 
 Search order is request state. The browser puts `order=soonest` in the page URL
 and generated share links, and omits the default `best_match` order. It does
 not store order in an account, cookie, server profile, or `localStorage` entry.
 
 Share links contain the location and may contain order. They contain no
-preference value. Feeds and calendar links also contain no preference value. A
-browser opening a share link applies its own saved preferences, if any.
+preference value. A browser opening a share link applies its own saved
+preferences, if any. The current Atom feed remains location-only and
+unfiltered. A backend-generated individual `.ics` URL instead carries the
+canonical location, selected order, non-default weather ranking, and active hard
+preferences so reopening it can reproduce the same public search. The browser
+treats that URL as opaque; its current calendar action remains hidden pending
+the ordered browser child. The URL creates no server profile or durable state,
+but browsers, calendar clients, copied-link recipients, Funnel, and systems that
+log the full request target may see the encoded filters, including preferred
+observation hours and viewing direction. Moon Service application logs omit the
+query string.
 Resetting all preferences removes the version 1 object and the weather-ranking
 value when browser storage accepts both removals, and uses `balanced` in memory.
 A weather-ranking read failure uses `balanced` for that load and shows the
@@ -430,7 +445,7 @@ should design recovery early, even if the first implementation is small.
 - Saved compositions.
 - Recurring event-aware opportunities, such as aircraft approaches, transport
   routes, public events, or user-defined weekly patterns.
-- `.ics` export and later calendar OAuth.
+- Subscribable `.ics` calendar feeds and later calendar OAuth.
 - Email alerts for users who opt in.
 - Telegram-style broadcast channels for popular cities or regions.
 - Reddit community posts or a project-owned subreddit.

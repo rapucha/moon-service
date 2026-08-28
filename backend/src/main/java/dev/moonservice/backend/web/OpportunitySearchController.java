@@ -32,6 +32,8 @@ class OpportunitySearchController {
     ) {
         Order order = Order.fromProductQuery(rawOrder);
         OpportunityResponse response = opportunitySearchService.search(query, locationId, order);
+        response = OpportunityCalendarLinkAssembler.withCalendarLinks(
+                response, order, null, null);
         return ResponseEntity.status(httpStatusFor(response)).body(response);
     }
 
@@ -44,6 +46,11 @@ class OpportunitySearchController {
         ProductRequestParser.OpportunityRequest productRequest =
                 ProductRequestParser.parseOpportunity(request);
         OpportunityResponse response = searchProductRequest(productRequest, order);
+        response = OpportunityCalendarLinkAssembler.withCalendarLinks(
+                response,
+                order,
+                productRequest.weatherRanking(),
+                productRequest.preferences());
         return ResponseEntity.status(httpStatusFor(response))
                 .header(HttpHeaders.CACHE_CONTROL, "no-store")
                 .body(response);
