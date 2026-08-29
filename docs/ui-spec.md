@@ -597,6 +597,18 @@ The editor exposes these hard filters:
   `waning_gibbous`, `last_quarter`, and `waning_crescent`. An absent value and
   all five shapes selected both mean unrestricted, and the editor shows all
   five selected in either state. At least one shape must remain selected.
+  Directly after the Moon shape choices, show this amber warning whenever
+  `New / very thin` or `Crescent` is selected, including the default
+  unrestricted state:
+
+  > ⚠ Eye safety: A New Moon is normally not visible. A very thin crescent can
+  > be hard to find in bright twilight. **Never** search for the Moon near the
+  > Sun through binoculars, a telescope, or a camera's optical viewfinder.
+
+  The warning is an ordinary paragraph, not a live region or alert. When
+  neither risky shape is selected, hide it from both visual presentation and
+  the accessibility tree. Showing or hiding it does not move keyboard focus
+  from the changed checkbox.
 - Bright-limb orientation is optional and has one target on a circular,
   single-handle dial. It has no editable numeric range inputs. The browser
   starts a new target at `270°` (`Left`) and

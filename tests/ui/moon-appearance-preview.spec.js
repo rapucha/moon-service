@@ -455,11 +455,38 @@ test("keeps the shape choices responsive and keyboard accessible", async ({
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth))
     .toBe(true);
 
+  const warningText = "⚠ Eye safety: A New Moon is normally not visible. A very thin crescent "
+    + "can be hard to find in bright twilight. Never search for the Moon near the Sun through "
+    + "binoculars, a telescope, or a camera's optical viewfinder.";
+  const warningMarker = "⚠ Eye safety: A New Moon is normally not visible.";
+  const warning = page.locator("#preference-eye-safety-warning");
+  const preferencePanel = page.locator("#opportunity-preferences");
+  await expect(warning).toBeVisible();
+  await expect(warning).toHaveText(warningText);
+  await expect(warning).toHaveClass("preference-notice warning");
+  await expect(warning.locator("strong")).toHaveText("Never");
+  expect(await warning.ariaSnapshot()).toContain(warningMarker);
+  expect(await warning.ariaSnapshot()).toContain("- strong: Never");
+
+  await selectOnly(page, ["crescent"]);
+  await expect(warning).toBeVisible();
+  const half = page.getByLabel("Half", { exact: true });
+  const crescent = page.getByLabel("Crescent", { exact: true });
+  await half.check();
+  await crescent.focus();
+  await page.keyboard.press("Space");
+  await expect(crescent).not.toBeChecked();
+  await expect(crescent).toBeFocused();
+  await expect(warning).toBeHidden();
+  expect(await preferencePanel.ariaSnapshot()).not.toContain(warningMarker);
+
   const newMoon = page.getByLabel("New / very thin", { exact: true });
   await newMoon.focus();
   await page.keyboard.press("Space");
-  await expect(newMoon).not.toBeChecked();
+  await expect(newMoon).toBeChecked();
   await expect(newMoon).toBeFocused();
+  await expect(warning).toBeVisible();
+  expect(await preferencePanel.ariaSnapshot()).toContain(warningMarker);
 });
 
 async function captureApiCalls(page) {

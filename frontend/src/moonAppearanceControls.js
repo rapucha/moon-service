@@ -38,6 +38,7 @@ var RANGE_EPSILON = 1.0e-6;
 
 export function createMoonAppearanceControls(form) {
   var shapeInputs = Array.from(form.querySelectorAll("[data-moon-shape]"));
+  var eyeSafetyWarning = form.querySelector("#preference-eye-safety-warning");
   var preferenceDetails = /** @type {HTMLDetailsElement} */ (
     form.closest("#opportunity-preferences")
   );
@@ -135,6 +136,7 @@ export function createMoonAppearanceControls(form) {
 
   function syncEditor() {
     var selected = selectedShapes();
+    eyeSafetyWarning.hidden = !selected.includes("new") && !selected.includes("crescent");
     var fullOnly = selected.length === 1 && selected[0] === "full";
     var mixed = selected.includes("full") && selected.length > 1;
     var expanded = limbEnabled.checked && !fullOnly;
