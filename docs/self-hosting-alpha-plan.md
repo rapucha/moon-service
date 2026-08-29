@@ -70,6 +70,9 @@ timer rearming and exact GitHub deployment confirmation are follow-up
   refresh. Location-only state uses exact XML weight; filtered state has a
   96 KiB minimum weight. Do not persist this state. Add a database only when
   saved locations, alerts, durable counters, or durable cache state require it.
+- Keep the first subscribable iCalendar feed stateless and without an output
+  cache or ETag. Accept up to ten PNG renders and roughly 0.8-0.9 MiB for an
+  uncached maximum response until real traffic supports a different plan.
 
 ### Calibration feedback may be lost
 
@@ -260,12 +263,11 @@ Implemented shape:
 - Funnel proxies directly to `http://127.0.0.1:8080`. The existing exact
   primary-IPv4 listener remains available only to the trusted LAN.
 - Public routes are limited to the web app and its static assets, `/search`,
-  `/api/opportunities`, `/feeds/atom`, structurally valid `/o/*.ics`,
-  provider-independent `/readyz`, and exact token-authenticated
-  `/admin/status`.
+  `/api/opportunities`, `/feeds/atom`, structurally valid `/o/*.ics`, exact
+  `/calendars/opportunities.ics`, provider-independent `/readyz`, and exact
+  token-authenticated `/admin/status`.
 - The prototype fixture endpoint, `POST /api/opportunities/search`, is blocked.
-  RSS and subscribable calendar-feed routes require their own accepted public
-  limits before they can join the hosted allowlist.
+  RSS remains outside the hosted allowlist.
 - Every `/admin/**` route except exact authenticated `GET`/`HEAD /admin/status`
   is blocked before controller handling.
 - No raw router port forward is required for HTTP(S) when Funnel is used.
@@ -320,9 +322,8 @@ Other hosted-surface controls remain narrow:
 - Request size limits suitable for query-only endpoints.
 - Conservative timeouts so slow clients do not tie up the backend.
 - Basic security headers for browser responses.
-- Atom and individual `.ics` requests join the explicit shared whole-site and
-  provider bounds. Future RSS and subscribable calendar routes must do the same
-  before public exposure; their caching and polling policy remains future work.
+- Atom, individual `.ics`, and exact subscribable-calendar requests join the
+  explicit shared whole-site and provider bounds. RSS remains future work.
 
 ### Activation Result And Follow-Up
 
@@ -400,17 +401,22 @@ Exit criteria met:
 - Dependency failure returns `temporarily_unavailable`, not an empty opportunity
   list.
 
-## Phase 4: Atom And Individual iCalendar Without A Database
+## Phase 4: Atom And iCalendar Without A Database
 
 Goal: ship low-friction feed/calendar behavior without forcing persistence too
 early.
+
+Issue #304 delivers the backend subscription route. Issue #305 waits for a
+deployed #304 before it adds the product-response link and browser copy action.
+Neither issue adds `webcal:` or `webcals:`.
 
 No database is required for these first cases:
 
 - One-off `.ics` export for a single opportunity.
 - The public Atom feed for a canonical location, including stateless canonical
   preference and weather filters.
-- A later public `.ics` calendar feed for a canonical public location.
+- The public `.ics` calendar feed for a canonical location, including the same
+  stateless canonical preference and weather filters.
 
 The implementation should be deterministic:
 
@@ -458,10 +464,32 @@ The individual export is also stateless:
 - There is no signed snapshot, export cache, account, token, database record, or
   disk state.
 
+The subscribable calendar is stateless too:
+
+- `GET` or `HEAD /calendars/opportunities.ics?locationId=<canonical-id>` accepts
+  optional non-default `weatherRanking` and active canonical Version 1
+  `preferences`. It rejects `order` and uses the current seven-day,
+  ten-result engine in fixed `soonest` order.
+- A successful response is one complete rolling `VCALENDAR` with the resolved
+  location's structural `VTIMEZONE` and zero to ten ordinary events. Events
+  reuse #294's UID, outward-minute UTC times, three-line description, and
+  inline 192-by-192 PNG. A valid empty `200` has no placeholder. Opportunities
+  no longer returned are absent from the next server response.
+- `GET` sends `Cache-Control: private, max-age=900` and exact
+  `Content-Length`. `HEAD` validates and searches but skips calendar and image
+  serialization, has no body, and omits `Content-Length`. There is no ETag,
+  output cache, account, token, stored subscription, scheduled generation,
+  database record, new provider, or disk state.
+- An uncached maximum `GET` may render ten PNGs and send roughly 0.8-0.9 MiB.
+  Provider caches may save geocoding and weather calls; they do not save
+  scoring, rendering, serialization, or bandwidth. Hosted whole-site and
+  provider admission run before the search.
+
 Moon Service application logging omits query strings. The public export URL can
 still reveal selected observation hours, viewing direction, and other filters
 to browsers, copied-link recipients, calendar clients, Funnel, and any
-infrastructure that records the full request target.
+infrastructure that records the full request target. The same boundary applies
+to a subscribable calendar URL.
 
 Database triggers:
 
@@ -482,10 +510,19 @@ Exit criteria:
 - A later database can replace cache/storage seams without changing public feed
   URLs.
 
-Deploy Atom and individual-export changes through the existing image pipeline.
+Deploy Atom and calendar changes through the existing image pipeline.
 After an Atom change, check one location-only feed, one filtered feed, and a
 conditional filtered request. After an individual-export change, check one
 current `.ics` GET and matching HEAD and one stale request on the public host.
+For the subscribable feed, check one all-off GET, one preference-bearing GET,
+matching HEAD without `Content-Length`, one invalid request, and the empty
+calendar shape. Before publication, load and manually refresh the exact local
+network-calendar URL in Thunderbird 153.0esr and GNOME Calendar 41.2. Confirm
+that both handle an addition, a same-UID update, and removal of an omitted event
+while another remains. Confirm that Thunderbird removes the final event on an
+empty response. GNOME Calendar 41.2 is known to fetch that response but retain
+its final cached event; do not add a placeholder event for this accepted client
+limitation.
 Keep the revision-aware readiness check and automatic known-good rollback
 unchanged.
 

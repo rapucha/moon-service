@@ -35,9 +35,10 @@ that overlap these recurring events even when their timing varies.
 ## MVP User Promise
 
 No account is required. Enter a city or location and see the next promising
-Moon opportunity. Use the public Atom feed to follow future recommendations or
-download one selected opportunity as an `.ics` event. Add email or an installed
-client later only if users find recurring personal alerts useful.
+Moon opportunity. Use the public Atom feed or rolling iCalendar feed to follow
+future recommendations, or download one selected opportunity as an `.ics`
+event. Add email or an installed client later only if users find recurring
+personal alerts useful.
 
 The first useful result can include:
 
@@ -79,7 +80,13 @@ In scope:
   its own calendar download. Each event embeds the opportunity's Moon phase and
   orientation with RFC 7986 `IMAGE`. A calendar client may ignore the image, so
   the ordinary event fields must remain useful without it.
-- Add dynamic public `.ics` calendar feeds for canonical real locations later.
+- Provide a stateless, preference-aware `.ics` calendar feed for a canonical
+  real location. It is a complete rolling snapshot of the current seven-day,
+  ten-result search in fixed `soonest` order. A valid empty calendar contains
+  no placeholder event. In manual tests, Thunderbird 153.0esr removed the final
+  event; GNOME Calendar 41.2 fetched the same response but retained its final
+  cached event. Moon Service does not add a placeholder to work around that
+  client behavior.
 
 Tracked MVP implementation issues:
 
@@ -259,7 +266,11 @@ analytics event, page, lookup or share URL, application log, provider cache,
 opportunity cache, weather cache, or cache shared across backend instances. The
 process-local Atom feed-state cache is the narrow exception: after a client
 opens a filtered Atom URL, it keys rebuildable state by the URL's canonical
-filtered path.
+filtered path. The rolling iCalendar feed stores no output or subscription
+state. Its private 15-minute client cache policy does not guarantee reuse; an
+uncached maximum response may render ten inline Moon images and send roughly
+0.8-0.9 MiB. Existing provider caches may save provider calls, but they do not
+save scoring, image rendering, serialization, or bandwidth.
 
 Search order is request state. The browser puts `order=soonest` in the page URL
 and generated share links, and omits the default `best_match` order. It does
@@ -288,6 +299,14 @@ event` with that backend URL unchanged. The browser does not require
 `links.icsReady` or serialize a calendar. It treats every response-supplied URL
 as opaque.
 
+The rolling calendar route accepts the canonical location, non-default weather
+ranking, and active hard preferences in its public URL. It creates no account,
+token, saved subscription, persistent preference, or scheduled job. Issue #305
+will add a root `links.calendarFeed` value and `Copy calendar URL` action only
+after #304 is deployed. The backend will own the complete root-relative path
+and query; the browser will add only its current origin. The first discovery
+flow will not use `webcal:` or `webcals:` and will not reconstruct preferences.
+
 When applied response metadata reports at least one normalized hard preference
 or non-default weather ranking, and at least one usable preference-bearing
 calendar action or the filtered `Atom feed` action is present, the browser shows
@@ -302,9 +321,9 @@ Every usable preference-bearing calendar action and the `Atom feed` action in
 filtered state reference the one warning through its stable element ID. The
 all-off Atom action does not. A missing filtered Atom action does not remove a
 warning still required by a calendar action. The browser uses response metadata
-rather than parsing a URL to decide whether the warning is required. Both
-filtered Atom and individual-export URLs create no server profile or durable
-state, but browsers,
+rather than parsing a URL to decide whether the warning is required. Filtered
+Atom, individual-export, and subscribable calendar URLs create no server
+profile or durable state, but browsers,
 feed and calendar clients, copied-link recipients, Funnel, and systems that log
 the full request target may see the encoded filters. These can reveal preferred
 observation hours and altitude or azimuth viewing direction. Moon Service
@@ -483,7 +502,7 @@ should design recovery early, even if the first implementation is small.
 - Saved compositions.
 - Recurring event-aware opportunities, such as aircraft approaches, transport
   routes, public events, or user-defined weekly patterns.
-- Subscribable `.ics` calendar feeds and later calendar OAuth.
+- Later calendar OAuth.
 - Email alerts for users who opt in.
 - Telegram-style broadcast channels for popular cities or regions.
 - Reddit community posts or a project-owned subreddit.

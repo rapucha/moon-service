@@ -26,6 +26,7 @@ final class HostedAlphaResourceLimitFilter extends OncePerRequestFilter {
     private static final String OPPORTUNITY_PATH = "/api/opportunities";
     private static final String PLANNING_PATH = "/api/opportunities/planning";
     private static final String ATOM_FEED_PATH = "/feeds/atom";
+    private static final String CALENDAR_FEED_PATH = "/calendars/opportunities.ics";
     private static final String ADMIN_STATUS_PATH = "/admin/status";
     private static final String READINESS_PATH = "/readyz";
 
@@ -98,6 +99,7 @@ final class HostedAlphaResourceLimitFilter extends OncePerRequestFilter {
         HostedAlphaSurfaceFilter.addSecurityHeaders(response);
         if (ADMIN_STATUS_PATH.equals(path)
                 || ATOM_FEED_PATH.equals(path)
+                || CALENDAR_FEED_PATH.equals(path)
                 || HostedAlphaSurfaceFilter.isCalendarEventPath(path)
                 || isProductPost(request.getMethod(), path)) {
             response.setHeader("Cache-Control", "no-store");
@@ -121,6 +123,7 @@ final class HostedAlphaResourceLimitFilter extends OncePerRequestFilter {
                 && ("GET".equals(method) || "HEAD".equals(method) || "POST".equals(method)))
                 || (PLANNING_PATH.equals(path) && "POST".equals(method))
                 || (ATOM_FEED_PATH.equals(path) && ("GET".equals(method) || "HEAD".equals(method)))
+                || (CALENDAR_FEED_PATH.equals(path) && ("GET".equals(method) || "HEAD".equals(method)))
                 || (HostedAlphaSurfaceFilter.isCalendarEventPath(path)
                 && ("GET".equals(method) || "HEAD".equals(method)));
     }

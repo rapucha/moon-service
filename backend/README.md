@@ -2,7 +2,7 @@
 
 This is the first real backend module for Moon Service. It promotes the tested
 Spring HTTP contract out of `prototypes/` while keeping durable/shared caches,
-RSS and subscribable calendar feeds deliberately out of scope.
+accounts, and RSS deliberately out of scope.
 
 ## Current Scope
 
@@ -21,6 +21,10 @@ RSS and subscribable calendar feeds deliberately out of scope.
   `GET /o/<opportunity-id>.ics?locationId=<canonical-id>`, with matching
   bodyless `HEAD` support and complete backend-owned links on ordinary product
   results. Browser calendar actions use link presence, not `icsReady`.
+- Stateless subscribable iCalendar feed at
+  `GET /calendars/opportunities.ics?locationId=<canonical-id>`, with optional
+  canonical preference/weather filters and specialized bodyless `HEAD`
+  handling.
 - `POST /api/opportunities/search` using the same JSON request body as the scoring
   prototype fixture.
 - Disabled-by-default calibration feedback capability at
@@ -55,9 +59,9 @@ RSS and subscribable calendar feeds deliberately out of scope.
 
 Durable persistence is limited to the disabled-by-default calibration-feedback
 repository described below. Durable/shared caches, accounts, cookies, RSS,
-subscribable calendar feeds, and deployment configuration remain out of scope.
+and deployment configuration remain out of scope.
 Public Atom feed state is bounded, process-local, and rebuildable. Individual
-calendar export adds no stored state.
+calendar export and the subscribable calendar feed add no stored state.
 Missing or unknown `moon.location.resolver` or `moon.weather.provider` values
 fail startup; the runtime backend does not include fixture provider modes.
 
@@ -233,6 +237,50 @@ generated calendar when iCal4j reports validation errors and selects the
 library's conservative 25-code-unit fold setting so arbitrary Unicode lines
 remain within the RFC 5545 75-octet limit. The redistributed backend includes
 the dependency's BSD 3-Clause notice at `META-INF/LICENSE-iCal4j.txt`.
+
+## Subscribable iCalendar Feed
+
+`GET /calendars/opportunities.ics?locationId=<canonical-id>` returns one
+rolling calendar for a resolved location. Optional non-default
+`weatherRanking` and active canonical Version 1 `preferences` use the same
+encoding and validation as the Atom and individual-calendar routes. The feed
+rejects `order` and always asks the current opportunity engine for at most ten
+ordinary results in fixed `soonest` order across the current seven-day window.
+
+Success is one UTF-8 `VCALENDAR` containing the resolved location's structural
+`VTIMEZONE` and zero to ten ordinary `VEVENT` components. Each event preserves
+#294's deterministic UID, outward-minute UTC times, current three-line
+description, and inline 192-by-192 PNG. An empty search returns `200` with the
+`VTIMEZONE` and no placeholder event. Every refresh is a complete current
+snapshot: surviving opportunities keep their UIDs, while opportunities no
+longer returned disappear from the document.
+
+`GET` returns `Cache-Control: private, max-age=900` and the exact
+`Content-Length`. `HEAD` performs the same validation, admission, location
+resolution, and search, but skips calendar serialization and image rendering.
+It returns the applicable status and cache headers without a body or
+`Content-Length`. Errors are `no-store`. The route adds no ETag, output cache,
+account, subscription token, persistent state, scheduled generation, or new
+provider.
+
+The accepted maximum uncached `GET` is roughly 0.8-0.9 MiB and may render ten
+PNG images. Existing provider caches may save geocoding and weather calls, but
+they do not save scoring, image rendering, serialization, or response
+bandwidth. Hosted whole-site and provider admission therefore run before the
+search. Application logs omit the query string; calendar clients, copied-link
+recipients, Funnel, and request-target logs may still see the location and
+filters.
+
+Manual network-calendar validation used Thunderbird 153.0esr and GNOME
+Calendar 41.2. Both clients loaded and refreshed a populated feed, applied an
+addition and a same-UID update, and removed an omitted event while another
+event remained. Thunderbird removed the final event after a valid empty
+refresh. GNOME Calendar fetched the same `200` response but retained its final
+cached event. Keep the valid `VTIMEZONE`-only empty response; do not add a
+placeholder event. Issue #305 separately owns the root response link and `Copy
+calendar URL` browser action after #304 is deployed. It will add the browser's
+current origin to the backend-owned root-relative path; neither issue adds
+`webcal:` or `webcals:`.
 
 ## Runtime Configuration
 
@@ -678,9 +726,9 @@ query, URL, preference, filter, weather data, request body, user-agent value,
 IP address, or other user data. It uses only the existing bounded
 application-log retention and adds no log destination, metric, or storage.
 
-Preference-aware calendar URLs can still be visible to browsers, copied-link
-recipients, calendar clients, Funnel, and other infrastructure that records the
-full request target.
+Preference-aware individual and subscribable calendar URLs can still be
+visible to browsers, copied-link recipients, calendar clients, Funnel, and
+other infrastructure that records the full request target.
 
 ### Hosted-alpha application surface
 
@@ -692,8 +740,9 @@ policy to every request reaching that application instance.
 
 The enabled policy allows `GET` and `HEAD` for `/`, `/search`, `/about`, their
 backing HTML files, the exact static files tracked by the current build,
-`/api/opportunities`, `/feeds/atom`, valid `/o/*.ics`, `/readyz`, exact
-`/admin/status`, and the feedback capability route. It also allows
+`/api/opportunities`, `/feeds/atom`, valid `/o/*.ics`, exact
+`/calendars/opportunities.ics`, `/readyz`, `/admin/status`, and the feedback
+capability route. It also allows
 `POST /api/opportunities` for a bounded preference body and only `POST` for the
 feedback submission route. Adding a
 static file does not publish it automatically. Add its exact path to the
@@ -734,7 +783,8 @@ one provider token and one of two concurrent provider-operation permits before
 controller or provider work. Exact `GET` and `HEAD /feeds/atom` use the same
 admission before the feed-cache lookup, so a cached feed request can receive
 `429`. Valid `GET` and `HEAD /o/*.ics` also use it before their location and
-weather work.
+weather work. Exact `GET` and `HEAD /calendars/opportunities.ics` use it before
+their search; `HEAD` still skips calendar and image serialization.
 The fixture POST, static files, admin status, and readiness do not consume those
 two resources. A rejection returns HTTP `429`, canonical `rate_limited` JSON,
 and a numeric `Retry-After` hint. The Docker carve-out is only bodyless
@@ -897,8 +947,8 @@ rebuildable. Do not add a local Postgres deployment, durable shared cache, or
 long-retention logs only to support alpha hosting. The public Atom feed uses
 deterministic output and bounded process state. Add Postgres later when private
 feeds, saved locations, alert subscriptions, durable provider counters, or
-durable cache state require it. RSS and subscribable `.ics` feeds remain later
-work; individual `.ics` export is stateless.
+durable cache state require it. RSS remains later work; individual and
+subscribable `.ics` output are stateless.
 
 The current planning boundary is documented in
 `docs/self-hosting-alpha-plan.md`.

@@ -3,10 +3,14 @@ package dev.moonservice.backend.web;
 import dev.moonservice.backend.opportunity.search.OpportunitySearchResponse;
 import net.fortuna.ical4j.data.CalendarOutputter;
 import net.fortuna.ical4j.model.Calendar;
+import net.fortuna.ical4j.model.component.CalendarComponent;
 import net.fortuna.ical4j.model.ComponentList;
 import net.fortuna.ical4j.model.ParameterList;
 import net.fortuna.ical4j.model.PropertyList;
+import net.fortuna.ical4j.model.TimeZoneRegistry;
+import net.fortuna.ical4j.model.TimeZoneRegistryFactory;
 import net.fortuna.ical4j.model.component.VEvent;
+import net.fortuna.ical4j.model.component.VTimeZone;
 import net.fortuna.ical4j.model.parameter.Display;
 import net.fortuna.ical4j.model.parameter.Encoding;
 import net.fortuna.ical4j.model.parameter.FmtType;
@@ -36,6 +40,7 @@ import java.time.format.DateTimeFormatter;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.Base64;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
 import java.util.Objects;
@@ -43,6 +48,7 @@ import java.util.UUID;
 
 final class ICalendarEventRenderer {
     private static final int UTF8_SAFE_FOLD_LENGTH = 25;
+    private static final int MAX_FEED_EVENTS = 10;
     private static final int MOON_IMAGE_SIZE = 192;
     private static final int MOON_IMAGE_CENTER = MOON_IMAGE_SIZE / 2;
     private static final int MOON_IMAGE_RADIUS = 88;
@@ -60,6 +66,38 @@ final class ICalendarEventRenderer {
         Objects.requireNonNull(location, "location");
         Objects.requireNonNull(opportunity, "opportunity");
         Objects.requireNonNull(generatedAt, "generatedAt");
+        return serialize(new Calendar(
+                calendarProperties(),
+                new ComponentList<>(List.of(event(location, opportunity, generatedAt)))
+        ));
+    }
+
+    static byte[] renderFeed(
+            OpportunitySearchResponse.Location location,
+            List<OpportunitySearchResponse.Opportunity> opportunities,
+            Instant generatedAt
+    ) {
+        Objects.requireNonNull(location, "location");
+        Objects.requireNonNull(opportunities, "opportunities");
+        Objects.requireNonNull(generatedAt, "generatedAt");
+        List<CalendarComponent> components = new ArrayList<>();
+        components.add(timeZone(location.timezone()));
+        opportunities.stream()
+                .sorted(Comparator
+                        .comparing((OpportunitySearchResponse.Opportunity opportunity) ->
+                                Instant.parse(opportunity.suggestedAt()))
+                        .thenComparing(OpportunitySearchResponse.Opportunity::id))
+                .limit(MAX_FEED_EVENTS)
+                .map(opportunity -> event(location, opportunity, generatedAt))
+                .forEach(components::add);
+        return serialize(new Calendar(calendarProperties(), new ComponentList<>(components)));
+    }
+
+    private static VEvent event(
+            OpportunitySearchResponse.Location location,
+            OpportunitySearchResponse.Opportunity opportunity,
+            Instant generatedAt
+    ) {
         Instant startsAt = Instant.parse(opportunity.startsAt());
         Instant endsAt = Instant.parse(opportunity.endsAt());
         Instant minuteStart = startsAt.truncatedTo(ChronoUnit.MINUTES);
@@ -68,7 +106,7 @@ final class ICalendarEventRenderer {
             minuteEnd = minuteEnd.plus(1, ChronoUnit.MINUTES);
         }
 
-        VEvent event = new VEvent(new PropertyList(List.of(
+        return new VEvent(new PropertyList(List.of(
                 new Uid(uid(location.id(), opportunity.id())),
                 new DtStamp(generatedAt.truncatedTo(ChronoUnit.SECONDS)),
                 new DtStart<>(minuteStart),
@@ -85,14 +123,27 @@ final class ICalendarEventRenderer {
                                 new FmtType("image/png"))),
                         moonImage(opportunity))
         )));
-        Calendar calendar = new Calendar(
-                new PropertyList(List.of(
-                        ImmutableVersion.VERSION_2_0,
-                        new ProdId("-//Moon Service//Moon Opportunity//EN"),
-                        ImmutableCalScale.GREGORIAN
-                )),
-                new ComponentList<>(List.of(event))
-        );
+    }
+
+    private static PropertyList calendarProperties() {
+        return new PropertyList(List.of(
+                ImmutableVersion.VERSION_2_0,
+                new ProdId("-//Moon Service//Moon Opportunity//EN"),
+                ImmutableCalScale.GREGORIAN
+        ));
+    }
+
+    private static VTimeZone timeZone(String zoneId) {
+        TimeZoneRegistry registry = TimeZoneRegistryFactory.getInstance().createRegistry();
+        net.fortuna.ical4j.model.TimeZone timeZone = registry.getTimeZone(
+                Objects.requireNonNull(zoneId, "zoneId"));
+        if (timeZone == null) {
+            throw new IllegalStateException("Location time zone is unavailable.");
+        }
+        return timeZone.getVTimeZone();
+    }
+
+    private static byte[] serialize(Calendar calendar) {
         ValidationResult validation = calendar.validate();
         if (validation.hasErrors()) {
             throw new IllegalStateException("Generated iCalendar failed validation.");
@@ -102,7 +153,7 @@ final class ICalendarEventRenderer {
         try {
             new CalendarOutputter(false, UTF8_SAFE_FOLD_LENGTH).output(calendar, output);
         } catch (IOException exception) {
-            throw new UncheckedIOException("Failed to serialize iCalendar event.", exception);
+            throw new UncheckedIOException("Failed to serialize iCalendar.", exception);
         }
         return output.toByteArray();
     }

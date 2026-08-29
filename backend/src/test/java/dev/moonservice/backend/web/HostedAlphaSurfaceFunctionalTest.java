@@ -197,6 +197,18 @@ class HostedAlphaSurfaceFunctionalTest {
 
     @ParameterizedTest
     @ValueSource(strings = {"GET", "HEAD"})
+    void exposesExactCalendarFeed(String method) {
+        advanceProviderRefill();
+
+        expectHostedHeaders(webTestClient.method(HttpMethod.valueOf(method))
+                .uri("/calendars/opportunities.ics")
+                .exchange()
+                .expectStatus().isBadRequest()
+                .expectHeader().valueEquals("Cache-Control", "no-store"));
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"GET", "HEAD"})
     void exposesExactIndividualCalendarPath(String method) {
         advanceProviderRefill();
 
@@ -290,6 +302,12 @@ class HostedAlphaSurfaceFunctionalTest {
             expectHeadRateLimited(webTestClient.head()
                     .uri("/feeds/atom?locationId=private-feed-location").exchange(), true);
             expectRateLimited(webTestClient.get()
+                    .uri("/calendars/opportunities.ics?locationId=private-calendar-feed-location")
+                    .exchange(), true);
+            expectHeadRateLimited(webTestClient.head()
+                    .uri("/calendars/opportunities.ics?locationId=private-calendar-feed-location")
+                    .exchange(), true);
+            expectRateLimited(webTestClient.get()
                     .uri("/o/result.ics?locationId=private-calendar-location").exchange(), true);
             expectHeadRateLimited(webTestClient.head()
                     .uri("/o/result.ics?locationId=private-calendar-location").exchange(), true);
@@ -312,6 +330,12 @@ class HostedAlphaSurfaceFunctionalTest {
                     .uri("/feeds/atom?locationId=private-feed-location").exchange(), true);
             expectHeadRateLimited(webTestClient.head()
                     .uri("/feeds/atom?locationId=private-feed-location").exchange(), true);
+            expectRateLimited(webTestClient.get()
+                    .uri("/calendars/opportunities.ics?locationId=private-calendar-feed-location")
+                    .exchange(), true);
+            expectHeadRateLimited(webTestClient.head()
+                    .uri("/calendars/opportunities.ics?locationId=private-calendar-feed-location")
+                    .exchange(), true);
             expectRateLimited(webTestClient.get()
                     .uri("/o/result.ics?locationId=private-calendar-location").exchange(), true);
             expectHeadRateLimited(webTestClient.head()
@@ -351,6 +375,7 @@ class HostedAlphaSurfaceFunctionalTest {
             "/api/opportunities/planning/", "/api/opportunities/Planning",
             "/api/opportunities/planning;other", "/PlanningView.js",
             "/feeds/atom/", "/feeds/Atom", "/feeds/atom/other",
+            "/calendars/opportunities.ics/", "/calendars/other.ics",
             "/o", "/o/result", "/o/result.txt", "/o/result.ics/", "/o/nested/result.ics",
             "/error", "/healthz", "/unknown"
     })
@@ -413,13 +438,16 @@ class HostedAlphaSurfaceFunctionalTest {
     @ParameterizedTest
     @ValueSource(strings = {"POST", "PUT", "PATCH", "DELETE", "OPTIONS"})
     void allowsOnlyGetAndHeadOnPublicExportPaths(String method) {
-        for (String path : List.of("/feeds/atom", "/o/result.ics")) {
-            expectHostedHeaders(webTestClient.method(HttpMethod.valueOf(method))
+        for (String path : List.of(
+                "/feeds/atom", "/calendars/opportunities.ics", "/o/result.ics")) {
+            WebTestClient.ResponseSpec response = webTestClient.method(HttpMethod.valueOf(method))
                     .uri(path)
                     .exchange()
                     .expectStatus().isEqualTo(405)
                     .expectHeader().valueEquals("Allow", "GET, HEAD")
-                    .expectHeader().valueEquals("Cache-Control", "no-store"));
+                    .expectHeader().valueEquals("Cache-Control", "no-store");
+            expectHostedHeaders(response);
+            response.expectBody().isEmpty();
         }
     }
 
@@ -445,15 +473,19 @@ class HostedAlphaSurfaceFunctionalTest {
     @Test
     void rejectsBodyOnApprovedGets() {
         for (String path : List.of(
-                "/admin/status", "/feeds/atom", "/o/result.ics?locationId=location")) {
+                "/admin/status", "/feeds/atom",
+                "/calendars/opportunities.ics?locationId=location",
+                "/o/result.ics?locationId=location")) {
             advanceProviderRefill();
-            expectHostedHeaders(webTestClient.method(HttpMethod.GET)
+            WebTestClient.ResponseSpec response = webTestClient.method(HttpMethod.GET)
                     .uri(path)
                     .contentType(MediaType.APPLICATION_JSON)
                     .bodyValue("{}")
                     .exchange()
                     .expectStatus().isBadRequest()
-                    .expectHeader().valueEquals("Cache-Control", "no-store"));
+                    .expectHeader().valueEquals("Cache-Control", "no-store");
+            expectHostedHeaders(response);
+            response.expectBody().isEmpty();
         }
     }
 
