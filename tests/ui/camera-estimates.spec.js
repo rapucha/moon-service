@@ -235,8 +235,6 @@ test("uses each digital geometry and applies decimal MP, focal, and teleconverte
     expect(request.url).not.toMatch(/camera|focal|megapixel|teleconverter/i);
   }
   expect(new URL(page.url()).searchParams.toString()).toBe("q=Prague");
-  await expect(page.getByRole("link", { name: "Open share link" }))
-    .toHaveAttribute("href", "/search?q=Prague");
   expect(await page.evaluate(() => JSON.parse(
     window.localStorage.getItem("moonService.recentSearches.v1")
   ))).toEqual([{

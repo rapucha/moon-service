@@ -11,14 +11,16 @@ import { scoreBlock, scoreDetails } from "./scoreView.js";
 import { weatherRankingLabel } from "./weatherRankingPreference.js";
 
 var PREFERENCE_LINK_WARNING_ID = "preference-link-warning";
-var PREFERENCE_LINK_WARNING = "This link contains your selected location and photography filters. Anyone "
-  + "with the link can see them, including your preferred observation times and viewing direction "
-  + "(altitude and azimuth). Do not share it if those details are private.";
+var PREFERENCE_LINK_WARNING = "The Atom feed and calendar links on this page contain your selected location "
+  + "and photography filters. Anyone with one of these links can see that information, including your "
+  + "preferred observation times and viewing direction (altitude and azimuth). Do not share these links "
+  + "if those details are private.";
 
 export function preferenceBearingActionContext(payload) {
   var realLocation = payload?.location?.kind === "real_location";
   var opportunities = Array.isArray(payload?.opportunities) ? payload.opportunities : [];
   var filtered = hasAppliedPreferenceMetadata(payload);
+  var calendarFeedPath = realLocation ? usableCalendarFeedPath(payload?.links?.calendarFeed) : null;
   var filteredAtomPath = filtered && realLocation
     ? usableLink(payload?.links?.atomWithFilters) : null;
   var atomPath = realLocation && payload.location.id
@@ -26,15 +28,25 @@ export function preferenceBearingActionContext(payload) {
   var hasCalendarPath = realLocation && opportunities.some(function (opportunity) {
     return Boolean(usableLink((opportunity.links || {}).ics));
   });
-  var descriptionId = filtered && (filteredAtomPath || hasCalendarPath)
+  var descriptionId = filtered && (calendarFeedPath || filteredAtomPath || hasCalendarPath)
     ? PREFERENCE_LINK_WARNING_ID : null;
 
   return {
-    atomLink: atomPath
-      ? element("a", {
-        href: atomPath,
+    atomFeedButton: atomPath
+      ? element("button", {
+        type: "button",
+        className: "copy-button",
+        "data-share-url": window.location.origin + atomPath,
         "aria-describedby": filteredAtomPath ? descriptionId : null
-      }, "Atom feed")
+      }, "Copy Atom feed link")
+      : null,
+    calendarFeedButton: calendarFeedPath
+      ? element("button", {
+        type: "button",
+        className: "copy-button",
+        "data-share-url": window.location.origin + calendarFeedPath,
+        "aria-describedby": descriptionId
+      }, "Copy calendar feed link")
       : null,
     calendarActionsEnabled: realLocation,
     descriptionId: descriptionId,
@@ -340,4 +352,9 @@ function hasAppliedPreferenceMetadata(payload) {
 
 function usableLink(value) {
   return typeof value === "string" && value.trim() ? value : null;
+}
+
+function usableCalendarFeedPath(value) {
+  return typeof value === "string" && value && value === value.trim()
+    && value.startsWith("/") && !value.startsWith("//") ? value : null;
 }

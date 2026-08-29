@@ -1,4 +1,3 @@
-import { sharePathFor } from "./api.js";
 import { createCurrentMoonView } from "./currentMoonCard.js";
 import { element } from "./dom.js";
 import { candidateMeta, formatDateTime } from "./format.js";
@@ -104,7 +103,7 @@ export function createResponseView(results, callbacks) {
     var currentMoonCard = createCurrentMoonView(payload, timezone, countryCode);
     var preferenceActions = preferenceBearingActionContext(payload);
     var children = [
-      resultSummary(payload, request, groups.length, opportunities.length, soonest, preferenceActions),
+      resultSummary(payload, groups.length, opportunities.length, soonest, preferenceActions),
       preferenceActions.notice
     ];
     if (currentMoonCard) children.push(currentMoonCard);
@@ -193,10 +192,8 @@ export function createResponseView(results, callbacks) {
     }, 0);
   }
 
-  function resultSummary(payload, request, passCount, candidateCount, soonest, preferenceActions) {
+  function resultSummary(payload, passCount, candidateCount, soonest, preferenceActions) {
     var location = payload.location || {};
-    var sharePath = sharePathFor(request);
-    var shareUrl = window.location.origin + sharePath;
     var passNoun = soonest ? "Moon pass" : "ranked Moon pass";
     var passText = passCount + " " + passNoun + (passCount === 1 ? "" : "es");
     var candidateText = candidateCount === 1 ? "1 candidate window" : candidateCount + " candidate windows";
@@ -208,8 +205,7 @@ export function createResponseView(results, callbacks) {
           element("h3", { id: "result-title" }, location.displayName || "Resolved location"),
           element("p", { className: "summary-count" }, passText + " · " + candidateText)),
         element("div", { className: "share-tools" },
-          element("button", { type: "button", className: "copy-button", "data-share-url": shareUrl }, "Copy link"),
-          element("a", { href: sharePath }, "Open share link"), preferenceActions.atomLink)
+          preferenceActions.atomFeedButton, preferenceActions.calendarFeedButton)
       ));
   }
 

@@ -16,7 +16,7 @@ accounts, and RSS deliberately out of scope.
   preferences and the product POST when at least one is active.
 - Public Atom feed at `GET /feeds/atom?locationId=<canonical-id>`, with optional
   canonical preference/weather filters, matching bodyless `HEAD` support, and
-  backend-owned filtered links consumed unchanged by the browser contract.
+  backend-owned filtered links copied unchanged by the browser contract.
 - Stateless individual iCalendar export at
   `GET /o/<opportunity-id>.ics?locationId=<canonical-id>`, with matching
   bodyless `HEAD` support and complete backend-owned links on ordinary product
@@ -24,7 +24,8 @@ accounts, and RSS deliberately out of scope.
 - Stateless subscribable iCalendar feed at
   `GET /calendars/opportunities.ics?locationId=<canonical-id>`, with optional
   canonical preference/weather filters and specialized bodyless `HEAD`
-  handling.
+  handling. Successful real-location product responses carry its canonical
+  root-relative path, and the browser can copy the complete same-origin URL.
 - `POST /api/opportunities/search` using the same JSON request body as the scoring
   prototype fixture.
 - Disabled-by-default calibration feedback capability at
@@ -185,9 +186,9 @@ returns `503` instead of serving old XML as a success.
 
 Successful filtered product POST responses include the backend-generated root
 `links.atomWithFilters` when a hard filter or non-default weather mode was
-applied. Applied response metadata selects the state of the browser's one
-contextual `Atom feed` action. In filtered state, the browser uses that string
-unchanged as the action's `href`.
+applied. Applied response metadata selects the URL copied by the browser's
+`Copy Atom feed link` button. In filtered state, the browser adds its current
+origin to that backend path without changing it.
 
 Application request logs omit the query string. A filtered URL can disclose the
 location, preferred observation hours, and viewing direction to feed readers,
@@ -277,10 +278,24 @@ addition and a same-UID update, and removed an omitted event while another
 event remained. Thunderbird removed the final event after a valid empty
 refresh. GNOME Calendar fetched the same `200` response but retained its final
 cached event. Keep the valid `VTIMEZONE`-only empty response; do not add a
-placeholder event. Issue #305 separately owns the root response link and `Copy
-calendar URL` browser action after #304 is deployed. It will add the browser's
-current origin to the backend-owned root-relative path; neither issue adds
-`webcal:` or `webcals:`.
+placeholder event.
+
+Every successful canonical real-location product GET or POST includes root
+`links.calendarFeed`, including when no opportunity is returned. The backend
+owns the complete canonical root-relative path and query. All-off output uses
+only `locationId`; filtered output adds only normalized active Version 1 hard
+preferences and applied non-default weather ranking. The link never contains
+the product result's `order`, free-text lookup, or another response value.
+
+For a usable value, the browser shows `Copy calendar feed link` and copies its
+current origin followed by the unchanged backend path. It hides the action for an
+absent, non-string, empty, whitespace-padded, absolute, or network-path value.
+It does not trim a value into validity, construct a fallback, fetch the feed,
+or store the URL. The existing Clipboard API and prompt fallback handle the
+copy interaction. Filtered state reuses the existing link-privacy warning and
+its `aria-describedby`; all-off state does not. There is no `webcal:` or
+`webcals:` launcher, token, public-origin setting, or client-side query
+construction.
 
 ## Runtime Configuration
 
@@ -524,19 +539,30 @@ backend location ID. A preference-free example is
 `/search?locationId=moon-service-3067696`; an active preference does not change
 that URL.
 
-A loaded real-location result shows at most one `Atom feed` action. A non-empty
+A loaded real-location result summary contains exactly two matching buttons
+when both feed paths are usable: `Copy Atom feed link` and `Copy calendar feed
+link`. A non-empty
 `normalizedActiveFilters` object or an `appliedWeatherRanking` of
 `prefer_clear` or `ignore_weather` selects filtered state. In that state, a
-non-blank root `links.atomWithFilters` string becomes the action's `href`
-unchanged. An absent, non-string, or blank value produces no Atom action; the
-browser does not substitute the all-off feed.
+non-blank root `links.atomWithFilters` string supplies the path unchanged. The
+browser copies its current origin followed by that path. An absent, non-string,
+or blank value produces no Atom copy button; the browser does not substitute the
+all-off feed.
 
-Otherwise, the result is all-off and the browser builds
+Otherwise, the result is all-off and the browser builds and copies
 `/feeds/atom?locationId=<canonical-id>` with only that ID. It ignores a stray
-`links.atomWithFilters` rather than changing state. The browser never shows both
-forms or a separate `Atom feed with these filters` label. It does not copy the
+`links.atomWithFilters` rather than changing state. It does not include the
 search text or result order or reconstruct preferences, weather ranking, or a
 filtered URL.
+
+A successful real-location response also supplies root `links.calendarFeed`,
+including for an empty opportunity list. When the value is a nonempty string
+equal to its trimmed value, begins with one `/`, and does not begin with `//`,
+the result-summary action group shows `Copy calendar feed link`. The browser
+copies exactly `window.location.origin` plus that unchanged value. Otherwise it
+hides only this action. It does not parse, normalize, reconstruct, fetch, or
+store the feed URL and does not substitute an all-off link. The existing
+Clipboard API write and prompt fallback remain the copy mechanisms.
 
 Every displayed ordinary recommendation with a non-blank `links.ics` string
 shows `Download calendar event` with that backend string unchanged. An absent,
@@ -546,21 +572,22 @@ same-tab navigation. Nonordinary results do not receive the action.
 
 When applied response metadata contains at least one normalized hard preference
 or a non-default weather ranking, and at least one usable preference-bearing
-calendar action or the filtered `Atom feed` action is present, the page shows
+calendar or feed-copy action is present, the page shows
 this warning once before the opportunity list:
 
-> This link contains your selected location and photography filters. Anyone
-> with the link can see them, including your preferred observation times and
-> viewing direction (altitude and azimuth). Do not share it if those details
-> are private.
+> The Atom feed and calendar links on this page contain your selected location
+> and photography filters. Anyone with one of these links can see that
+> information, including your preferred observation times and viewing direction
+> (altitude and azimuth). Do not share these links if those details are private.
 
 The warning has one stable element ID. Every usable preference-bearing calendar
-action and the `Atom feed` action in filtered state reference it through
-`aria-describedby`;
-the all-off Atom action does not. A missing filtered Atom action does not remove
-a warning still required by a calendar action. The browser decides from
-response metadata rather than URL parsing. These actions add no account, token,
-subscription state, analytics, cookie, profile, or `localStorage` key.
+or feed-copy action references it through `aria-describedby`; the all-off feed
+copy buttons do not. A missing filtered Atom or calendar-feed action does not
+remove a warning still required by another calendar action. The browser decides
+from response metadata rather than URL parsing. Both feed buttons use the same
+Clipboard API, prompt fallback, and temporary `Copied` state. These actions add
+no account, token, subscription state, analytics, cookie, profile, or
+`localStorage` key.
 
 The page uses two optional browser `localStorage` entries.
 `moonService.recentSearches.v1` keeps up to five display names, location IDs,
@@ -605,7 +632,7 @@ fixture so the smoke check does not depend on live providers. Override
 Manual browser checks for frontend behavior:
 
 - Open `/search`, submit `Praha`, and confirm opportunities render with Moon,
-  Sun/light, weather, score, share action, tooltips, and caveat details.
+  Sun/light, weather, score, feed-copy actions, tooltips, and caveat details.
 - Open `/about` and confirm the short service intro, purpose, and current
   boundaries are visible.
 - Open `/search?q=Praha` directly and confirm the page is shareable without an

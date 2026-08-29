@@ -635,9 +635,10 @@ provider. It must not add the mode to provider, opportunity, weather, or shared
 cache keys, page/share URLs, cookies, server-side profiles, or analytics events.
 The process-local Atom feed-state cache is the narrow exception: it keys one
 rebuildable state by the canonical filtered feed path. A successful response
-may contain the backend-generated individual `.ics` and filtered Atom URLs
-documented below; those reusable URLs can carry normalized applied preferences
-and weather ranking. Moon Service application logs omit their query strings.
+may contain the backend-generated individual `.ics`, filtered Atom, and
+subscribable-calendar URLs documented below; those reusable URLs can carry
+normalized applied preferences and weather ranking. Moon Service application
+logs omit their query strings.
 The server must not permanently store the body, a preference, the mode, an
 availability window, or a personal profile.
 
@@ -1546,7 +1547,8 @@ instead describes weather across the opportunity window:
   ],
   "links": {
     "self": "/search?q=Praha",
-    "location": "/l/prague-cz"
+    "location": "/l/prague-cz",
+    "calendarFeed": "/calendars/opportunities.ics?locationId=openmeteo%3Aprague-cz"
   },
   "messages": [
     {
@@ -1615,6 +1617,9 @@ instead describes weather across the opportunity window:
     "aliasSource": "curated"
   },
   "opportunities": [],
+  "links": {
+    "calendarFeed": "/calendars/opportunities.ics?locationId=openmeteo%3Atokyo-jp"
+  },
   "messages": [
     {
       "level": "info",
@@ -1765,6 +1770,9 @@ instead describes weather across the opportunity window:
   "emptyReason": {
     "code": "no_useful_low_moon_windows",
     "text": "No useful low-Moon window was found in the forecast period."
+  },
+  "links": {
+    "calendarFeed": "/calendars/opportunities.ics?locationId=openmeteo%3Aprague-cz"
   }
 }
 ```
@@ -2194,15 +2202,16 @@ backend support is tracked by
   same route accepts optional canonical `weatherRanking` and Version 1
   `preferences` values in that order. It accepts no `order`, search text,
   coordinates, account ID, token, or arbitrary user text.
-- The browser shows at most one action labeled `Atom feed`. Applied response
-  metadata selects its state: a non-empty `normalizedActiveFilters` object or an
-  `appliedWeatherRanking` of `prefer_clear` or `ignore_weather` is filtered.
-  That state uses root `links.atomWithFilters` unchanged only when it is a
-  non-blank string. An absent, non-string, or blank value produces no Atom
-  action and no all-off substitute. Otherwise, the browser builds the existing
-  location-only URL and ignores a stray filtered member. It never shows both
-  forms or the label `Atom feed with these filters`, and it does not serialize
-  or reconstruct a filtered URL. Both backend URL forms remain valid.
+- The browser shows one `Copy Atom feed link` button when the applicable path
+  is usable. Applied response metadata selects its state: a non-empty
+  `normalizedActiveFilters` object or an `appliedWeatherRanking` of
+  `prefer_clear` or `ignore_weather` is filtered. That state uses root
+  `links.atomWithFilters` unchanged only when it is a non-blank string. An
+  absent, non-string, or blank value produces no Atom copy button and no all-off
+  substitute. Otherwise, the browser builds the existing location-only path and
+  ignores a stray filtered member. It copies exactly `window.location.origin`
+  plus the selected path and does not serialize or reconstruct a filtered URL.
+  Both backend URL forms remain valid.
 - A feed reader polls Moon Service. Moon Service creates no account, subscriber
   mapping, saved subscription, push channel, or durable location record.
 
@@ -2506,22 +2515,23 @@ nonordinary results do not receive one.
 
 When applied response metadata contains at least one normalized hard preference
 or a non-default weather ranking, and at least one usable preference-bearing
-calendar action or the filtered `Atom feed` action is present, the browser shows
-this warning once before the opportunity list:
+calendar or feed-copy action is present, the browser shows this warning once
+before the opportunity list:
 
-> This link contains your selected location and photography filters. Anyone
-> with the link can see them, including your preferred observation times and
-> viewing direction (altitude and azimuth). Do not share it if those details
-> are private.
+> The Atom feed and calendar links on this page contain your selected location
+> and photography filters. Anyone with one of these links can see that
+> information, including your preferred observation times and viewing direction
+> (altitude and azimuth). Do not share these links if those details are private.
 
 The notice has one stable element ID. Every usable preference-bearing calendar
-action and the `Atom feed` action in filtered state reference it through
-`aria-describedby`;
-the all-off Atom action does not. An unusable filtered Atom value hides that
-action without removing a notice still required by a calendar action. The
-browser uses response metadata rather than URL parsing for the condition. It
-uses normal same-tab anchor navigation and adds no account, token, saved
-subscription, analytics, cookie, profile, or browser storage for either action.
+or feed-copy action references it through `aria-describedby`; the all-off feed
+copy buttons do not. An unusable filtered Atom or calendar-feed value hides that
+button without removing a notice still required by another calendar action.
+The browser uses response metadata rather than URL parsing for the condition.
+Individual-event actions use normal same-tab anchor navigation. Both feed-copy
+buttons use the existing Clipboard API, prompt fallback, and temporary `Copied`
+state. None adds an account, token, saved subscription, analytics, cookie,
+profile, or browser storage.
 
 ### Subscribable iCalendar feed
 
@@ -2601,14 +2611,47 @@ refresh. GNOME Calendar fetched the same `200` response but retained its final
 cached event. The server must keep the valid `VTIMEZONE`-only empty response
 and must not add a placeholder event to work around client behavior.
 
+### Calendar subscription discovery
+
+Every successful canonical `real_location` product GET or POST includes root
+`links.calendarFeed`, including when `opportunities` is empty. Other result
+types and the direct fixture endpoint omit it. An absent optional root member
+is omitted rather than serialized as JSON `null`.
+
+The backend value is the complete canonical root-relative feed path. All-off
+state contains only canonical `locationId`. Filtered state adds only recognized,
+normalized active Version 1 hard preferences and applied non-default
+`weatherRanking`, in the feed route's canonical order. It omits inactive and
+unknown preference members, balanced weather, free-text `q`, coordinates,
+camera data, and product-result order. The feed remains fixed to `soonest`, so
+the link never contains `order`. Adding this root field preserves
+`links.atomWithFilters` and every opportunity's `links.ics`.
+
+For a loaded real-location result, the browser accepts `links.calendarFeed`
+only when it is a nonempty string equal to its trimmed value, starts with one
+`/`, and does not start with `//`. It shows one `Copy calendar feed link` button
+in the result-summary action group, including for an empty opportunity list,
+and copies exactly `window.location.origin` plus the unchanged backend value.
+The existing Clipboard API success changes the button text temporarily to
+`Copied`; the existing prompt fallback remains available when that API is
+unavailable.
+
+An absent, non-string, empty, whitespace-padded, absolute, or network-path
+value hides only the copy action. The browser does not trim a value into
+validity, substitute an all-off link, parse or reconstruct the query, fetch the
+feed, or store the URL. Filtered state uses the exact link warning and stable
+`aria-describedby` described above. All-off state has no warning association.
+The action copies ordinary current-origin HTTP or HTTPS; production therefore
+copies HTTPS and loopback review keeps its local origin. It adds no `webcal:`,
+`webcals:`, public-origin configuration, forwarded-host trust, token, or new
+state.
+
+With both paths usable, the final result summary contains exactly two matching
+feed-copy buttons: `Copy Atom feed link` and `Copy calendar feed link`. Both
+copy complete current-origin URLs and use the same `Copied` behavior.
+
 ### Later feed and calendar work
 
-- Issue #305 remains responsible for adding a root `links.calendarFeed` value
-  to product responses and a browser `Copy calendar URL` action after #304 is
-  deployed. The backend owns the root-relative path and query; the browser will
-  add only its current origin.
-- The first browser discovery flow will expose HTTPS copy only. It will not add
-  `webcal:` or `webcals:` launchers or client-side preference serialization.
 - RSS remains later work under #16.
 - Recurring events and eclipses need event-specific calendar timing rules.
 - Fictional reports do not receive `.ics` output.
@@ -2625,11 +2668,11 @@ and must not add a placeholder event to work around client behavior.
   page, and share URLs, cookies, server-side profiles, analytics events,
   provider caches, opportunity caches, weather caches, and caches shared across
   backend instances. A successful response may carry the documented
-  backend-generated individual `.ics` and filtered Atom URLs. Issue #305 will
-  add the backend-generated subscribable-calendar path. After a client opens a
-  filtered Atom URL, the process-local Atom feed-state cache keys rebuildable
-  state by the URL's canonical filtered path. The calendar feed adds no output
-  cache or stored subscription. Every response from the POST uses
+  backend-generated individual `.ics`, filtered Atom, and root-relative
+  subscribable-calendar URLs. After a client requests a filtered Atom URL, the
+  process-local Atom feed-state cache keys rebuildable state by the URL's
+  canonical filtered path. The calendar feed and browser copy action add no
+  output cache or stored subscription. Every response from the POST uses
   `Cache-Control: no-store`.
 - The browser may keep recent searches locally with `localStorage`.
 - Backend logs should avoid raw query strings and exact coordinates where
@@ -2696,9 +2739,9 @@ and [weather cache](../backend/src/main/java/dev/moonservice/backend/weather/Cac
 
 Keep the target components separate even though the public API has one
 opportunity search endpoint. The backend boundary includes the public Atom
-feed, individual calendar-link assembly, and stateless subscribable calendar
-feed. It does not implement fictional lookup, RSS, the pending #305
-subscription-link assembly, or recurring-event search.
+feed, individual and subscribable calendar-link assembly, and stateless
+subscribable calendar feed. It does not implement fictional lookup, RSS, or
+recurring-event search.
 
 ```text
 opportunity_search
@@ -2707,7 +2750,7 @@ opportunity_search
   -> ephemeris
   -> weather
   -> scoring
-  -> implemented Atom and individual-calendar assembly
+  -> implemented Atom, individual-calendar, and calendar-feed-link assembly
   -> stateless subscribable-calendar rendering
 ```
 

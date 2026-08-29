@@ -20,9 +20,9 @@ Open-Meteo URLs are provider dependencies, not Moon Service routes.
 | `GET /` | Web entry page; current product route | Web browser | Allowlisted; whole-site bound |
 | `GET /search` | Lookup and share page; current product route | Web browser | Allowlisted; whole-site bound |
 | `GET /about` | Product/privacy information page | Web browser | Allowlisted; whole-site bound |
-| `GET /feeds/atom` | Public Atom feed for one canonical location, with optional hard preferences and weather ranking | Feed reader; browser exposes one contextual action for the applied state | Allowlisted; site and provider bounds |
+| `GET /feeds/atom` | Public Atom feed for one canonical location, with optional hard preferences and weather ranking | Feed reader; browser copies one current-origin URL for the applied state | Allowlisted; site and provider bounds |
 | `GET /o/{opportunityId}.ics` | Stateless individual iCalendar export | Browser action for each usable ordinary product link | Allowlisted for valid paths; site and provider bounds |
-| `GET /calendars/opportunities.ics` | Stateless rolling iCalendar feed for one canonical location, with optional hard preferences and weather ranking | Network calendar by direct URL; browser copy discovery waits for #305 | Allowlisted; site and provider bounds |
+| `GET /calendars/opportunities.ics` | Stateless rolling iCalendar feed for one canonical location, with optional hard preferences and weather ranking | Network calendar polls a backend-generated URL; browser copies it from a successful real-location response | Allowlisted; site and provider bounds |
 | `GET /api/opportunities` | Location-to-opportunity product API | Browser `app.js` | Allowlisted; site and search bounds |
 | `POST /api/opportunities` | Request-scoped preference product API | Browser `app.js` through `opportunityPreferences.js` | Allowlisted POST; site and provider bounds |
 | `POST /api/opportunities/planning` | Weather-free next-date planning API | Browser `app.js` through `opportunityPreferences.js` | Allowlisted POST; site and provider bounds |
@@ -108,17 +108,17 @@ Open-Meteo URLs are provider dependencies, not Moon Service routes.
   with `Cache-Control: no-store`. Preference field names and values are not
   permanently stored, logged, or placed in a provider, opportunity, weather,
   or cross-instance cache. The process-local Atom feed-state cache is the narrow
-  exception: after a client opens a filtered Atom URL, it keys rebuildable state
+  exception: after a client requests a filtered Atom URL, it keys rebuildable state
   by the URL's canonical filtered path. Page, lookup, and share URLs contain no
   preference values. A successful product response may contain
-  backend-generated individual-export and filtered Atom URLs carrying the
-  canonical location, non-default weather ranking, and active hard preferences;
-  the individual export may also carry selected order. The subscribable
-  calendar accepts the same canonical location and filters directly; #305 owns
-  its pending product-response link. Moon Service request logging omits these
-  query strings, but browsers, feed and calendar clients, copied-link
-  recipients, Funnel, and infrastructure that records the full request target
-  can see them. Preference-related application logging is
+  backend-generated individual-export, filtered Atom, and subscribable-calendar
+  URLs carrying the canonical location, non-default weather ranking, and active
+  hard preferences; the individual export may also carry selected order. The
+  calendar link is root-relative, and the browser adds only its current origin
+  when copying it. Moon Service request logging omits these query strings, but
+  browsers, feed and calendar clients, copied-link recipients, Funnel, and
+  infrastructure that records the full request target can see them.
+  Preference-related application logging is
   limited to the documented ignored-field aggregate event and the sanitized
   filtered-link invariant event described under `POST /api/opportunities`.
 
@@ -148,13 +148,15 @@ and [hosted-alpha functional tests](../backend/src/test/java/dev/moonservice/bac
 - **Handler:** `WebPageController.searchPage`, with the same internal forward to
   `/index.html`.
 - **Purpose/audience:** current lookup page and shareable result URL.
-- **Production invocation:** navigation links, browser history, and generated
-  share links use `/search?q=...` or `/search?locationId=...`, with optional
-  `order=soonest`. Browser code reads the lookup and order parameters. It calls
+- **Production invocation:** navigation links and browser history use
+  `/search?q=...` or `/search?locationId=...`, with optional `order=soonest`.
+  A user may share that current browser address. Browser code reads the lookup
+  and order parameters. It calls
   `GET /api/opportunities` when no hard preference is active and
   `POST /api/opportunities` when at least one is active. `locationId` wins if
   both lookup fields are present in a page URL. Preference values never enter
-  the page URL or a generated share link.
+  the page URL, so they are absent when a user shares the current browser
+  address.
 - **Other callers:** browser and application functional tests.
 - **Authentication/data:** none. The URL can contain a location query or
   selected location ID and is therefore visible in browser history/share links.
@@ -210,12 +212,13 @@ and [hosted-alpha functional tests](../backend/src/test/java/dev/moonservice/bac
 - **Purpose/lifecycle:** current public Atom feed for one canonical location.
   The same route can apply canonical Version 1 hard preferences and
   non-default weather ranking while keeping fixed `soonest` order.
-- **Production invocation:** the result page exposes at most one `Atom feed`
-  action after it loads a real location, and a feed reader then polls the
-  selected URL. Applied response metadata selects the state. All-off uses the
-  browser-built location-only URL and ignores a stray filtered member. Filtered
-  state uses a non-blank backend `links.atomWithFilters` string unchanged; an
-  unusable value produces no Atom action. Both backend URL forms remain valid.
+- **Production invocation:** after a real location loads, `Copy Atom feed link`
+  copies the browser's current origin plus the path for the applied state. A
+  feed reader can poll the copied URL. All-off uses the browser-built
+  location-only path and ignores a stray filtered member. Filtered state uses a
+  non-blank backend `links.atomWithFilters` string unchanged; an unusable value
+  produces no Atom copy button and no all-off fallback. Both backend URL forms
+  remain valid.
 - **Authentication/data:** none. The query requires `locationId` and may contain
   canonical `weatherRanking` and `preferences`. Unknown preference-object
   members are ignored, while duplicate or unknown query parameters and invalid
@@ -301,9 +304,19 @@ and [hosted-alpha functional tests](../backend/src/test/java/dev/moonservice/bac
   Manual validation in Thunderbird 153.0esr and GNOME Calendar 41.2 covered
   loading, additions, same-UID updates, and omission while another event
   remained. Thunderbird cleared the final event on an empty snapshot; GNOME
-  fetched it but retained the final cached event. Product-response discovery
-  and the browser's `Copy calendar URL` action remain pending under #305 until
-  #304 is deployed. No `webcal:` or `webcals:` launcher exists.
+  fetched it but retained the final cached event. Successful canonical
+  real-location product GET and POST responses expose the backend-generated
+  root-relative path as `links.calendarFeed`, including when no opportunity is
+  returned. The browser's `Copy calendar feed link` button copies its current
+  origin plus that exact value through the existing Clipboard API or prompt
+  fallback.
+  An absent, non-string, empty, whitespace-padded, absolute, or network-path
+  value hides the action without a fallback or reconstruction. No `webcal:` or
+  `webcals:` launcher exists. With both feed paths usable, the result summary
+  contains exactly the matching `Copy Atom feed link` and `Copy calendar feed
+  link` buttons. Both use the same temporary `Copied` behavior. Filtered buttons
+  reference the existing warning through `aria-describedby`; all-off buttons do
+  not.
 - **Request:** `locationId` is required. Optional non-default
   `weatherRanking` and active canonical Version 1 `preferences` follow the
   shared public query codec. The route rejects `order`, duplicate or unknown
@@ -377,7 +390,10 @@ and [hosted-alpha functional tests](../backend/src/test/java/dev/moonservice/bac
   resource admission can instead return `429` with `rate_limited`,
   `retryAfterSeconds`, and `Retry-After` before the controller runs. Every
   ordinary opportunity also carries a complete canonical `links.ics` URL using
-  the resolved location ID and selected order.
+  the resolved location ID and selected order. Every successful canonical
+  real-location response also carries root `links.calendarFeed`, including when
+  the opportunity list is empty. Its root-relative path contains only the
+  canonical location ID and never contains the product order.
 - **Authentication/data:** anonymous. `q` is sent to Open-Meteo geocoding;
   normalized queries or location IDs and resolution results are cached in the
   current process with bounded size and status-specific TTLs. Resolved location
@@ -436,6 +452,12 @@ and [hosted-alpha functional tests](../backend/src/test/java/dev/moonservice/bac
   ten-result product limit. Each ordinary opportunity carries a complete
   backend-generated `links.ics` URL that reproduces the resolved location,
   selected order, effective weather ranking, and active hard preferences.
+  Every successful canonical real-location response also carries root
+  `links.calendarFeed`, including when the opportunity list is empty. The
+  canonical root-relative value contains the location, applied non-default
+  weather ranking, and normalized active hard preferences, but never contains
+  result order. An absent optional member is omitted instead of serialized as
+  JSON `null`.
   After final response assembly, applied filtered state also requires root
   `links.atomWithFilters` to be a non-blank string. Applied filtered state means
   that `normalizedActiveFilters` is non-empty or `appliedWeatherRanking` is
@@ -453,11 +475,12 @@ and [hosted-alpha functional tests](../backend/src/test/java/dev/moonservice/bac
   geocoding or weather. The service does not store a request body, preference,
   availability value, or user profile. Page and share URLs, cookies,
   application logs, analytics events, provider requests, and shared caches omit
-  those values. The response's backend-generated individual-export and filtered
-  Atom URLs are the deliberate exceptions: they can carry applied preferences
-  and non-default weather so the exports are reusable. The individual link can
-  also carry selected order. Moon Service request logging omits their query
-  strings. When the filtered-link invariant fails, the backend writes one
+  those values. The response's backend-generated individual-export, filtered
+  Atom, and subscribable-calendar URLs are the deliberate exceptions: they can
+  carry applied preferences and non-default weather so the exports are
+  reusable. The individual link can also carry selected order. Moon Service
+  request logging omits their query strings. When the filtered-link invariant
+  fails, the backend writes one
   `ERROR` application-log event with fixed code
   `filtered_atom_link_invariant_failed`. The validated current request ID is
   its sole explicit dynamic value. The event contains no location, query, URL,

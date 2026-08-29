@@ -72,9 +72,9 @@ In scope:
 - Present ranked opportunities.
 - Provide a shareable result page.
 - Provide a public Atom feed for a canonical real location. The browser shows
-  one contextual `Atom feed` action: applied response metadata selects the
-  backend-generated filtered URL or the location-only all-off URL. RSS remains
-  unaccepted.
+  `Copy Atom feed link`: applied response metadata selects the backend-generated
+  filtered path or the location-only all-off path, and the browser copies its
+  current origin plus that path. RSS remains unaccepted.
 - Provide a stateless, preference-aware `.ics` export for an individual event.
   Every displayed ordinary recommendation with a usable backend link offers
   its own calendar download. Each event embeds the opportunity's Moon phase and
@@ -86,7 +86,9 @@ In scope:
   no placeholder event. In manual tests, Thunderbird 153.0esr removed the final
   event; GNOME Calendar 41.2 fetched the same response but retained its final
   cached event. Moon Service does not add a placeholder to work around that
-  client behavior.
+  client behavior. Successful real-location product responses expose the
+  backend-owned root-relative feed path, and the browser offers `Copy calendar
+  feed link`, including when the current result is empty.
 
 Tracked MVP implementation issues:
 
@@ -265,31 +267,33 @@ request body or preferences or add them to a server-side profile, cookie,
 analytics event, page, lookup or share URL, application log, provider cache,
 opportunity cache, weather cache, or cache shared across backend instances. The
 process-local Atom feed-state cache is the narrow exception: after a client
-opens a filtered Atom URL, it keys rebuildable state by the URL's canonical
+requests a filtered Atom URL, it keys rebuildable state by the URL's canonical
 filtered path. The rolling iCalendar feed stores no output or subscription
 state. Its private 15-minute client cache policy does not guarantee reuse; an
 uncached maximum response may render ten inline Moon images and send roughly
 0.8-0.9 MiB. Existing provider caches may save provider calls, but they do not
 save scoring, image rendering, serialization, or bandwidth.
 
-Search order is request state. The browser puts `order=soonest` in the page URL
-and generated share links, and omits the default `best_match` order. It does
-not store order in an account, cookie, server profile, or `localStorage` entry.
+Search order is request state. The browser puts `order=soonest` in the page URL,
+so it remains in a browser address that the user shares, and omits the default
+`best_match` order. It does not store order in an account, cookie, server
+profile, or `localStorage` entry.
 
 Share links contain the location and may contain order. They contain no
 preference value. A browser opening a share link applies its own saved
-preferences, if any. For a loaded real-location result, the browser shows at
-most one action labeled `Atom feed`. A non-empty `normalizedActiveFilters`
-object or an `appliedWeatherRanking` of `prefer_clear` or `ignore_weather`
+preferences, if any. For a loaded real-location result, the browser shows
+`Copy Atom feed link` when the applicable path is usable. A non-empty
+`normalizedActiveFilters` object or an `appliedWeatherRanking` of
+`prefer_clear` or `ignore_weather`
 selects filtered state. A non-blank root `links.atomWithFilters` string then
-supplies the action's backend URL unchanged. If that value is absent,
-non-string, or blank, the filtered result has no Atom action and does not
-silently substitute an all-off feed.
+supplies the backend path unchanged. The browser copies its current origin
+followed by that path. If the value is absent, non-string, or blank, the
+filtered result has no Atom copy button and does not silently substitute an
+all-off feed.
 
-Otherwise, the response is all-off and the action uses the current
-location-only Atom URL. The browser ignores a stray `links.atomWithFilters` in
-that state. It never shows a second Atom action or the label `Atom feed with
-these filters`.
+Otherwise, the response is all-off and the button copies the current origin
+plus the location-only Atom path. The browser ignores a stray
+`links.atomWithFilters` in that state.
 
 A backend-generated individual `.ics` URL carries the canonical location,
 selected order, non-default weather ranking, and active hard preferences so
@@ -301,29 +305,43 @@ as opaque.
 
 The rolling calendar route accepts the canonical location, non-default weather
 ranking, and active hard preferences in its public URL. It creates no account,
-token, saved subscription, persistent preference, or scheduled job. Issue #305
-will add a root `links.calendarFeed` value and `Copy calendar URL` action only
-after #304 is deployed. The backend will own the complete root-relative path
-and query; the browser will add only its current origin. The first discovery
-flow will not use `webcal:` or `webcals:` and will not reconstruct preferences.
+token, saved subscription, persistent preference, or scheduled job. Every
+successful canonical real-location product GET or POST contains root
+`links.calendarFeed`, including when no opportunity is returned. The backend
+owns the complete canonical root-relative path and query. All-off state includes
+only canonical `locationId`; filtered state adds only normalized active hard
+preferences and applied non-default weather ranking. The feed is fixed to
+`soonest`, so the link never includes product order.
+
+For a usable value, `Copy calendar feed link` copies the browser's current
+origin followed by the unchanged backend path. An absent, non-string, empty,
+whitespace-padded, absolute, or network-path value hides the action. The browser
+does not trim, parse, reconstruct, fetch, store, or replace the value with an
+all-off fallback. It uses the existing Clipboard API and prompt fallback. The
+first discovery flow does not use `webcal:` or `webcals:`, a token, or a
+configured public origin.
+
+With both paths usable, the final result summary contains exactly two matching
+buttons: `Copy Atom feed link` and `Copy calendar feed link`. Both use the
+existing Clipboard API, prompt fallback, and temporary `Copied` state.
 
 When applied response metadata reports at least one normalized hard preference
 or non-default weather ranking, and at least one usable preference-bearing
-calendar action or the filtered `Atom feed` action is present, the browser shows
+calendar or feed-copy action is present, the browser shows
 this warning once before the opportunity list:
 
-> This link contains your selected location and photography filters. Anyone
-> with the link can see them, including your preferred observation times and
-> viewing direction (altitude and azimuth). Do not share it if those details
-> are private.
+> The Atom feed and calendar links on this page contain your selected location
+> and photography filters. Anyone with one of these links can see that
+> information, including your preferred observation times and viewing direction
+> (altitude and azimuth). Do not share these links if those details are private.
 
-Every usable preference-bearing calendar action and the `Atom feed` action in
-filtered state reference the one warning through its stable element ID. The
-all-off Atom action does not. A missing filtered Atom action does not remove a
-warning still required by a calendar action. The browser uses response metadata
-rather than parsing a URL to decide whether the warning is required. Filtered
-Atom, individual-export, and subscribable calendar URLs create no server
-profile or durable state, but browsers,
+Every usable preference-bearing calendar or feed-copy action references the
+one warning through its stable element ID. The all-off feed-copy buttons do not.
+A missing filtered Atom or calendar-feed action does not remove a warning still
+required by another calendar action. The browser uses response metadata rather
+than parsing a URL to decide whether the warning is required. Filtered Atom,
+individual-export, and subscribable calendar URLs create no server profile or
+durable state, but browsers,
 feed and calendar clients, copied-link recipients, Funnel, and systems that log
 the full request target may see the encoded filters. These can reveal preferred
 observation hours and altitude or azimuth viewing direction. Moon Service

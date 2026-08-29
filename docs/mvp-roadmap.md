@@ -15,10 +15,11 @@ preference and weather contract to Atom. Issues
 [#295](https://github.com/rapucha/moon-service/issues/295) and
 [#297](https://github.com/rapucha/moon-service/issues/297) delivered browser
 discovery for those backend links. Backend subscribable-calendar issue
-[#304](https://github.com/rapucha/moon-service/issues/304) delivers the public
-subscription route. Browser copy issue
-[#305](https://github.com/rapucha/moon-service/issues/305) waits for #304 to be
-deployed. Both remain under tracking parent
+[#304](https://github.com/rapucha/moon-service/issues/304) delivered and
+deployed the public subscription route. Browser copy issue
+[#305](https://github.com/rapucha/moon-service/issues/305) delivers the root
+calendar-feed link and matching `Copy Atom feed link` and `Copy calendar feed
+link` buttons. Both remain under tracking parent
 [#16](https://github.com/rapucha/moon-service/issues/16). Calibration under
 #33 remains a longer project.
 
@@ -102,9 +103,10 @@ Exit criteria:
 ## Phase 3: MVP App Loop
 
 Status: in progress. The anonymous lookup loop, location-only and filtered Atom
-backend, and individual `.ics` backend export are implemented. Empirical
-ranking validation remains. Issue #304 delivers the subscribable calendar
-backend; #305 will add browser copy discovery only after #304 is deployed.
+backend, individual `.ics` backend export, and deployed subscribable-calendar
+route are implemented. Empirical ranking validation remains. Issue #305's
+scope delivers the backend calendar-feed link and two matching feed-copy
+buttons.
 
 Goal: make the simplest useful public loop work.
 
@@ -116,16 +118,15 @@ Tasks:
 - Provide a shareable result URL.
 - Add clear privacy copy for geocoding, weather lookup, coordinate rounding, and backend logs.
 - Use the location-only Atom feed delivered in #289 and the preference-filtered
-  backend feed delivered in #296. Expose one contextual `Atom feed` action
-  through #297: applied metadata selects the exact filtered URL or the
-  location-only all-off URL, and an unusable filtered value produces no Atom
-  action. RSS has not been accepted.
+  backend feed delivered in #296. Use #297's applied-state URL selection for
+  `Copy Atom feed link`: an unusable filtered value produces no button or
+  all-off fallback. RSS has not been accepted.
 - Provide the stateless preference-aware individual `.ics` backend export in
   #294 and expose every usable ordinary product link through #295.
-- Deliver the stateless preference-aware rolling `.ics` feed for canonical real
-  locations through #304. After it is deployed, add the root backend link and
-  HTTPS `Copy calendar URL` action through #305. Do not add `webcal:` or
-  `webcals:` launchers.
+- Use the deployed stateless preference-aware rolling `.ics` feed for canonical
+  real locations from #304. Issue #305 delivers its root backend link and HTTPS
+  `Copy calendar feed link` button beside the matching Atom copy button. Do not
+  add `webcal:` or `webcals:` launchers.
 
 Exit criteria:
 
@@ -245,8 +246,9 @@ The existing feed/calendar backend steps are complete: #294 delivered the
 stateless preference-aware individual `.ics` route and #296 delivered the
 preference-filtered Atom route and complete product links. Issues #295 and #297
 delivered the browser actions and their shared privacy disclosure. Issue #304
-delivers the stateless subscribable-calendar backend. Issue #305 waits for
-deployed #304 before adding its backend response link and browser copy action.
+delivered and deployed the stateless subscribable-calendar backend. Issue #305
+delivers its backend response link and the matching Atom and calendar feed-copy
+buttons.
 
 The completed foundations are:
 
@@ -294,8 +296,8 @@ the location-only Atom feed. Issue #294 delivered the stateless
 preference-aware individual `.ics` route, and #296 delivered preference-filtered
 Atom while keeping the location-only contract. Issues #295 and #297 delivered
 browser discovery for those preference-bearing backend links without changing
-the location-only feed. Issue #304 delivers the subscribable calendar route;
-#305 waits for its deployment before adding root-link and HTTPS-copy discovery.
+the location-only feed. Issue #304 delivered and deployed the subscribable
+calendar route. Issue #305 delivers root-link and HTTPS feed-copy discovery.
 RSS remains later. The
 JitPack dependency decision and safeguards required before
 public deployment are recorded in

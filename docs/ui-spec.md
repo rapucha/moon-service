@@ -18,9 +18,11 @@ calibration-feedback interaction tracked by
 next-matching-date recovery tracked by
 [#233](https://github.com/rapucha/moon-service/issues/233), Atom feed discovery
 tracked by [#289](https://github.com/rapucha/moon-service/issues/289), and the
-individual calendar and preference-filtered Atom actions tracked by
+individual calendar download and preference-filtered Atom discovery tracked by
 [#295](https://github.com/rapucha/moon-service/issues/295) and
-[#297](https://github.com/rapucha/moon-service/issues/297). Broader visual
+[#297](https://github.com/rapucha/moon-service/issues/297), and calendar
+subscription copy discovery tracked by
+[#305](https://github.com/rapucha/moon-service/issues/305). Broader visual
 design, RSS, standalone calendar export pages, account flows, and native apps
 are out of scope for this document until they become active product work.
 
@@ -445,7 +447,8 @@ preference is active, and includes `weatherRanking` only for a non-default
 choice. Empty and unsupported present URL values reach the server unchanged
 and follow its invalid-request flow.
 
-`order=soonest` remains in the page URL and generated share links. An omitted
+`order=soonest` remains in the page URL and therefore in a browser address that
+the user shares. An omitted
 order is canonical Best match. An explicit `order=best_match` reaches the
 server once and is removed with `replaceState` only after a successful
 real-location response. A user order change uses `pushState`, so browser back
@@ -467,59 +470,82 @@ order account, cookie, server profile, or `localStorage` entry. Share links
 contain the location and may contain order, but never contain preferences. A
 receiving browser applies its own saved preferences, if any.
 
-## Atom Feed Discovery
+## Feed Link Discovery
 
-After a successful real-location lookup, the resolved-result header shows at
-most one normal same-origin anchor labeled `Atom feed` beside the sharing
-controls. The action stays hidden until the page has a loaded `status: "ok"`,
-`location.kind: "real_location"` result with a canonical location ID. It does
-not appear for the initial page, an ambiguous or missing location, a fictional
-result, a failed request, or the separate planning result.
+After a successful canonical real-location GET or POST, the final result
+summary contains exactly two matching buttons when both feed paths are usable:
 
-Applied response metadata selects the action's state. A non-empty
+- `Copy Atom feed link`;
+- `Copy calendar feed link`.
+
+The result summary renders neither `Copy link` nor `Open share link`. A user
+shares the current page through the browser's address controls.
+
+The buttons also appear when the loaded result has no current opportunities.
+They stay hidden for the initial page, every non-success or non-real-location
+result, planning output, and unresolved lookup. An unusable path hides only its
+own button and leaves the loaded result and other actions unchanged.
+
+Applied response metadata selects the Atom path. A non-empty
 `normalizedActiveFilters` object or an `appliedWeatherRanking` of
 `prefer_clear` or `ignore_weather` selects filtered state. In that state, a
-non-blank root `links.atomWithFilters` string becomes the anchor's `href`
-unchanged. An absent, non-string, or blank value produces no Atom action. The
-browser does not guess, weaken, reconstruct, or substitute the all-off URL.
-
-Otherwise, the response is all-off. The browser builds
+non-blank root `links.atomWithFilters` string supplies the path unchanged. An
+absent, non-string, or blank value hides `Copy Atom feed link`; the browser does
+not substitute the all-off path. Otherwise, the browser builds
 `/feeds/atom?locationId=<percent-encoded-canonical-id>`, containing only that
-ID, and ignores a stray `links.atomWithFilters`. It never renders both URL forms
-or a separate `Atom feed with these filters` label. It treats a selected
-backend URL as opaque and does not serialize preferences, weather ranking, or
-another filtered value. Atom remains fixed to `soonest`; the displayed result
-order does not become a feed input, and alternate links inside entries remain
-location-only.
+ID, and ignores a stray `links.atomWithFilters`. It copies exactly
+`window.location.origin` plus the selected path. It does not serialize or
+reconstruct a filtered URL. Atom remains fixed to `soonest`; displayed result
+order does not become a feed input.
 
-The user adds the displayed public URL to a feed reader. The reader polls Moon
-Service; the browser does not create an account, save a server-side
-subscription, or register a push channel.
+Root `links.calendarFeed` supplies the calendar path, including for an empty
+opportunity list. It is usable only when it is a nonempty string equal to its
+trimmed value, begins with one `/`, and does not begin with `//`. The browser
+copies exactly `window.location.origin` followed by that unchanged value. An
+absent, non-string, empty, whitespace-padded, absolute, or network-path value
+hides `Copy calendar feed link`. The browser does not trim a value into
+validity, parse or normalize the query, serialize preferences, construct a
+fallback, fetch the feed, or store the URL.
+
+Both buttons use the same copy interaction. A successful Clipboard API write
+changes the activated label temporarily to `Copied`. When the Clipboard API is
+unavailable, the existing prompt fallback displays the same complete URL. The
+browser adds no `webcal:` or `webcals:` scheme, token, public-origin setting,
+subscription state, analytics event, or request merely because it renders the
+buttons. A feed or calendar client can poll the copied URL.
+
+Applied response metadata also controls disclosure. Active hard preferences or
+an applied `prefer_clear` or `ignore_weather` ranking make both copied URLs
+preference-bearing. Each usable feed-copy button then references the existing
+warning's stable ID through `aria-describedby`. All-off buttons have no warning
+association. The browser does not inspect either feed URL to decide this state.
 
 ## Preference-bearing Link Disclosure
 
 When applied response metadata contains at least one normalized hard preference
 or a non-default applied weather ranking, and the result renders at least one
-usable preference-bearing calendar action or the filtered `Atom feed` action,
-show this notice once before the opportunity list:
+usable preference-bearing calendar or feed-copy action, show this notice once
+before the opportunity list:
 
-> This link contains your selected location and photography filters. Anyone
-> with the link can see them, including your preferred observation times and
-> viewing direction (altitude and azimuth). Do not share it if those details
-> are private.
+> The Atom feed and calendar links on this page contain your selected location
+> and photography filters. Anyone with one of these links can see that
+> information, including your preferred observation times and viewing direction
+> (altitude and azimuth). Do not share these links if those details are private.
 
 The notice is visible without a modal, hover, expandable disclosure, or
 confirmation step. It has one stable element ID. Every usable
-preference-bearing `Download calendar event` anchor and the `Atom feed` anchor
-in filtered state reference that ID through `aria-describedby`. The all-off
-Atom anchor does not. The browser derives the condition from applied response
-metadata, not by parsing a URL. An all-off response, or a result with no usable
+preference-bearing `Download calendar event` anchor and every feed-copy button
+reference that ID through `aria-describedby`. The all-off feed-copy buttons do
+not. The browser derives the condition from applied response metadata, not by
+parsing a URL. An all-off response, or a result with no usable
 preference-bearing action, has no notice. A filtered result with an unusable
-Atom link has no Atom action but keeps a notice still required by a usable
-calendar action.
+Atom or calendar-feed link hides that button but keeps a notice still required
+by another usable calendar action.
 
-These actions use normal same-tab navigation. They add no account, token,
-analytics, cookie, profile, subscription state, or `localStorage` key.
+Individual-event actions use normal same-tab navigation. Feed discovery uses
+the Clipboard API or prompt fallback described above. These actions add no
+account, token, analytics, cookie, profile, subscription state, or
+`localStorage` key.
 
 ## Opportunity Preferences
 
@@ -818,7 +844,7 @@ interactions. `app.js` coordinates the lookup flow with the preference module.
 `responseView.js` remains responsible for ordinary opportunity statuses,
 including the structured preference impact inside an empty result.
 The resolved-result header retains the location, ranked Moon-pass and candidate
-counts, and sharing controls. It does not add a secondary metadata grid for the
+counts, and feed-copy buttons. It does not add a secondary metadata grid for the
 fixed forecast horizon, evaluated-window count, timezone, or lookup method.
 
 Every preference input has a visible label. Related choices use `fieldset` and
@@ -906,7 +932,7 @@ facts.
 
 The planning panel omits ordinary opportunity cards, Moon-pass grouping,
 candidate lists, weather and forecast facts, score and confidence, components,
-photo hints, ranking reasons, sharing controls, and calendar actions. It does
+photo hints, ranking reasons, feed-copy buttons, and calendar actions. It does
 not create a placeholder fact when bright-limb orientation is `null`.
 
 The planning renderer accepts only the closed documented `nextPlanningWindow`

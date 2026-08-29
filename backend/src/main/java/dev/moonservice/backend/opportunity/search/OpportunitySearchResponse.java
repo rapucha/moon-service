@@ -137,6 +137,7 @@ public record OpportunitySearchResponse(
     }
 
     public OpportunitySearchResponse withFilteredAtomLink(String value) {
+        String calendarFeed = links == null ? null : links.calendarFeed();
         return new OpportunitySearchResponse(
                 status,
                 generatedAt,
@@ -160,7 +161,7 @@ public record OpportunitySearchResponse(
                 preferenceImpact,
                 asOf,
                 currentMoon,
-                new Links(value));
+                new Links(value, calendarFeed));
     }
 
     private static PreferenceImpactDetails preferenceImpact(
@@ -380,6 +381,7 @@ public record OpportunitySearchResponse(
     ) {
     }
 
-    public record Links(String atomWithFilters) {
+    @JsonInclude(JsonInclude.Include.NON_NULL)
+    public record Links(String atomWithFilters, String calendarFeed) {
     }
 }
