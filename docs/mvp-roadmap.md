@@ -13,11 +13,14 @@ stateless preference-aware backend export for one `.ics` event, and
 [#296](https://github.com/rapucha/moon-service/issues/296) delivered the same
 preference and weather contract to Atom. Issues
 [#295](https://github.com/rapucha/moon-service/issues/295) and
-[#297](https://github.com/rapucha/moon-service/issues/297) deliver browser
-discovery for those backend links. Later subscribable calendars
-remain under tracking parent
-[#16](https://github.com/rapucha/moon-service/issues/16). Calibration under #33
-remains a longer project.
+[#297](https://github.com/rapucha/moon-service/issues/297) delivered browser
+discovery for those backend links. Backend subscribable-calendar issue
+[#304](https://github.com/rapucha/moon-service/issues/304) delivers the public
+subscription route. Browser copy issue
+[#305](https://github.com/rapucha/moon-service/issues/305) waits for #304 to be
+deployed. Both remain under tracking parent
+[#16](https://github.com/rapucha/moon-service/issues/16). Calibration under
+#33 remains a longer project.
 
 ## Phase 0: Planning Baseline
 
@@ -100,8 +103,8 @@ Exit criteria:
 
 Status: in progress. The anonymous lookup loop, location-only and filtered Atom
 backend, and individual `.ics` backend export are implemented. Empirical
-ranking validation and subscribable calendar feeds remain. Issues #295 and #297
-add browser discovery for the preference-bearing export links.
+ranking validation remains. Issue #304 delivers the subscribable calendar
+backend; #305 will add browser copy discovery only after #304 is deployed.
 
 Goal: make the simplest useful public loop work.
 
@@ -119,8 +122,10 @@ Tasks:
   action. RSS has not been accepted.
 - Provide the stateless preference-aware individual `.ics` backend export in
   #294 and expose every usable ordinary product link through #295.
-- Provide dynamic public `.ics` calendar feeds for canonical real locations
-  later.
+- Deliver the stateless preference-aware rolling `.ics` feed for canonical real
+  locations through #304. After it is deployed, add the root backend link and
+  HTTPS `Copy calendar URL` action through #305. Do not add `webcal:` or
+  `webcals:` launchers.
 
 Exit criteria:
 
@@ -236,10 +241,12 @@ The anonymous web loop now returns up to ten raw ranked candidates while
 preserving explicit caller control on the direct scoring contract. This is a
 discovery safeguard, not a scoring calibration.
 
-The current feed/calendar backend steps are complete: #294 delivered the
+The existing feed/calendar backend steps are complete: #294 delivered the
 stateless preference-aware individual `.ics` route and #296 delivered the
 preference-filtered Atom route and complete product links. Issues #295 and #297
-implement the browser actions and their shared privacy disclosure.
+delivered the browser actions and their shared privacy disclosure. Issue #304
+delivers the stateless subscribable-calendar backend. Issue #305 waits for
+deployed #304 before adding its backend response link and browser copy action.
 
 The completed foundations are:
 
@@ -285,9 +292,11 @@ Public feed and calendar-export work remains tracked under
 [#16](https://github.com/rapucha/moon-service/issues/16). Issue #289 delivered
 the location-only Atom feed. Issue #294 delivered the stateless
 preference-aware individual `.ics` route, and #296 delivered preference-filtered
-Atom while keeping the location-only contract. Issues #295 and #297 add browser
-discovery for those preference-bearing backend links without changing the
-location-only feed. RSS and subscribable calendar feeds remain later. The
+Atom while keeping the location-only contract. Issues #295 and #297 delivered
+browser discovery for those preference-bearing backend links without changing
+the location-only feed. Issue #304 delivers the subscribable calendar route;
+#305 waits for its deployment before adding root-link and HTTPS-copy discovery.
+RSS remains later. The
 JitPack dependency decision and safeguards required before
 public deployment are recorded in
 [#17](https://github.com/rapucha/moon-service/issues/17).

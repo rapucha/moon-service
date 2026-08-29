@@ -25,6 +25,7 @@ public final class HostedAlphaSurfaceFilter extends OncePerRequestFilter {
     private static final String OPPORTUNITY_PATH = "/api/opportunities";
     private static final String PLANNING_PATH = "/api/opportunities/planning";
     private static final String ATOM_FEED_PATH = "/feeds/atom";
+    private static final String CALENDAR_FEED_PATH = "/calendars/opportunities.ics";
     static final String FEEDBACK_CAPABILITY_PATH = "/api/calibration-feedback/v1/capability";
     static final String FEEDBACK_SUBMISSIONS_PATH = "/api/calibration-feedback/v1/submissions";
     static final String CONTENT_SECURITY_POLICY = "default-src 'none'; base-uri 'none'; "
@@ -37,7 +38,7 @@ public final class HostedAlphaSurfaceFilter extends OncePerRequestFilter {
     private static final Set<String> APPROVED_PATHS = Set.of(
             "/", "/about", "/about.html", "/index.html", "/search",
             "/admin/status", OPPORTUNITY_PATH, PLANNING_PATH, "/readyz",
-            ATOM_FEED_PATH,
+            ATOM_FEED_PATH, CALENDAR_FEED_PATH,
             FEEDBACK_CAPABILITY_PATH, FEEDBACK_SUBMISSIONS_PATH,
             "/angularPreferenceControls.js", "/angularPreferencePreview.css",
             "/angularPreferencePreview.js", "/angularPreferenceRules.js",
@@ -151,7 +152,7 @@ public final class HostedAlphaSurfaceFilter extends OncePerRequestFilter {
     }
 
     private static void preventPublicLinkErrorCaching(String path, HttpServletResponse response) {
-        if (ATOM_FEED_PATH.equals(path) || isCalendarRequestPath(path)) {
+        if (ATOM_FEED_PATH.equals(path) || CALENDAR_FEED_PATH.equals(path) || isCalendarRequestPath(path)) {
             response.setHeader("Cache-Control", "no-store");
         }
     }

@@ -19,7 +19,7 @@ server.
 
 ## Public UX
 
-Current public browser, Atom feed, and individual-event routes:
+Public browser, Atom feed, and calendar routes in this contract:
 
 ```text
 /search?q=Praha
@@ -27,16 +27,14 @@ Current public browser, Atom feed, and individual-event routes:
 /feeds/atom?locationId=moon-service-3067696
 /feeds/atom?locationId=moon-service-3067696&preferences=<canonical-v1-json>
 /o/<opportunity-id>.ics?locationId=moon-service-3067696
+/calendars/opportunities.ics?locationId=moon-service-3067696
 ```
 
-Both feed forms use the current opaque, provider-tied canonical location ID.
-A provider change may require a new subscription URL. Issue
+The Atom forms and subscribable calendar use the current opaque,
+provider-tied canonical location ID. A provider change may require a new
+subscription URL. Issue
 [#288](https://github.com/rapucha/moon-service/issues/288) tracks the later
-friendly-URL decision. Subscribable calendar routes remain planned under #16:
-
-```text
-/calendars/prague-cz.ics
-```
+friendly-URL decision.
 
 Implementation tracking:
 [#15](https://github.com/rapucha/moon-service/issues/15) for the web lookup and
@@ -156,8 +154,8 @@ HTTP status codes can stay conventional:
 
 - `200` for product states such as `ok`, `ambiguous_location`, and `location_not_found`.
 - `400` for `invalid_request`.
-- `404` for `location_not_found` or `opportunity_not_found` on the individual
-  calendar route.
+- `404` for `location_not_found` on a direct calendar route, or
+  `opportunity_not_found` on the individual calendar route.
 - `413` for `request_too_large`.
 - `415` for `unsupported_media_type`.
 - `429` for `rate_limited`.
@@ -2525,11 +2523,93 @@ browser uses response metadata rather than URL parsing for the condition. It
 uses normal same-tab anchor navigation and adds no account, token, saved
 subscription, analytics, cookie, profile, or browser storage for either action.
 
+### Subscribable iCalendar feed
+
+The backend serves this rolling network-calendar route:
+
+```text
+GET /calendars/opportunities.ics?locationId=<canonical-id>[&weatherRanking=<mode>][&preferences=<json>]
+```
+
+The query uses the individual-export codec and canonical field order:
+`locationId`, optional non-default `weatherRanking`, then optional active
+Version 1 `preferences`. Fixed `soonest` order is not a parameter. The route
+rejects `order`, duplicate or unknown query parameters, malformed JSON,
+unsupported preference versions, and invalid recognized values before provider
+work. It keeps the product POST's tolerance for unknown members inside the
+decoded Version 1 object and omits those members from canonical output.
+
+The route runs the current opportunity engine for the resolved location,
+weather ranking, and hard preferences. It keeps the current seven-day horizon,
+ten-result limit, and fixed `soonest` order. It adds no candidate generator,
+filter, score cutoff, provider, or fallback search.
+
+A successful `GET` returns one valid UTF-8 `VCALENDAR` with the resolved
+location's structural `VTIMEZONE` and zero to ten ordinary `VEVENT`
+components. The timezone component is not a visible event; each event keeps
+UTC timestamps. Events are ordered by precise `suggestedAt` and then
+opportunity ID. Each event reuses the individual export's deterministic #294
+UID, outward whole-minute `DTSTART` and `DTEND`, current summary, location,
+three-line description, inline 192-by-192 Moon PNG, CRLF output, TEXT escaping,
+iCal4j validation, and UTF-8-safe folding.
+
+An empty successful search returns `200` with the same calendar shape, its
+`VTIMEZONE`, and no `VEVENT`. It does not return `204`, `404`, a component-free
+calendar, or a placeholder event. Every response is the complete current
+rolling snapshot. A surviving opportunity keeps its UID, a result no longer
+returned disappears from the next document, and a new opportunity ID becomes
+a new event. The server stores no reconciliation state and emits no tombstone,
+`SEQUENCE`, recurrence rule, or alarm.
+
+Successful `GET` responses use:
+
+```text
+Content-Type: text/calendar;charset=UTF-8
+Cache-Control: private, max-age=900
+Content-Length: <exact body length>
+```
+
+There is no attachment disposition, ETag, or `Last-Modified`. `HEAD` performs
+the same request validation, hosted admission, location resolution, and search
+as `GET`, but skips iCalendar serialization and Moon-image rendering. It sends
+the applicable status, content type, and cache policy without a body or
+`Content-Length`. A rendering-only failure can therefore affect `GET` without
+being predicted by `HEAD`.
+
+Invalid input returns `400 invalid_request`, an unresolved canonical location
+returns `404 location_not_found`, and provider, search, image, validation, or
+serialization failure returns `503 temporarily_unavailable`. Hosted admission
+may return `429 rate_limited`. Errors are `Cache-Control: no-store`, with the
+existing safe JSON body for `GET` and no body for `HEAD`; hosted-surface
+rejections remain bodyless.
+
+The first version adds no output cache, ETag, account, token, subscriber
+record, persistent preference, scheduled generation, or new provider. Existing
+provider caches can avoid some repeated geocoding and weather calls. They do
+not avoid scoring, PNG rendering, serialization, or bandwidth. An uncached
+maximum `GET` may therefore render ten PNGs and send roughly 0.8-0.9 MiB. This
+cost is accepted for the first version.
+
+Application and controlled access logs omit the query string. Calendar
+clients, copied-link recipients, browser history, Funnel, and other
+request-target logs may still retain the location, observation hours, or
+altitude and azimuth filters. Manual validation used Thunderbird 153.0esr and
+GNOME Calendar 41.2. Both clients loaded the network calendar and applied an
+addition, a same-UID update, and removal of an omitted event while another
+event remained. Thunderbird removed the final event after a valid empty
+refresh. GNOME Calendar fetched the same `200` response but retained its final
+cached event. The server must keep the valid `VTIMEZONE`-only empty response
+and must not add a placeholder event to work around client behavior.
+
 ### Later feed and calendar work
 
-- RSS and subscribable public calendar feeds remain later work under #16.
-- A later `/calendars/<location>.ics` feed may contain a rolling window of
-  ordinary public opportunities and needs its own caching contract.
+- Issue #305 remains responsible for adding a root `links.calendarFeed` value
+  to product responses and a browser `Copy calendar URL` action after #304 is
+  deployed. The backend owns the root-relative path and query; the browser will
+  add only its current origin.
+- The first browser discovery flow will expose HTTPS copy only. It will not add
+  `webcal:` or `webcals:` launchers or client-side preference serialization.
+- RSS remains later work under #16.
 - Recurring events and eclipses need event-specific calendar timing rules.
 - Fictional reports do not receive `.ics` output.
 
@@ -2545,10 +2625,12 @@ subscription, analytics, cookie, profile, or browser storage for either action.
   page, and share URLs, cookies, server-side profiles, analytics events,
   provider caches, opportunity caches, weather caches, and caches shared across
   backend instances. A successful response may carry the documented
-  backend-generated individual `.ics` and filtered Atom URLs. After a client
-  opens a filtered Atom URL, the process-local Atom feed-state cache keys
-  rebuildable state by the URL's canonical filtered path. Every response from
-  the POST uses `Cache-Control: no-store`.
+  backend-generated individual `.ics` and filtered Atom URLs. Issue #305 will
+  add the backend-generated subscribable-calendar path. After a client opens a
+  filtered Atom URL, the process-local Atom feed-state cache keys rebuildable
+  state by the URL's canonical filtered path. The calendar feed adds no output
+  cache or stored subscription. Every response from the POST uses
+  `Cache-Control: no-store`.
 - The browser may keep recent searches locally with `localStorage`.
 - Backend logs should avoid raw query strings and exact coordinates where
   possible.
@@ -2613,9 +2695,10 @@ and [weather cache](../backend/src/main/java/dev/moonservice/backend/weather/Cac
 ## Target Internal Service Boundary
 
 Keep the target components separate even though the public API has one
-opportunity search endpoint. It now implements the public Atom feed and
-individual calendar-link assembly. It does not implement fictional lookup,
-RSS, subscribable calendar feeds, or recurring-event search.
+opportunity search endpoint. The backend boundary includes the public Atom
+feed, individual calendar-link assembly, and stateless subscribable calendar
+feed. It does not implement fictional lookup, RSS, the pending #305
+subscription-link assembly, or recurring-event search.
 
 ```text
 opportunity_search
@@ -2625,6 +2708,7 @@ opportunity_search
   -> weather
   -> scoring
   -> implemented Atom and individual-calendar assembly
+  -> stateless subscribable-calendar rendering
 ```
 
 The coordinate-backed opportunity engine was delivered through

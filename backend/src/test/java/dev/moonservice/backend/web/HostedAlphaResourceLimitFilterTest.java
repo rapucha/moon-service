@@ -5,6 +5,8 @@ import dev.moonservice.backend.config.MoonRuntimeProperties;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.http.HttpServletResponse;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.core.annotation.AnnotatedElementUtils;
 import org.springframework.core.annotation.Order;
 import org.springframework.mock.web.MockHttpServletRequest;
@@ -80,8 +82,10 @@ class HostedAlphaResourceLimitFilterTest {
         verify(rejected).close();
     }
 
-    @Test
-    void appliesWholeSiteBeforeProviderAdmissionToAtomFeedAndPreventsCachingRefusals() throws Exception {
+    @ParameterizedTest
+    @ValueSource(strings = {"/feeds/atom", "/calendars/opportunities.ics"})
+    void appliesWholeSiteBeforeProviderAdmissionToPublicFeedsAndPreventsCachingRefusals(String path)
+            throws Exception {
         MutableClock clock = new MutableClock();
         HostedAlphaProviderAdmission providerAdmission = mock(HostedAlphaProviderAdmission.class);
         HostedAlphaProviderAdmission.Admission accepted = admission(true, 0L);
@@ -93,16 +97,18 @@ class HostedAlphaResourceLimitFilterTest {
                 providerAdmission,
                 true);
 
-        assertThat(exchange(filter, feedRequest("GET")).getStatus()).isEqualTo(200);
+        MockHttpServletResponse acceptedResponse = exchange(filter, request("GET", path));
+        assertThat(acceptedResponse.getStatus()).isEqualTo(200);
+        assertThat(acceptedResponse.getHeader("Cache-Control")).isNull();
         verify(accepted).close();
 
-        MockHttpServletResponse wholeSiteLimited = exchange(filter, feedRequest("GET"));
+        MockHttpServletResponse wholeSiteLimited = exchange(filter, request("GET", path));
         assertRateLimited(wholeSiteLimited, 1L);
         assertThat(wholeSiteLimited.getHeader("Cache-Control")).isEqualTo("no-store");
         verify(providerAdmission, times(1)).tryAcquire();
 
         clock.advance(Duration.ofSeconds(1));
-        MockHttpServletResponse providerLimited = exchange(filter, feedRequest("HEAD"));
+        MockHttpServletResponse providerLimited = exchange(filter, request("HEAD", path));
         assertThat(providerLimited.getStatus()).isEqualTo(429);
         assertThat(providerLimited.getHeader("Retry-After")).isEqualTo("37");
         assertThat(providerLimited.getContentType()).isEqualTo("application/json");
@@ -227,10 +233,6 @@ class HostedAlphaResourceLimitFilterTest {
     }
     private static MockHttpServletRequest opportunityRequest() {
         return request("GET", "/api/opportunities");
-    }
-
-    private static MockHttpServletRequest feedRequest(String method) {
-        return request(method, "/feeds/atom");
     }
 
     private static MockHttpServletRequest request(String method, String path) {

@@ -246,7 +246,7 @@ class OpportunityFilteredAtomLinkFunctionalTest {
                 "ignore_weather",
                 "opportunity-1",
                 "/search/result",
-                "2026-08-29",
+                "2099-01-02",
                 "Good conditions")) {
             assertFalse(invariantLine.contains(privateMarker),
                     () -> "Invariant event leaked fixture marker: " + privateMarker);
@@ -309,9 +309,9 @@ class OpportunityFilteredAtomLinkFunctionalTest {
                 "opportunity-1",
                 "moonrise_low",
                 null,
-                "2026-08-29T02:00:00Z",
-                "2026-08-29T02:30:00Z",
-                "2026-08-29T03:00:00Z",
+                "2099-01-02T02:00:00Z",
+                "2099-01-02T02:30:00Z",
+                "2099-01-02T03:00:00Z",
                 "Europe/Prague",
                 80,
                 "high",
