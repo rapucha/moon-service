@@ -533,8 +533,6 @@ test("renders server preference metadata as safe text without changing the share
   await expect(page.locator("#preference-timezone-note")).toBeHidden();
   await expect(noMatch.locator(":scope > summary .tooltip")).toHaveAttribute("title", "No candidate window matched this search.");
   await expect(page.locator(".summary-grid, .preference-impact .tooltip")).toHaveCount(0);
-  await expect(page.getByRole("link", { name: "Open share link" }))
-    .toHaveAttribute("href", "/search?q=Prague");
   const currentUrl = new URL(page.url());
   expect([...currentUrl.searchParams.entries()]).toEqual([["q", "Prague"]]);
 });

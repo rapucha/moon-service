@@ -5,6 +5,7 @@ const sourceFixture = JSON.parse(readFileSync(
   new URL("./fixtures/moon-pass-response.json", import.meta.url),
   "utf8"
 ));
+const CALENDAR_FEED_HREF = "/calendars/opportunities.ics?locationId=moon-service-3067696";
 const fixture = tenCandidateFixture(sourceFixture);
 const displayedCandidateIndexes = [5, 0, 6, 1, 7, 2, 8, 3, 9, 4];
 
@@ -30,9 +31,13 @@ test("renders ten ranked candidates as responsive pass groups", async ({ page })
   await expect(page.locator(".summary-count")).toHaveText(
     "5 ranked Moon passes · 10 candidate windows"
   );
-  const atomLink = page.getByRole("link", { name: "Atom feed", exact: true });
-  await expect(atomLink).toHaveCount(1);
-  await expect(atomLink).toHaveAttribute("href", "/feeds/atom?locationId=moon-service-3067696");
+  const feedButtons = page.locator(".share-tools button");
+  const origin = await page.evaluate(() => window.location.origin);
+  await expect(feedButtons).toHaveText(["Copy Atom feed link", "Copy calendar feed link"]);
+  await expect(feedButtons.nth(0)).toHaveAttribute(
+    "data-share-url", origin + "/feeds/atom?locationId=moon-service-3067696");
+  await expect(feedButtons.nth(1)).toHaveAttribute("data-share-url", origin + CALENDAR_FEED_HREF);
+  await expect(page.locator(".share-tools a")).toHaveCount(0);
   await expect(page.locator(".rank-label")).toHaveText([
     "Best match",
     "Option 2",
@@ -121,6 +126,7 @@ function tenCandidateFixture(source) {
 
   return Object.assign({}, source, {
     candidateWindowsEvaluated: 24,
+    links: { calendarFeed: CALENDAR_FEED_HREF },
     opportunities: opportunities
   });
 }

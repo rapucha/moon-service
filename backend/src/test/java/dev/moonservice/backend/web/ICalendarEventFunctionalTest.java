@@ -450,6 +450,8 @@ class ICalendarEventFunctionalTest {
         JsonNode after = MAPPER.readTree(result.getResponse().getContentAsByteArray());
         ((tools.jackson.databind.node.ObjectNode) before.path("opportunities").get(0)).remove("links");
         ((tools.jackson.databind.node.ObjectNode) after.path("opportunities").get(0)).remove("links");
+        ((tools.jackson.databind.node.ObjectNode) before).remove("links");
+        ((tools.jackson.databind.node.ObjectNode) after).remove("links");
         assertEquals(before, after);
         assertNotSame(source.opportunities().get(0).links(),
                 ((OpportunitySearchResponse) OpportunityCalendarLinkAssembler.withCalendarLinks(

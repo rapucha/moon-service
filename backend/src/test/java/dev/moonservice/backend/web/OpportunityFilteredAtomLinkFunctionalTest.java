@@ -131,7 +131,7 @@ class OpportunityFilteredAtomLinkFunctionalTest {
 
         mvc.perform(get("/api/opportunities").queryParam("q", "plain-query"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.links").doesNotExist());
+                .andExpect(jsonPath("$.links.atomWithFilters").doesNotExist());
         mvc.perform(post("/api/opportunities")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
@@ -139,7 +139,7 @@ class OpportunityFilteredAtomLinkFunctionalTest {
                                  "preferences":{"version":1}}
                                 """))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.links").doesNotExist());
+                .andExpect(jsonPath("$.links.atomWithFilters").doesNotExist());
     }
 
     @Test

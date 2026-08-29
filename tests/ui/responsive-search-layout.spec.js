@@ -117,8 +117,6 @@ test("keeps Recent searches accessible without placing it ahead of mobile result
   await expect(page.getByRole("heading", { name: "Lookup notes" })).toHaveCount(0);
   await expect(page.getByRole("link", { name: "NASA: How to Photograph the Moon" }))
     .toBeVisible();
-  await expect(page.getByRole("link", { name: "Open share link" })).toBeVisible();
-
   await recent.getByRole("button", { name: "Clear" }).click();
   await expect(recent).toContainText("No recent searches in this browser.");
 
@@ -140,8 +138,6 @@ test("keeps ambiguous selection and unavailable-result flows", async ({ page }) 
 
   await page.locator(".candidate-list").getByRole("button", { name: /Prague, Czechia/ }).click();
   await expect(page).toHaveURL(/locationId=prague-cz/);
-  await expect(page.getByRole("link", { name: "Open share link" })).toBeVisible();
-
   await page.getByLabel("City or town").fill("Unavailable");
   await page.getByRole("button", { name: "Find", exact: true }).click();
   await expect(page.getByRole("heading", { name: "Lookup temporarily unavailable" })).toBeVisible();

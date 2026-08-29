@@ -15,7 +15,7 @@ const ALTITUDE_PREFERENCES = {
 const UNFILTERED_ATOM_HREF = "/feeds/atom?locationId=moon-service-3067696";
 const FILTERED_ATOM_HREF = "/feeds/atom?opaque=server-owned%2Fdo-not-rebuild";
 const PREFERENCE_WARNING_ID = "preference-link-warning";
-const PREFERENCE_WARNING_TEXT = "This link contains your selected location and photography filters. Anyone with the link can see them, including your preferred observation times and viewing direction (altitude and azimuth). Do not share it if those details are private.";
+const PREFERENCE_WARNING_TEXT = "The Atom feed and calendar links on this page contain your selected location and photography filters. Anyone with one of these links can see that information, including your preferred observation times and viewing direction (altitude and azimuth). Do not share these links if those details are private.";
 
 test("uses balanced GET without storing a weather choice and fits both layouts", async ({ page }) => {
   const calls = await captureApiCalls(page);
@@ -76,8 +76,8 @@ test("loads a saved weather choice and keeps soonest in the POST", async ({ page
   expect(calls[0].body).toEqual({ q: "Prague", weatherRanking: "prefer_clear" });
   await expect(page.getByRole("radio", { name: "Prefer clear skies" })).toBeChecked();
   expect(await storedWeather(page)).toBe("prefer_clear");
-  await expect(page.getByRole("link", { name: "Open share link" }))
-    .toHaveAttribute("href", "/search?q=Prague&order=soonest");
+  await expect(page).toHaveURL("/search?q=Prague&order=soonest");
+  await expectNoOldFilteredAtomLabel(page);
 });
 
 test("removes a stored balanced choice and uses the default", async ({ page }) => {
@@ -191,7 +191,7 @@ test("moves through native weather radios without submitting", async ({ page }) 
   expect(await storedWeather(page)).toBeNull();
 });
 
-test("applies and stores a weather-only choice without changing the share URL", async ({ page }) => {
+test("applies and stores a weather-only choice without changing the browser URL", async ({ page }) => {
   const calls = await captureApiCalls(page);
 
   await page.goto("/search?q=Prague");
@@ -205,8 +205,7 @@ test("applies and stores a weather-only choice without changing the share URL", 
   expect(calls[1].body).toEqual({ q: "Prague", weatherRanking: "prefer_clear" });
   expect(await storedWeather(page)).toBe("prefer_clear");
   await expect(page).toHaveURL("/search?q=Prague");
-  await expect(page.getByRole("link", { name: "Open share link" }))
-    .toHaveAttribute("href", "/search?q=Prague");
+  await expectNoOldFilteredAtomLabel(page);
   await expectPreferenceBearingActions(page, FILTERED_ATOM_HREF);
 });
 
@@ -282,8 +281,8 @@ test("keeps the filtered Atom warning without calendar actions", async ({ page }
   await page.goto("/search?q=Prague");
   await waitForCallCount(calls, 1);
 
-  const atom = page.getByRole("link", { name: "Atom feed", exact: true });
-  await expect(atom).toHaveAttribute("href", FILTERED_ATOM_HREF);
+  const atom = page.getByRole("button", { name: "Copy Atom feed link", exact: true });
+  await expect(atom).toHaveAttribute("data-share-url", await absoluteUrl(page, FILTERED_ATOM_HREF));
   await expect(atom).toHaveAttribute("aria-describedby", PREFERENCE_WARNING_ID);
   await expect(page.locator("#" + PREFERENCE_WARNING_ID)).toHaveText(PREFERENCE_WARNING_TEXT);
   await expect(page.getByRole("link", { name: "Download calendar event" })).toHaveCount(0);
@@ -304,7 +303,9 @@ test("omits the warning when applied metadata has no usable action", async ({ pa
   await page.goto("/search?q=Prague");
   await waitForCallCount(calls, 1);
 
-  await expect(page.getByRole("link", { name: "Atom feed", exact: true })).toHaveCount(0);
+  await expect(page.getByRole(
+    "button", { name: "Copy Atom feed link", exact: true }
+  )).toHaveCount(0);
   await expectNoOldFilteredAtomLabel(page);
   await expect(page.getByRole(
     "link", { name: "Download calendar event", exact: true }
@@ -443,9 +444,9 @@ async function waitForCallCount(calls, count) {
 }
 
 async function expectUnfilteredAtom(page) {
-  const unfiltered = page.getByRole("link", { name: "Atom feed", exact: true });
+  const unfiltered = page.getByRole("button", { name: "Copy Atom feed link", exact: true });
   await expect(unfiltered).toHaveCount(1);
-  await expect(unfiltered).toHaveAttribute("href", UNFILTERED_ATOM_HREF);
+  await expect(unfiltered).toHaveAttribute("data-share-url", await absoluteUrl(page, UNFILTERED_ATOM_HREF));
   await expect(unfiltered).not.toHaveAttribute("aria-describedby", PREFERENCE_WARNING_ID);
   await expectNoOldFilteredAtomLabel(page);
 }
@@ -464,12 +465,12 @@ async function expectPreferenceBearingActions(page, filteredHref) {
     link => link.getAttribute("aria-describedby")
   ))).toEqual(Array(fixture.opportunities.length).fill(PREFERENCE_WARNING_ID));
 
-  const atom = page.getByRole("link", { name: "Atom feed", exact: true });
+  const atom = page.getByRole("button", { name: "Copy Atom feed link", exact: true });
   if (filteredHref === null) {
     await expect(atom).toHaveCount(0);
   } else {
     await expect(atom).toHaveCount(1);
-    await expect(atom).toHaveAttribute("href", filteredHref);
+    await expect(atom).toHaveAttribute("data-share-url", await absoluteUrl(page, filteredHref));
     await expect(atom).toHaveAttribute("aria-describedby", PREFERENCE_WARNING_ID);
     await atom.focus();
     await expect(atom).toBeFocused();
@@ -490,6 +491,13 @@ async function expectNoOldFilteredAtomLabel(page) {
   await expect(page.getByRole(
     "link", { name: "Atom feed with these filters", exact: true }
   )).toHaveCount(0);
+  await expect(page.getByRole("link", { name: "Atom feed", exact: true })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Copy link", exact: true })).toHaveCount(0);
+  await expect(page.getByRole("link", { name: "Open share link", exact: true })).toHaveCount(0);
+}
+
+async function absoluteUrl(page, path) {
+  return page.evaluate(value => window.location.origin + value, path);
 }
 
 async function openPreferences(page) {

@@ -55,8 +55,6 @@ test("keeps Best match canonical and uses keyboard order history without losing 
     ["q", "Prague"],
     ["order", "soonest"]
   ]);
-  await expect(page.getByRole("link", { name: "Open share link" }))
-    .toHaveAttribute("href", "/search?q=Prague&order=soonest");
   await expectSoonestPresentation(page);
 
   await bestMatch.focus();
@@ -105,9 +103,6 @@ test("keeps Soonest in active-preference POST, reset, apply, city, and recent fl
     preferences: ALTITUDE_PREFERENCES
   });
   await expect(page.getByRole("radio", { name: "Soonest" })).toBeChecked();
-  await expect(page.getByRole("link", { name: "Open share link" }))
-    .toHaveAttribute("href", "/search?q=Prague&order=soonest");
-
   await openDetails(page, "#opportunity-preferences");
   const historyLength = await page.evaluate(() => window.history.length);
   await page.getByRole("button", { name: /Reset all/ }).click();
@@ -211,8 +206,6 @@ test("sends explicit Best match once and canonicalizes only after success", asyn
   await expect(page.getByRole("heading", { name: "Prague, Czechia" })).toBeVisible();
   await expect(page).toHaveURL("/search?q=Prague");
   await expect(page.getByRole("radio", { name: "Best match" })).toBeChecked();
-  await expect(page.getByRole("link", { name: "Open share link" }))
-    .toHaveAttribute("href", "/search?q=Prague");
 });
 
 for (const scenario of [
@@ -312,8 +305,6 @@ test("hides order for one Moon pass and keeps its candidates chronological", asy
   ]);
   await expect(page.locator("#opportunity-order")).toBeHidden();
   await expect(page).toHaveURL("/search?q=Prague&order=soonest");
-  await expect(page.getByRole("link", { name: "Open share link" }))
-    .toHaveAttribute("href", "/search?q=Prague&order=soonest");
 });
 
 test("does not group candidates without a shared Moon pass ID", async ({ page }) => {

@@ -22,8 +22,26 @@ final class OpportunityCalendarLinkAssembler {
         if (!(source instanceof OpportunitySearchResponse response)) {
             return source;
         }
-        String query = PublicPreferenceQuery.calendarQuery(
+        String opportunityQuery = PublicPreferenceQuery.calendarQuery(
                 response.location().id(), order, weatherRanking, preferences);
+        OpportunitySearchResponse.Links links = response.links();
+        if ("ok".equals(response.status())
+                && "real_location".equals(response.location().kind())) {
+            boolean hasAppliedPreferences = preferences != null
+                    && response.normalizedActiveFilters() != null
+                    && !response.normalizedActiveFilters().isEmpty();
+            boolean hasAppliedNondefaultWeather = weatherRanking != null
+                    && weatherRanking != ProductWeatherRanking.BALANCED
+                    && weatherRanking.scoringValue().wireValue().equals(response.appliedWeatherRanking());
+            String calendarFeedQuery = PublicPreferenceQuery.calendarQuery(
+                    response.location().id(),
+                    Order.BEST_MATCH,
+                    hasAppliedNondefaultWeather ? weatherRanking : null,
+                    hasAppliedPreferences ? preferences : null);
+            links = new OpportunitySearchResponse.Links(
+                    links == null ? null : links.atomWithFilters(),
+                    "/calendars/opportunities.ics" + calendarFeedQuery);
+        }
         return new OpportunitySearchResponse(
                 response.status(),
                 response.generatedAt(),
@@ -34,7 +52,7 @@ final class OpportunityCalendarLinkAssembler {
                 response.candidateWindowsEvaluated(),
                 response.maxMoonAltitudeDegrees(),
                 response.opportunities().stream()
-                        .map(opportunity -> withCalendarLink(opportunity, query))
+                        .map(opportunity -> withCalendarLink(opportunity, opportunityQuery))
                         .toList(),
                 response.rejected(),
                 response.messages(),
@@ -49,7 +67,7 @@ final class OpportunityCalendarLinkAssembler {
                 response.preferenceImpact(),
                 response.asOf(),
                 response.currentMoon(),
-                response.links());
+                links);
     }
 
     private static OpportunitySearchResponse.Opportunity withCalendarLink(
