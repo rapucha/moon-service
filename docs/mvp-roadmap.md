@@ -17,11 +17,13 @@ preference and weather contract to Atom. Issues
 discovery for those backend links. Backend subscribable-calendar issue
 [#304](https://github.com/rapucha/moon-service/issues/304) delivered and
 deployed the public subscription route. Browser copy issue
-[#305](https://github.com/rapucha/moon-service/issues/305) delivers the root
+[#305](https://github.com/rapucha/moon-service/issues/305) delivered the root
 calendar-feed link and matching `Copy Atom feed link` and `Copy calendar feed
-link` buttons. Both remain under tracking parent
-[#16](https://github.com/rapucha/moon-service/issues/16). Calibration under
-#33 remains a longer project.
+link` buttons. This completed the accepted feed and calendar-export work under
+the now-closed tracking parent
+[#16](https://github.com/rapucha/moon-service/issues/16). Issue
+[#292](https://github.com/rapucha/moon-service/issues/292) delivered the
+thin-Moon eye-safety warning. Calibration under #33 remains a longer project.
 
 ## Phase 0: Planning Baseline
 
@@ -104,9 +106,8 @@ Exit criteria:
 
 Status: in progress. The anonymous lookup loop, location-only and filtered Atom
 backend, individual `.ics` backend export, and deployed subscribable-calendar
-route are implemented. Empirical ranking validation remains. Issue #305's
-scope delivers the backend calendar-feed link and two matching feed-copy
-buttons.
+route are implemented. Empirical ranking validation remains. Issue #305
+delivered the backend calendar-feed link and two matching feed-copy buttons.
 
 Goal: make the simplest useful public loop work.
 
@@ -124,7 +125,7 @@ Tasks:
 - Provide the stateless preference-aware individual `.ics` backend export in
   #294 and expose every usable ordinary product link through #295.
 - Use the deployed stateless preference-aware rolling `.ics` feed for canonical
-  real locations from #304. Issue #305 delivers its root backend link and HTTPS
+  real locations from #304. Issue #305 delivered its root backend link and HTTPS
   `Copy calendar feed link` button beside the matching Atom copy button. Do not
   add `webcal:` or `webcals:` launchers.
 
@@ -175,8 +176,6 @@ than only in this roadmap:
 
 - [#33](https://github.com/rapucha/moon-service/issues/33): empirically
   calibrate scoring with photographer judgments and real observations.
-- [#16](https://github.com/rapucha/moon-service/issues/16): add public feeds
-  and iCalendar exports for real opportunities.
 
 Open supporting follow-ups:
 
@@ -247,7 +246,7 @@ stateless preference-aware individual `.ics` route and #296 delivered the
 preference-filtered Atom route and complete product links. Issues #295 and #297
 delivered the browser actions and their shared privacy disclosure. Issue #304
 delivered and deployed the stateless subscribable-calendar backend. Issue #305
-delivers its backend response link and the matching Atom and calendar feed-copy
+delivered its backend response link and the matching Atom and calendar feed-copy
 buttons.
 
 The completed foundations are:
@@ -290,15 +289,15 @@ If it supports no behavior change, record provisional acceptance, calibration
 gaps, and remaining uncertainty before closing #33. The parent remains open
 through collection and corpus curation.
 
-Public feed and calendar-export work remains tracked under
-[#16](https://github.com/rapucha/moon-service/issues/16). Issue #289 delivered
-the location-only Atom feed. Issue #294 delivered the stateless
+The accepted public feed and calendar-export work was completed under the
+now-closed [#16](https://github.com/rapucha/moon-service/issues/16). Issue #289
+delivered the location-only Atom feed. Issue #294 delivered the stateless
 preference-aware individual `.ics` route, and #296 delivered preference-filtered
 Atom while keeping the location-only contract. Issues #295 and #297 delivered
 browser discovery for those preference-bearing backend links without changing
 the location-only feed. Issue #304 delivered and deployed the subscribable
-calendar route. Issue #305 delivers root-link and HTTPS feed-copy discovery.
-RSS remains later. The
+calendar route. Issue #305 delivered root-link and HTTPS feed-copy discovery.
+RSS remains later and was not part of #16's accepted completion. The
 JitPack dependency decision and safeguards required before
 public deployment are recorded in
 [#17](https://github.com/rapucha/moon-service/issues/17).
