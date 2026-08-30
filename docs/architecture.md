@@ -220,8 +220,8 @@ The stable rules are:
 Some current source structure is transitional:
 
 - Location and weather cache implementations depend on observability-owned
-  cache-metric types, while observability decorators depend back on location
-  and weather types.
+  cache-metric types. The location resolver still has an observability
+  decorator that depends back on location types.
 - `backend.opportunity` depends on DTOs and ports in
   `backend.opportunity.search`, while that package still imports an exception
   from `backend.opportunity`.
