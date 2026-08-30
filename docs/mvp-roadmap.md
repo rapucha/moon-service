@@ -185,9 +185,6 @@ Open supporting follow-ups:
   context for future interests and recurring events.
 - [#5](https://github.com/rapucha/moon-service/issues/5): decouple controller
   tests from provider identity details.
-- [#109](https://github.com/rapucha/moon-service/issues/109): documented the
-  later Expo iOS/Android companion strategy. It coexists with the first-class
-  web app.
 
 Completed MVP foundations include:
 
@@ -217,6 +214,9 @@ Completed MVP foundations include:
   observability.
 - [#87](https://github.com/rapucha/moon-service/issues/87): return up to ten
   anonymous ranked candidates while scoring remains uncalibrated.
+- [#109](https://github.com/rapucha/moon-service/issues/109): documented the
+  later Expo iOS/Android companion strategy. It coexists with the first-class
+  web app.
 
 ## Deferred Features
 
@@ -259,19 +259,20 @@ The completed foundations are:
 3. [#164](https://github.com/rapucha/moon-service/issues/164) added the optional
    bounded PostgreSQL repository, migrations, idempotent storage outcomes, and
    database isolation.
+4. [#165](https://github.com/rapucha/moon-service/issues/165) delivered the
+   bounded calibration capability and submission APIs.
 
-The remaining delivery order is:
+The already-reconciled
+[#168](https://github.com/rapucha/moon-service/issues/168) loaded-opportunity
+browser form remains open, but the owner deferred implementation.
 
-1. Complete [#165](https://github.com/rapucha/moon-service/issues/165) with the
-   capability and submission API, exact validation and digest behavior,
-   admission, stable errors, and the logging boundary.
-2. Reconcile [#168](https://github.com/rapucha/moon-service/issues/168) with the
-   reduced contract before implementing the loaded-opportunity browser form.
-3. [#170](https://github.com/rapucha/moon-service/issues/170) may independently
+The remaining calibration delivery order is:
+
+1. [#170](https://github.com/rapucha/moon-service/issues/170) may independently
    provision private PostgreSQL on NFS.
-4. After #165 and #170, create a reviewed issue to connect the application to
+2. After #170, create a reviewed issue to connect the application to
    PostgreSQL without making lookup, liveness, or readiness depend on it.
-5. Reconcile [#171](https://github.com/rapucha/moon-service/issues/171) with the
+3. Reconcile [#171](https://github.com/rapucha/moon-service/issues/171) with the
    reduced stored fields before implementing host-only operator statistics,
    deterministic export, and confirmed deletion.
 
