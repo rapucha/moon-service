@@ -30,12 +30,12 @@ class CachingWeatherForecastProviderTest {
     private static final WeatherForecast CLOUDY_FORECAST = instant -> weather(instant, 80);
 
     @Test
-    void cachesAvailableForecastsByProviderRequestShape() {
+    void cachesAvailableForecastsByLocationAndRange() {
         CountingProvider delegate = new CountingProvider(CLEAR_FORECAST);
         CachingWeatherForecastProvider provider = provider(delegate, new FakeTicker());
 
-        WeatherForecast first = provider.forecastFor(amsterdam(), STARTS_AT, ENDS_AT, 7);
-        WeatherForecast second = provider.forecastFor(amsterdamWithExtraCoordinatePrecision(), SAME_START_HOUR, ENDS_AT, 7);
+        WeatherForecast first = provider.forecastFor(amsterdam(), STARTS_AT, ENDS_AT);
+        WeatherForecast second = provider.forecastFor(amsterdamWithExtraCoordinatePrecision(), SAME_START_HOUR, ENDS_AT);
 
         assertEquals(20, first.weatherAt(STARTS_AT).cloudCoverPercent());
         assertEquals(20, second.weatherAt(SAME_START_HOUR).cloudCoverPercent());
@@ -50,8 +50,8 @@ class CachingWeatherForecastProviderTest {
         assertEquals("weather", provider.cacheName());
         assertEquals(0, provider.cacheMetrics().requestCount());
 
-        provider.forecastFor(amsterdam(), STARTS_AT, ENDS_AT, 7);
-        provider.forecastFor(amsterdam(), STARTS_AT, ENDS_AT, 7);
+        provider.forecastFor(amsterdam(), STARTS_AT, ENDS_AT);
+        provider.forecastFor(amsterdam(), STARTS_AT, ENDS_AT);
 
         CacheMetricsSnapshot metrics = provider.cacheMetrics();
         assertEquals(2, metrics.requestCount());
@@ -71,15 +71,15 @@ class CachingWeatherForecastProviderTest {
 
         assertThrows(
                 WeatherForecastUnavailableException.class,
-                () -> provider.forecastFor(amsterdam(), STARTS_AT, ENDS_AT, 7));
+                () -> provider.forecastFor(amsterdam(), STARTS_AT, ENDS_AT));
         assertThrows(
                 WeatherForecastUnavailableException.class,
-                () -> provider.forecastFor(amsterdam(), STARTS_AT, ENDS_AT, 7));
+                () -> provider.forecastFor(amsterdam(), STARTS_AT, ENDS_AT));
         assertEquals(1, delegate.calls());
 
         ticker.advance(Duration.ofSeconds(31));
 
-        WeatherForecast forecast = provider.forecastFor(amsterdam(), STARTS_AT, ENDS_AT, 7);
+        WeatherForecast forecast = provider.forecastFor(amsterdam(), STARTS_AT, ENDS_AT);
         assertEquals(80, forecast.weatherAt(STARTS_AT).cloudCoverPercent());
         assertEquals(2, delegate.calls());
     }
@@ -90,11 +90,11 @@ class CachingWeatherForecastProviderTest {
         CountingProvider delegate = new CountingProvider(CLEAR_FORECAST);
         CachingWeatherForecastProvider provider = provider(delegate, ticker);
 
-        provider.forecastFor(amsterdam(), STARTS_AT, ENDS_AT, 7);
+        provider.forecastFor(amsterdam(), STARTS_AT, ENDS_AT);
 
         ticker.advance(Duration.ofSeconds(31));
 
-        provider.forecastFor(amsterdam(), STARTS_AT, ENDS_AT, 7);
+        provider.forecastFor(amsterdam(), STARTS_AT, ENDS_AT);
         assertEquals(1, delegate.calls());
     }
 
@@ -106,7 +106,7 @@ class CachingWeatherForecastProviderTest {
 
         try (ExecutorService executor = Executors.newFixedThreadPool(callers)) {
             List<Future<WeatherForecast>> futures = java.util.stream.IntStream.range(0, callers)
-                    .mapToObj(index -> executor.submit(() -> provider.forecastFor(amsterdam(), STARTS_AT, ENDS_AT, 7)))
+                    .mapToObj(index -> executor.submit(() -> provider.forecastFor(amsterdam(), STARTS_AT, ENDS_AT)))
                     .toList();
 
             assertTrue(delegate.awaitFirstCall(), "Delegate was not called.");
@@ -179,8 +179,7 @@ class CachingWeatherForecastProviderTest {
         public WeatherForecast forecastFor(
                 ResolvedLocation location,
                 Instant startsAt,
-                Instant endsAt,
-                int forecastHorizonDays
+                Instant endsAt
         ) {
             calls.incrementAndGet();
             return forecast;
@@ -203,8 +202,7 @@ class CachingWeatherForecastProviderTest {
         public WeatherForecast forecastFor(
                 ResolvedLocation location,
                 Instant startsAt,
-                Instant endsAt,
-                int forecastHorizonDays
+                Instant endsAt
         ) {
             int index = calls.getAndIncrement();
             Object result = results.get(Math.min(index, results.size() - 1));
@@ -233,8 +231,7 @@ class CachingWeatherForecastProviderTest {
         public WeatherForecast forecastFor(
                 ResolvedLocation location,
                 Instant startsAt,
-                Instant endsAt,
-                int forecastHorizonDays
+                Instant endsAt
         ) {
             calls.incrementAndGet();
             firstCall.countDown();

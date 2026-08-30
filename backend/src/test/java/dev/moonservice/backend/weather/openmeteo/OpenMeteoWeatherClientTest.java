@@ -81,8 +81,7 @@ class OpenMeteoWeatherClientTest {
         WeatherForecast forecast = client.forecastFor(
                 amsterdam(),
                 Instant.parse("2026-06-29T00:00:00Z"),
-                Instant.parse("2026-06-29T02:00:00Z"),
-                7);
+                Instant.parse("2026-06-29T02:00:00Z"));
 
         HourlyWeather firstHour = forecast.weatherAt(Instant.parse("2026-06-29T00:30:00Z"));
         HourlyWeather secondHour = forecast.weatherAt(Instant.parse("2026-06-29T01:30:00Z"));
@@ -113,8 +112,7 @@ class OpenMeteoWeatherClientTest {
                 () -> client.forecastFor(
                         amsterdam(),
                         Instant.parse("2026-06-29T00:00:00Z"),
-                        Instant.parse("2026-06-30T00:00:00Z"),
-                        7));
+                        Instant.parse("2026-06-30T00:00:00Z")));
     }
 
     @Test
@@ -140,8 +138,7 @@ class OpenMeteoWeatherClientTest {
                 () -> client.forecastFor(
                         amsterdam(),
                         Instant.parse("2026-06-29T00:00:00Z"),
-                        Instant.parse("2026-06-30T00:00:00Z"),
-                        7));
+                        Instant.parse("2026-06-30T00:00:00Z")));
     }
 
     @Test
@@ -153,8 +150,7 @@ class OpenMeteoWeatherClientTest {
                 () -> client.forecastFor(
                         amsterdam(),
                         Instant.parse("2026-06-29T00:00:00Z"),
-                        Instant.parse("2026-06-30T00:00:00Z"),
-                        7));
+                        Instant.parse("2026-06-30T00:00:00Z")));
     }
 
     @Test
@@ -167,8 +163,7 @@ class OpenMeteoWeatherClientTest {
                 () -> client.forecastFor(
                         amsterdam(),
                         Instant.parse("2026-06-29T00:00:00Z"),
-                        Instant.parse("2026-06-30T00:00:00Z"),
-                        7));
+                        Instant.parse("2026-06-30T00:00:00Z")));
     }
 
     @Test
@@ -181,8 +176,7 @@ class OpenMeteoWeatherClientTest {
         WeatherForecast forecast = client.forecastFor(
                 amsterdam(),
                 Instant.parse("2026-06-29T00:00:00Z"),
-                Instant.parse("2026-06-29T02:00:00Z"),
-                7);
+                Instant.parse("2026-06-29T02:00:00Z"));
 
         assertEquals(22, forecast.weatherAt(Instant.parse("2026-06-29T00:30:00Z")).cloudCoverPercent());
         assertEquals(2, transport.calls());
@@ -200,8 +194,7 @@ class OpenMeteoWeatherClientTest {
         WeatherForecast forecast = client.forecastFor(
                 amsterdam(),
                 Instant.parse("2026-06-29T00:00:00Z"),
-                Instant.parse("2026-06-29T02:00:00Z"),
-                7);
+                Instant.parse("2026-06-29T02:00:00Z"));
 
         assertEquals(22, forecast.weatherAt(Instant.parse("2026-06-29T00:30:00Z")).cloudCoverPercent());
         assertEquals(2, transport.calls());
@@ -220,8 +213,7 @@ class OpenMeteoWeatherClientTest {
                 () -> client.forecastFor(
                         amsterdam(),
                         Instant.parse("2026-06-29T00:00:00Z"),
-                        Instant.parse("2026-06-29T02:00:00Z"),
-                        7));
+                        Instant.parse("2026-06-29T02:00:00Z")));
         assertEquals(1, transport.calls());
     }
 
@@ -236,8 +228,7 @@ class OpenMeteoWeatherClientTest {
                 () -> client.forecastFor(
                         amsterdam(),
                         Instant.parse("2026-06-29T00:00:00Z"),
-                        Instant.parse("2026-06-29T02:00:00Z"),
-                        7));
+                        Instant.parse("2026-06-29T02:00:00Z")));
         assertEquals(1, transport.calls());
     }
 

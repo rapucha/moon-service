@@ -50,18 +50,18 @@ class OpenMeteoObservabilityTest {
     void recordsWeatherOutcomes() {
         OpenMeteoObservability observability = openMeteoObservability();
         ObservedWeatherForecastProvider availableProvider = new ObservedWeatherForecastProvider(
-                (location, startsAt, endsAt, forecastHorizonDays) -> instant -> weather(instant),
+                (location, startsAt, endsAt) -> instant -> weather(instant),
                 observability.weather());
         ObservedWeatherForecastProvider unavailableProvider = new ObservedWeatherForecastProvider(
-                (location, startsAt, endsAt, forecastHorizonDays) -> {
+                (location, startsAt, endsAt) -> {
                     throw new WeatherForecastUnavailableException("Weather lookup is temporarily unavailable.");
                 },
                 observability.weather());
 
-        availableProvider.forecastFor(location(), Instant.EPOCH, Instant.EPOCH.plusSeconds(3600), 1);
+        availableProvider.forecastFor(location(), Instant.EPOCH, Instant.EPOCH.plusSeconds(3600));
         assertThrows(
                 WeatherForecastUnavailableException.class,
-                () -> unavailableProvider.forecastFor(location(), Instant.EPOCH, Instant.EPOCH.plusSeconds(3600), 1));
+                () -> unavailableProvider.forecastFor(location(), Instant.EPOCH, Instant.EPOCH.plusSeconds(3600)));
 
         OpenMeteoObservability.WeatherSnapshot snapshot = observability.weatherSnapshot();
         assertEquals(2, snapshot.calls());

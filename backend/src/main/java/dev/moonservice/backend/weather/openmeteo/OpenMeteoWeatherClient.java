@@ -62,8 +62,7 @@ public class OpenMeteoWeatherClient implements WeatherForecastProvider {
     public WeatherForecast forecastFor(
             ResolvedLocation location,
             Instant startsAt,
-            Instant endsAt,
-            int forecastHorizonDays
+            Instant endsAt
     ) {
         String body;
         try {

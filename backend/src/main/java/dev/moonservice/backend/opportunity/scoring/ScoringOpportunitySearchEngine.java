@@ -90,8 +90,7 @@ public class ScoringOpportunitySearchEngine implements OpportunitySearchEngine {
             WeatherForecast forecast = weatherForecastProvider.forecastFor(
                     location,
                     config.start(),
-                    config.end(),
-                    request.forecastHorizonDays());
+                    config.end());
             OpportunityService.PreferenceEvaluation evaluation = switch (request.order()) {
                 case BEST_MATCH -> opportunityService.evaluate(
                         config,
@@ -133,8 +132,7 @@ public class ScoringOpportunitySearchEngine implements OpportunitySearchEngine {
             WeatherForecast forecast = weatherForecastProvider.forecastFor(
                     location,
                     config.start(),
-                    config.end(),
-                    request.forecastHorizonDays());
+                    config.end());
             PrototypeResult result = opportunityService.evaluate(
                     config,
                     window -> forecast.weatherAt(window.suggested().instant()).toWeatherFixture(),

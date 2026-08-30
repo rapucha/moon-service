@@ -15,9 +15,9 @@ import java.util.Objects;
 
 /**
  * Process-local cache for provider-backed weather forecasts. Keys mirror the
- * upstream request shape: rounded coordinates, elevation, UTC forecast hours,
- * and forecast horizon; Caffeine coalesces concurrent identical misses into one
- * upstream weather call.
+ * upstream request shape: rounded coordinates, elevation, and UTC forecast
+ * hours; Caffeine coalesces concurrent identical misses into one upstream
+ * weather call.
  */
 public final class CachingWeatherForecastProvider implements WeatherForecastProvider, CacheMetricsSource {
     private final WeatherForecastProvider delegate;
@@ -59,22 +59,20 @@ public final class CachingWeatherForecastProvider implements WeatherForecastProv
     public WeatherForecast forecastFor(
             ResolvedLocation location,
             Instant startsAt,
-            Instant endsAt,
-            int forecastHorizonDays
+            Instant endsAt
     ) {
-        ForecastKey key = ForecastKey.from(location, startsAt, endsAt, forecastHorizonDays);
-        return cache.get(key, ignored -> lookup(location, startsAt, endsAt, forecastHorizonDays))
+        ForecastKey key = ForecastKey.from(location, startsAt, endsAt);
+        return cache.get(key, ignored -> lookup(location, startsAt, endsAt))
                 .forecastOrThrow();
     }
 
     private ForecastLookup lookup(
             ResolvedLocation location,
             Instant startsAt,
-            Instant endsAt,
-            int forecastHorizonDays
+            Instant endsAt
     ) {
         try {
-            return ForecastLookup.available(delegate.forecastFor(location, startsAt, endsAt, forecastHorizonDays));
+            return ForecastLookup.available(delegate.forecastFor(location, startsAt, endsAt));
         } catch (WeatherForecastUnavailableException ex) {
             return ForecastLookup.unavailable(ex);
         }
@@ -110,14 +108,12 @@ public final class CachingWeatherForecastProvider implements WeatherForecastProv
             long longitudeTenThousandths,
             int elevationMeters,
             Instant startHour,
-            Instant endHour,
-            int forecastHorizonDays
+            Instant endHour
     ) {
         static ForecastKey from(
                 ResolvedLocation location,
                 Instant startsAt,
-                Instant endsAt,
-                int forecastHorizonDays
+                Instant endsAt
         ) {
             Objects.requireNonNull(location, "location");
             Objects.requireNonNull(startsAt, "startsAt");
@@ -127,8 +123,7 @@ public final class CachingWeatherForecastProvider implements WeatherForecastProv
                     coordinateKey(location.longitude()),
                     location.elevationMeters(),
                     startsAt.truncatedTo(ChronoUnit.HOURS),
-                    endsAt.minusSeconds(1).truncatedTo(ChronoUnit.HOURS),
-                    forecastHorizonDays);
+                    endsAt.minusSeconds(1).truncatedTo(ChronoUnit.HOURS));
         }
 
         private static long coordinateKey(double value) {

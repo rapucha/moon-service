@@ -8,7 +8,6 @@ public interface WeatherForecastProvider {
     WeatherForecast forecastFor(
             ResolvedLocation location,
             Instant startsAt,
-            Instant endsAt,
-            int forecastHorizonDays
+            Instant endsAt
     );
 }
