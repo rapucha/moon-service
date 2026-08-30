@@ -622,7 +622,8 @@ test("uses opportunity Moon facts for recommendations whose point phase is missi
   const bestAt = response.opportunities[0].moonPath.suggested.at;
   const alternativeAt = response.opportunities[1].moonPath.suggested.at;
   const imageUrls = await card.evaluate(async (node, input) => {
-    const { moonPhaseImageDataUrl } = await import("/moonPhaseView.js");
+    const modulePath = "/moonPhaseView.js";
+    const { moonPhaseImageDataUrl } = await import(modulePath);
     const markerUrl = at => node.querySelector(`.moon-sample-marker[data-at='${at}'] .moon-sample-marker-image`)
       ?.getAttribute("href");
     return {
