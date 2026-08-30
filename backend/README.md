@@ -705,7 +705,7 @@ connect/read timeout is 3 seconds.
 
 Runtime Open-Meteo weather lookup is wrapped in an in-memory Caffeine cache.
 The cache key matches the provider request shape: coordinates rounded to 4
-decimal places, elevation, UTC start/end forecast hours, and forecast horizon.
+decimal places, elevation, and UTC start/end forecast hours.
 Successful forecasts are cached for 1 hour, and temporarily-unavailable weather
 lookups are cached for 30 seconds. Concurrent identical cache misses share one
 upstream weather call inside the process.

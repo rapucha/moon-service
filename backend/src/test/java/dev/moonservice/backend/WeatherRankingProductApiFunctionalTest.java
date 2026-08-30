@@ -31,7 +31,6 @@ import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.Mockito.clearInvocations;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.reset;
@@ -126,7 +125,7 @@ class WeatherRankingProductApiFunctionalTest {
         assertEquals("balanced", explicit.path("appliedWeatherRanking").asString());
         assertEquals(get, omitted);
         assertEquals(omitted, withoutAppliedWeatherRanking(explicit));
-        verify(weatherForecastProvider, times(3)).forecastFor(any(), any(), any(), anyInt());
+        verify(weatherForecastProvider, times(3)).forecastFor(any(), any(), any());
     }
 
     @Test
@@ -159,7 +158,7 @@ class WeatherRankingProductApiFunctionalTest {
                     List.of("weatherFit", "forecastConfidence"),
                     textValues(opportunity.at("/scoreBasis/excludedComponents")));
         }
-        verify(weatherForecastProvider, times(3)).forecastFor(any(), any(), any(), anyInt());
+        verify(weatherForecastProvider, times(3)).forecastFor(any(), any(), any());
     }
 
     @Test
@@ -192,7 +191,7 @@ class WeatherRankingProductApiFunctionalTest {
         assertNotEquals(
                 balanced.at("/opportunities/0/components"),
                 ignoreWeather.at("/opportunities/0/components"));
-        verify(weatherForecastProvider, times(2)).forecastFor(any(), any(), any(), anyInt());
+        verify(weatherForecastProvider, times(2)).forecastFor(any(), any(), any());
     }
 
     @Test
@@ -212,14 +211,14 @@ class WeatherRankingProductApiFunctionalTest {
 
         doThrow(new WeatherForecastUnavailableException("Weather provider failed."))
                 .when(weatherForecastProvider)
-                .forecastFor(any(), any(), any(), anyInt());
+                .forecastFor(any(), any(), any());
         JsonNode unavailable = productPostUnavailable("""
                 {"q":"Prague","weatherRanking":"ignore_weather"}
                 """);
 
         assertEquals("temporarily_unavailable", unavailable.path("status").asString());
         assertFalse(unavailable.has("appliedWeatherRanking"));
-        verify(weatherForecastProvider).forecastFor(any(), any(), any(), anyInt());
+        verify(weatherForecastProvider).forecastFor(any(), any(), any());
     }
 
     @Test

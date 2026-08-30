@@ -90,8 +90,7 @@ class PreferenceImpactFunctionalTest {
         verify(weatherForecastProvider, times(1)).forecastFor(
                 any(),
                 eq(Instant.parse("2026-06-28T22:00:00Z")),
-                eq(Instant.parse("2026-07-05T22:00:00Z")),
-                eq(7));
+                eq(Instant.parse("2026-07-05T22:00:00Z")));
     }
 
     @Test

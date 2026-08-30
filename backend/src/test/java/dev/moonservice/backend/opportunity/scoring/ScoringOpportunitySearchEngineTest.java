@@ -160,10 +160,12 @@ class ScoringOpportunitySearchEngineTest {
     @Test
     void scoresResolvedLocationWithWeatherForecastProviderData() {
         AtomicReference<ResolvedLocation> requestedLocation = new AtomicReference<>();
-        AtomicReference<Integer> requestedForecastHorizonDays = new AtomicReference<>();
-        WeatherForecastProvider provider = (location, startsAt, endsAt, forecastHorizonDays) -> {
+        AtomicReference<Instant> requestedStartsAt = new AtomicReference<>();
+        AtomicReference<Instant> requestedEndsAt = new AtomicReference<>();
+        WeatherForecastProvider provider = (location, startsAt, endsAt) -> {
             requestedLocation.set(location);
-            requestedForecastHorizonDays.set(forecastHorizonDays);
+            requestedStartsAt.set(startsAt);
+            requestedEndsAt.set(endsAt);
             HourlyWeather weather = new HourlyWeather(
                     startsAt,
                     82,
@@ -188,7 +190,8 @@ class ScoringOpportunitySearchEngineTest {
 
         OpportunitySearchResponse.Weather weather = response.opportunities().getFirst().weather();
         assertEquals(amsterdam(), requestedLocation.get());
-        assertEquals(7, requestedForecastHorizonDays.get());
+        assertEquals(Instant.parse("2026-06-28T22:00:00Z"), requestedStartsAt.get());
+        assertEquals(Instant.parse("2026-07-05T22:00:00Z"), requestedEndsAt.get());
         assertEquals(82, weather.cloudCoverMeanPercent());
         assertEquals(70, weather.lowCloudCoverMaxPercent());
         assertEquals(35, weather.precipitationProbabilityMaxPercent());
@@ -201,7 +204,7 @@ class ScoringOpportunitySearchEngineTest {
     @Test
     void liveSearchKeepsOngoingMoonPassWindowAndScoresRemainingSuggestion() {
         Instant notBefore = Instant.parse("2026-06-29T01:30:00Z");
-        WeatherForecastProvider provider = (location, startsAt, endsAt, forecastHorizonDays) -> instant -> {
+        WeatherForecastProvider provider = (location, startsAt, endsAt) -> instant -> {
             if (instant.isBefore(notBefore)) {
                 return new HourlyWeather(instant, 100, 100, 100, 100, 90, 3.0, 8000, 61, 2.0);
             }
@@ -514,14 +517,14 @@ class ScoringOpportunitySearchEngineTest {
     }
 
     private static ScoringOpportunitySearchEngine engineWithPartlyCloudyWeather() {
-        return new ScoringOpportunitySearchEngine(new PreviewEvaluator(), (location, startsAt, endsAt, days) -> {
+        return new ScoringOpportunitySearchEngine(new PreviewEvaluator(), (location, startsAt, endsAt) -> {
             HourlyWeather weather = toHourlyWeather(startsAt, WeatherFixture.PRAGUE_PARTLY_CLOUDY);
             return instant -> weather;
         });
     }
 
     private static ScoringOpportunitySearchEngine engineWithUnusedWeather() {
-        return new ScoringOpportunitySearchEngine(new PreviewEvaluator(), (location, startsAt, endsAt, days) -> {
+        return new ScoringOpportunitySearchEngine(new PreviewEvaluator(), (location, startsAt, endsAt) -> {
             throw new AssertionError("Weather provider should not be called by this test.");
         });
     }

@@ -29,8 +29,7 @@ public final class TestWeatherForecastProvider implements WeatherForecastProvide
     public WeatherForecast forecastFor(
             ResolvedLocation location,
             Instant startsAt,
-            Instant endsAt,
-            int forecastHorizonDays
+            Instant endsAt
     ) {
         return instant -> weather;
     }

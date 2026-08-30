@@ -5,7 +5,6 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.clearInvocations;
 import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.verify;
@@ -530,7 +529,7 @@ class OpportunitySearchFunctionalTest {
                 "ignored_preference_fields preferenceVersion=1 count=24 truncated=true"));
         assertFalse(output.getOut().contains("private-marker"));
         verify(locationResolver).resolve(new LocationQuery("Prague"));
-        verify(weatherForecastProvider).forecastFor(any(), any(), any(), eq(7));
+        verify(weatherForecastProvider).forecastFor(any(), any(), any());
     }
 
     @Test

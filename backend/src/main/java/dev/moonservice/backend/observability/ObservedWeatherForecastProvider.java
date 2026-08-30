@@ -24,12 +24,11 @@ public final class ObservedWeatherForecastProvider implements WeatherForecastPro
     public WeatherForecast forecastFor(
             ResolvedLocation location,
             Instant startsAt,
-            Instant endsAt,
-            int forecastHorizonDays
+            Instant endsAt
     ) {
         long started = System.nanoTime();
         try {
-            WeatherForecast forecast = delegate.forecastFor(location, startsAt, endsAt, forecastHorizonDays);
+            WeatherForecast forecast = delegate.forecastFor(location, startsAt, endsAt);
             metrics.recordWeatherAvailable(elapsedNanos(started));
             return forecast;
         } catch (WeatherForecastUnavailableException ex) {
