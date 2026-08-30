@@ -62,13 +62,15 @@ class AtomEntryPreviewRendererTest {
         assertOverlay(AtomEntryPreviewRenderer.WeatherOverlay.CLOUDY, "mostly_cloudy", 0);
         assertOverlay(AtomEntryPreviewRenderer.WeatherOverlay.CLOUDY, "overcast", 0);
         assertOverlay(AtomEntryPreviewRenderer.WeatherOverlay.FOG, "poor_visibility", 0);
-        assertOverlay(AtomEntryPreviewRenderer.WeatherOverlay.MIXED, "mixed", 0);
+        assertOverlay(AtomEntryPreviewRenderer.WeatherOverlay.MIXED, "unknown_conditions", 4);
         assertOverlay(AtomEntryPreviewRenderer.WeatherOverlay.RAIN, "precipitation_risk", 61);
         assertOverlay(AtomEntryPreviewRenderer.WeatherOverlay.SNOW, "precipitation_risk", 71);
         assertOverlay(AtomEntryPreviewRenderer.WeatherOverlay.STORM, "precipitation_risk", 95);
         assertOverlay(AtomEntryPreviewRenderer.WeatherOverlay.MIXED, "precipitation_risk", 50);
         assertThrows(IllegalArgumentException.class,
                 () -> AtomEntryPreviewRenderer.WeatherOverlay.from(weather("precipitation_risk", 0)));
+        assertThrows(IllegalArgumentException.class,
+                () -> AtomEntryPreviewRenderer.WeatherOverlay.from(weather("mixed", 0)));
         assertThrows(IllegalArgumentException.class,
                 () -> AtomEntryPreviewRenderer.WeatherOverlay.from(weather("unsupported", 0)));
 

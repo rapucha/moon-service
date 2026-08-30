@@ -435,7 +435,7 @@ final class AtomEntryPreviewRenderer {
                 case "partly_cloudy", "mostly_cloudy", "overcast" -> CLOUDY;
                 case "poor_visibility" -> FOG;
                 case "precipitation_risk" -> precipitation(weather.weatherCode());
-                case "mixed" -> MIXED;
+                case "unknown_conditions" -> MIXED;
                 default -> throw new IllegalArgumentException(
                         "Unknown weather segment kind: " + weather.segmentKind());
             };

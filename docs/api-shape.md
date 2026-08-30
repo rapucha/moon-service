@@ -2291,14 +2291,17 @@ separate icon. The existing `weather.segmentKind` selects the broad overlay:
 - `partly_cloudy`, `mostly_cloudy`, or `overcast`: several soft cloud masses
   that clearly obscure part of the Moon;
 - `poor_visibility`: soft horizontal fog layers;
-- `mixed`: clouds and a few low rain strokes; and
+- `unknown_conditions`: reuse the generic mixed artwork of clouds and a few
+  low rain strokes; and
 - `precipitation_risk`: use the backend's shared WMO classification to choose
   the precipitation overlay.
 
 For `precipitation_risk`, `ScoringModel.weatherCodeKind(int)` provides the
 shared classification. Its rain, snow, and storm kinds select the matching
-artwork. `OTHER_PRECIPITATION` selects the mixed overlay. A non-precipitation
-kind paired with `precipitation_risk` is an internal error.
+artwork. `OTHER_PRECIPITATION` selects the mixed overlay, while
+`unknown_conditions` selects that generic artwork directly. The renderer does
+not accept `mixed` as a compatibility alias. A non-precipitation kind paired
+with `precipitation_risk` is an internal error.
 
 Rain and storm strokes stay in the Moon's lowest third. The texture remains
 visible enough for the scene to read as a Moon opportunity. The renderer does

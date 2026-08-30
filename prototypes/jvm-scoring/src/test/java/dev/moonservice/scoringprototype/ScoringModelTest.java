@@ -170,15 +170,21 @@ class ScoringModelTest {
         assertWeatherSegment("precipitation_risk", 50, 100, 1000);
         assertWeatherSegment("poor_visibility", 45, 100, 20000);
         assertWeatherSegment("poor_visibility", 0, 100, 4999);
+        assertWeatherSegment("poor_visibility", 49, 0, 4999);
         assertWeatherSegment("overcast", 3, 0, 20000);
         assertWeatherSegment("overcast", 0, 85, 20000);
+        assertWeatherSegment("overcast", 49, 85, 20000);
         assertWeatherSegment("mostly_cloudy", 0, 65, 20000);
         assertWeatherSegment("partly_cloudy", 2, 0, 20000);
         assertWeatherSegment("partly_cloudy", 0, 25, 20000);
         assertWeatherSegment("mostly_clear", 1, 0, 20000);
         assertWeatherSegment("mostly_clear", 0, 10, 20000);
         assertWeatherSegment("clear", 0, 0, 20000);
-        assertWeatherSegment("mixed", 49, 0, 20000);
+        assertWeatherSegment("unknown_conditions", 49, 0, 20000);
+
+        WeatherFixture unknownWeather = new WeatherFixture(
+                0, 0, 0, 0, 0, 0.0, 20000, 49, 1.0);
+        assertEquals("unknown conditions", ScoringModel.weatherSummary(unknownWeather));
     }
 
     @Test

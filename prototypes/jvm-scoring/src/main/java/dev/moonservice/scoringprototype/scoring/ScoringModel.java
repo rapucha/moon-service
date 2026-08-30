@@ -177,10 +177,14 @@ public final class ScoringModel {
             case "overcast" -> "overcast";
             case "precipitation_risk" -> "rain likely";
             case "poor_visibility" -> "fog or low visibility";
-            default -> "mixed conditions";
+            default -> "unknown conditions";
         };
     }
 
+    /**
+     * Classifies Open-Meteo {@code weather_code} values against its documented WMO table.
+     * Unlisted nonnegative values use defensive classifications so provider drift remains visible.
+     */
     public static WeatherCodeKind weatherCodeKind(int weatherCode) {
         return switch (weatherCode) {
             case 0 -> WeatherCodeKind.CLEAR;
@@ -223,7 +227,7 @@ public final class ScoringModel {
         if (weatherCodeKind == WeatherCodeKind.CLEAR) {
             return "clear";
         }
-        return "mixed";
+        return "unknown_conditions";
     }
 
     public static String lightBucket(double sunAltitude) {

@@ -1,5 +1,6 @@
 package dev.moonservice.backend.weather.openmeteo;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -14,8 +15,11 @@ import dev.moonservice.backend.weather.HourlyWeather;
 import dev.moonservice.backend.weather.WeatherForecast;
 import dev.moonservice.backend.weather.WeatherForecastUnavailableException;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
+import org.springframework.boot.test.system.CapturedOutput;
+import org.springframework.boot.test.system.OutputCaptureExtension;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -29,6 +33,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.atomic.AtomicReference;
 
+@ExtendWith(OutputCaptureExtension.class)
 class OpenMeteoWeatherClientTest {
     @Test
     void buildsOpenMeteoWeatherRequest() {
@@ -70,7 +75,7 @@ class OpenMeteoWeatherClientTest {
     }
 
     @Test
-    void mapsProviderHourlyForecastToNormalizedWeather() throws Exception {
+    void mapsProviderHourlyForecastToNormalizedWeather(CapturedOutput output) throws Exception {
         String responseBody = fixture("amsterdam-hourly.json");
         AtomicReference<URI> capturedRequestUri = new AtomicReference<>();
         OpenMeteoWeatherClient client = client(requestUri -> {
@@ -98,6 +103,44 @@ class OpenMeteoWeatherClientTest {
         assertEquals(12000, secondHour.visibilityMeters());
         assertEquals(1.0, secondHour.forecastAgeHours());
         assertEquals("https", capturedRequestUri.get().getScheme());
+        assertThat(output).doesNotContain("open_meteo_unexpected_weather_codes");
+    }
+
+    @Test
+    void logsUnexpectedWeatherCodesOnceWithoutProviderContext(CapturedOutput output) {
+        OpenMeteoWeatherClient client = client(ignoredRequestUri -> """
+                {
+                  "private_marker": "private-response-marker",
+                  "hourly": {
+                    "time": [1782691200, 1782694800, 1782698400, 1782702000],
+                    "cloud_cover": [1, 2, 3, 4],
+                    "cloud_cover_low": [1, 2, 3, 4],
+                    "cloud_cover_mid": [1, 2, 3, 4],
+                    "cloud_cover_high": [1, 2, 3, 4],
+                    "precipitation_probability": [0, 0, 0, 0],
+                    "precipitation": [0, 0, 0, 0],
+                    "weather_code": [100, 4, 100, 47],
+                    "visibility": [24000, 24000, 24000, 24000]
+                  }
+                }
+                """);
+
+        client.forecastFor(
+                amsterdam(),
+                Instant.parse("2026-06-29T00:00:00Z"),
+                Instant.parse("2026-06-30T00:00:00Z"));
+
+        assertThat(output)
+                .contains("WARN")
+                .containsOnlyOnce("open_meteo_unexpected_weather_codes")
+                .contains("codes=[4, 47, 100]")
+                .doesNotContain("amsterdam-nl")
+                .doesNotContain("Amsterdam, North Holland, Netherlands")
+                .doesNotContain("52.37403")
+                .doesNotContain("4.88969")
+                .doesNotContain("api.open-meteo.com")
+                .doesNotContain("1782691200")
+                .doesNotContain("private-response-marker");
     }
 
     @ParameterizedTest
@@ -116,19 +159,19 @@ class OpenMeteoWeatherClientTest {
     }
 
     @Test
-    void mapsInvalidHourlyValuesToUnavailable() {
-        OpenMeteoWeatherClient client = client(requestUri -> """
+    void mapsInvalidHourlyValuesToUnavailableWithoutLoggingPartialResponse(CapturedOutput output) {
+        OpenMeteoWeatherClient client = client(ignoredRequestUri -> """
                 {
                   "hourly": {
-                    "time": [1782691200],
-                    "cloud_cover": ["not-a-number"],
-                    "cloud_cover_low": [3],
-                    "cloud_cover_mid": [4],
-                    "cloud_cover_high": [5],
-                    "precipitation_probability": [6],
-                    "precipitation": [0],
-                    "weather_code": [2],
-                    "visibility": [24000]
+                    "time": [1782691200, 1782694800],
+                    "cloud_cover": [1, "not-a-number"],
+                    "cloud_cover_low": [3, 3],
+                    "cloud_cover_mid": [4, 4],
+                    "cloud_cover_high": [5, 5],
+                    "precipitation_probability": [6, 6],
+                    "precipitation": [0, 0],
+                    "weather_code": [4, 2],
+                    "visibility": [24000, 24000]
                   }
                 }
                 """);
@@ -139,6 +182,7 @@ class OpenMeteoWeatherClientTest {
                         amsterdam(),
                         Instant.parse("2026-06-29T00:00:00Z"),
                         Instant.parse("2026-06-30T00:00:00Z")));
+        assertThat(output).doesNotContain("open_meteo_unexpected_weather_codes");
     }
 
     @Test

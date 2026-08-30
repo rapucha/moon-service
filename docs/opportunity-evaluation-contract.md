@@ -523,19 +523,26 @@ ranking.
 
 ### Factual Weather-Summary Precedence
 
+`ScoringModel.weatherCodeKind(int)` interprets `weatherCode` as an Open-Meteo
+`weather_code` value from the provider's documented WMO table. Named kinds map
+the documented values. Unlisted nonnegative values below `50` use the defensive
+`UNKNOWN` kind; unlisted values at or above `50` use the existing defensive
+`OTHER_PRECIPITATION` kind. Both indicate provider-contract drift. An `UNKNOWN`
+code does not override usable visibility or cloud-cover facts.
+
 The evaluator checks these rules from top to bottom and uses the first match.
 This label is factual output. It is separate from `weatherFit`.
 
 | First matching rule | Segment kind | Display summary |
 | --- | --- | --- |
-| Weather code is at least `50` | `precipitation_risk` | `rain likely` |
+| Weather-code kind is `RAIN`, `SNOW`, `STORM`, or `OTHER_PRECIPITATION` | `precipitation_risk` | `rain likely` |
 | Weather code is `45` or `48`, or visibility is below `5,000 m` | `poor_visibility` | `fog or low visibility` |
 | Weather code is `3`, or total cloud is at least `85%` | `overcast` | `overcast` |
 | Total cloud is at least `65%` | `mostly_cloudy` | `mostly cloudy` |
 | Weather code is `2`, or total cloud is at least `25%` | `partly_cloudy` | `partly cloudy` |
 | Weather code is `1`, or total cloud is at least `10%` | `mostly_clear` | `mostly clear` |
 | Weather code is `0` | `clear` | `clear` |
-| No rule above matches | `mixed` | `mixed conditions` |
+| No rule above matches | `unknown_conditions` | `unknown conditions` |
 
 ## Forecast Age And Final Confidence
 
