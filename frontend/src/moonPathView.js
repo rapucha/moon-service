@@ -261,12 +261,8 @@ function altitudeChartSvg(sourcePoints, lightBandSourcePoints, azimuthSourcePoin
       width: ((gap.end - gap.start) / timeSpan) * chartWidth
     };
   });
-  var markerImageUrl = options.body === "moon"
-    ? moonPhaseImageDataUrl(
-      (options.moon || {}).phaseAngleDegrees,
-      64,
-      (options.moon || {}).brightLimbTiltDegrees,
-      (options.moon || {}).northPoleTiltDegrees)
+  var markerImageSource = options.body === "moon"
+    ? options.moon || {}
     : SUN_SAMPLE_MARKER_IMAGE_URL;
 
   return svgElement("svg", {
@@ -324,7 +320,7 @@ function altitudeChartSvg(sourcePoints, lightBandSourcePoints, azimuthSourcePoin
       }, formatHourTick(tick.at, timezone, countryCode));
     }),
     visibleMarkers.map(function (point) {
-      return bodyAltitudeMarker(point, markerImageUrl, options.body);
+      return bodyAltitudeMarker(point, markerImageSource, options.body);
     }),
     maskRects.map(function (rect) {
       return svgElement("rect", {
@@ -554,6 +550,7 @@ function localMinuteOfHour(time, timezone) {
 function altitudeMarker(point, imageUrl) {
   var suggested = point.role === "suggested";
   var best = point.markerLabel === "Best";
+  var decorated = suggested && !isRecommendationMarker(point);
   var size = suggested ? (best ? 34 : 22) : 10.5;
   var ringRadius = size / 2 - 1;
   var haloRadius = best ? 20 : 13;
@@ -574,7 +571,7 @@ function altitudeMarker(point, imageUrl) {
     suggested && point.markerLabel
       ? svgElement("text", { className: "moon-sample-marker-label", x: 0, y: -24, textAnchor: "middle" }, point.markerLabel)
       : null,
-    suggested ? svgElement("circle", { className: "moon-sample-marker-halo", cx: 0, cy: 0, r: haloRadius }) : null,
+    decorated ? svgElement("circle", { className: "moon-sample-marker-halo", cx: 0, cy: 0, r: haloRadius }) : null,
     imageUrl
       ? svgElement("image", {
         className: "moon-sample-marker-image",
@@ -586,26 +583,30 @@ function altitudeMarker(point, imageUrl) {
         preserveAspectRatio: "xMidYMid meet"
       })
       : svgElement("circle", { className: "moon-sample-dot is-" + roleClass(point.role), cx: 0, cy: 0, r: size / 2 }),
-    suggested ? svgElement("circle", { className: "moon-sample-marker-ring", cx: 0, cy: 0, r: ringRadius }) : null
+    decorated ? svgElement("circle", { className: "moon-sample-marker-ring", cx: 0, cy: 0, r: ringRadius }) : null
   );
 }
 
-function bodyAltitudeMarker(point, imageUrl, body) {
+function bodyAltitudeMarker(point, imageSource, body) {
   if (body === "sun") {
     return sunAltitudeMarker(point);
   }
-  return altitudeMarker(point, moonAltitudeMarkerImageUrl(point, imageUrl));
+  return altitudeMarker(point, moonAltitudeMarkerImageUrl(point, imageSource));
 }
 
-function moonAltitudeMarkerImageUrl(point, fallbackImageUrl) {
-  if (!Number.isFinite(point.moonPhaseAngleDegrees)) {
-    return fallbackImageUrl;
-  }
+function moonAltitudeMarkerImageUrl(point, fallbackMoon) {
+  var usePoint = Number.isFinite(point.moonPhaseAngleDegrees);
+  var moon = fallbackMoon || {};
   return moonPhaseImageDataUrl(
-    point.moonPhaseAngleDegrees,
+    usePoint ? point.moonPhaseAngleDegrees : moon.phaseAngleDegrees,
     64,
-    point.brightLimbTiltDegrees,
-    point.northPoleTiltDegrees) || fallbackImageUrl;
+    usePoint ? point.brightLimbTiltDegrees : moon.brightLimbTiltDegrees,
+    usePoint ? point.northPoleTiltDegrees : moon.northPoleTiltDegrees,
+    isRecommendationMarker(point) ? { outline: false } : undefined);
+}
+
+function isRecommendationMarker(point) {
+  return point.markerLabel === "Best" || point.markerLabel === "Alt";
 }
 
 function sunAltitudeMarker(point) {
