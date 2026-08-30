@@ -1,9 +1,7 @@
-package dev.moonservice.backend.observability;
+package dev.moonservice.backend.weather;
 
 import dev.moonservice.backend.location.ResolvedLocation;
-import dev.moonservice.backend.weather.WeatherForecast;
-import dev.moonservice.backend.weather.WeatherForecastProvider;
-import dev.moonservice.backend.weather.WeatherForecastUnavailableException;
+import dev.moonservice.backend.observability.OpenMeteoObservability;
 
 import java.time.Instant;
 import java.util.Objects;

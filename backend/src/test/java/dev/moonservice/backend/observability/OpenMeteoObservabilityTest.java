@@ -13,7 +13,9 @@ import dev.moonservice.backend.openmeteo.OpenMeteoTransport;
 import dev.moonservice.backend.openmeteo.OpenMeteoTransportException;
 import dev.moonservice.backend.openmeteo.RetryingOpenMeteoTransport;
 import dev.moonservice.backend.observability.quota.ProviderQuotaMonitor;
+import dev.moonservice.backend.weather.CachingWeatherForecastProvider;
 import dev.moonservice.backend.weather.HourlyWeather;
+import dev.moonservice.backend.weather.ObservedWeatherForecastProvider;
 import dev.moonservice.backend.weather.WeatherForecastUnavailableException;
 
 import java.net.URI;
@@ -67,6 +69,30 @@ class OpenMeteoObservabilityTest {
         assertEquals(2, snapshot.calls());
         assertEquals(1, snapshot.available());
         assertEquals(1, snapshot.temporarilyUnavailable());
+    }
+
+    @Test
+    void keepsWeatherOutcomeMeasurementInsideTheCache() {
+        OpenMeteoObservability observability = openMeteoObservability();
+        CachingWeatherForecastProvider provider = CachingWeatherForecastProvider.withSettings(
+                new ObservedWeatherForecastProvider(
+                        (location, startsAt, endsAt) -> instant -> weather(instant),
+                        observability.weather()),
+                10,
+                Duration.ofMinutes(15),
+                Duration.ofMinutes(1));
+
+        provider.forecastFor(location(), Instant.EPOCH, Instant.EPOCH.plusSeconds(3600));
+        provider.forecastFor(location(), Instant.EPOCH, Instant.EPOCH.plusSeconds(3600));
+
+        OpenMeteoObservability.WeatherSnapshot weather = observability.weatherSnapshot();
+        CacheMetricsSnapshot cache = provider.cacheMetrics();
+        assertEquals(1, weather.calls());
+        assertEquals(1, weather.available());
+        assertEquals(0, weather.temporarilyUnavailable());
+        assertEquals(2, cache.requestCount());
+        assertEquals(1, cache.hitCount());
+        assertEquals(1, cache.missCount());
     }
 
     @Test
