@@ -131,12 +131,14 @@ suggested Moon does not overlap an ordinary sample. The renderer draws no Moon
 ring and no brighter strip along the bucket shading.
 
 The opportunity's existing `weather.segmentKind` selects a restrained clear,
-cloudy, fog, precipitation, or mixed overlay on the large Moon scene. For
+cloudy, fog, precipitation, or fallback overlay on the large Moon scene. For
 precipitation risk, the shared `ScoringModel.weatherCodeKind(int)`
 classification selects rain, snow, or storm artwork. Its
-`OTHER_PRECIPITATION` result selects mixed artwork. There is no separate weather
-icon. Rain and storm strokes stay in the lowest third of the Moon, and cloudy
-weather still leaves enough texture visible to read the scene.
+`OTHER_PRECIPITATION` result selects mixed artwork. `unknown_conditions` reuses
+the same generic artwork, and the renderer does not accept `mixed` as a
+compatibility alias. There is no separate weather icon. Rain and storm strokes
+stay in the lowest third of the Moon, and cloudy weather still leaves enough
+texture visible to read the scene.
 Every useful fact also appears as text. The feed uses no CSS, JavaScript, table,
 or `srcset`. A feed reader may remove the XHTML or picture, so this rich view is
 optional.
@@ -694,9 +696,21 @@ and can be selected with `moon.weather.provider=open-meteo`. It requests hourly
 cloud cover, low/mid/high cloud cover, precipitation probability,
 precipitation amount, weather code, and visibility from Open-Meteo Forecast.
 The adapter normalizes provider-shaped hourly records into backend weather
-facts used by the scoring model. Malformed payloads, empty responses, HTTP
-failures, IO failures, timeouts, and rate limits fail the dependency boundary
-instead of producing fake no-op opportunities.
+facts used by the scoring model. The
+[opportunity-evaluation contract](../docs/opportunity-evaluation-contract.md#factual-weather-summary-precedence)
+defines the Open-Meteo WMO mapping and its defensive unmatched classifications.
+When an otherwise successfully parsed response contains an undocumented weather
+code, the adapter writes one aggregate `WARN` named
+`open_meteo_unexpected_weather_codes` with the sorted distinct numeric codes.
+It does not log the location, coordinates, request URI, response body, or
+provider timestamps. A cache hit does not repeat the warning because it does
+not call the upstream adapter. An unexpected code does not fail the lookup;
+normal classification and visibility or cloud-cover precedence still apply,
+and `UNKNOWN` uses `unknown_conditions` only as the final fallback.
+
+Malformed payloads, empty responses, HTTP failures, IO failures, timeouts, and
+rate limits fail the dependency boundary instead of producing fake no-op
+opportunities.
 The weather client uses the same shared Open-Meteo `RestClient` transport and
 Spring `RetryTemplate` wrapper as geocoding: at most one retry on HTTP `429`,
 `502`, `503`, `504`, timeout, or IO failure. Short `Retry-After` values are

@@ -142,7 +142,7 @@ class AtomFeedRichContentTest {
         int[] weatherCodes = {0, 2, 45, 61, 71, 95, 4, 1, 82, 86};
         String[] segmentKinds = {
                 "clear", "partly_cloudy", "poor_visibility", "precipitation_risk",
-                "precipitation_risk", "precipitation_risk", "mixed", "mostly_clear",
+                "precipitation_risk", "precipitation_risk", "unknown_conditions", "mostly_clear",
                 "precipitation_risk", "precipitation_risk"
         };
         for (int index = 0; index < 10; index++) {

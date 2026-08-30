@@ -8,6 +8,9 @@ import dev.moonservice.backend.weather.WeatherForecastProvider;
 import dev.moonservice.backend.weather.WeatherForecastUnavailableException;
 import dev.moonservice.backend.openmeteo.OpenMeteoTransport;
 import dev.moonservice.backend.openmeteo.OpenMeteoTransportException;
+import dev.moonservice.scoringprototype.scoring.ScoringModel;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.web.util.UriComponentsBuilder;
 import tools.jackson.core.JacksonException;
 import tools.jackson.databind.JsonNode;
@@ -21,8 +24,11 @@ import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
+import java.util.Set;
+import java.util.TreeSet;
 
 public class OpenMeteoWeatherClient implements WeatherForecastProvider {
+    private static final Logger LOGGER = LoggerFactory.getLogger(OpenMeteoWeatherClient.class);
     private static final double FORECAST_AGE_HOURS = 1.0;
     private static final String HOURLY_VARIABLES = String.join(
             ",",
@@ -119,8 +125,9 @@ public class OpenMeteoWeatherClient implements WeatherForecastProvider {
         }
 
         List<HourlyWeather> hours = new ArrayList<>();
+        Set<Integer> unexpectedWeatherCodes = new TreeSet<>();
         for (int index = 0; index < size; index++) {
-            hours.add(new HourlyWeather(
+            HourlyWeather hour = new HourlyWeather(
                     instantAt(times, index),
                     percentAt(hourly, "cloud_cover", index, size),
                     percentAt(hourly, "cloud_cover_low", index, size),
@@ -131,9 +138,20 @@ public class OpenMeteoWeatherClient implements WeatherForecastProvider {
                     nonNegativeIntAt(hourly, "visibility", index, size),
                     nonNegativeIntAt(hourly, "weather_code", index, size),
                     FORECAST_AGE_HOURS
-            ));
+            );
+            hours.add(hour);
+            switch (ScoringModel.weatherCodeKind(hour.weatherCode())) {
+                case UNKNOWN, OTHER_PRECIPITATION -> unexpectedWeatherCodes.add(hour.weatherCode());
+                default -> {
+                }
+            }
         }
-        return new HourlyWeatherForecast(hours);
+
+        HourlyWeatherForecast forecast = new HourlyWeatherForecast(hours);
+        if (!unexpectedWeatherCodes.isEmpty()) {
+            LOGGER.warn("open_meteo_unexpected_weather_codes codes={}", unexpectedWeatherCodes);
+        }
+        return forecast;
     }
 
     private static Instant instantAt(JsonNode times, int index) {
