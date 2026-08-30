@@ -209,7 +209,7 @@ test("renders grouped Moon pass cards", async ({ page }) => {
     .toHaveAttribute("href", /^data:image\/png;base64,/);
 
   const moonImageShading = await page.locator(".moon-pass-card").first().evaluate(async card => {
-    const markerUrl = card.querySelector(".moon-altitude-chart.altitude-chart-desktop .moon-sample-marker-image")
+    const markerUrl = card.querySelector(".moon-altitude-chart.altitude-chart-desktop .moon-sample-marker.is-best .moon-sample-marker-image")
       ?.getAttribute("href");
     const domeUrl = card.querySelector(".sky-body.is-moon .sky-body-image")?.getAttribute("href");
     const labelUrl = card.querySelector(".sky-separation-label-body.is-moon")?.getAttribute("href");
@@ -222,14 +222,15 @@ test("renders grouped Moon pass cards", async ({ page }) => {
     const context = canvas.getContext("2d");
     context?.drawImage(image, 0, 0);
     return {
-      sharedImage: markerUrl === domeUrl && domeUrl === labelUrl,
+      recommendationTreatment: markerUrl !== domeUrl && domeUrl === labelUrl
+        && !card.querySelector(".moon-sample-marker.is-suggested .moon-sample-marker-ring, .moon-sample-marker.is-suggested .moon-sample-marker-halo"),
       shadedPixel: Array.from(context?.getImageData(14, 32, 1, 1).data || []),
       litPixel: Array.from(context?.getImageData(49, 32, 1, 1).data || []),
       northernTexturePixel: Array.from(context?.getImageData(42, 20, 1, 1).data || []),
       southernTexturePixel: Array.from(context?.getImageData(42, 43, 1, 1).data || [])
     };
   });
-  expect(moonImageShading.sharedImage).toBe(true);
+  expect(moonImageShading.recommendationTreatment).toBe(true);
   expect(Math.min(...moonImageShading.shadedPixel.slice(0, 3))).toBeGreaterThanOrEqual(60);
   expect(moonImageShading.shadedPixel[3]).toBe(255);
   expect(moonImageShading.shadedPixel.slice(0, 3).reduce((sum, value) => sum + value, 0))
@@ -560,7 +561,7 @@ test("uses each pass sample Moon orientation for start, path, and end markers", 
   }
 });
 
-test("uses the Best Moon image when pass sample phase is missing or invalid", async ({ page }) => {
+test("keeps ordinary fallback markers outlined and the Best fallback outline-free", async ({ page }) => {
   const response = structuredClone(fixture);
   const passId = response.opportunities[0].moonPass.id;
   const startAt = response.opportunities[0].moonPass.path.start.at;
@@ -596,13 +597,14 @@ test("uses the Best Moon image when pass sample phase is missing or invalid", as
   });
 
   for (const mode of ["desktop", "mobile"]) {
-    expect(imageUrls[mode].samples.length).toBeGreaterThanOrEqual(3);
-    expect(imageUrls[mode].samples.every(url => url === imageUrls[mode].best)).toBe(true);
+    expect(new Set(imageUrls[mode].samples).size).toBe(1);
+    expect(imageUrls[mode].samples[0]).not.toBe(imageUrls[mode].best);
   }
 });
 
-test("uses each recommendation bright-limb tilt and shares the best Moon image", async ({ page }) => {
+test("uses opportunity Moon facts for recommendations whose point phase is missing", async ({ page }) => {
   const response = structuredClone(fixture);
+  response.opportunities.slice(0, 2).forEach(opportunity => { opportunity.moonPath.suggested.moonPhaseAngleDegrees = null; });
   response.opportunities[0].moon.brightLimbTiltDegrees = 0;
   response.opportunities[1].moon.brightLimbTiltDegrees = 180;
 
@@ -619,25 +621,24 @@ test("uses each recommendation bright-limb tilt and shares the best Moon image",
   const card = page.locator(".moon-pass-card").first();
   const bestAt = response.opportunities[0].moonPath.suggested.at;
   const alternativeAt = response.opportunities[1].moonPath.suggested.at;
-  const imageUrls = await card.evaluate((node, instants) => {
+  const imageUrls = await card.evaluate(async (node, input) => {
+    const { moonPhaseImageDataUrl } = await import("/moonPhaseView.js");
     const markerUrl = at => node.querySelector(`.moon-sample-marker[data-at='${at}'] .moon-sample-marker-image`)
       ?.getAttribute("href");
     return {
-      best: markerUrl(instants.bestAt),
-      alternative: markerUrl(instants.alternativeAt),
-      dome: node.querySelector(".sky-body.is-moon .sky-body-image")?.getAttribute("href"),
-      label: node.querySelector(".sky-separation-label-body.is-moon")?.getAttribute("href")
+      best: markerUrl(input.bestAt),
+      alternative: markerUrl(input.alternativeAt),
+      alternativeOutlined: moonPhaseImageDataUrl(
+        input.alternativeMoon.phaseAngleDegrees, 64, input.alternativeMoon.brightLimbTiltDegrees, input.alternativeMoon.northPoleTiltDegrees)
     };
-  }, { bestAt, alternativeAt });
+  }, { bestAt, alternativeAt, alternativeMoon: response.opportunities[1].moon });
 
-  expect(imageUrls.best).toMatch(/^data:image\/png;base64,/);
-  expect(imageUrls.alternative).toMatch(/^data:image\/png;base64,/);
+  expect([imageUrls.best, imageUrls.alternative].every(url => /^data:image\/png;base64,/.test(url))).toBe(true);
   expect(imageUrls.alternative).not.toBe(imageUrls.best);
-  expect(imageUrls.dome).toBe(imageUrls.best);
-  expect(imageUrls.label).toBe(imageUrls.best);
+  expect(imageUrls.alternative).not.toBe(imageUrls.alternativeOutlined);
 });
 
-test("uses each recommendation north-pole tilt and shares the best Moon image", async ({ page }) => {
+test("uses each recommendation north-pole tilt without sharing its outlined Moon image", async ({ page }) => {
   const response = structuredClone(fixture);
   response.opportunities[0].moon.brightLimbTiltDegrees = 0;
   response.opportunities[1].moon.brightLimbTiltDegrees = 0;
@@ -668,9 +669,8 @@ test("uses each recommendation north-pole tilt and shares the best Moon image", 
     };
   }, { bestAt, alternativeAt });
 
-  expect(imageUrls.best).toMatch(/^data:image\/png;base64,/);
-  expect(imageUrls.alternative).toMatch(/^data:image\/png;base64,/);
+  expect([imageUrls.best, imageUrls.alternative].every(url => /^data:image\/png;base64,/.test(url))).toBe(true);
   expect(imageUrls.alternative).not.toBe(imageUrls.best);
-  expect(imageUrls.dome).toBe(imageUrls.best);
-  expect(imageUrls.label).toBe(imageUrls.best);
+  expect(imageUrls.dome).not.toBe(imageUrls.best);
+  expect(imageUrls.label).toBe(imageUrls.dome);
 });

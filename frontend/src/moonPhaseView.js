@@ -35,13 +35,14 @@ export function moonPhaseImageDataUrl(
   phaseAngleDegrees,
   size,
   brightLimbTiltDegrees,
-  northPoleTiltDegrees
+  northPoleTiltDegrees,
+  options
 ) {
   var canvas = element("canvas", {
     width: size || 56,
     height: size || 56
   });
-  drawMoonPhase(canvas, phaseAngleDegrees, brightLimbTiltDegrees, northPoleTiltDegrees);
+  drawMoonPhase(canvas, phaseAngleDegrees, brightLimbTiltDegrees, northPoleTiltDegrees, options);
   try {
     return canvas.toDataURL("image/png");
   } catch (error) {
