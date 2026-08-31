@@ -112,14 +112,22 @@ The successful response covers the half-open 18 calendar-month horizon in the
 resolved location timezone. It returns every locally visible lunar eclipse in
 chronological order, including its objective phases and maximum, actual local
 visibility intervals, one selected/display interval, a suggested observation
-instant, and Moon/Sun display facts. A valid result can have `events: []`.
+instant, Moon/Sun display facts, and drawable shadow samples for every phase
+contact, maximum, and a distinct suggested instant. A valid result can have
+`events: []`.
 
-Active preferences are assessed in canonical Version 1 order. They can move
-the suggestion within the displayed visible interval and report a match,
-mismatch, or inapplicable filter, but they do not remove or reorder an eclipse.
-The service uses the existing five-minute sampling and one-second transition
-refinement rules. Bright-limb orientation is inapplicable to eclipse-shadow
-geometry.
+Preferences never move, remove, or reorder a lunar eclipse. The suggestion is
+objective maximum when that instant is in the display interval. Otherwise it
+is the visible point in that interval nearest maximum. Only active altitude and
+azimuth limits are assessed there, as matches or warnings. Time/light,
+named-phase, and bright-limb limits produce no lunar-eclipse assessment rows.
+The five-minute grid and one-second refinement remain in use only to find local
+visibility intervals.
+
+Shadow samples use Astronomy Engine's supported public Sun/Moon vectors and
+rotations. Their center offsets and umbra/penumbra radii are expressed in Moon
+radii for direct screen rendering. Objective contacts, subtype, and peak
+obscuration still come from Astronomy Engine's public eclipse search.
 
 Weather never changes the astronomical result. When a suggestion falls inside
 ordinary seven-day forecast coverage, the service makes one existing provider

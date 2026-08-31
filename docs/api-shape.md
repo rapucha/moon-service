@@ -2211,6 +2211,7 @@ Each member of `events` contains:
 - objective `startsAt`, `maximumAt`, and `endsAt`;
 - `umbralObscurationPercent`;
 - `phases`;
+- `shadowSamples`;
 - `moonAtMaximum` with observer-relative `altitudeDegrees` and
   `azimuthDegrees`;
 - `localVisibility`;
@@ -2251,6 +2252,41 @@ intersection:
 
 Phase intervals are chronological and non-overlapping. `intervals` is always
 present and is empty when status is `not_visible`.
+
+### Shadow samples
+
+`shadowSamples` is chronological and duplicate-free. It contains the union of
+every returned phase start and end, objective maximum, and `suggestedAt` when
+that instant is distinct:
+
+```json
+{
+  "at": "2025-09-07T18:11:41.502Z",
+  "moon": {
+    "altitudeDegrees": 5.730577,
+    "azimuthDegrees": 107.552074,
+    "northPoleTiltDegrees": 343.280190
+  },
+  "shadow": {
+    "centerRightMoonRadii": -0.1673,
+    "centerUpMoonRadii": 0.9953,
+    "umbraRadiusMoonRadii": 2.74475,
+    "penumbraRadiusMoonRadii": 4.70873
+  }
+}
+```
+
+The shadow center is relative to the Moon center. Positive right points toward
+the viewer's right and positive up points toward local zenith. All offsets and
+radii use the Moon's mean radius as one unit. Umbra and penumbra radii are
+positive and the penumbra is larger. `northPoleTiltDegrees` uses the existing
+screen convention and may be `null` only when that pole projection is
+undefined. Every shadow value is finite.
+
+Astronomy Engine's public eclipse search remains authoritative for objective
+contacts, subtype, and peak obscuration. The drawable samples use the pinned
+library's supported public geocentric vectors and rotations through the
+existing ephemeris sampler. They do not use an internal shadow function.
 
 ### Local visibility
 
@@ -2307,48 +2343,42 @@ Only intervals that overlap the horizon are candidates for
 choose the interval whose nearest point is closest to maximum; an exact tie
 selects the earlier interval. `selectedInterval` remains actual and unclamped.
 `displayInterval` is its non-empty intersection with the request horizon.
-`suggestedAt` always lies within that display interval and before a horizon
-end that makes the display end exclusive.
+`suggestedAt` is objective maximum when maximum lies in that display interval.
+Otherwise it is the display point nearest maximum. When that point is the
+request horizon's exclusive end, use the later of the display start and one
+second before the end. `suggestedAt` therefore always lies inside the display
+interval.
 
 ### Preference assessment
 
-Preferences affect the suggested time and assessment, not event inclusion,
-subtype, or order.
+Preferences do not affect lunar-eclipse inclusion, subtype, order, intervals,
+or suggested time. Only active altitude and azimuth limits are assessed at the
+fixed `suggestedAt` instant.
 
 ```json
 {
   "overall": "matches",
   "filters": [
     { "filter": "altitudeDegrees", "status": "matches" },
-    { "filter": "brightLimbOrientationDegrees", "status": "not_applicable" }
+    { "filter": "azimuthDegrees", "status": "matches" }
   ]
 }
 ```
 
-`filters` is always present and includes each active filter once in canonical
-Version 1 order: altitude, azimuth, time, named phase, then bright-limb
-orientation. Each status is `matches`, `does_not_match`, or
-`not_applicable`. Overall is:
+`filters` is always present and contains only active `altitudeDegrees` and
+`azimuthDegrees`, in that order. Each status is `matches` or
+`does_not_match`. Overall is:
 
-- `no_active_preferences` when the list is empty;
-- `not_applicable` when every active filter is inapplicable;
-- `matches` when one common evaluated instant satisfies every applicable
-  filter; or
+- `no_active_preferences` when neither applicable limit is active;
+- `matches` when every returned row matches; or
 - `does_not_match` otherwise.
 
-Per-filter matches are assessed independently. Inapplicable filters do not
-participate in the common-instant test. Altitude, lunar-disk azimuth,
-local-clock time, and light buckets keep their ordinary Version 1 meanings. A
-lunar eclipse is `full_moon` for named-phase matching. Bright-limb orientation
-is inapplicable because eclipse-shadow geometry is not the bright limb.
-
-Evaluation uses the Version 1 five-minute grid anchored at objective eclipse
-start, one-second transition refinement, and relevant objective, visibility,
-selection, display, and maximum boundaries. A condition that starts and ends
-entirely between samples remains outside the guarantee. If applicable filters
-share matching instants, `suggestedAt` is the one nearest objective maximum.
-Otherwise it is the evaluated visible instant nearest maximum. Exact ties
-choose the earlier instant. A mismatch never hides an eclipse.
+Altitude and lunar-disk azimuth keep their ordinary Version 1 matcher and
+topocentric-footprint meanings. Active time/light, named-phase, and bright-limb
+limits remain accepted and normalized in request metadata, but they produce no
+lunar-eclipse assessment rows and do not affect `overall`. A mismatch is a
+warning and never hides an eclipse. Preference assessment does not use the
+five-minute time grid.
 
 ### Weather
 

@@ -1,21 +1,18 @@
 package dev.moonservice.backend.events;
 
-import dev.moonservice.backend.events.EventPreferenceEvaluator.TimeSpan;
 import dev.moonservice.backend.events.MoonEventResponse.*;
 import dev.moonservice.backend.location.*;
 import dev.moonservice.backend.location.openmeteo.TestOpenMeteoLocationResolver;
 import dev.moonservice.backend.opportunity.OpportunitySearchDefaults;
 import dev.moonservice.backend.weather.*;
-import dev.moonservice.scoringprototype.ephemeris.MoonSample;
-import dev.moonservice.scoringprototype.fixture.Location;
 import dev.moonservice.scoringprototype.input.OpportunityPreferences;
 import dev.moonservice.scoringprototype.input.OpportunityPreferences.*;
+import dev.moonservice.scoringprototype.window.RefinedTimeGrid;
 import org.junit.jupiter.api.Test;
 
 import java.time.*;
 import java.util.List;
 import java.util.Set;
-import java.util.function.Function;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
@@ -58,6 +55,25 @@ class LunarEclipseEventServiceTest {
                 .containsExactly("penumbral", "partial", "total");
         assertThat(total.phases().get(1).startsAt()).isEqualTo("2025-09-07T16:26:40.111Z");
         assertThat(total.phases().get(2).endsAt()).isEqualTo("2025-09-07T18:53:08.096Z");
+        assertThat(total.localVisibility().displayInterval().suggestedAt())
+                .isEqualTo(total.maximumAt());
+        assertThat(total.shadowSamples()).extracting(EclipseShadowSample::at)
+                .containsExactly(
+                        "2025-09-07T15:28:02.516Z",
+                        "2025-09-07T16:26:40.111Z",
+                        "2025-09-07T17:30:14.908Z",
+                        "2025-09-07T18:11:41.502Z",
+                        "2025-09-07T18:53:08.096Z",
+                        "2025-09-07T19:56:42.892Z",
+                        "2025-09-07T20:55:20.487Z");
+        EclipseShadowSample maximumShadow = total.shadowSamples().get(3);
+        assertThat(maximumShadow.moon().northPoleTiltDegrees()).isNotNull();
+        assertThat(maximumShadow.shadow().centerRightMoonRadii())
+                .isCloseTo(-0.1673, within(0.0001));
+        assertThat(maximumShadow.shadow().centerUpMoonRadii())
+                .isCloseTo(0.9953, within(0.0001));
+        assertThat(maximumShadow.shadow().penumbraRadiusMoonRadii())
+                .isGreaterThan(maximumShadow.shadow().umbraRadiusMoonRadii());
         assertThat(total.moonAtMaximum().altitudeDegrees()).isCloseTo(5.730577, within(0.00001));
         assertThat(total.moonAtMaximum().azimuthDegrees()).isCloseTo(107.552074, within(0.00001));
         assertThat(total.preferenceAssessment().overall()).isEqualTo("no_active_preferences");
@@ -69,12 +85,14 @@ class LunarEclipseEventServiceTest {
         assertThat(partial.umbralObscurationPercent()).isCloseTo(96.6055593, within(0.000001));
         assertThat(partial.phases()).extracting(EclipsePhase::kind)
                 .containsExactly("penumbral", "partial");
+        assertThat(partial.shadowSamples()).hasSize(5);
         assertThat(partial.localVisibility().status()).isEqualTo("partly_visible");
         assertThat(partial.weather().status()).isEqualTo("outside_forecast_horizon");
 
         LunarEclipseEvent penumbral = response.events().get(2);
         assertThat(penumbral.umbralObscurationPercent()).isZero();
         assertThat(penumbral.phases()).extracting(EclipsePhase::kind).containsExactly("penumbral");
+        assertThat(penumbral.shadowSamples()).hasSize(3);
         assertThat(penumbral.localVisibility().status()).isEqualTo("fully_visible");
         assertThat(penumbral.weather().status()).isEqualTo("outside_forecast_horizon");
 
@@ -125,6 +143,9 @@ class LunarEclipseEventServiceTest {
                 .isEqualTo("2026-08-28T04:13:00Z");
         assertThat(event.localVisibility().displayInterval().endsAt())
                 .isEqualTo(event.localVisibility().selectedInterval().endsAt());
+        assertThat(event.shadowSamples()).hasSize(6);
+        assertThat(event.shadowSamples()).extracting(EclipseShadowSample::at)
+                .contains("2026-08-28T04:13:00Z");
     }
 
     @Test
@@ -138,7 +159,7 @@ class LunarEclipseEventServiceTest {
 
         assertThat(response.endsAt()).isEqualTo(maximum.toString());
         assertThat(Instant.parse(eclipse.localVisibility().displayInterval().suggestedAt()))
-                .isBefore(maximum);
+                .isEqualTo(maximum.minusSeconds(1));
     }
 
     @Test
@@ -166,9 +187,9 @@ class LunarEclipseEventServiceTest {
         assertThat(split.localVisibility().selectedInterval())
                 .isEqualTo(split.localVisibility().intervals().getFirst());
 
-        TimeSpan earlier = new TimeSpan(
+        RefinedTimeGrid.Interval earlier = new RefinedTimeGrid.Interval(
                 Instant.parse("2027-01-01T00:00:00Z"), Instant.parse("2027-01-01T01:00:00Z"));
-        TimeSpan later = new TimeSpan(
+        RefinedTimeGrid.Interval later = new RefinedTimeGrid.Interval(
                 Instant.parse("2027-01-01T03:00:00Z"), Instant.parse("2027-01-01T04:00:00Z"));
         assertThat(LunarEclipseEventService.select(
                 List.of(later, earlier), Instant.parse("2027-01-01T02:00:00Z")))
@@ -176,92 +197,62 @@ class LunarEclipseEventServiceTest {
     }
 
     @Test
-    void assessesEveryPreferenceWithoutRemovingAMismatch() {
+    void assessesOnlyAltitudeAndAzimuthWithoutChangingTheEvent() {
         LunarEclipseEvent allOff = firstEvent(OpportunityPreferences.none());
         assertThat(allOff.preferenceAssessment().overall()).isEqualTo("no_active_preferences");
+        assertThat(allOff.preferenceAssessment().filters()).isEmpty();
+        assertThat(allOff.localVisibility().displayInterval().suggestedAt())
+                .isEqualTo(allOff.maximumAt());
 
-        OpportunityPreferences matching = new OpportunityPreferences(
+        OpportunityPreferences everyFilter = new OpportunityPreferences(
                 1,
                 new AltitudeRange(5, 6),
                 new AzimuthPreference(new DegreeRange(107, 108), null),
                 new TimePreference(TimeMode.LOCAL_CLOCK,
-                        new LocalClockWindow(LocalTime.of(20, 0), LocalTime.of(20, 30)), null),
-                Set.of(NamedPhase.FULL_MOON),
+                        new LocalClockWindow(LocalTime.of(0, 0), LocalTime.of(1, 0)), null),
+                Set.of(NamedPhase.NEW_MOON),
                 List.of(new DegreeRange(0, 1)));
-        LunarEclipseEvent match = firstEvent(matching);
-        assertThat(match.preferenceAssessment().overall()).isEqualTo("matches");
-        assertThat(match.preferenceAssessment().filters())
+        LunarEclipseEvent matching = firstEvent(everyFilter);
+        assertThat(matching.preferenceAssessment().overall()).isEqualTo("matches");
+        assertThat(matching.preferenceAssessment().filters())
                 .containsExactly(
                         new FilterAssessment("altitudeDegrees", "matches"),
-                        new FilterAssessment("azimuthDegrees", "matches"),
-                        new FilterAssessment("time", "matches"),
-                        new FilterAssessment("namedPhases", "matches"),
-                        new FilterAssessment("brightLimbOrientationDegrees", "not_applicable"));
-        assertThat(match.localVisibility().displayInterval().suggestedAt())
-                .isEqualTo(match.maximumAt());
+                        new FilterAssessment("azimuthDegrees", "matches"));
 
-        OpportunityPreferences onlyInapplicable = new OpportunityPreferences(
-                1, null, null, null, null, List.of(new DegreeRange(0, 1)));
-        assertThat(firstEvent(onlyInapplicable).preferenceAssessment().overall())
-                .isEqualTo("not_applicable");
+        OpportunityPreferences irrelevantOnly = new OpportunityPreferences(
+                1,
+                null,
+                null,
+                new TimePreference(TimeMode.LIGHT_BUCKET, null, Set.of(AmbientLight.DAYLIGHT)),
+                Set.of(NamedPhase.NEW_MOON),
+                List.of(new DegreeRange(0, 1)));
+        LunarEclipseEvent irrelevant = firstEvent(irrelevantOnly);
+        assertThat(irrelevant.preferenceAssessment().overall()).isEqualTo("no_active_preferences");
+        assertThat(irrelevant.preferenceAssessment().filters()).isEmpty();
 
-        OpportunityPreferences wrongPhase = new OpportunityPreferences(
-                1, null, null, null, Set.of(NamedPhase.NEW_MOON), null);
-        LunarEclipseEvent mismatch = firstEvent(wrongPhase);
-        assertThat(mismatch.preferenceAssessment().overall()).isEqualTo("does_not_match");
-        assertThat(mismatch.id()).isEqualTo(allOff.id());
-
-        OpportunityPreferences noCommonInstant = new OpportunityPreferences(
+        OpportunityPreferences wrongAltitude = new OpportunityPreferences(
                 1,
                 new AltitudeRange(20, 30),
+                new AzimuthPreference(new DegreeRange(107, 108), null),
                 null,
-                new TimePreference(TimeMode.LOCAL_CLOCK,
-                        new LocalClockWindow(LocalTime.of(19, 40), LocalTime.of(20, 0)), null),
                 null,
                 null);
-        LunarEclipseEvent separated = firstEvent(noCommonInstant);
-        assertThat(separated.preferenceAssessment().filters())
-                .allMatch(filter -> filter.status().equals("matches"));
-        assertThat(separated.preferenceAssessment().overall()).isEqualTo("does_not_match");
-        assertThat(separated.id()).isEqualTo(allOff.id());
+        LunarEclipseEvent mismatch = firstEvent(wrongAltitude);
+        assertThat(mismatch.preferenceAssessment().overall()).isEqualTo("does_not_match");
+        assertThat(mismatch.preferenceAssessment().filters())
+                .containsExactly(
+                        new FilterAssessment("altitudeDegrees", "does_not_match"),
+                        new FilterAssessment("azimuthDegrees", "matches"));
 
-        OpportunityPreferences light = new OpportunityPreferences(
-                1, null, null,
-                new TimePreference(TimeMode.LIGHT_BUCKET, null, Set.of(AmbientLight.NAUTICAL_TWILIGHT)),
-                null, null);
-        assertThat(firstEvent(light).preferenceAssessment().overall()).isEqualTo("matches");
-    }
-
-    @Test
-    void refinesPreferenceTransitionsToOneSecondAndUsesTheNearestMatchingInstant() {
-        Instant start = Instant.parse("2027-01-01T00:00:00Z");
-        Instant maximum = start.plus(Duration.ofMinutes(2));
-        Function<Instant, MoonSample> samples = instant -> new MoonSample(
-                instant,
-                Duration.between(start, instant).toMillis() / 60_000.0,
-                180.0,
-                100.0,
-                180.0,
-                0.0,
-                -15.0,
-                0.0);
-        OpportunityPreferences preferences = new OpportunityPreferences(
-                1, new AltitudeRange(2.5, 90), null, null, null, null);
-
-        EventPreferenceEvaluator.Result result = new EventPreferenceEvaluator().evaluate(
-                prototypeLocation(PRAGUE),
-                preferences,
-                start,
-                maximum,
-                new TimeSpan(start, start.plus(Duration.ofMinutes(10))),
-                false,
-                List.of(maximum),
-                samples,
-                ignored -> 0.25);
-
-        assertThat(result.assessment().overall()).isEqualTo("matches");
-        assertThat(result.suggestedAt())
-                .isBetween(start.plusSeconds(149), start.plusSeconds(151));
+        assertThat(List.of(matching, irrelevant, mismatch))
+                .allSatisfy(event -> {
+                    assertThat(event.id()).isEqualTo(allOff.id());
+                    assertThat(event.startsAt()).isEqualTo(allOff.startsAt());
+                    assertThat(event.maximumAt()).isEqualTo(allOff.maximumAt());
+                    assertThat(event.endsAt()).isEqualTo(allOff.endsAt());
+                    assertThat(event.localVisibility()).isEqualTo(allOff.localVisibility());
+                    assertThat(event.shadowSamples()).isEqualTo(allOff.shadowSamples());
+                });
     }
 
     @Test
@@ -370,13 +361,6 @@ class LunarEclipseEventServiceTest {
                 0,
                 zoneId,
                 "XX");
-    }
-
-    private static Location prototypeLocation(ResolvedLocation location) {
-        return new Location(
-                location.locationId(), "real_location", location.locationId(), location.displayName(),
-                location.latitude(), location.longitude(), location.elevationMeters(),
-                location.zoneId().getId(), location.countryCode());
     }
 
     private static HourlyWeather weatherHour(String startsAt) {
