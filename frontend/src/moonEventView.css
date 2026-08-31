@@ -1,0 +1,290 @@
+.special-moon-events {
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+}
+
+.special-moon-events > h3,
+.special-moon-event-summary h4,
+.special-moon-event-details h5 {
+  margin: 0;
+  letter-spacing: 0;
+}
+
+.special-moon-events > h3 {
+  font-size: 1.25rem;
+}
+
+.special-moon-events-status,
+.special-moon-event-description,
+.special-moon-weather,
+.special-moon-events-caveat {
+  margin: 0;
+}
+
+.special-moon-events-status,
+.special-moon-event-description,
+.special-moon-events-caveat {
+  color: var(--muted);
+}
+
+.special-moon-events-content,
+.special-moon-event-list {
+  display: grid;
+  gap: 14px;
+  min-width: 0;
+}
+
+.special-moon-event-card {
+  min-width: 0;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface-subtle);
+}
+
+.special-moon-event-card[open] {
+  border-color: var(--line-strong);
+  background: var(--surface);
+}
+
+.special-moon-event-summary {
+  padding: 14px 16px;
+  color: var(--ink);
+}
+
+.special-moon-event-summary::marker {
+  color: var(--accent-strong);
+}
+
+.special-moon-event-summary:focus-visible {
+  outline: 3px solid rgba(33, 111, 104, 0.24);
+  outline-offset: -3px;
+}
+
+.special-moon-event-summary h4 {
+  display: grid;
+  grid-template-columns: 132px minmax(0, 1fr);
+  gap: 14px;
+  align-items: center;
+  min-width: 0;
+  color: var(--ink);
+}
+
+.special-moon-summary-canvas,
+.special-moon-stage-canvas {
+  display: block;
+  max-width: 100%;
+  height: auto;
+  border: 0;
+  border-radius: 50%;
+}
+
+.special-moon-summary-canvas {
+  width: 132px;
+}
+
+.special-moon-summary-copy {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.special-moon-event-kind {
+  color: var(--blue);
+  font-size: 0.74rem;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.special-moon-event-title {
+  font-size: 1.14rem;
+  line-height: 1.25;
+}
+
+.special-moon-event-date,
+.special-moon-event-position {
+  color: var(--muted);
+  font-size: 0.86rem;
+  font-weight: 650;
+}
+
+.special-moon-event-best {
+  color: var(--accent-strong);
+  font-size: 0.92rem;
+  font-weight: 800;
+}
+
+.special-moon-position-warning {
+  color: var(--amber);
+  font-weight: 800;
+}
+
+.special-moon-event-position,
+.special-moon-event-facts dd {
+  position: relative;
+}
+
+.special-moon-event-position .special-moon-position-warning,
+.special-moon-event-facts dd .special-moon-position-warning {
+  position: static;
+}
+
+.special-moon-event-position .special-moon-position-warning::after,
+.special-moon-event-facts dd .special-moon-position-warning::after {
+  box-sizing: border-box;
+  width: min(250px, 100%);
+}
+
+.special-moon-event-details {
+  display: grid;
+  gap: 16px;
+  min-width: 0;
+  padding: 16px;
+  border-top: 1px solid var(--line);
+}
+
+.special-moon-event-details h5 {
+  font-size: 0.96rem;
+}
+
+.special-moon-stages,
+.special-moon-phases {
+  display: grid;
+  gap: 9px;
+  min-width: 0;
+}
+
+.special-moon-stage-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(112px, 1fr));
+  gap: 9px;
+  min-width: 0;
+}
+
+.special-moon-stage {
+  display: grid;
+  gap: 7px;
+  justify-items: center;
+  min-width: 0;
+  margin: 0;
+  padding: 10px 7px;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  background: var(--surface-subtle);
+}
+
+.special-moon-stage.is-best {
+  border-color: rgba(33, 111, 104, 0.52);
+  background: #f1f7f5;
+}
+
+.special-moon-stage-canvas {
+  width: min(112px, 100%);
+}
+
+.special-moon-stage figcaption {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+  text-align: center;
+}
+
+.special-moon-stage figcaption strong {
+  line-height: 1.25;
+  overflow-wrap: anywhere;
+}
+
+.special-moon-stage figcaption > span {
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+
+.special-moon-stage .special-moon-stage-best {
+  color: var(--accent-strong);
+  font-weight: 800;
+}
+
+.special-moon-event-facts {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 9px 16px;
+  margin: 0;
+}
+
+.special-moon-event-facts div {
+  min-width: 0;
+  padding-top: 8px;
+  border-top: 1px solid var(--line);
+}
+
+.special-moon-event-facts dd {
+  overflow-wrap: anywhere;
+}
+
+.special-moon-horizon-note {
+  margin: 0;
+  padding: 9px 11px;
+  border-left: 3px solid var(--amber);
+  background: var(--amber-soft);
+}
+
+.special-moon-phase-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 9px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.special-moon-phase-list > li {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+  padding: 10px;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  background: var(--surface-subtle);
+}
+
+.special-moon-phase-list > li > span {
+  color: var(--muted);
+  font-size: 0.84rem;
+}
+
+.special-moon-phase-list ul {
+  margin: 5px 0 0;
+  padding-left: 17px;
+}
+
+.special-moon-phase-list li li {
+  overflow-wrap: anywhere;
+}
+
+.special-moon-events-caveat {
+  padding-top: 12px;
+  border-top: 1px solid var(--line);
+  font-size: 0.9rem;
+}
+
+@media (max-width: 680px) {
+  .special-moon-event-summary h4 {
+    grid-template-columns: 88px minmax(0, 1fr);
+    gap: 11px;
+  }
+
+  .special-moon-summary-canvas {
+    width: 88px;
+  }
+
+  .special-moon-event-details {
+    padding: 13px;
+  }
+
+  .special-moon-event-facts,
+  .special-moon-phase-list {
+    grid-template-columns: 1fr;
+  }
+
+}

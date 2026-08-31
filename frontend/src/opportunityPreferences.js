@@ -3,6 +3,7 @@ import {
   normalizeAngularPreferences
 } from "./angularPreferenceControls.js";
 import { preferenceApiPathFor } from "./api.js";
+import { element } from "./dom.js";
 import {
   createMoonAppearanceControls,
   normalizeMoonAppearancePreferences
@@ -13,6 +14,11 @@ var VERSION = 1;
 var CLOCK_PATTERN = /^(?:[01]\d|2[0-3]):[0-5]\d$/;
 var LIGHT_BUCKETS = ["daylight", "golden_hour", "civil_twilight", "nautical_twilight", "night"];
 var MEMORY_ONLY_NOTICE = "Preference storage is unavailable. Changes last only on this page; previously saved preferences may return after reload.";
+var showSpecialMoonEvents = true;
+
+export function specialMoonEventsEnabled() {
+  return showSpecialMoonEvents;
+}
 
 export function createOpportunityPreferences(options) {
   var details = options.details;
@@ -24,6 +30,7 @@ export function createOpportunityPreferences(options) {
   var clockEnd = /** @type {HTMLInputElement} */ (form.querySelector("[data-clock-end]"));
   var lightEditor = form.querySelector("#preference-light-editor");
   var formStatus = form.querySelector("#preference-form-status");
+  var specialMoonEvents = createSpecialMoonEventsControl(form);
   var storageNotice = "";
   var weatherRanking = createWeatherRankingPreference(form, function (notice) {
     storageNotice = notice;
@@ -38,9 +45,11 @@ export function createOpportunityPreferences(options) {
   var response = null;
 
   loadState();
+  showSpecialMoonEvents = state.showSpecialMoonEvents;
   renderForm();
   renderResult();
 
+  specialMoonEvents.addEventListener("change", updateSpecialMoonEvents);
   form.addEventListener("change", syncTimeEditors);
   form.addEventListener("submit", applyForm);
   details.querySelector("#preference-reset").addEventListener("click", resetAll);
@@ -135,8 +144,10 @@ export function createOpportunityPreferences(options) {
       return;
     }
     withStorage(function (current) {
-      if (activeFilterCount(state) > 0) {
-        current.setItem(STORAGE_KEY, JSON.stringify(state));
+      if (activeFilterCount(state) > 0 || !state.showSpecialMoonEvents) {
+        var stored = { ...state };
+        if (stored.showSpecialMoonEvents) delete stored.showSpecialMoonEvents;
+        current.setItem(STORAGE_KEY, JSON.stringify(stored));
       } else {
         current.removeItem(STORAGE_KEY);
       }
@@ -170,6 +181,7 @@ export function createOpportunityPreferences(options) {
     angularControls.render(state);
     appearanceControls.render(state);
     weatherRanking.render();
+    specialMoonEvents.checked = state.showSpecialMoonEvents;
     var mode = state.time ? state.time.mode : "none";
     form.querySelector("[name='preference-time-mode'][value='" + mode + "']").checked = true;
     var window = mode === "local_clock"
@@ -218,8 +230,16 @@ export function createOpportunityPreferences(options) {
     }
   }
 
+  function updateSpecialMoonEvents() {
+    state.showSpecialMoonEvents = specialMoonEvents.checked;
+    showSpecialMoonEvents = state.showSpecialMoonEvents;
+    persist();
+    renderResult();
+  }
+
   function commit(next, closeDisclosure) {
     state = next;
+    showSpecialMoonEvents = state.showSpecialMoonEvents;
     response = null;
     persist();
     if (!closeDisclosure) renderForm();
@@ -235,6 +255,9 @@ export function createOpportunityPreferences(options) {
 
 function readForm(form, angularControls, appearanceControls) {
   var next = emptyState();
+  var specialMoonEvents = /** @type {HTMLInputElement} */ (
+    form.querySelector("#preference-special-events"));
+  next.showSpecialMoonEvents = specialMoonEvents.checked;
   var angular = angularControls.read();
   if (angular.error) {
     return angular;
@@ -291,6 +314,12 @@ function normalizeState(value, requireVersion) {
     }
     next.time = time;
   }
+  if (value.showSpecialMoonEvents !== undefined) {
+    if (typeof value.showSpecialMoonEvents !== "boolean") {
+      return null;
+    }
+    next.showSpecialMoonEvents = value.showSpecialMoonEvents;
+  }
   return next;
 }
 
@@ -335,7 +364,7 @@ function ignoredText(payload) {
   return "The server ignored " + count + " unsupported preference " + noun + pathText + moreText;
 }
 
-function emptyState() { return { version: VERSION }; }
+function emptyState() { return { version: VERSION, showSpecialMoonEvents: true }; }
 
 function activeFilterCount(value) {
   return Number(Boolean(value.altitudeDegrees))
@@ -347,10 +376,23 @@ function activeFilterCount(value) {
 
 function activePreferences(value) {
   var active = { ...value };
+  delete active.showSpecialMoonEvents;
   if (active.namedPhases?.length === 1 && active.namedPhases[0] === "full_moon") {
     delete active.brightLimbOrientationDegrees;
   }
   return active;
+}
+
+function createSpecialMoonEventsControl(form) {
+  var input = /** @type {HTMLInputElement} */ (element("input", {
+    id: "preference-special-events",
+    type: "checkbox"
+  }));
+  var control = element("label", { className: "preference-choice", htmlFor: input.id },
+    input,
+    element("span", {}, "Show lunar eclipses"));
+  form.querySelector(".preference-context-note").before(control);
+  return input;
 }
 
 function validClockWindow(window) {

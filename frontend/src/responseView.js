@@ -1,6 +1,7 @@
 import { createCurrentMoonView } from "./currentMoonCard.js";
 import { element } from "./dom.js";
 import { candidateMeta, formatDateTime } from "./format.js";
+import { createMoonEventView } from "./moonEventView.js";
 import { moonPassCard, preferenceBearingActionContext } from "./opportunityCard.js";
 import { fact } from "./terms.js";
 import { weatherRankingFromResponse } from "./weatherRankingPreference.js";
@@ -17,6 +18,7 @@ export function createResponseView(results, callbacks) {
   callbacks = callbacks || {};
   var cameraSetup = null;
   var current = null;
+  var moonEventView = createMoonEventView(results);
 
   return {
     renderIntro: renderIntro,
@@ -133,6 +135,7 @@ export function createResponseView(results, callbacks) {
     }
 
     replaceResults(children);
+    moonEventView.render(payload);
     return groups.length > 1;
   }
 
@@ -300,6 +303,7 @@ export function createResponseView(results, callbacks) {
   }
 
   function replaceResults(children) {
+    moonEventView.cancel();
     if (!Array.isArray(children)) {
       children = [children];
     }
