@@ -2137,10 +2137,11 @@ startup, opportunity lookup, liveness, `/healthz`, or `/readyz`.
 ## Moon Event POST
 
 `POST /api/moon-events` discovers special Moon events independently of ordinary
-Moon-pass scoring. The first event type is a locally visible lunar eclipse.
-The website consumes this contract through `moonEventView.js`; later Atom and
-iCalendar integrations must not define its astronomy or preference rules
-separately.
+Moon-pass scoring. Its closed event union contains locally visible lunar
+eclipses and exact full Moons that satisfy the versioned near-perigee
+definition below. The website consumes this contract through
+`moonEventView.js`; later Atom and iCalendar integrations must not define its
+astronomy or preference rules separately.
 
 ```http
 POST /api/moon-events
@@ -2190,8 +2191,9 @@ location timezone. The horizon is half-open: `[startsAt, endsAt)`.
 }
 ```
 
-A valid search with no visible event uses this complete response with an empty
-`events` array. Events are ordered by objective `maximumAt`, then stable `id`.
+A valid search with no qualifying event uses this complete response with an
+empty `events` array. Events are ordered by their objective instant: eclipse
+`maximumAt` or full-Moon `peakAt`, then stable `id`.
 
 Location resolution preserves the planning API's distinct response shapes:
 
@@ -2204,7 +2206,7 @@ Validation and HTTP errors use the existing product error envelope.
 
 ### Lunar-eclipse event
 
-Each member of `events` contains:
+A lunar-eclipse member of `events` contains:
 
 - opaque, stable `id`;
 - fixed `kind: "lunar_eclipse"`;
@@ -2289,7 +2291,7 @@ contacts, subtype, and peak obscuration. The drawable samples use the pinned
 library's supported public geocentric vectors and rotations through the
 existing ephemeris sampler. They do not use an internal shadow function.
 
-### Local visibility
+### Lunar-eclipse local visibility
 
 Visibility uses observer-relative Moon-center altitude with Astronomy Engine
 `Refraction.Normal`. Altitude at or above zero degrees is visible. Terrain,
@@ -2350,11 +2352,110 @@ request horizon's exclusive end, use the later of the display start and one
 second before the end. `suggestedAt` therefore always lies inside the display
 interval.
 
+### Near-perigee full-Moon event
+
+The second union member represents one exact full Moon with the single
+Version 1 near-perigee qualifier:
+
+```json
+{
+  "id": "full-moon-opaque-stable-id",
+  "kind": "full_moon",
+  "peakAt": "2027-01-22T12:17:50.281Z",
+  "qualifiers": [
+    {
+      "kind": "near_perigee",
+      "definitionVersion": 1,
+      "closeness": 0.992593085406,
+      "distanceKilometersAtPeak": 357634.79259981716,
+      "perigeeDistanceKilometers": 357272.55244686815,
+      "apogeeDistanceKilometers": 406178.2267796418
+    }
+  ],
+  "localViewing": {
+    "intervals": [
+      {
+        "startsAt": "2027-01-22T15:50:00Z",
+        "endsAt": "2027-01-23T06:42:00Z"
+      }
+    ],
+    "selectedInterval": {
+      "startsAt": "2027-01-22T15:50:00Z",
+      "endsAt": "2027-01-23T06:42:00Z"
+    },
+    "displayInterval": {
+      "startsAt": "2027-01-22T15:50:00Z",
+      "suggestedAt": "2027-01-22T15:50:00Z",
+      "endsAt": "2027-01-23T06:42:00Z",
+      "moon": {
+        "altitudeDegrees": 18.2,
+        "azimuthDegrees": 91.4
+      },
+      "sun": {
+        "altitudeDegrees": -20.3,
+        "lightBucket": "night"
+      }
+    }
+  },
+  "preferenceAssessment": {
+    "overall": "matches",
+    "filters": [
+      { "filter": "altitudeDegrees", "status": "matches" }
+    ]
+  },
+  "weather": { "status": "outside_forecast_horizon" }
+}
+```
+
+Astronomy Engine 2.1.19 supplies the exact full-Moon peak, the consecutive
+lunar apsides that bracket it, and their unrounded geocentric distances. One
+of those apsides is perigee and the other is apogee. Moon Service calculates:
+
+```text
+closeness = (D_apogee - D_full) / (D_apogee - D_perigee)
+```
+
+The full Moon qualifies when the unrounded `closeness` is at least `0.90`.
+`qualifiers` contains exactly one `near_perigee` member with
+`definitionVersion: 1`. Its distances and closeness are finite JSON numbers.
+Response and display rounding never decide qualification. `Supermoon` is the
+informal website term; it is not an official astronomical classification.
+
+The opaque ID depends only on event kind and the exact objective peak. It does
+not change with qualifier values, location, preferences, local viewing,
+weather, generation time, or display rounding. A qualifying full Moon that
+coincides with a lunar eclipse remains one distinct `full_moon` member as well
+as the separate `lunar_eclipse` member.
+
+The useful viewing domain is `[peakAt-24h, peakAt+24h]`. The search extends far
+enough beyond the main horizon to discover a useful interval that overlaps it.
+Include a qualifying event when its peak is inside the main half-open horizon
+or a local visible interval in the useful domain overlaps that horizon. A peak
+outside the horizon with no overlapping local visibility is omitted. A peak
+inside the horizon is retained even when no local visible interval overlaps.
+
+Full-Moon local visibility uses the same Moon-center altitude, refraction,
+five-minute sampling, one-second transition refinement, and level horizon as
+eclipse visibility. `intervals` contains every actual chronological,
+non-overlapping visible interval in the complete useful domain. Select only
+among intervals that overlap the main horizon. Prefer an interval containing
+the exact peak; otherwise choose the interval whose nearest point is closest
+to peak, with an earlier-interval tie break. `selectedInterval` stays actual;
+`displayInterval` is its non-empty intersection with the main horizon. The
+suggested instant is the exact peak when visible and otherwise the point in the
+display interval nearest the peak. The main horizon's exclusive-end rule is
+the same as for eclipses.
+
+For a retained qualifying event whose peak is inside the main horizon, when no
+visible interval overlaps that horizon, omit `localViewing` and `weather`. Do
+not fabricate a suggestion, Moon or Sun position, ambient light, or forecast.
+The objective event and qualifier remain.
+
 ### Preference assessment
 
-Preferences do not affect lunar-eclipse inclusion, subtype, order, intervals,
-or suggested time. Only active altitude and azimuth limits are assessed at the
-fixed `suggestedAt` instant.
+Preferences do not affect special-event inclusion, qualification, subtype,
+order, intervals, or suggested time. When local viewing exists, only active
+altitude and azimuth limits are assessed at the fixed `suggestedAt` instant.
 
 ```json
 {
@@ -2367,27 +2468,33 @@ fixed `suggestedAt` instant.
 ```
 
 `filters` is always present and contains only active `altitudeDegrees` and
-`azimuthDegrees`, in that order. Each status is `matches` or
-`does_not_match`. Overall is:
+`azimuthDegrees`, in that order. With local viewing, each status is `matches`
+or `does_not_match`. Overall is:
 
 - `no_active_preferences` when neither applicable limit is active;
 - `matches` when every returned row matches; or
 - `does_not_match` otherwise.
 
 Altitude and lunar-disk azimuth keep their ordinary Version 1 matcher and
-topocentric-footprint meanings. Active time/light, named-phase, and bright-limb
-limits remain accepted and normalized in request metadata, but they produce no
-lunar-eclipse assessment rows and do not affect `overall`. A mismatch is a
-warning and never hides an eclipse. Preference assessment does not use the
-five-minute time grid.
+topocentric-footprint meanings. Active time in either mode, named-phase, and
+bright-limb limits remain accepted and normalized in request metadata, but
+they produce no special-event assessment rows and do not affect `overall`. A
+mismatch is a warning and never hides an event. Preference assessment does not
+use the five-minute time grid to move the already selected instant.
+
+A retained full Moon without `localViewing` still returns
+`preferenceAssessment`. It contains only active altitude and azimuth rows, each
+with `status: "not_applicable"`. Overall is `not_applicable` when at least one
+such row exists and `no_active_preferences` when neither limit is active.
 
 ### Weather
 
-Weather never changes inclusion, order, subtype, or preference status. The
-event service uses only the existing provider and ordinary seven-day forecast
-coverage. If no returned suggestion falls inside that coverage, it makes no
-weather request. Otherwise it makes one request and uses it for every covered
-event.
+Weather never changes inclusion, qualification, order, subtype, or preference
+status. The event service uses only the existing provider and ordinary
+seven-day forecast coverage. If no returned suggestion falls inside that
+coverage, it makes no weather request. Otherwise it makes one request and uses
+it for every covered eclipse and full Moon. A full Moon without local viewing
+has no suggestion and omits `weather`.
 
 `weather` is exactly one of these shapes:
 
@@ -2433,9 +2540,11 @@ route adds no CORS or preflight support.
 
 ### Later event types
 
-Other astronomical event types need their own approved product rules before
-joining this response. Atom and iCalendar may later publish the event service
-result, but must not reimplement its visibility or preference evaluation.
+Micromoons, perigee-only events, named or cultural Moons, blue Moons,
+conjunctions, occultations, solar eclipses, and other astronomical event types
+need their own approved product rules before joining this response. Atom and
+iCalendar may later publish the event service result, but must not reimplement
+its visibility, qualification, or preference evaluation.
 Personal saved event subscriptions would require a privacy and storage model
 for stored preferences, notification delivery, retention, and deletion.
 

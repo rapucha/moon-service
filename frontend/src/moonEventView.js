@@ -1,5 +1,5 @@
 import { element } from "./dom.js";
-import { lunarEclipseCard } from "./lunarEclipseCard.js";
+import { fullMoonCard, lunarEclipseCard } from "./lunarEclipseCard.js";
 import { specialMoonEventsEnabled } from "./opportunityPreferences.js";
 
 var EVENT_PATH = "/api/moon-events";
@@ -33,6 +33,9 @@ export function createMoonEventView(results) {
     currentResponse = ordinaryResponse;
     var location = ordinaryResponse?.location;
     var normalized = ordinaryResponse?.normalizedActiveFilters;
+    if (normalized === undefined && ordinaryResponse?.appliedPreferenceVersion === undefined) {
+      normalized = {};
+    }
     if (!specialMoonEventsEnabled() || location?.kind !== "real_location"
         || typeof location.id !== "string" || !location.id
         || !validTimeZone(location.timezone) || !objectValue(normalized)) {
@@ -126,16 +129,19 @@ function renderSuccess(request, payload) {
   request.section.node.setAttribute("aria-busy", "false");
   if (payload.events.length === 0) {
     request.section.status.textContent =
-      "No lunar eclipse is visible from this location in the next 18 months.";
+      "No lunar eclipse or near-perigee full Moon is available for this location "
+      + "in the next 18 months.";
     request.section.content.replaceChildren();
     return;
   }
   request.section.status.textContent = payload.events.length === 1
-    ? "1 lunar eclipse found." : payload.events.length + " lunar eclipses found.";
+    ? "1 special Moon event found." : payload.events.length + " special Moon events found.";
   request.section.content.replaceChildren(
     element("div", { className: "special-moon-event-list" },
       payload.events.map(function (event) {
-        return lunarEclipseCard(event, payload.location);
+        return event.kind === "lunar_eclipse"
+          ? lunarEclipseCard(event, payload.location)
+          : fullMoonCard(event, payload.location);
       }))
   );
 }
@@ -149,7 +155,7 @@ function validResponse(payload, request) {
     && samePreferences(payload.normalizedActiveFilters, request.preferences)
     && Array.isArray(payload.events)
     && payload.events.every(function (event) {
-      return validEvent(event, request.preferences, payload.endsAt);
+      return validEvent(event, request.preferences, payload.startsAt, payload.endsAt);
     });
 }
 
@@ -184,9 +190,18 @@ function sameValue(left, right) {
   });
 }
 
-function validEvent(event, preferences, responseEndsAt) {
+function validEvent(event, preferences, responseStartsAt, responseEndsAt) {
+  if (!objectValue(event) || typeof event.id !== "string" || event.id.length === 0) return false;
+  if (event.kind === "lunar_eclipse") {
+    return validLunarEclipse(event, preferences, responseEndsAt);
+  }
+  return event.kind === "full_moon"
+    && validFullMoon(event, preferences, responseStartsAt, responseEndsAt);
+}
+
+function validLunarEclipse(event, preferences, responseEndsAt) {
   return objectValue(event) && typeof event.id === "string" && event.id.length > 0
-    && event.kind === "lunar_eclipse" && SUBTYPES.includes(event.subtype)
+    && SUBTYPES.includes(event.subtype)
     && orderedInstants(event.startsAt, event.maximumAt, event.endsAt)
     && finiteBetween(event.umbralObscurationPercent, 0, 100)
     && Array.isArray(event.phases) && event.phases.length > 0
@@ -194,6 +209,59 @@ function validEvent(event, preferences, responseEndsAt) {
     && validEventVisibility(event.localVisibility, event, responseEndsAt)
     && validAssessment(event.preferenceAssessment, preferences)
     && validWeather(event.weather) && validShadowSamples(event);
+}
+
+function validFullMoon(event, preferences, responseStartsAt, responseEndsAt) {
+  if (!validInstant(event.peakAt) || !Array.isArray(event.qualifiers)
+      || event.qualifiers.length !== 1 || !validNearPerigee(event.qualifiers[0])) return false;
+  if (event.localViewing === undefined) {
+    return event.weather === undefined
+      && instantValue(event.peakAt) >= instantValue(responseStartsAt)
+      && instantValue(event.peakAt) < instantValue(responseEndsAt)
+      && validAssessment(event.preferenceAssessment, preferences, true);
+  }
+  return validFullMoonViewing(event.localViewing, event.peakAt, responseStartsAt, responseEndsAt)
+    && validAssessment(event.preferenceAssessment, preferences)
+    && validWeather(event.weather);
+}
+
+function validNearPerigee(qualifier) {
+  if (!objectValue(qualifier) || qualifier.kind !== "near_perigee"
+      || qualifier.definitionVersion !== 1 || !finiteBetween(qualifier.closeness, 0.9, 1)
+      || !Number.isFinite(qualifier.distanceKilometersAtPeak)
+      || !Number.isFinite(qualifier.perigeeDistanceKilometers)
+      || !Number.isFinite(qualifier.apogeeDistanceKilometers)
+      || qualifier.perigeeDistanceKilometers <= 0
+      || qualifier.perigeeDistanceKilometers >= qualifier.apogeeDistanceKilometers
+      || !finiteBetween(qualifier.distanceKilometersAtPeak,
+        qualifier.perigeeDistanceKilometers, qualifier.apogeeDistanceKilometers)) return false;
+  var expected = (qualifier.apogeeDistanceKilometers - qualifier.distanceKilometersAtPeak)
+    / (qualifier.apogeeDistanceKilometers - qualifier.perigeeDistanceKilometers);
+  return Math.abs(expected - qualifier.closeness) <= 1e-9;
+}
+
+function validFullMoonViewing(viewing, peakAt, responseStartsAt, responseEndsAt) {
+  if (!objectValue(viewing) || !Array.isArray(viewing.intervals)
+      || viewing.intervals.length === 0 || !validInterval(viewing.selectedInterval)
+      || !validDisplayInterval(viewing.displayInterval, responseEndsAt)) return false;
+  var peak = instantValue(peakAt);
+  var intervalsValid = viewing.intervals.every(function (interval, index, intervals) {
+    return validInterval(interval) && instantValue(interval.startsAt) >= peak - 86_400_000
+      && instantValue(interval.endsAt) <= peak + 86_400_000
+      && (index === 0 || instantValue(intervals[index - 1].endsAt)
+        <= instantValue(interval.startsAt));
+  });
+  var selected = viewing.selectedInterval;
+  var display = viewing.displayInterval;
+  return intervalsValid && viewing.intervals.some(function (interval) {
+    return sameInterval(interval, selected);
+  }) && instantValue(selected.startsAt) < instantValue(responseEndsAt)
+    && instantValue(selected.endsAt) > instantValue(responseStartsAt)
+    && containsInterval(selected, display)
+    && instantValue(display.startsAt) === Math.max(
+      instantValue(selected.startsAt), instantValue(responseStartsAt))
+    && instantValue(display.endsAt) === Math.min(
+      instantValue(selected.endsAt), instantValue(responseEndsAt));
 }
 
 function validPhase(phase) {
@@ -240,7 +308,7 @@ function validDisplayInterval(interval, responseEndsAt) {
     && typeof interval.sun.lightBucket === "string" && interval.sun.lightBucket.length > 0;
 }
 
-function validAssessment(assessment, preferences) {
+function validAssessment(assessment, preferences, unavailable) {
   if (!objectValue(assessment) || !Array.isArray(assessment.filters)) return false;
   var active = APPLICABLE_FILTERS.filter(function (key) {
     return Object.prototype.hasOwnProperty.call(preferences, key);
@@ -248,10 +316,12 @@ function validAssessment(assessment, preferences) {
   if (assessment.filters.length !== active.length) return false;
   var rowsValid = assessment.filters.every(function (filter, index) {
     return objectValue(filter) && filter.filter === active[index]
-      && (filter.status === "matches" || filter.status === "does_not_match");
+      && (unavailable ? filter.status === "not_applicable"
+        : filter.status === "matches" || filter.status === "does_not_match");
   });
   if (!rowsValid) return false;
   if (active.length === 0) return assessment.overall === "no_active_preferences";
+  if (unavailable) return assessment.overall === "not_applicable";
   var allMatch = assessment.filters.every(function (filter) { return filter.status === "matches"; });
   return assessment.overall === (allMatch ? "matches" : "does_not_match");
 }

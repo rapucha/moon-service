@@ -1,6 +1,6 @@
 package dev.moonservice.backend.web;
 
-import dev.moonservice.backend.events.LunarEclipseEventService;
+import dev.moonservice.backend.events.MoonEventService;
 import dev.moonservice.backend.events.MoonEventResponse;
 import dev.moonservice.backend.opportunity.InvalidOpportunitySearchRequestException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -13,10 +13,10 @@ import org.springframework.web.bind.annotation.RestController;
 
 @RestController
 class MoonEventController {
-    private final LunarEclipseEventService lunarEclipseEventService;
+    private final MoonEventService moonEventService;
 
-    MoonEventController(LunarEclipseEventService lunarEclipseEventService) {
-        this.lunarEclipseEventService = lunarEclipseEventService;
+    MoonEventController(MoonEventService moonEventService) {
+        this.moonEventService = moonEventService;
     }
 
     @PostMapping(value = "/api/moon-events", produces = MediaType.APPLICATION_JSON_VALUE)
@@ -28,7 +28,7 @@ class MoonEventController {
         ProductRequestParser.PlanningRequest eventRequest =
                 ProductRequestParser.parsePlanning(request);
         ProductRequestParser.IgnoredFields ignoredFields = eventRequest.ignoredFields();
-        MoonEventResponse response = lunarEclipseEventService.search(
+        MoonEventResponse response = moonEventService.search(
                 eventRequest.locationId(),
                 eventRequest.preferences(),
                 ignoredFields.paths(),

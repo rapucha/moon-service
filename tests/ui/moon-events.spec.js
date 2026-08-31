@@ -23,7 +23,7 @@ test("requests filtered events and renders collapsed model-derived eclipse cards
 
   await page.goto("/search?locationId=moon-service-3067696");
   const section = page.locator(".special-moon-events");
-  await expect(page.getByLabel("Show lunar eclipses")).toBeChecked();
+  await expect(page.getByLabel("Show lunar eclipses and supermoons")).toBeChecked();
   await expect(section.getByRole("heading", { name: "Special Moon events", level: 3 })).toBeVisible();
   await expect(section.getByRole("status")).toHaveText("Checking special Moon events…");
   await expect(section).toHaveAttribute("aria-busy", "true");
@@ -37,7 +37,7 @@ test("requests filtered events and renders collapsed model-derived eclipse cards
   expect(new URL(calls.events[0].url).search).toBe("");
 
   releaseEvents();
-  await expect(section.getByRole("status")).toHaveText("3 lunar eclipses found.");
+  await expect(section.getByRole("status")).toHaveText("3 special Moon events found.");
   const cards = section.locator(".special-moon-event-card");
   await expect(cards).toHaveCount(3);
   expect(await cards.evaluateAll(nodes => nodes.every(node => !node.hasAttribute("open")))).toBe(true);
@@ -98,7 +98,12 @@ test("requests filtered events and renders collapsed model-derived eclipse cards
 
 test("uses exact all-off preferences and a compact empty state", async ({ page }) => {
   const calls = await captureApis(page, {
-    ordinary: call => json(ordinaryResponse(locationIdFrom(call), {})),
+    ordinary: call => {
+      const response = ordinaryResponse(locationIdFrom(call), {});
+      delete response.appliedPreferenceVersion;
+      delete response.normalizedActiveFilters;
+      return json(response);
+    },
     events: call => json(emptyEventResponse(call.body.locationId))
   });
 
@@ -109,7 +114,8 @@ test("uses exact all-off preferences and a compact empty state", async ({ page }
     preferences: { version: 1 }
   });
   await expect(page.locator(".special-moon-events-status")).toHaveText(
-    "No lunar eclipse is visible from this location in the next 18 months."
+    "No lunar eclipse or near-perigee full Moon is available for this location "
+      + "in the next 18 months."
   );
   await expect(page.locator(".special-moon-event-card")).toHaveCount(0);
   await expect(page.getByText("No opportunities found in the next 7 days")).toBeVisible();
@@ -134,7 +140,7 @@ test("changes the local control immediately, excludes it from APIs, and restores
   });
 
   await page.goto("/search?locationId=moon-service-3067696");
-  const control = page.getByLabel("Show lunar eclipses");
+  const control = page.getByLabel("Show lunar eclipses and supermoons");
   await expect(control).not.toBeChecked();
   await expect(page.locator(".special-moon-events")).toHaveCount(0);
   expect(calls.events).toHaveLength(0);
@@ -172,7 +178,8 @@ test("changes the local control immediately, excludes it from APIs, and restores
   await control.check();
   await waitForEventCalls(calls, 2);
   await expect(page.locator(".special-moon-events-status")).toHaveText(
-    "No lunar eclipse is visible from this location in the next 18 months."
+    "No lunar eclipse or near-perigee full Moon is available for this location "
+      + "in the next 18 months."
   );
   expect(calls.ordinary).toHaveLength(ordinaryCalls);
 
@@ -216,11 +223,11 @@ test("keeps a disabled control in memory when storage fails", async ({ page }) =
   await page.goto("/search?locationId=moon-service-3067696");
   await waitForEventCalls(calls, 1);
   await openPreferences(page);
-  await page.getByLabel("Show lunar eclipses").uncheck();
+  await page.getByLabel("Show lunar eclipses and supermoons").uncheck();
   await expect(page.locator("#preference-storage-notice")).toContainText(
     "Changes last only on this page"
   );
-  await expect(page.getByLabel("Show lunar eclipses")).not.toBeChecked();
+  await expect(page.getByLabel("Show lunar eclipses and supermoons")).not.toBeChecked();
   await expect(page.locator(".special-moon-events")).toHaveCount(0);
   expect(calls.events).toHaveLength(1);
 });

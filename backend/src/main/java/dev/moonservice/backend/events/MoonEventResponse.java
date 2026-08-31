@@ -22,7 +22,7 @@ public sealed interface MoonEventResponse
             List<String> ignoredPreferenceFields,
             int ignoredPreferenceFieldCount,
             int additionalIgnoredPreferenceFieldCount,
-            List<LunarEclipseEvent> events
+            List<MoonEvent> events
     ) implements MoonEventResponse {
         public Success {
             normalizedActiveFilters = Map.copyOf(normalizedActiveFilters);
@@ -62,6 +62,12 @@ public sealed interface MoonEventResponse
     ) {
     }
 
+    sealed interface MoonEvent permits FullMoonEvent, LunarEclipseEvent {
+        String id();
+
+        String kind();
+    }
+
     record LunarEclipseEvent(
             String id,
             String kind,
@@ -76,11 +82,36 @@ public sealed interface MoonEventResponse
             EventVisibility localVisibility,
             PreferenceAssessment preferenceAssessment,
             Weather weather
-    ) {
+    ) implements MoonEvent {
         public LunarEclipseEvent {
             phases = List.copyOf(phases);
             shadowSamples = List.copyOf(shadowSamples);
         }
+    }
+
+    @JsonInclude(JsonInclude.Include.NON_NULL)
+    record FullMoonEvent(
+            String id,
+            String kind,
+            String peakAt,
+            List<FullMoonQualifier> qualifiers,
+            LocalViewing localViewing,
+            PreferenceAssessment preferenceAssessment,
+            Weather weather
+    ) implements MoonEvent {
+        public FullMoonEvent {
+            qualifiers = List.copyOf(qualifiers);
+        }
+    }
+
+    record FullMoonQualifier(
+            String kind,
+            int definitionVersion,
+            double closeness,
+            double distanceKilometersAtPeak,
+            double perigeeDistanceKilometers,
+            double apogeeDistanceKilometers
+    ) {
     }
 
     record EclipsePhase(
@@ -135,6 +166,16 @@ public sealed interface MoonEventResponse
             DisplayInterval displayInterval
     ) {
         public EventVisibility {
+            intervals = List.copyOf(intervals);
+        }
+    }
+
+    record LocalViewing(
+            List<Interval> intervals,
+            Interval selectedInterval,
+            DisplayInterval displayInterval
+    ) {
+        public LocalViewing {
             intervals = List.copyOf(intervals);
         }
     }

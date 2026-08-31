@@ -26,7 +26,7 @@ Open-Meteo URLs are provider dependencies, not Moon Service routes.
 | `GET /api/opportunities` | Location-to-opportunity product API | Browser `app.js` | Allowlisted; site and search bounds |
 | `POST /api/opportunities` | Request-scoped preference product API | Browser `app.js` through `opportunityPreferences.js` | Allowlisted POST; site and provider bounds |
 | `POST /api/opportunities/planning` | Weather-free next-date planning API | Browser `app.js` through `opportunityPreferences.js` | Allowlisted POST; site and provider bounds |
-| `POST /api/moon-events` | Locally visible lunar-eclipse discovery API | Browser `moonEventView.js` | Allowlisted POST; site and provider bounds |
+| `POST /api/moon-events` | Lunar-eclipse and near-perigee full-Moon discovery API | Browser `moonEventView.js` | Allowlisted POST; site and provider bounds |
 | `POST /api/opportunities/search` | Direct fixture/scoring prototype contract | None | Hidden after site admission |
 | `GET /api/calibration-feedback/v1/capability` | Public feedback feature/availability state | None yet | Allowlisted; exempt from hosted resource admission |
 | `POST /api/calibration-feedback/v1/submissions` | Bounded current-observation feedback write | None yet | Allowlisted POST; provider-bound resolution and feedback write bucket |
@@ -560,9 +560,10 @@ and [hosted-alpha functional tests](../backend/src/test/java/dev/moonservice/bac
 ### `POST /api/moon-events`
 
 - **Handler/purpose:** `MoonEventController.search` delegates to
-  `LunarEclipseEventService` for independent discovery of locally visible lunar
-  eclipses during the next 18 calendar months.
-- **Production invocation:** when the browser-local **Show lunar eclipses**
+  `MoonEventService`, which resolves one location, discovers lunar eclipses and
+  qualifying near-perigee exact full Moons during the next 18 calendar months,
+  orders the closed event union, and coordinates one weather lookup.
+- **Production invocation:** when the browser-local **Show lunar eclipses and supermoons**
   preference is enabled, browser `moonEventView.js` calls the route once after
   each successful real-location ordinary result. It sends the canonical result
   location and Version 1 preferences built from `normalizedActiveFilters`.
@@ -574,10 +575,15 @@ and [hosted-alpha functional tests](../backend/src/test/java/dev/moonservice/bac
   the planning parser and rejects query parameters and other top-level fields.
   Existing media handling, body limit, normalization, and ignored-field
   warning apply.
-- **Response:** the half-open timezone-aware horizon contains objective eclipse
-  facts, observer-relative visibility, display selection, Version 1 preference
-  assessment, and event-local weather. Preferences and weather never hide or
-  reorder events. Weather uses zero or one existing seven-day provider lookup.
+- **Response:** the result covers the half-open timezone-aware horizon and
+  contains objective eclipse facts and qualifying near-perigee full-Moon peaks.
+  A full Moon whose peak is outside the horizon is included when its useful
+  local viewing overlaps it. A qualifying peak inside the horizon remains when
+  no local viewing overlaps and then omits local facts and weather. Members
+  otherwise include applicable observer-relative visibility, display selection,
+  Version 1 altitude/azimuth assessment, and event-local weather. Preferences
+  and weather never hide or reorder events. Weather uses zero or one existing
+  seven-day provider lookup.
 - **Authentication/data:** anonymous. It stores no request, result, or profile.
   Preferences remain in the body and outside providers, URLs, analytics,
   shared event caches, application logs, and provider-cache keys. Every
@@ -588,10 +594,12 @@ and [hosted-alpha functional tests](../backend/src/test/java/dev/moonservice/bac
   refusal uses the existing no-store `429`; no CORS or preflight is added.
 - **References:** [controller](../backend/src/main/java/dev/moonservice/backend/web/MoonEventController.java),
   [browser event view](../frontend/src/moonEventView.js),
-  [eclipse card](../frontend/src/lunarEclipseCard.js),
+  [event cards](../frontend/src/lunarEclipseCard.js),
   [eclipse renderer](../frontend/src/lunarEclipseRenderer.js),
   [ordinary response integration](../frontend/src/responseView.js),
-  [service](../backend/src/main/java/dev/moonservice/backend/events/LunarEclipseEventService.java),
+  [aggregator](../backend/src/main/java/dev/moonservice/backend/events/MoonEventService.java),
+  [eclipse discovery](../backend/src/main/java/dev/moonservice/backend/events/LunarEclipseEventService.java),
+  [near-perigee discovery](../backend/src/main/java/dev/moonservice/backend/events/NearPerigeeFullMoonService.java),
   [response model](../backend/src/main/java/dev/moonservice/backend/events/MoonEventResponse.java),
   [API contract](api-shape.md#moon-event-post).
 

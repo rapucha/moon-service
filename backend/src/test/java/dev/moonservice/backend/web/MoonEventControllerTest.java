@@ -1,6 +1,6 @@
 package dev.moonservice.backend.web;
 
-import dev.moonservice.backend.events.LunarEclipseEventService;
+import dev.moonservice.backend.events.MoonEventService;
 import dev.moonservice.backend.events.MoonEventResponse;
 import dev.moonservice.backend.events.MoonEventResponse.*;
 import org.junit.jupiter.api.Test;
@@ -34,9 +34,10 @@ class MoonEventControllerTest {
     private static final String PATH = "/api/moon-events";
 
     @Test
-    void returnsTheClosedEventShapeAndOnlyAggregateIgnoredFieldLogging(CapturedOutput output)
-            throws Exception {
-        LunarEclipseEventService service = mock(LunarEclipseEventService.class);
+    void returnsTheClosedEventUnionAndOnlyAggregateIgnoredFieldLogging(
+            CapturedOutput output
+    ) throws Exception {
+        MoonEventService service = mock(MoonEventService.class);
         when(service.search(anyString(), any(), anyList(), anyInt()))
                 .thenReturn(successResponse());
 
@@ -53,6 +54,11 @@ class MoonEventControllerTest {
                 .andExpect(jsonPath("$.status").value("ok"))
                 .andExpect(jsonPath("$.events[0].kind").value("lunar_eclipse"))
                 .andExpect(jsonPath("$.events[0].weather.status").value("available"))
+                .andExpect(jsonPath("$.events[2].kind").value("full_moon"))
+                .andExpect(jsonPath("$.events[2].qualifiers[0].kind")
+                        .value("near_perigee"))
+                .andExpect(jsonPath("$.events[3].localViewing").doesNotExist())
+                .andExpect(jsonPath("$.events[3].weather").doesNotExist())
                 .andReturn();
 
         JsonNode response = MAPPER.readTree(result.getResponse().getContentAsString());
@@ -85,6 +91,22 @@ class MoonEventControllerTest {
                 "precipitationProbabilityPercent");
         assertThat(response.at("/events/1/weather").propertyNames()).containsExactly("status");
 
+        JsonNode fullMoon = response.path("events").get(2);
+        assertThat(fullMoon.propertyNames()).containsExactlyInAnyOrder(
+                "id", "kind", "peakAt", "qualifiers", "localViewing",
+                "preferenceAssessment", "weather");
+        assertThat(fullMoon.path("qualifiers").get(0).propertyNames())
+                .containsExactlyInAnyOrder(
+                        "kind", "definitionVersion", "closeness",
+                        "distanceKilometersAtPeak", "perigeeDistanceKilometers",
+                        "apogeeDistanceKilometers");
+        assertThat(fullMoon.path("localViewing").propertyNames())
+                .containsExactlyInAnyOrder(
+                        "intervals", "selectedInterval", "displayInterval");
+        JsonNode noLocal = response.path("events").get(3);
+        assertThat(noLocal.propertyNames()).containsExactlyInAnyOrder(
+                "id", "kind", "peakAt", "qualifiers", "preferenceAssessment");
+
         verify(service).search(
                 eq("prague-cz"),
                 argThat(preferences -> preferences.normalizedFilters().keySet()
@@ -100,7 +122,7 @@ class MoonEventControllerTest {
     @MethodSource("invalidRequests")
     void rejectsInvalidBodiesAndQueryVariantsBeforeServiceWork(String uri, String body, String message)
             throws Exception {
-        LunarEclipseEventService service = mock(LunarEclipseEventService.class);
+        MoonEventService service = mock(MoonEventService.class);
 
         mvc(service).perform(post(uri)
                         .contentType(MediaType.APPLICATION_JSON)
@@ -136,7 +158,7 @@ class MoonEventControllerTest {
 
     @Test
     void enforcesMediaBodyAndRepresentationRulesWithNoStoreErrors() throws Exception {
-        LunarEclipseEventService service = mock(LunarEclipseEventService.class);
+        MoonEventService service = mock(MoonEventService.class);
         MockMvc mvc = mvc(service);
         String valid = "{\"locationId\":\"prague-cz\",\"preferences\":{\"version\":1}}";
 
@@ -166,7 +188,7 @@ class MoonEventControllerTest {
 
     @Test
     void mapsOnlyTopLevelTemporaryUnavailabilityToServiceUnavailable() throws Exception {
-        LunarEclipseEventService service = mock(LunarEclipseEventService.class);
+        MoonEventService service = mock(MoonEventService.class);
         when(service.search(anyString(), any(), anyList(), anyInt()))
                 .thenReturn(new Status(
                         "temporarily_unavailable",
@@ -181,7 +203,7 @@ class MoonEventControllerTest {
                 .andExpect(jsonPath("$.status").value("temporarily_unavailable"));
     }
 
-    private static MockMvc mvc(LunarEclipseEventService service) {
+    private static MockMvc mvc(MoonEventService service) {
         return MockMvcBuilders.standaloneSetup(new MoonEventController(service))
                 .setControllerAdvice(new OpportunitySearchErrorHandler())
                 .addFilters(new HostedAlphaSurfaceFilter(false))
@@ -189,10 +211,12 @@ class MoonEventControllerTest {
     }
 
     private static Success successResponse() {
-        LunarEclipseEvent available = event("event-1", new Weather(
+        LunarEclipseEvent available = eclipse("event-1", new Weather(
                 "available", "2026-09-01T02:00:00Z", "partly cloudy", 38, 5));
-        LunarEclipseEvent outside = event("event-2", new Weather(
-                "outside_forecast_horizon", null, null, null, null));
+        LunarEclipseEvent outside = eclipse(
+                "event-2", outsideForecastHorizon());
+        FullMoonEvent local = fullMoon("event-3", true);
+        FullMoonEvent noLocal = fullMoon("event-4", false);
         return new Success(
                 "ok",
                 "2026-08-30T10:00:00Z",
@@ -205,11 +229,11 @@ class MoonEventControllerTest {
                 List.of("/private-marker"),
                 1,
                 0,
-                List.of(available, outside));
+                List.of(available, outside, local, noLocal));
     }
 
-    private static LunarEclipseEvent event(String id, Weather weather) {
-        Interval interval = new Interval("2026-09-01T01:00:00Z", "2026-09-01T04:00:00Z");
+    private static LunarEclipseEvent eclipse(String id, Weather weather) {
+        Interval interval = interval();
         return new LunarEclipseEvent(
                 id,
                 "lunar_eclipse",
@@ -230,14 +254,51 @@ class MoonEventControllerTest {
                         "fully_visible",
                         List.of(interval),
                         interval,
-                        new DisplayInterval(
-                                interval.startsAt(),
-                                "2026-09-01T02:30:00Z",
-                                interval.endsAt(),
-                                new MoonPosition(20.0, 180.0),
-                                new SunPosition(-15.0, "night"))),
+                        display(interval)),
                 new PreferenceAssessment(
                         "matches", List.of(new FilterAssessment("altitudeDegrees", "matches"))),
                 weather);
+    }
+
+    private static FullMoonEvent fullMoon(String id, boolean local) {
+        Interval interval = interval();
+        LocalViewing viewing = local
+                ? new LocalViewing(List.of(interval), interval, display(interval))
+                : null;
+        return new FullMoonEvent(
+                id,
+                "full_moon",
+                "2027-01-22T12:17:50.281Z",
+                List.of(new FullMoonQualifier(
+                        "near_perigee",
+                        1,
+                        0.992593085406,
+                        357634.79259981716,
+                        357272.55244686815,
+                        406178.2267796418)),
+                viewing,
+                new PreferenceAssessment(
+                        local ? "matches" : "not_applicable",
+                        List.of(new FilterAssessment(
+                                "altitudeDegrees",
+                                local ? "matches" : "not_applicable"))),
+                local ? outsideForecastHorizon() : null);
+    }
+
+    private static Interval interval() {
+        return new Interval("2026-09-01T01:00:00Z", "2026-09-01T04:00:00Z");
+    }
+
+    private static DisplayInterval display(Interval interval) {
+        return new DisplayInterval(
+                interval.startsAt(),
+                "2026-09-01T02:30:00Z",
+                interval.endsAt(),
+                new MoonPosition(20.0, 180.0),
+                new SunPosition(-15.0, "night"));
+    }
+
+    private static Weather outsideForecastHorizon() {
+        return new Weather("outside_forecast_horizon", null, null, null, null);
     }
 }

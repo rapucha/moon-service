@@ -71,6 +71,10 @@
   color: var(--ink);
 }
 
+.special-moon-event-summary.special-moon-event-summary-text h4 {
+  grid-template-columns: 1fr;
+}
+
 .special-moon-summary-canvas,
 .special-moon-stage-canvas {
   display: block;

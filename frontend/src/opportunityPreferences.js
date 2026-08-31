@@ -390,7 +390,7 @@ function createSpecialMoonEventsControl(form) {
   }));
   var control = element("label", { className: "preference-choice", htmlFor: input.id },
     input,
-    element("span", {}, "Show lunar eclipses"));
+    element("span", {}, "Show lunar eclipses and supermoons"));
   form.querySelector(".preference-context-note").before(control);
   return input;
 }

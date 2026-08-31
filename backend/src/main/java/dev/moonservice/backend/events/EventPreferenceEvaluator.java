@@ -37,6 +37,20 @@ final class EventPreferenceEvaluator {
         return new PreferenceAssessment(overall, filters);
     }
 
+    static PreferenceAssessment notApplicable(OpportunityPreferences preferences) {
+        Objects.requireNonNull(preferences, "preferences");
+        List<FilterAssessment> filters = new ArrayList<>();
+        if (preferences.altitudeDegrees() != null) {
+            filters.add(new FilterAssessment("altitudeDegrees", "not_applicable"));
+        }
+        if (preferences.azimuthDegrees() != null) {
+            filters.add(new FilterAssessment("azimuthDegrees", "not_applicable"));
+        }
+        return new PreferenceAssessment(
+                filters.isEmpty() ? "no_active_preferences" : "not_applicable",
+                filters);
+    }
+
     private static FilterAssessment assessment(String filter, boolean matches) {
         return new FilterAssessment(filter, matches ? "matches" : "does_not_match");
     }
