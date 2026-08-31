@@ -12,9 +12,9 @@ accounts, and RSS deliberately out of scope.
   backend location candidate after ambiguous city lookup.
 - `POST /api/opportunities` for a live lookup with request-scoped hard
   preferences.
-- `POST /api/moon-events` for locally visible lunar eclipses during the next
-  18 calendar months, with request-scoped preference assessment and ordinary
-  short-range weather when available.
+- `POST /api/moon-events` for lunar eclipses and qualifying near-perigee exact
+  full Moons during the next 18 calendar months, with request-scoped position
+  preference assessment and ordinary short-range weather when available.
 - Browser lookup page at `/search?q=Praha`, using GET without active hard
   preferences and the product POST when at least one is active.
 - Public Atom feed at `GET /feeds/atom?locationId=<canonical-id>`, with optional
@@ -97,7 +97,7 @@ so it may show fewer than ten pass cards. This broader result set is provisional
 while scoring is evaluated under issue #33; the direct fixture endpoint below
 continues to honor its explicit caller-supplied `limit`.
 
-## Lunar Eclipse API
+## Moon Event API
 
 `POST /api/moon-events` accepts a canonical location and the complete Version 1
 preference object:
@@ -109,20 +109,23 @@ curl -sS http://127.0.0.1:8080/api/moon-events \
 ```
 
 The successful response covers the half-open 18 calendar-month horizon in the
-resolved location timezone. It returns every locally visible lunar eclipse in
-chronological order, including its objective phases and maximum, actual local
-visibility intervals, one selected/display interval, a suggested observation
-instant, Moon/Sun display facts, and drawable shadow samples for every phase
-contact, maximum, and a distinct suggested instant. A valid result can have
-`events: []`.
+resolved location timezone. It returns a chronological closed union of locally
+visible lunar eclipses and qualifying near-perigee exact full Moons. Eclipse
+members include objective phases, maximum, local visibility, and drawable
+shadow samples. Full-Moon members include the exact peak, versioned qualifier,
+and local viewing within 24 hours on either side. A qualifying full Moon whose
+peak is inside the horizon remains in the response when no local interval
+overlaps; that member omits `localViewing` and `weather`. A valid result can
+have `events: []`.
 
-Preferences never move, remove, or reorder a lunar eclipse. The suggestion is
-objective maximum when that instant is in the display interval. Otherwise it
-is the visible point in that interval nearest maximum. Only active altitude and
-azimuth limits are assessed there, as matches or warnings. Time/light,
-named-phase, and bright-limb limits produce no lunar-eclipse assessment rows.
-The five-minute grid and one-second refinement remain in use only to find local
-visibility intervals.
+Preferences never move, remove, or reorder either event type. With local
+viewing, the suggestion is the objective event time when that instant lies in
+`displayInterval` and otherwise the nearest visible point in that interval.
+Only active altitude and azimuth limits are assessed there, as matches or
+warnings. For a retained full Moon without local viewing, active altitude and
+azimuth rows are `not_applicable`. Time/light, named-phase, and bright-limb
+limits produce no special-event assessment rows. The five-minute grid and
+one-second refinement remain in use only to find local visibility intervals.
 
 Shadow samples use Astronomy Engine's supported public Sun/Moon vectors and
 rotations. Their center offsets and umbra/penumbra radii are expressed in Moon
@@ -131,9 +134,10 @@ obscuration still come from Astronomy Engine's public eclipse search.
 
 Weather never changes the astronomical result. When a suggestion falls inside
 ordinary seven-day forecast coverage, the service makes one existing provider
-lookup for the whole request. Other events report
-`outside_forecast_horizon`; lookup failure reports event-local
-`temporarily_unavailable` without losing the event.
+lookup for the whole request. Events with suggestions outside that coverage
+report `outside_forecast_horizon`; lookup failure reports event-local
+`temporarily_unavailable` without losing the event. Events without local
+viewing omit weather.
 
 The endpoint accepts no query parameters or `weatherRanking`. It creates no
 permanent location, preference, or result record; existing provider caches keep

@@ -70,6 +70,10 @@ In scope:
 - Find upcoming Moon windows for that location.
 - Score opportunities using Moon geometry, Sun state, and weather.
 - Present ranked opportunities.
+- Show upcoming locally visible lunar eclipses and qualifying near-perigee exact
+  full Moons separately from ordinary scored opportunities. A qualifying full
+  Moon stays discoverable when its objective peak is in the search horizon but
+  no local viewing interval overlaps it.
 - Provide a shareable result page.
 - Provide a public Atom feed for a canonical real location. The browser shows
   `Copy Atom feed link`: applied response metadata selects the backend-generated
@@ -127,7 +131,9 @@ Moon Service keeps four timing ideas separate:
 - **Event uncertainty:** A recurring event may have an expected time, an
   uncertainty window, an overlap window, and a confidence level. An eclipse
   may have precise contacts, phases, maximum, local visibility, and safety
-  bounds. Each event owns its timing rules.
+  bounds. A near-perigee full Moon has one exact peak and separate local
+  viewing intervals within 24 hours on either side. Each event owns its timing
+  rules.
 - **Grouping tolerance:** The service may join precise matching fragments into
   one ordinary practical envelope only when they belong to the same physical
   Moon pass, their natural source-window coverage is continuous, and each

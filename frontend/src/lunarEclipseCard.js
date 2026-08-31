@@ -63,6 +63,43 @@ export function lunarEclipseCard(event, location) {
       "Visibility uses a level astronomical horizon and does not account for terrain, buildings, or trees.")));
 }
 
+export function fullMoonCard(event, location) {
+  var viewing = event.localViewing;
+  var display = viewing?.displayInterval;
+  var bestAt = display?.suggestedAt;
+  var qualifier = event.qualifiers[0];
+  var headingId = "special-moon-event-" + safeId(event.id);
+  var bestLabel = bestAt === event.peakAt ? "Best · Full Moon" : "Best visible";
+  var unavailable = "Not visible from " + location.displayName + " during the searched dates.";
+
+  return element("details", {
+    className: "special-moon-event-card",
+    ariaLabelledby: headingId
+  },
+  element("summary", {
+    className: "special-moon-event-summary special-moon-event-summary-text"
+  },
+  element("h4", { id: headingId },
+    element("span", { className: "special-moon-summary-copy" },
+      element("span", { className: "special-moon-event-kind" }, "Full Moon"),
+      element("span", { className: "special-moon-event-title" }, "Supermoon"),
+      element("span", { className: "special-moon-event-date" },
+        localDate(bestAt || event.peakAt, location)),
+      display
+        ? element("span", { className: "special-moon-event-best" },
+          bestLabel + " · " + formatTime(bestAt, location.timezone, location.countryCode))
+        : element("span", { className: "special-moon-event-date" }, unavailable),
+      display ? element("span", { className: "special-moon-event-position" },
+        moonPosition(display.moon, event.preferenceAssessment)) : null))),
+  element("div", { className: "special-moon-event-details" },
+    element("p", { className: "special-moon-event-description" },
+      "A full Moon near perigee under Moon Service definition 1. “Supermoon” is an informal term."),
+    fullMoonFacts(event, qualifier, location),
+    display ? element("p", { className: "special-moon-weather" }, weatherText(event.weather)) : null,
+    display ? element("p", { className: "special-moon-events-caveat" },
+      "Visibility uses a level astronomical horizon and does not account for terrain, buildings, or trees.") : null));
+}
+
 function stageStrip(event, location) {
   return element("section", {
     className: "special-moon-stages",
@@ -96,6 +133,25 @@ function eventFacts(event, location) {
     fact("Moon position", moonPosition(display.moon, event.preferenceAssessment)),
     fact("Ambient light", readableToken(display.sun.lightBucket)),
     fact("Umbral obscuration", round1(event.umbralObscurationPercent) + "%"));
+}
+
+function fullMoonFacts(event, qualifier, location) {
+  var display = event.localViewing?.displayInterval;
+  var facts = [
+    fact("Exact full Moon", localTime(event.peakAt, location)),
+    fact("Distance at peak", distanceText(qualifier.distanceKilometersAtPeak)),
+    fact("Near-perigee closeness", round1(qualifier.closeness * 100)
+      + "% · Moon Service definition: at least 90%")
+  ];
+  if (display) {
+    facts.push(
+      fact("Visible window", intervalText(display, location)),
+      fact("Best local time", localTime(display.suggestedAt, location)),
+      fact("Moon position", moonPosition(display.moon, event.preferenceAssessment)),
+      fact("Ambient light", readableToken(display.sun.lightBucket))
+    );
+  }
+  return element("dl", { className: "special-moon-event-facts" }, facts);
 }
 
 function phaseVisibility(phases, location) {
@@ -172,6 +228,12 @@ function localTime(value, location) {
 
 function intervalText(interval, location) {
   return localTime(interval.startsAt, location) + " – " + localTime(interval.endsAt, location);
+}
+
+function distanceText(value) {
+  return new Intl.NumberFormat(navigator.languages?.[0] || navigator.language, {
+    maximumFractionDigits: 0
+  }).format(value) + " km";
 }
 
 function moonPosition(moon, assessment) {

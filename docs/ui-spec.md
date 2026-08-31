@@ -1058,10 +1058,11 @@ separate night.
 
 ## Special Moon events
 
-The Preferences panel contains one unframed `Show lunar eclipses` checkbox. It
-is on by default and belongs to the existing browser-local Version 1 preference
-state. A stored Version 1 value without this field means enabled, which keeps
-preferences written by older deployed pages compatible. Disabled is stored as
+The Preferences panel contains one unframed
+`Show lunar eclipses and supermoons` checkbox. It is on by default and belongs
+to the existing browser-local Version 1 preference state. A stored Version 1
+value without this field means enabled, which keeps preferences written by
+older deployed pages compatible. Disabled is stored as
 `showSpecialMoonEvents: false`; Reset all returns to enabled. The field is not
 a hard limit and is absent from preference counts, ordinary and planning API
 bodies, Moon-event API preferences, URLs, history, cookies, analytics, and
@@ -1086,27 +1087,37 @@ ranking and the browser-only control are never sent. A newer lookup cancels or
 invalidates the request. A stale, wrong-location, malformed, or non-`ok` event
 response cannot replace or alter ordinary content.
 
+The preference-free ordinary GET response predates applied-preference metadata
+and omits both `appliedPreferenceVersion` and `normalizedActiveFilters`. The
+event view treats that established shape as canonical all-off state. If an
+ordinary response claims an applied preference version but omits its normalized
+filters, the event view remains hidden instead of guessing them.
+
 The section uses these compact states:
 
 - loading: `Checking special Moon events…`;
 - successful empty:
-  `No lunar eclipse is visible from this location in the next 18 months.`;
+  `No lunar eclipse or near-perigee full Moon is available for this location
+  in the next 18 months.`;
 - localized failure:
   `Special Moon events are temporarily unavailable. Moon opportunities are
   unchanged.`
 
-Returned eclipses remain in API order. Each is a native `details` card that is
-collapsed by default. Its summary uses the MoonPass visual language and shows
-the subtype, local calendar date, best local time, Moon altitude and direction,
-and a model-derived Moon. It says `Best · Maximum` when the fixed suggestion is
-objective maximum and `Best visible` otherwise. The card shows no preference
-pill. When altitude or direction does not match an active preference, only that
-numeric position value uses warning colour and a focusable tooltip:
+Returned eclipses and full Moons remain in API order. Each is a native
+`details` card that is collapsed by default. An eclipse summary uses the
+MoonPass visual language and shows the subtype, local calendar date, best local
+time, Moon altitude and direction, and a model-derived Moon. It says
+`Best · Maximum` when the fixed suggestion is objective maximum and
+`Best visible` otherwise. A full-Moon summary uses the same typography without
+adding an image or icon. When local viewing exists, it says `Best · Full Moon`
+when `suggestedAt` equals `peakAt` and `Best visible` otherwise. Cards show no
+preference pill. When altitude or direction does not match an active preference,
+only that numeric position value uses warning colour and a focusable tooltip:
 `Outside your altitude preference.` or `Outside your direction preference.`
 Matching and unrestricted values retain ordinary styling and no tooltip. The
 same treatment applies to the summary and expanded Moon-position fact.
 
-Expanded cards show every returned `shadowSamples` member in chronological
+Expanded eclipse cards show every returned `shadowSamples` member in chronological
 order. Phase contacts use `Penumbral begins`, `Partial begins`, `Total begins`,
 and corresponding end labels. Objective maximum uses `Maximum`; a distinct
 suggestion uses `Best visible`. The best sample carries the same summary label.
@@ -1120,7 +1131,7 @@ legibility and are not a colour prediction. A nullable
 `northPoleTiltDegrees` keeps the shadow geometry and shows the surface
 north-up. The renderer adds no Moon outline.
 
-Expanded facts include objective maximum, the display-visible interval, every
+Expanded eclipse facts include objective maximum, the display-visible interval, every
 phase's local visibility, best time and Moon position, ambient light, umbral
 obscuration, weather, and the level-horizon caveat. Available weather says
 `Forecast at the best time: <summary>.` Outside coverage and temporary failure
@@ -1131,10 +1142,27 @@ Card titles are `Penumbral lunar eclipse`, `Partial lunar eclipse`, and `Total
 lunar eclipse`. Penumbral copy notes that the change can be subtle. Partial
 copy explains the dark bite and unusual-crescent appearance. Total copy says
 the Moon may appear red without calling every total eclipse a Blood Moon.
+The full-Moon card title is `Supermoon`. Its expanded facts show the exact
+full-Moon time, distance at peak, readable near-perigee closeness and the 90%
+Moon Service definition. It states that Supermoon is an informal term and does
+not claim a particular size, brightness, or rarity. When local viewing exists,
+the card also shows its visible interval, best local time, Moon position,
+ambient light, level-horizon caveat, and weather. When it does not exist, the
+summary says `Not visible from {location name} during the searched dates.` and
+the expanded card omits those local facts, preference warnings, caveat, and
+weather.
+
+Photography preferences never hide or reschedule a special event. Only active
+altitude and direction preferences are assessed at the already selected local
+time. Time, light bucket, named Moon shape, and bright-limb orientation do not
+produce assessment rows. A retained full Moon without a local viewing interval
+has no position warning because there is no local instant to assess.
+
 Cards contain no ordinary score, rank, confidence, exposure balance, photo
 hint, image download, calendar, Atom, share, or solar-warning action.
 
-`lunarEclipseCard.js` owns event-specific semantic structure and copy;
+`lunarEclipseCard.js` owns the eclipse and full-Moon semantic structure and
+copy;
 `lunarEclipseRenderer.js` owns canvas drawing; and `moonEventView.css` owns the
 responsive presentation. Native summaries are keyboard operable, every canvas
 has text alternatives, the section has one polite local status, and desktop
