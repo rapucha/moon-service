@@ -92,6 +92,7 @@ class HostedAlphaSurfaceFilterTest {
     @ValueSource(strings = {
             "/admin", "/admin/", "/admin/other", "/admin/status/",
             "/api/opportunities/", "/api/opportunities/search", "/api/unknown", "/healthz",
+            "/api/moon-events/", "/api/moon-events/search", "/API/moon-events",
             "//readyz", "/readyz;unexpected=true", "/READYZ"
     })
     void hidesUnapprovedPathVariants(String path) throws Exception {
@@ -104,6 +105,25 @@ class HostedAlphaSurfaceFilterTest {
 
         assertThat(response.getStatus()).isEqualTo(405);
         assertThat(response.getHeader("Allow")).isEqualTo("GET, HEAD");
+    }
+
+    @Test
+    void exposesOnlyFramedPostForMoonEventsAndPreventsCachingEveryExactPathResponse()
+            throws Exception {
+        HostedAlphaSurfaceFilter filter = new HostedAlphaSurfaceFilter(true);
+        MockHttpServletRequest post = request("POST", "/api/moon-events");
+        post.setContent("{}".getBytes(StandardCharsets.UTF_8));
+        MockHttpServletResponse accepted = new MockHttpServletResponse();
+        AtomicBoolean chainCalled = new AtomicBoolean(false);
+
+        filter.doFilter(post, accepted, (request, response) -> chainCalled.set(true));
+
+        assertThat(chainCalled).isTrue();
+        assertThat(accepted.getHeader("Cache-Control")).isEqualTo("no-store");
+        MockHttpServletResponse rejected = rejectedResponse(request("GET", "/api/moon-events"));
+        assertThat(rejected.getStatus()).isEqualTo(405);
+        assertThat(rejected.getHeader("Allow")).isEqualTo("POST");
+        assertThat(rejected.getHeader("Cache-Control")).isEqualTo("no-store");
     }
 
     @Test

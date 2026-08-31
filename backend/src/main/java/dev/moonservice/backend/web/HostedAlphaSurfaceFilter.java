@@ -24,6 +24,7 @@ import java.util.Set;
 public final class HostedAlphaSurfaceFilter extends OncePerRequestFilter {
     private static final String OPPORTUNITY_PATH = "/api/opportunities";
     private static final String PLANNING_PATH = "/api/opportunities/planning";
+    private static final String MOON_EVENT_PATH = "/api/moon-events";
     private static final String ATOM_FEED_PATH = "/feeds/atom";
     private static final String CALENDAR_FEED_PATH = "/calendars/opportunities.ics";
     static final String FEEDBACK_CAPABILITY_PATH = "/api/calibration-feedback/v1/capability";
@@ -37,7 +38,7 @@ public final class HostedAlphaSurfaceFilter extends OncePerRequestFilter {
 
     private static final Set<String> APPROVED_PATHS = Set.of(
             "/", "/about", "/about.html", "/index.html", "/search",
-            "/admin/status", OPPORTUNITY_PATH, PLANNING_PATH, "/readyz",
+            "/admin/status", OPPORTUNITY_PATH, PLANNING_PATH, MOON_EVENT_PATH, "/readyz",
             ATOM_FEED_PATH, CALENDAR_FEED_PATH,
             FEEDBACK_CAPABILITY_PATH, FEEDBACK_SUBMISSIONS_PATH,
             "/angularPreferenceControls.js", "/angularPreferencePreview.css",
@@ -78,7 +79,9 @@ public final class HostedAlphaSurfaceFilter extends OncePerRequestFilter {
             FilterChain filterChain
     ) throws ServletException, IOException {
         String path = applicationPath(request);
-        if (isProductPost(request.getMethod(), path) || isCalendarRequestPath(path)) {
+        if (isProductPost(request.getMethod(), path)
+                || MOON_EVENT_PATH.equals(path)
+                || isCalendarRequestPath(path)) {
             response.setHeader("Cache-Control", "no-store");
         }
         if (!enabled) {
@@ -123,7 +126,9 @@ public final class HostedAlphaSurfaceFilter extends OncePerRequestFilter {
     }
 
     private static List<String> allowedMethods(String path) {
-        if (FEEDBACK_SUBMISSIONS_PATH.equals(path) || PLANNING_PATH.equals(path)) {
+        if (FEEDBACK_SUBMISSIONS_PATH.equals(path)
+                || PLANNING_PATH.equals(path)
+                || MOON_EVENT_PATH.equals(path)) {
             return List.of("POST");
         }
         return OPPORTUNITY_PATH.equals(path)
@@ -135,12 +140,15 @@ public final class HostedAlphaSurfaceFilter extends OncePerRequestFilter {
         return "POST".equals(method)
                 && (FEEDBACK_SUBMISSIONS_PATH.equals(path)
                 || OPPORTUNITY_PATH.equals(path)
-                || PLANNING_PATH.equals(path));
+                || PLANNING_PATH.equals(path)
+                || MOON_EVENT_PATH.equals(path));
     }
 
     private static boolean isProductPost(String method, String path) {
         return "POST".equals(method)
-                && (OPPORTUNITY_PATH.equals(path) || PLANNING_PATH.equals(path));
+                && (OPPORTUNITY_PATH.equals(path)
+                || PLANNING_PATH.equals(path)
+                || MOON_EVENT_PATH.equals(path));
     }
 
     static boolean isFeedbackPath(String path) {
@@ -152,7 +160,10 @@ public final class HostedAlphaSurfaceFilter extends OncePerRequestFilter {
     }
 
     private static void preventPublicLinkErrorCaching(String path, HttpServletResponse response) {
-        if (ATOM_FEED_PATH.equals(path) || CALENDAR_FEED_PATH.equals(path) || isCalendarRequestPath(path)) {
+        if (ATOM_FEED_PATH.equals(path)
+                || CALENDAR_FEED_PATH.equals(path)
+                || MOON_EVENT_PATH.equals(path)
+                || isCalendarRequestPath(path)) {
             response.setHeader("Cache-Control", "no-store");
         }
     }

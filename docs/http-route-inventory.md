@@ -4,9 +4,9 @@ This is the canonical inventory of HTTP operations explicitly mapped by Moon
 Service controllers. It records who uses each route, why it exists, and how its
 exposure differs between the ordinary application and hosted-alpha mode.
 
-The route universe is the fifteen mappings declared by `WebPageController`,
+The route universe is the sixteen mappings declared by `WebPageController`,
 `AtomFeedController`, `ICalendarEventController`, `ICalendarFeedController`,
-`OpportunitySearchController`, `MoonPlanningController`,
+`OpportunitySearchController`, `MoonPlanningController`, `MoonEventController`,
 `CalibrationFeedbackController`, `HealthController`, and
 `AdminStatusController`. Spring's implicit `HEAD`
 handling, `/error`, exception handlers, and static-resource serving are
@@ -26,6 +26,7 @@ Open-Meteo URLs are provider dependencies, not Moon Service routes.
 | `GET /api/opportunities` | Location-to-opportunity product API | Browser `app.js` | Allowlisted; site and search bounds |
 | `POST /api/opportunities` | Request-scoped preference product API | Browser `app.js` through `opportunityPreferences.js` | Allowlisted POST; site and provider bounds |
 | `POST /api/opportunities/planning` | Weather-free next-date planning API | Browser `app.js` through `opportunityPreferences.js` | Allowlisted POST; site and provider bounds |
+| `POST /api/moon-events` | Locally visible lunar-eclipse discovery API | Direct API clients; later website, Atom, and iCalendar slices | Allowlisted POST; site and provider bounds |
 | `POST /api/opportunities/search` | Direct fixture/scoring prototype contract | None | Hidden after site admission |
 | `GET /api/calibration-feedback/v1/capability` | Public feedback feature/availability state | None yet | Allowlisted; exempt from hosted resource admission |
 | `POST /api/calibration-feedback/v1/submissions` | Bounded current-observation feedback write | None yet | Allowlisted POST; provider-bound resolution and feedback write bucket |
@@ -50,9 +51,11 @@ Open-Meteo URLs are provider dependencies, not Moon Service routes.
   and maximum allowed hosted capacity is 40, with a default and fastest allowed
   refill of one token per second; stricter settings are valid. An empty bucket
   returns `429` with a numeric `Retry-After` before the route's usual `200`,
-  `400`, `401`, `404`, `405`, or `503` behavior can be selected. `GET`, the product POST,
-  and the planning POST return canonical `rate_limited` JSON; both POST responses include
-  `Cache-Control: no-store`. `HEAD` carries the same status, headers, and would-be content length without a body.
+  `400`, `401`, `404`, `405`, or `503` behavior can be selected. `GET`, the
+  product POST, planning POST, and Moon-event POST return canonical
+  `rate_limited` JSON; all three POST responses include `Cache-Control:
+  no-store`. `HEAD` carries the same status, headers, and would-be content
+  length without a body.
 - Exact `GET`/`HEAD /api/opportunities` and `POST /api/opportunities` requests
   that pass the whole-site bound ask the shared non-web
   `HostedAlphaProviderAdmission` component to acquire a concurrent
@@ -61,8 +64,8 @@ Open-Meteo URLs are provider dependencies, not Moon Service routes.
   ten provider tokens, and a one-token-per-minute refill; stricter settings are
   valid. A refusal returns to `HostedAlphaResourceLimitFilter`, which maps it to
   `429`; an accepted permit is released when downstream handling finishes. The
-  exact planning POST uses the same resources after whole-site admission. Those
-  resources also apply to exact `GET` or `HEAD /feeds/atom` before its feed
+  exact planning and Moon-event POSTs use the same resources after whole-site
+  admission. Those resources also apply to exact `GET` or `HEAD /feeds/atom` before its feed
   cache lookup and to structurally valid `GET` or `HEAD /o/*.ics` before its
   live search. Exact `GET` or `HEAD /calendars/opportunities.ics` uses the same
   resources before its live search. A cached Atom request can therefore
@@ -83,10 +86,10 @@ Open-Meteo URLs are provider dependencies, not Moon Service routes.
   feedback write token.
 - Hosted-alpha mode exposes only exact allowlisted paths. It allows bodyless
   `GET` or `HEAD` on every approved path except feedback submissions and the
-  planning route. It also allows `POST` with a body on the exact
-  product-opportunity, planning, and feedback submission paths, and passes each
-  body to that route's 16,384-byte bound. It adds the hosted security headers,
-  returns empty `404` for hidden or unknown path variants, empty `405` with a
+  planning and Moon-event routes. It also allows `POST` with a body on the
+  exact product-opportunity, planning, Moon-event, and feedback submission
+  paths, and passes each body to that route's 16,384-byte bound. It adds the
+  hosted security headers, returns empty `404` for hidden or unknown path variants, empty `405` with a
   path-specific `Allow` value for disallowed methods, and empty `400` for a
   framed `GET` or `HEAD` body. The exact `/cameraFramingPreview.js`,
   `/cameraReferenceScene.js`, `/highResolutionMoonRenderer.js`,
@@ -549,6 +552,34 @@ and [hosted-alpha functional tests](../backend/src/test/java/dev/moonservice/bac
   [planning renderer](../frontend/src/planningView.js),
   [response model](../backend/src/main/java/dev/moonservice/backend/opportunity/planning/MoonPlanningResponse.java),
   [API contract](api-shape.md#moon-planning-post).
+
+### `POST /api/moon-events`
+
+- **Handler/purpose:** `MoonEventController.search` delegates to
+  `LunarEclipseEventService` for independent discovery of locally visible lunar
+  eclipses during the next 18 calendar months. Direct API clients can use it;
+  the website, Atom, and iCalendar do not call it yet.
+- **Request:** same-origin `application/json` with required canonical
+  `locationId`, required `preferences`, and `preferences.version: 1`. It uses
+  the planning parser and rejects query parameters and other top-level fields.
+  Existing media handling, body limit, normalization, and ignored-field
+  warning apply.
+- **Response:** the half-open timezone-aware horizon contains objective eclipse
+  facts, observer-relative visibility, display selection, Version 1 preference
+  assessment, and event-local weather. Preferences and weather never hide or
+  reorder events. Weather uses zero or one existing seven-day provider lookup.
+- **Authentication/data:** anonymous. It stores no request, result, or profile.
+  Preferences remain in the body and outside providers, URLs, analytics,
+  shared event caches, application logs, and provider-cache keys. Every
+  response is `no-store`.
+- **Exposure:** available on the ordinary listener. Hosted alpha allows only
+  exact framed `POST`, with whole-site and shared-provider admission. Other
+  methods return `405` with `Allow: POST`; variants return `404`. Admission
+  refusal uses the existing no-store `429`; no CORS or preflight is added.
+- **References:** [controller](../backend/src/main/java/dev/moonservice/backend/web/MoonEventController.java),
+  [service](../backend/src/main/java/dev/moonservice/backend/events/LunarEclipseEventService.java),
+  [response model](../backend/src/main/java/dev/moonservice/backend/events/MoonEventResponse.java),
+  [API contract](api-shape.md#moon-event-post).
 
 ### `POST /api/opportunities/search`
 

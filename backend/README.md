@@ -12,6 +12,9 @@ accounts, and RSS deliberately out of scope.
   backend location candidate after ambiguous city lookup.
 - `POST /api/opportunities` for a live lookup with request-scoped hard
   preferences.
+- `POST /api/moon-events` for locally visible lunar eclipses during the next
+  18 calendar months, with request-scoped preference assessment and ordinary
+  short-range weather when available.
 - Browser lookup page at `/search?q=Praha`, using GET without active hard
   preferences and the product POST when at least one is active.
 - Public Atom feed at `GET /feeds/atom?locationId=<canonical-id>`, with optional
@@ -93,6 +96,42 @@ windows by default. The browser groups windows from the same physical Moon pass,
 so it may show fewer than ten pass cards. This broader result set is provisional
 while scoring is evaluated under issue #33; the direct fixture endpoint below
 continues to honor its explicit caller-supplied `limit`.
+
+## Lunar Eclipse API
+
+`POST /api/moon-events` accepts a canonical location and the complete Version 1
+preference object:
+
+```bash
+curl -sS http://127.0.0.1:8080/api/moon-events \
+  -H 'Content-Type: application/json' \
+  --data '{"locationId":"moon-service-3067696","preferences":{"version":1}}'
+```
+
+The successful response covers the half-open 18 calendar-month horizon in the
+resolved location timezone. It returns every locally visible lunar eclipse in
+chronological order, including its objective phases and maximum, actual local
+visibility intervals, one selected/display interval, a suggested observation
+instant, and Moon/Sun display facts. A valid result can have `events: []`.
+
+Active preferences are assessed in canonical Version 1 order. They can move
+the suggestion within the displayed visible interval and report a match,
+mismatch, or inapplicable filter, but they do not remove or reorder an eclipse.
+The service uses the existing five-minute sampling and one-second transition
+refinement rules. Bright-limb orientation is inapplicable to eclipse-shadow
+geometry.
+
+Weather never changes the astronomical result. When a suggestion falls inside
+ordinary seven-day forecast coverage, the service makes one existing provider
+lookup for the whole request. Other events report
+`outside_forecast_horizon`; lookup failure reports event-local
+`temporarily_unavailable` without losing the event.
+
+The endpoint accepts no query parameters or `weatherRanking`. It creates no
+permanent location, preference, or result record; existing provider caches keep
+their established inputs and policies. It sends no preference to a provider.
+Every response is `Cache-Control: no-store`. See the complete closed wire
+contract in [`docs/api-shape.md`](../docs/api-shape.md#moon-event-post).
 
 ## Public Atom Feed
 
@@ -784,7 +823,8 @@ backing HTML files, the exact static files tracked by the current build,
 `/api/opportunities`, `/feeds/atom`, valid `/o/*.ics`, exact
 `/calendars/opportunities.ics`, `/readyz`, `/admin/status`, and the feedback
 capability route. It also allows
-`POST /api/opportunities` for a bounded preference body and only `POST` for the
+`POST /api/opportunities`, `POST /api/opportunities/planning`, and
+`POST /api/moon-events` for bounded preference bodies, and only `POST` for the
 feedback submission route. Adding a
 static file does not publish it automatically. Add its exact path to the
 allowlist. The functional test finds packaged static files and fails if the
@@ -825,7 +865,9 @@ controller or provider work. Exact `GET` and `HEAD /feeds/atom` use the same
 admission before the feed-cache lookup, so a cached feed request can receive
 `429`. Valid `GET` and `HEAD /o/*.ics` also use it before their location and
 weather work. Exact `GET` and `HEAD /calendars/opportunities.ics` use it before
-their search; `HEAD` still skips calendar and image serialization.
+their search; `HEAD` still skips calendar and image serialization. Exact
+`POST /api/moon-events` uses the same provider admission before location and
+event work.
 The fixture POST, static files, admin status, and readiness do not consume those
 two resources. A rejection returns HTTP `429`, canonical `rate_limited` JSON,
 and a numeric `Retry-After` hint. The Docker carve-out is only bodyless

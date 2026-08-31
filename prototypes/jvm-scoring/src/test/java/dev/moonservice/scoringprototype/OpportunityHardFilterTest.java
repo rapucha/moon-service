@@ -273,11 +273,13 @@ class OpportunityHardFilterTest {
     void azimuthProjectsRadiusAtAltitudeAndSpansCompassAtZenith() {
         MoonSample horizon = sample(BASE, 0.0, 100.0, 180.0, -8.0, 200.0);
         MoonSample high = sample(BASE, 60.0, 100.0, 180.0, -8.0, 200.0);
+        MoonSample zenith = sample(BASE, 90.0, 100.0, 180.0, -8.0, 200.0);
         DegreeRange offset = new DegreeRange(101.5, 110.0);
         assertFalse(disk(horizon, 1.0, offset, null));
         assertTrue(disk(high, 1.0, offset, null));
-        assertTrue(disk(sample(BASE, 90.0, 100.0, 180.0, -8.0, 200.0),
-                1.0, new DegreeRange(250, 251), null));
+        assertTrue(disk(zenith, 1.0, new DegreeRange(250, 251), null));
+        DegreeRange removedWrappedSector = new DegreeRange(279, 0);
+        assertFalse(disk(zenith, 1.0, removedWrappedSector, removedWrappedSector));
     }
 
     @Test
@@ -558,7 +560,7 @@ class OpportunityHardFilterTest {
             DegreeRange included,
             DegreeRange excluded
     ) {
-        return OpportunityHardFilter.diskMatchesAzimuth(
+        return Version1PreferenceMatcher.matchesAzimuth(
                 sample, radius, new AzimuthPreference(included, excluded));
     }
 
