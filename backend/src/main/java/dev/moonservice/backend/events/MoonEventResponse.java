@@ -71,6 +71,7 @@ public sealed interface MoonEventResponse
             String endsAt,
             double umbralObscurationPercent,
             List<EclipsePhase> phases,
+            List<EclipseShadowSample> shadowSamples,
             MoonPosition moonAtMaximum,
             EventVisibility localVisibility,
             PreferenceAssessment preferenceAssessment,
@@ -78,6 +79,7 @@ public sealed interface MoonEventResponse
     ) {
         public LunarEclipseEvent {
             phases = List.copyOf(phases);
+            shadowSamples = List.copyOf(shadowSamples);
         }
     }
 
@@ -86,6 +88,28 @@ public sealed interface MoonEventResponse
             String startsAt,
             String endsAt,
             PhaseVisibility localVisibility
+    ) {
+    }
+
+    record EclipseShadowSample(
+            String at,
+            EclipseShadowMoon moon,
+            EclipseShadow shadow
+    ) {
+    }
+
+    record EclipseShadowMoon(
+            double altitudeDegrees,
+            double azimuthDegrees,
+            Double northPoleTiltDegrees
+    ) {
+    }
+
+    record EclipseShadow(
+            double centerRightMoonRadii,
+            double centerUpMoonRadii,
+            double umbraRadiusMoonRadii,
+            double penumbraRadiusMoonRadii
     ) {
     }
 

@@ -155,11 +155,13 @@ The current code does not implement a public `EphemerisService` interface, and
 issue #17 does not add one only for hypothetical replacement. Direct Astronomy
 Engine types and calls are concentrated in `EphemerisSampler`, which emits
 Moon Service's own `MoonSample` values and a project-owned lunar angular-radius
-value in degrees. `WindowGenerator.SampleProvider` keeps window/scoring
-algorithms testable without upstream types. The fixture-only backend path
-receives product-shaped results through `PreviewEvaluator`. Resolved-location
-and typed preference searches call `OpportunityService`, format the ordinary
-result through `ResponseFormatter`, and keep preference metadata typed.
+value in degrees. It also emits project-owned `LunarEclipseShadowSample`
+values for the lunar-eclipse API. `WindowGenerator.SampleProvider` keeps
+window/scoring algorithms testable without upstream types. The fixture-only
+backend path receives product-shaped results through `PreviewEvaluator`.
+Resolved-location and typed preference searches call `OpportunityService`,
+format the ordinary result through `ResponseFormatter`, and keep preference
+metadata typed.
 
 That localized adapter is sufficient for the MVP. Introduce a formal provider
 interface only when a second implementation, a move out of the retained
@@ -186,6 +188,8 @@ EphemerisService
     - next moonset time
     - Sun altitude degrees
     - Sun azimuth degrees
+    - eclipse-shadow center right/up in Moon radii
+    - eclipse umbra and penumbra radii in Moon radii
 ```
 
 This boundary allows replacing the ephemeris library later without changing
@@ -202,6 +206,126 @@ degrees.
 Use `1,737.4 km` as the physical mean radius, following the
 [JPL planetary-satellite physical parameters](https://ssd.jpl.nasa.gov/sats/phys_par/sep.html).
 Keep the upstream distance type and calculation inside `EphemerisSampler`.
+
+### Lunar-eclipse shadow geometry
+
+Keep Astronomy Engine's public lunar-eclipse search authoritative for phase
+contacts, subtype, maximum, and peak obscuration. For drawable geometry at one
+instant, `EphemerisSampler` uses only the supported public `geoVector`,
+`geoMoon`, `equator`, and rotation APIs in version 2.1.19. Do not call the
+library's Kotlin-internal shadow or disc-overlap functions.
+
+Let `s` be the corrected geocentric Sun vector, `m` the geocentric Moon vector,
+and `d = -s` the Earth-shadow direction. All vectors are EQJ and use AU:
+
+```text
+u      = dot(d, m) / dot(d, d)
+offset = u*d - m
+```
+
+`offset` points from the Moon center to the Earth-shadow axis. Use the named
+constants `695,700.0 km` for the Sun radius, `6,371.0 km + 88.0 km` for the
+effective eclipse radius of Earth, and the existing `1,737.4 km` Moon mean
+radius. At the Moon's shadow plane:
+
+```text
+umbra     = earthRadius - u*(sunRadius - earthRadius)
+penumbra  = earthRadius + u*(sunRadius + earthRadius)
+```
+
+The cone stays geocentric so the physical eclipse does not change by observer.
+Rotate `offset` and the corrected topocentric Moon direction into the existing
+horizontal frame only to express the result on the observer's screen. Project
+onto the same viewer-right and local-zenith basis used for lunar pole
+orientation. Divide offsets and radii by the Moon mean radius. Positive right
+points toward increasing azimuth on screen; positive up points toward local
+zenith. Atmospheric refraction affects the reported Moon altitude, not the
+shadow offset.
+
+Fixed tests compare the derived center distance with the required
+penumbra/Moon, umbra/Moon, and totality internal tangencies at known contacts.
+The allowed error is `0.01` Moon radii. This calculation is a narrow current
+adapter capability, not a provider interface or fallback.
+
+### Replacing the implementation
+
+The shadow calculation uses library-neutral geometry on public Sun and Moon
+vectors. A replacement does not need to reproduce Astronomy Engine's internal
+functions. It must provide vectors in one documented frame and unit, preserve
+the geocentric cone, and map its results into Moon Service's project-owned
+samples. This makes the current public-API implementation easier to replace
+than a dependency on Astronomy Engine's Kotlin internals.
+
+There are two practical implementation shapes:
+
+1. An in-process JVM library can replace the Astronomy Engine calls inside the
+   adapter. This keeps one process and avoids network failure modes. Introduce
+   a formal `EphemerisService` interface only when the replacement is ready to
+   run beside the current implementation or another concrete caller needs it.
+2. A Python service can own an implementation such as Skyfield and expose a
+   private REST API to the Spring backend. A full search operation should
+   accept the location and search interval and return Moon Service's event
+   facts and project-owned samples, not Skyfield objects. If the service also
+   offers a sampling operation, that operation should accept several instants
+   at once. Both forms avoid one network call for every sampled instant.
+
+[Skyfield's lunar-eclipse routine](https://rhodesmill.org/skyfield/almanac.html#lunar-eclipses)
+finds eclipse maxima and types and reports shadow dimensions at maximum. Its
+ordinary position APIs can provide the Sun, Moon, and observer vectors needed
+for the same screen projection. It does not return phase contacts or
+viewer-oriented geometry at arbitrary instants, so it is not a drop-in
+replacement for the current search and sampler. A complete replacement must
+still produce and validate Moon Service's phase contacts, per-instant shadow
+samples, local visibility, and pole orientation.
+
+Skyfield's eclipse helper also owns its own shadow-enlargement and body-radius
+constants, as shown in its
+[official source](https://github.com/skyfielders/python-skyfield/blob/master/skyfield/eclipselib.py).
+Using its returned radii directly would rebaseline Moon Service's geometry. A
+compatibility-focused replacement should keep the project constants and cone
+formula around Skyfield vectors. An intentional model change needs separate
+approval and new tolerances. After cutover, Astronomy Engine and Skyfield must
+not remain competing authorities for one event.
+
+A Skyfield container also owns data and runtime concerns that do not exist in
+the current single-JVM deployment. Skyfield reads a JPL `.bsp` planetary
+ephemeris and uses time-scale data for UTC and Earth-rotation conversions. Its
+[loader can download missing files](https://rhodesmill.org/skyfield/files.html),
+but a reproducible service should instead build with pinned, checksummed files
+and start without downloading data. The image must also pin Python, Skyfield,
+[NumPy](https://rhodesmill.org/skyfield/installation.html), the ephemeris
+kernel, and [time data](https://rhodesmill.org/skyfield/time.html) as one tested
+set. Lunar pole orientation needs the additional lunar frame and orientation
+files described in Skyfield's
+[planetary reference-frame documentation](https://rhodesmill.org/skyfield/planetary.html#observing-a-moon-location).
+Pin their coverage and checksums too. A future issue must define readiness,
+resource limits, timeouts, deployment, update cadence, and failure behavior
+before this service becomes authoritative.
+
+The adapter must translate conventions explicitly. Skyfield documents a
+[north/east/zenith horizontal frame](https://rhodesmill.org/skyfield/coordinates.html#altitude-and-azimuth-horizonal-coordinates),
+while the current Astronomy Engine path is north/west/zenith. Skyfield also leaves
+[atmospheric refraction](https://rhodesmill.org/skyfield/positions.html#adjusting-altitude-for-atmospheric-refraction)
+off unless the caller requests it. Preserve Moon Service's right/up signs and
+normal-refraction policy unless an approved contract change says otherwise.
+
+Use an offline comparison for either replacement:
+
+1. Freeze the current contact, maximum, altitude/azimuth, pole-orientation, and
+   shadow-geometry fixtures.
+2. Run both implementations over those fixtures and the documented geographic
+   validation cases.
+3. Explain differences in contact times, subtype, obscuration, local
+   visibility, and screen coordinates. Decide whether changed maximum times
+   may change stable event IDs.
+4. Cut over only after the replacement satisfies explicit tolerances. Do not
+   add a production fallback merely to keep both implementations available.
+
+Running Skyfield as an internal Moon Service container would not disclose a
+location to a new third party, but it would add a required runtime component
+and internal transmission of the location. An externally operated astronomy
+service would also change the provider and privacy model. Either deployment
+needs its own approved issue; this document does not add the service.
 
 ### Observer-oriented bright-limb tilt
 

@@ -65,8 +65,17 @@ class MoonEventControllerTest {
                 "id", "kind", "displayName", "timezone", "countryCode");
         assertThat(response.path("events").get(0).propertyNames()).containsExactlyInAnyOrder(
                 "id", "kind", "subtype", "startsAt", "maximumAt", "endsAt",
-                "umbralObscurationPercent", "phases", "moonAtMaximum",
+                "umbralObscurationPercent", "phases", "shadowSamples", "moonAtMaximum",
                 "localVisibility", "preferenceAssessment", "weather");
+        assertThat(response.at("/events/0/shadowSamples/0").propertyNames())
+                .containsExactlyInAnyOrder("at", "moon", "shadow");
+        assertThat(response.at("/events/0/shadowSamples/0/moon").propertyNames())
+                .containsExactlyInAnyOrder(
+                        "altitudeDegrees", "azimuthDegrees", "northPoleTiltDegrees");
+        assertThat(response.at("/events/0/shadowSamples/0/shadow").propertyNames())
+                .containsExactlyInAnyOrder(
+                        "centerRightMoonRadii", "centerUpMoonRadii",
+                        "umbraRadiusMoonRadii", "penumbraRadiusMoonRadii");
         assertThat(response.at("/events/0/phases/0/localVisibility").propertyNames())
                 .containsExactlyInAnyOrder("status", "intervals");
         assertThat(response.at("/events/0/localVisibility").propertyNames())
@@ -212,6 +221,10 @@ class MoonEventControllerTest {
                 List.of(new EclipsePhase(
                         "penumbral", interval.startsAt(), interval.endsAt(),
                         new PhaseVisibility("fully_visible", List.of(interval)))),
+                List.of(new EclipseShadowSample(
+                        "2026-09-01T02:30:00Z",
+                        new EclipseShadowMoon(20.0, 180.0, 12.0),
+                        new EclipseShadow(-0.3, 0.4, 2.7, 4.7))),
                 new MoonPosition(20.0, 180.0),
                 new EventVisibility(
                         "fully_visible",
