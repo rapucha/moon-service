@@ -25,6 +25,7 @@ import java.util.Objects;
 final class HostedAlphaResourceLimitFilter extends OncePerRequestFilter {
     private static final String OPPORTUNITY_PATH = "/api/opportunities";
     private static final String PLANNING_PATH = "/api/opportunities/planning";
+    private static final String MOON_EVENT_PATH = "/api/moon-events";
     private static final String ATOM_FEED_PATH = "/feeds/atom";
     private static final String CALENDAR_FEED_PATH = "/calendars/opportunities.ics";
     private static final String ADMIN_STATUS_PATH = "/admin/status";
@@ -100,6 +101,7 @@ final class HostedAlphaResourceLimitFilter extends OncePerRequestFilter {
         if (ADMIN_STATUS_PATH.equals(path)
                 || ATOM_FEED_PATH.equals(path)
                 || CALENDAR_FEED_PATH.equals(path)
+                || MOON_EVENT_PATH.equals(path)
                 || HostedAlphaSurfaceFilter.isCalendarEventPath(path)
                 || isProductPost(request.getMethod(), path)) {
             response.setHeader("Cache-Control", "no-store");
@@ -122,6 +124,7 @@ final class HostedAlphaResourceLimitFilter extends OncePerRequestFilter {
         return (OPPORTUNITY_PATH.equals(path)
                 && ("GET".equals(method) || "HEAD".equals(method) || "POST".equals(method)))
                 || (PLANNING_PATH.equals(path) && "POST".equals(method))
+                || (MOON_EVENT_PATH.equals(path) && "POST".equals(method))
                 || (ATOM_FEED_PATH.equals(path) && ("GET".equals(method) || "HEAD".equals(method)))
                 || (CALENDAR_FEED_PATH.equals(path) && ("GET".equals(method) || "HEAD".equals(method)))
                 || (HostedAlphaSurfaceFilter.isCalendarEventPath(path)
@@ -130,7 +133,9 @@ final class HostedAlphaResourceLimitFilter extends OncePerRequestFilter {
 
     private static boolean isProductPost(String method, String path) {
         return "POST".equals(method)
-                && (OPPORTUNITY_PATH.equals(path) || PLANNING_PATH.equals(path));
+                && (OPPORTUNITY_PATH.equals(path)
+                || PLANNING_PATH.equals(path)
+                || MOON_EVENT_PATH.equals(path));
     }
 
     private static boolean isCalibrationFeedbackRequest(HttpServletRequest request) {

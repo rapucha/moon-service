@@ -76,6 +76,13 @@ answer:
    that it exists.
 2. Check whether an existing issue, pull request, or documented decision already
    owns the work.
+   When the draft proposes an evaluator, matcher, parser, renderer, provider
+   implementation, or comparable algorithm, search existing source by
+   responsibility and symbols. Separate reusable mechanics from different
+   orchestration or output semantics, and compare a shared boundary with a local
+   copy. Retain substantial duplication only with concrete correctness,
+   dependency, coupling, maintenance, or explicit owner evidence.
+   File-size pressure and agent-authored “keep separate” wording are not evidence.
 3. Start with the smallest standard implementation that matches the current
    accepted threat model. Challenge the proposed solution and present that
    approach beside any materially stricter alternative, including the current
@@ -175,6 +182,8 @@ Problem and evidence:
 Ownership and duplication:
 - Existing authority: <issue, PR, decision, or none>
 
+Existing-source overlap: <responsibilities and symbols searched; reusable mechanics; differing orchestration or output; retained substantial duplication and its evidence; or None only after the search>
+
 Agent-added scope:
 - Declared by the drafter: <items with source and status, or None>
 - Independently identified: <omissions or None>
@@ -240,6 +249,11 @@ project authority before it is created or treated as implementation authority.
 Read `.agents/review-policy.md` before applying its gates or triggers. Do not
 edit files or external state. Challenge the premise, alternatives, hidden
 dependencies, owner decisions, scope authority, YAGNI, and acceptance criteria.
+For a proposed evaluator, matcher, parser, renderer, provider implementation, or
+comparable algorithm, search existing source by responsibility and symbols.
+Distinguish reusable mechanics from different orchestration or output, compare a
+shared boundary with a local copy, and require concrete evidence for substantial
+duplication. File-size pressure and draft wording are not evidence.
 Simulate the required delivery and rollout transitions. Name each gate's actor,
 permission, artifact, and target. Return revise for a dependency cycle, a
 later-blocked prerequisite, or reliance on unrelated ambient work.

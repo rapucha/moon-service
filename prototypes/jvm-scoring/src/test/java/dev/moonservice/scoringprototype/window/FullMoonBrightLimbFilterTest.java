@@ -49,7 +49,7 @@ class FullMoonBrightLimbFilterTest {
     }
 
     private static boolean matches(OpportunityPreferences preferences, MoonSample sample) {
-        return OpportunityHardFilter.matchesAll(PRAGUE, sample, ignored -> 0.25, preferences);
+        return Version1PreferenceMatcher.matchesAll(PRAGUE, sample, ignored -> 0.25, preferences);
     }
 
     private static OpportunityPreferences preferences(

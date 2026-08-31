@@ -18,6 +18,7 @@ import dev.moonservice.scoringprototype.output.OpportunityIds;
 import dev.moonservice.scoringprototype.scoring.ScoringModel;
 import dev.moonservice.scoringprototype.window.MoonWindow;
 import dev.moonservice.scoringprototype.window.OpportunityHardFilter;
+import dev.moonservice.scoringprototype.window.RefinedTimeGrid;
 import dev.moonservice.scoringprototype.window.WindowGenerator;
 import org.springframework.stereotype.Service;
 
@@ -34,7 +35,6 @@ import java.util.Objects;
 public final class MoonPlanningService {
     static final int PLANNING_HORIZON_DAYS = 365;
     private static final double MAX_MOON_ALTITUDE_DEGREES = 90.0;
-    private static final Duration FILTER_SAMPLE_STEP = Duration.ofMinutes(5);
     private static final Duration KIND_SAMPLE_OFFSET = Duration.ofMinutes(1);
     private static final Duration PLANNING_HORIZON = planningHorizon();
 
@@ -167,15 +167,14 @@ public final class MoonPlanningService {
             throw new IllegalStateException("Planning window has no suggestion inside the search interval.");
         }
         MoonSample best = samples.sampleAt(window.startsAt());
-        Instant cursor = window.passStartsAt();
-        while (cursor.isBefore(intervalEnd)) {
-            if (!cursor.isBefore(window.startsAt())) {
-                MoonSample candidate = samples.sampleAt(cursor);
+        for (Instant instant : RefinedTimeGrid.sampleInstants(
+                window.passStartsAt(), window.startsAt(), intervalEnd, List.of())) {
+            if (instant.isBefore(intervalEnd)) {
+                MoonSample candidate = samples.sampleAt(instant);
                 if (betterCandidate(candidate, best)) {
                     best = candidate;
                 }
             }
-            cursor = cursor.plus(FILTER_SAMPLE_STEP);
         }
         return best;
     }

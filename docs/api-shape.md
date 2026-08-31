@@ -2134,6 +2134,280 @@ accepted report until it is manually deleted by server report UUID. A feedback
 database failure may disable submission, but it does not prevent application
 startup, opportunity lookup, liveness, `/healthz`, or `/readyz`.
 
+## Moon Event POST
+
+`POST /api/moon-events` discovers special Moon events independently of ordinary
+Moon-pass scoring. The first event type is a locally visible lunar eclipse.
+The website, Atom, and iCalendar integrations consume this contract in later
+slices; they do not define its astronomy or preference rules separately.
+
+```http
+POST /api/moon-events
+Content-Type: application/json
+```
+
+```json
+{
+  "locationId": "moon-service-3067696",
+  "preferences": { "version": 1 }
+}
+```
+
+Both fields are required. `{ "version": 1 }` means that every preference is
+off. The route uses the planning request parser, so Version 1 validation,
+normalization, ignored nested-field warnings, media handling, and the 16,384
+byte body limit are identical to the planning API. No other top-level field is
+accepted. In particular, the request cannot set `weatherRanking`, a horizon,
+a result limit, coordinates, or `q`. Query parameters, aliases, GET variants,
+and compatibility paths are not accepted.
+
+### Successful response
+
+The server captures `generatedAt` once. `startsAt` has the same value. `endsAt`
+is 18 calendar months later at the same local clock time in the resolved
+location timezone. The horizon is half-open: `[startsAt, endsAt)`.
+
+```json
+{
+  "status": "ok",
+  "generatedAt": "2025-09-01T00:00:00Z",
+  "startsAt": "2025-09-01T00:00:00Z",
+  "endsAt": "2027-03-01T01:00:00Z",
+  "location": {
+    "id": "moon-service-3067696",
+    "kind": "real_location",
+    "displayName": "Prague, Czechia",
+    "timezone": "Europe/Prague",
+    "countryCode": "CZ"
+  },
+  "appliedPreferenceVersion": 1,
+  "normalizedActiveFilters": {},
+  "ignoredPreferenceFields": [],
+  "ignoredPreferenceFieldCount": 0,
+  "additionalIgnoredPreferenceFieldCount": 0,
+  "events": []
+}
+```
+
+A valid search with no visible event uses this complete response with an empty
+`events` array. Events are ordered by objective `maximumAt`, then stable `id`.
+
+Location resolution preserves the planning API's distinct response shapes:
+
+- `ambiguous_location` returns `generatedAt` and canonical `candidates`;
+- `location_not_found` returns `generatedAt` and a generic `message`; and
+- `temporarily_unavailable` returns `generatedAt`, a generic `message`, and
+  HTTP `503`.
+
+Validation and HTTP errors use the existing product error envelope.
+
+### Lunar-eclipse event
+
+Each member of `events` contains:
+
+- opaque, stable `id`;
+- fixed `kind: "lunar_eclipse"`;
+- `subtype`;
+- objective `startsAt`, `maximumAt`, and `endsAt`;
+- `umbralObscurationPercent`;
+- `phases`;
+- `moonAtMaximum` with observer-relative `altitudeDegrees` and
+  `azimuthDegrees`;
+- `localVisibility`;
+- `preferenceAssessment`; and
+- `weather`.
+
+`subtype` is `penumbral`, `partial`, or `total`. `umbral` is not a
+subtype. Objective timing, subtype, phase semi-durations, and umbral
+obscuration come from the pinned Astronomy Engine lunar-eclipse calculation.
+The opaque ID depends only on event kind and objective maximum, so it does
+not change with request time, location, preferences, weather, or suggestion.
+
+All instants are RFC 3339 UTC strings. Clients use `location.timezone` for
+local formatting. `moonAtMaximum` is observer-relative for the resolved
+location. Fixed phase names, the horizon-month constant, and Sun facts at
+maximum are not repeated in the event.
+
+`phases` includes each phase the eclipse reaches, in `penumbral`, `partial`,
+and `total` order. Each phase has objective timing and every local visible
+intersection:
+
+```json
+{
+  "kind": "partial",
+  "startsAt": "2025-09-07T16:26:40.111Z",
+  "endsAt": "2025-09-07T19:56:42.892Z",
+  "localVisibility": {
+    "status": "partly_visible",
+    "intervals": [
+      {
+        "startsAt": "2025-09-07T16:26:40.111Z",
+        "endsAt": "2025-09-07T19:40:00Z"
+      }
+    ]
+  }
+}
+```
+
+Phase intervals are chronological and non-overlapping. `intervals` is always
+present and is empty when status is `not_visible`.
+
+### Local visibility
+
+Visibility uses observer-relative Moon-center altitude with Astronomy Engine
+`Refraction.Normal`. Altitude at or above zero degrees is visible. Terrain,
+buildings, and trees are not modeled.
+
+For the complete eclipse and each phase:
+
+- `fully_visible` means the visible-interval union covers the complete
+  objective interval;
+- `partly_visible` means that union has a non-empty proper intersection with
+  the objective interval; and
+- `not_visible` means it has no intersection.
+
+Objective and visible intervals are astronomy facts and are never clamped to
+the request horizon. The API returns an eclipse only when at least one complete
+event-level visible interval overlaps the half-open horizon.
+
+Event-level `localVisibility` contains every actual interval plus the interval
+used for display:
+
+```json
+{
+  "status": "partly_visible",
+  "intervals": [
+    {
+      "startsAt": "2025-09-07T15:28:02.516Z",
+      "endsAt": "2025-09-07T19:40:00Z"
+    }
+  ],
+  "selectedInterval": {
+    "startsAt": "2025-09-07T15:28:02.516Z",
+    "endsAt": "2025-09-07T19:40:00Z"
+  },
+  "displayInterval": {
+    "startsAt": "2025-09-07T15:28:02.516Z",
+    "suggestedAt": "2025-09-07T18:11:41.502Z",
+    "endsAt": "2025-09-07T19:40:00Z",
+    "moon": {
+      "altitudeDegrees": 5.730577,
+      "azimuthDegrees": 107.552074
+    },
+    "sun": {
+      "altitudeDegrees": -6.230685,
+      "lightBucket": "nautical_twilight"
+    }
+  }
+}
+```
+
+Only intervals that overlap the horizon are candidates for
+`selectedInterval`. Prefer an interval containing objective maximum. Otherwise,
+choose the interval whose nearest point is closest to maximum; an exact tie
+selects the earlier interval. `selectedInterval` remains actual and unclamped.
+`displayInterval` is its non-empty intersection with the request horizon.
+`suggestedAt` always lies within that display interval and before a horizon
+end that makes the display end exclusive.
+
+### Preference assessment
+
+Preferences affect the suggested time and assessment, not event inclusion,
+subtype, or order.
+
+```json
+{
+  "overall": "matches",
+  "filters": [
+    { "filter": "altitudeDegrees", "status": "matches" },
+    { "filter": "brightLimbOrientationDegrees", "status": "not_applicable" }
+  ]
+}
+```
+
+`filters` is always present and includes each active filter once in canonical
+Version 1 order: altitude, azimuth, time, named phase, then bright-limb
+orientation. Each status is `matches`, `does_not_match`, or
+`not_applicable`. Overall is:
+
+- `no_active_preferences` when the list is empty;
+- `not_applicable` when every active filter is inapplicable;
+- `matches` when one common evaluated instant satisfies every applicable
+  filter; or
+- `does_not_match` otherwise.
+
+Per-filter matches are assessed independently. Inapplicable filters do not
+participate in the common-instant test. Altitude, lunar-disk azimuth,
+local-clock time, and light buckets keep their ordinary Version 1 meanings. A
+lunar eclipse is `full_moon` for named-phase matching. Bright-limb orientation
+is inapplicable because eclipse-shadow geometry is not the bright limb.
+
+Evaluation uses the Version 1 five-minute grid anchored at objective eclipse
+start, one-second transition refinement, and relevant objective, visibility,
+selection, display, and maximum boundaries. A condition that starts and ends
+entirely between samples remains outside the guarantee. If applicable filters
+share matching instants, `suggestedAt` is the one nearest objective maximum.
+Otherwise it is the evaluated visible instant nearest maximum. Exact ties
+choose the earlier instant. A mismatch never hides an eclipse.
+
+### Weather
+
+Weather never changes inclusion, order, subtype, or preference status. The
+event service uses only the existing provider and ordinary seven-day forecast
+coverage. If no returned suggestion falls inside that coverage, it makes no
+weather request. Otherwise it makes one request and uses it for every covered
+event.
+
+`weather` is exactly one of these shapes:
+
+```json
+{
+  "status": "available",
+  "forecastHourStartsAt": "2025-09-07T18:00:00Z",
+  "summary": "partly cloudy",
+  "cloudCoverPercent": 38,
+  "precipitationProbabilityPercent": 5
+}
+```
+
+```json
+{ "status": "outside_forecast_horizon" }
+```
+
+```json
+{ "status": "temporarily_unavailable" }
+```
+
+An available result uses the actual provider hour containing `suggestedAt` and
+requires every shown member. The other two shapes contain only `status`.
+Provider failure or a missing covering hour changes only the event-local
+weather status; the astronomical response remains successful.
+
+### Privacy and exposure
+
+Every response reaching the exact route has `Cache-Control: no-store`.
+Location and preferences remain in the POST body. Moon Service does not add
+them to URLs, cookies, analytics, permanent storage, shared event-result
+caches, or application logs. Existing provider caches retain their established
+inputs and policies. Preferences are not sent to a provider or used in a
+provider cache key. Application logs may retain the fixed method and path,
+status, duration, request ID, and aggregate ignored-field count, but not
+preference paths or values.
+
+Hosted alpha exposes only exact `POST /api/moon-events`. It uses the existing
+whole-site and shared-provider admission and body limits. Other methods on the
+exact path return `405` with `Allow: POST`; path variants return `404`.
+Admission refusal uses the existing no-store `429 rate_limited` envelope. The
+route adds no CORS or preflight support.
+
+### Later event types
+
+Other astronomical event types need their own approved product rules before
+joining this response. Atom and iCalendar may later publish the event service
+result, but must not reimplement its visibility or preference evaluation.
+Personal saved event subscriptions would require a privacy and storage model
+for stored preferences, notification delivery, retention, and deletion.
+
 ## Future Event-Aware Search
 
 The first `/api/opportunities?q=...` contract searches by location. Recurring

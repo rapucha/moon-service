@@ -164,13 +164,13 @@ class PreferenceImpactAnalysisTest {
 
         for (double angle = 0.0; angle < 360.0; angle += 0.5) {
             MoonSample sample = sampleAtTilt(START, angle);
-            assertTrue(OpportunityHardFilter.matchesAll(PRAGUE, sample, instant -> 0.25, bright),
+            assertTrue(Version1PreferenceMatcher.matchesAll(PRAGUE, sample, instant -> 0.25, bright),
                     () -> "Expected coverage at " + sample.brightLimbTiltDegrees());
         }
         MoonSample sharedBoundary = sampleAtTilt(START, 22.5);
         assertTrue(sectors.get(0).contains(sharedBoundary.brightLimbTiltDegrees()));
         assertTrue(sectors.get(1).contains(sharedBoundary.brightLimbTiltDegrees()));
-        assertFalse(OpportunityHardFilter.matchesAll(
+        assertFalse(Version1PreferenceMatcher.matchesAll(
                 PRAGUE, undefinedTiltSample(START), instant -> 0.25, bright));
     }
 

@@ -96,6 +96,13 @@ answer:
    point. Review a required interface seam separately from its default or
    fallback body. Return `revise` when the required evidence is absent;
    acceptance criteria alone do not supply it.
+   When the plan proposes an evaluator, matcher, parser, renderer, provider
+   implementation, or comparable algorithm, search existing source by
+   responsibility and symbols. Separate reusable mechanics from different
+   orchestration or output semantics, and compare a shared boundary with a local
+   copy. Retain substantial duplication only with concrete correctness,
+   dependency, coupling, maintenance, or explicit owner evidence.
+   File-size pressure and agent-authored “keep separate” wording are not evidence.
 4. List candidate behavioral or operational slices before considering files,
    architecture layers, or limits. State each slice's observable outcome. Ask
    whether it stays useful, operable, and verifiable if no later slice lands.
@@ -222,6 +229,8 @@ Scope-authority assessment:
 - <unrequested work, abstraction/YAGNI, incidental finding, dependency, or none>
 - Follow-up mutation authority: <explicit user/source authority or owner-accepted enumerated split, including exact authorized issues>
 
+Existing-source overlap: <responsibilities and symbols searched; reusable mechanics; differing orchestration or output; retained substantial duplication and its evidence; or None only after the search>
+
 Production-use evidence:
 - <mechanism> -> <current caller/use or approved dependent consumer; current capability/failure; compatibility target/version when applicable>
 - Interface seam/body separation: <separate evidence or unsupported>
@@ -274,6 +283,11 @@ current accepted threat model. Present materially stricter alternatives with
 their current need, tradeoffs, and maintenance cost. Return revise for an
 unapproved stricter design, custom protocol client, or material forecast growth
 caused by an unreviewed mechanism or hardening choice. Separate optional work.
+For a proposed evaluator, matcher, parser, renderer, provider implementation, or
+comparable algorithm, search existing source by responsibility and symbols.
+Distinguish reusable mechanics from different orchestration or output, compare a
+shared boundary with a local copy, and require concrete evidence for substantial
+duplication. File-size pressure and draft wording are not evidence.
 Do not treat compliance with a numeric gate as a design goal. Return revise when
 a plan makes code denser, less explicit, or more order-dependent solely to fit
 the gate. Allow extraction only when a current production or test responsibility

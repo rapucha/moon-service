@@ -18,8 +18,6 @@ import java.util.function.Predicate;
 public final class PreferenceImpactAnalysis {
     static final int LOOK_AHEAD_DAYS = 200;
     private static final Duration LOOK_AHEAD = Duration.ofDays(LOOK_AHEAD_DAYS);
-    private static final Duration SAMPLE_STEP = Duration.ofMinutes(5);
-    private static final Duration REFINEMENT_TOLERANCE = Duration.ofSeconds(1);
 
     private final WindowGenerator windowGenerator = new WindowGenerator();
     private final OpportunityHardFilter hardFilter = new OpportunityHardFilter();
@@ -111,7 +109,7 @@ public final class PreferenceImpactAnalysis {
 
         Instant endsAt = notBefore.plus(LOOK_AHEAD);
         while (previous.isBefore(endsAt) && impacts.stream().anyMatch(MutableImpact::unresolved)) {
-            Instant next = min(previous.plus(SAMPLE_STEP), endsAt);
+            Instant next = RefinedTimeGrid.nextSample(previous, endsAt);
             MoonSample sample = samples.sampleAt(next);
             for (int index = 0; index < filters.size(); index++) {
                 MutableImpact impact = impacts.get(index);
@@ -119,7 +117,8 @@ public final class PreferenceImpactAnalysis {
                 if (impact.unresolved() && matches(location, sample, radii, singleton)) {
                     Predicate<Instant> predicate =
                             instant -> matches(location, samples.sampleAt(instant), radii, singleton);
-                    impact.nextMatchAt = refineFalseToTrue(previous, next, predicate);
+                    impact.nextMatchAt = RefinedTimeGrid.refineTransition(
+                            previous, next, false, predicate);
                 }
             }
             previous = next;
@@ -133,25 +132,8 @@ public final class PreferenceImpactAnalysis {
             OpportunityPreferences preferences
     ) {
         return sample.moonAltitudeDegrees() >= 0.0
-                && OpportunityHardFilter.matchesAll(location, sample, radii, preferences);
-    }
-
-    private static Instant refineFalseToTrue(
-            Instant start,
-            Instant end,
-            Predicate<Instant> matches
-    ) {
-        Instant lower = start;
-        Instant upper = end;
-        while (Duration.between(lower, upper).compareTo(REFINEMENT_TOLERANCE) > 0) {
-            Instant middle = lower.plus(Duration.between(lower, upper).dividedBy(2));
-            if (matches.test(middle)) {
-                upper = middle;
-            } else {
-                lower = middle;
-            }
-        }
-        return upper;
+                && Version1PreferenceMatcher.matchesAll(
+                        location, sample, radii::angularRadiusDegrees, preferences);
     }
 
     private static List<ActiveFilter> activeFilters(OpportunityPreferences preferences) {
@@ -178,10 +160,6 @@ public final class PreferenceImpactAnalysis {
                     preferences.brightLimbOrientationDegrees())));
         }
         return List.copyOf(filters);
-    }
-
-    private static Instant min(Instant left, Instant right) {
-        return left.compareTo(right) <= 0 ? left : right;
     }
 
     public record Result(int unfilteredOpportunityCount, List<FilterImpact> filters) {

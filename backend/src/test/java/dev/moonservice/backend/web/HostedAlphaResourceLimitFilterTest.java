@@ -82,6 +82,34 @@ class HostedAlphaResourceLimitFilterTest {
         verify(rejected).close();
     }
 
+    @Test
+    void admitsMoonEventPostThroughTheSharedProviderLimitAndUsesNoStoreOnRefusal()
+            throws Exception {
+        MutableClock clock = new MutableClock();
+        HostedAlphaProviderAdmission providerAdmission = mock(HostedAlphaProviderAdmission.class);
+        HostedAlphaProviderAdmission.Admission accepted = admission(true, 0L);
+        HostedAlphaProviderAdmission.Admission rejected = admission(false, 19L);
+        when(providerAdmission.tryAcquire()).thenReturn(accepted, rejected);
+        HostedAlphaResourceLimitFilter filter = filter(
+                properties(2, Duration.ofSeconds(1), 10, Duration.ofMinutes(1), 2),
+                clock,
+                providerAdmission,
+                true);
+
+        assertThat(exchange(filter, request("POST", "/api/moon-events")).getStatus()).isEqualTo(200);
+        verify(accepted).close();
+        MockHttpServletResponse limited = exchange(filter, request("POST", "/api/moon-events"));
+        assertRateLimited(limited, 19L);
+        assertThat(limited.getHeader("Cache-Control")).isEqualTo("no-store");
+        verify(rejected).close();
+
+        MockHttpServletResponse wrongMethodLimited =
+                exchange(filter, request("GET", "/api/moon-events"));
+        assertRateLimited(wrongMethodLimited, 1L);
+        assertThat(wrongMethodLimited.getHeader("Cache-Control")).isEqualTo("no-store");
+        verify(providerAdmission, times(2)).tryAcquire();
+    }
+
     @ParameterizedTest
     @ValueSource(strings = {"/feeds/atom", "/calendars/opportunities.ics"})
     void appliesWholeSiteBeforeProviderAdmissionToPublicFeedsAndPreventsCachingRefusals(String path)
