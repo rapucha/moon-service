@@ -2138,8 +2138,9 @@ startup, opportunity lookup, liveness, `/healthz`, or `/readyz`.
 
 `POST /api/moon-events` discovers special Moon events independently of ordinary
 Moon-pass scoring. The first event type is a locally visible lunar eclipse.
-The website, Atom, and iCalendar integrations consume this contract in later
-slices; they do not define its astronomy or preference rules separately.
+The website consumes this contract through `moonEventView.js`; later Atom and
+iCalendar integrations must not define its astronomy or preference rules
+separately.
 
 ```http
 POST /api/moon-events

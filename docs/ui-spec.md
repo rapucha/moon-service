@@ -22,7 +22,9 @@ individual calendar download and preference-filtered Atom discovery tracked by
 [#295](https://github.com/rapucha/moon-service/issues/295) and
 [#297](https://github.com/rapucha/moon-service/issues/297), and calendar
 subscription copy discovery tracked by
-[#305](https://github.com/rapucha/moon-service/issues/305). Broader visual
+[#305](https://github.com/rapucha/moon-service/issues/305). The `Special Moon
+events` lunar-eclipse section is tracked by
+[#318](https://github.com/rapucha/moon-service/issues/318). Broader visual
 design, RSS, standalone calendar export pages, account flows, and native apps
 are out of scope for this document until they become active product work.
 
@@ -153,8 +155,11 @@ The frontend module split is intended to keep future UI changes manageable:
   layout;
 - `moonPreferenceControls.css`: shared preference-control base, Moon-shape,
   and Moon-dial presentation;
-- `responseView.js`: response states, result rendering, and Current Moon Card
-  placement;
+- `responseView.js`: ordinary response states, result rendering, Current Moon
+  Card placement, and the Special Moon events insertion point;
+- `moonEventView.js`: current Moon-event request lifecycle, response validation,
+  and lunar-eclipse section rendering;
+- `moonEventView.css`: lunar-eclipse section/card layout and responsive styling;
 - `opportunityCard.js`: opportunity card layout and the shared
   preference-bearing-link notice;
 - `currentMoonCard.js`: current Moon disclosure, status, and active-path
@@ -1050,6 +1055,92 @@ rail on the altitude chart so direction shares the same time axis as altitude
 and light buckets.
 This keeps after-midnight times explicit without making them look like a
 separate night.
+
+## Special Moon events
+
+The Preferences panel contains one unframed `Show lunar eclipses` checkbox. It
+is on by default and belongs to the existing browser-local Version 1 preference
+state. A stored Version 1 value without this field means enabled, which keeps
+preferences written by older deployed pages compatible. Disabled is stored as
+`showSpecialMoonEvents: false`; Reset all returns to enabled. The field is not
+a hard limit and is absent from preference counts, ordinary and planning API
+bodies, Moon-event API preferences, URLs, history, cookies, analytics, and
+logs. A storage failure keeps the selected value in memory and uses the
+existing storage notice.
+
+The control acts immediately without applying draft photography limits or
+rerunning the ordinary lookup. Disabling it cancels any current Moon-event
+request and removes the section. Enabling it requests events for the last
+successful ordinary response and its canonical active filters. An ordinary
+`ok` response for a `real_location` places one section titled `Special Moon
+events` after the result summary and its optional link-privacy notice, and
+before Current Moon, ordinary opportunity or ordinary-empty content, and
+rejected-window diagnostics. No section is shown for another ordinary status
+or location kind.
+
+`moonEventView.js` owns the section and starts exactly one same-origin
+`POST /api/moon-events`. It uses the ordinary response's canonical location ID
+and copies only the five Version 1 filter fields from
+`normalizedActiveFilters`; all-off is exactly `{"version": 1}`. Weather
+ranking and the browser-only control are never sent. A newer lookup cancels or
+invalidates the request. A stale, wrong-location, malformed, or non-`ok` event
+response cannot replace or alter ordinary content.
+
+The section uses these compact states:
+
+- loading: `Checking special Moon events…`;
+- successful empty:
+  `No lunar eclipse is visible from this location in the next 18 months.`;
+- localized failure:
+  `Special Moon events are temporarily unavailable. Moon opportunities are
+  unchanged.`
+
+Returned eclipses remain in API order. Each is a native `details` card that is
+collapsed by default. Its summary uses the MoonPass visual language and shows
+the subtype, local calendar date, best local time, Moon altitude and direction,
+and a model-derived Moon. It says `Best · Maximum` when the fixed suggestion is
+objective maximum and `Best visible` otherwise. The card shows no preference
+pill. When altitude or direction does not match an active preference, only that
+numeric position value uses warning colour and a focusable tooltip:
+`Outside your altitude preference.` or `Outside your direction preference.`
+Matching and unrestricted values retain ordinary styling and no tooltip. The
+same treatment applies to the summary and expanded Moon-position fact.
+
+Expanded cards show every returned `shadowSamples` member in chronological
+order. Phase contacts use `Penumbral begins`, `Partial begins`, `Total begins`,
+and corresponding end labels. Objective maximum uses `Maximum`; a distinct
+suggestion uses `Best visible`. The best sample carries the same summary label.
+The browser uses returned screen-relative offsets and Moon-radius units
+directly; it does not calculate eclipse geometry or preference matches.
+
+`lunarEclipseRenderer.js` reuses the textured full-Moon drawing and applies the
+returned penumbra and umbra circles inside the Moon disk. Shadow placement is
+model-derived. Shading and muted red totality colour are stylized for
+legibility and are not a colour prediction. A nullable
+`northPoleTiltDegrees` keeps the shadow geometry and shows the surface
+north-up. The renderer adds no Moon outline.
+
+Expanded facts include objective maximum, the display-visible interval, every
+phase's local visibility, best time and Moon position, ambient light, umbral
+obscuration, weather, and the level-horizon caveat. Available weather says
+`Forecast at the best time: <summary>.` Outside coverage and temporary failure
+use `Weather forecast is not available yet.` and `Weather forecast is
+temporarily unavailable.`
+
+Card titles are `Penumbral lunar eclipse`, `Partial lunar eclipse`, and `Total
+lunar eclipse`. Penumbral copy notes that the change can be subtle. Partial
+copy explains the dark bite and unusual-crescent appearance. Total copy says
+the Moon may appear red without calling every total eclipse a Blood Moon.
+Cards contain no ordinary score, rank, confidence, exposure balance, photo
+hint, image download, calendar, Atom, share, or solar-warning action.
+
+`lunarEclipseCard.js` owns event-specific semantic structure and copy;
+`lunarEclipseRenderer.js` owns canvas drawing; and `moonEventView.css` owns the
+responsive presentation. Native summaries are keyboard operable, every canvas
+has text alternatives, the section has one polite local status, and desktop
+and narrow layouts do not overflow horizontally. The API field meanings and
+event calculations remain owned by
+[the Moon Event POST contract](api-shape.md#moon-event-post).
 
 ## Calibration Feedback Flow
 

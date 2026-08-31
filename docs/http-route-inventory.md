@@ -26,7 +26,7 @@ Open-Meteo URLs are provider dependencies, not Moon Service routes.
 | `GET /api/opportunities` | Location-to-opportunity product API | Browser `app.js` | Allowlisted; site and search bounds |
 | `POST /api/opportunities` | Request-scoped preference product API | Browser `app.js` through `opportunityPreferences.js` | Allowlisted POST; site and provider bounds |
 | `POST /api/opportunities/planning` | Weather-free next-date planning API | Browser `app.js` through `opportunityPreferences.js` | Allowlisted POST; site and provider bounds |
-| `POST /api/moon-events` | Locally visible lunar-eclipse discovery API | Direct API clients; later website, Atom, and iCalendar slices | Allowlisted POST; site and provider bounds |
+| `POST /api/moon-events` | Locally visible lunar-eclipse discovery API | Browser `moonEventView.js` | Allowlisted POST; site and provider bounds |
 | `POST /api/opportunities/search` | Direct fixture/scoring prototype contract | None | Hidden after site admission |
 | `GET /api/calibration-feedback/v1/capability` | Public feedback feature/availability state | None yet | Allowlisted; exempt from hosted resource admission |
 | `POST /api/calibration-feedback/v1/submissions` | Bounded current-observation feedback write | None yet | Allowlisted POST; provider-bound resolution and feedback write bucket |
@@ -91,9 +91,11 @@ Open-Meteo URLs are provider dependencies, not Moon Service routes.
   paths, and passes each body to that route's 16,384-byte bound. It adds the
   hosted security headers, returns empty `404` for hidden or unknown path variants, empty `405` with a
   path-specific `Allow` value for disallowed methods, and empty `400` for a
-  framed `GET` or `HEAD` body. The exact `/cameraFramingPreview.js`,
-  `/cameraReferenceScene.js`, `/highResolutionMoonRenderer.js`,
-  `/planningView.js`, `/cameraFramingPreview.css`, and
+  framed `GET` or `HEAD` body. The exact `/moonEventView.css`,
+  `/moonEventView.js`, `/lunarEclipseCard.js`,
+  `/lunarEclipseRenderer.js`, `/cameraFramingPreview.js`,
+  `/cameraReferenceScene.js`, `/highResolutionMoonRenderer.js`, `/planningView.js`,
+  `/cameraFramingPreview.css`, and
   `/moon-textures/lroc_color_2k.jpg` resources allow only bodyless `GET` and
   `HEAD`. The same rule applies to the six exact camera-preview paths:
   `/camera-preview/level-0.webp`, `/camera-preview/level-1.webp`,
@@ -187,6 +189,8 @@ and [hosted-alpha functional tests](../backend/src/test/java/dev/moonservice/bac
   and the URL. It creates no order cookie, profile, or `localStorage` entry.
 - **References:** [controller](../backend/src/main/java/dev/moonservice/backend/web/WebPageController.java),
   [browser flow](../frontend/src/app.js),
+  [ordinary response composition](../frontend/src/responseView.js),
+  [special Moon event view](../frontend/src/moonEventView.js),
   [recent-search storage](../frontend/src/recentSearches.js),
   [camera setup](../frontend/src/cameraSetup.js),
   [camera reference scene](../frontend/src/cameraReferenceScene.js),
@@ -557,8 +561,14 @@ and [hosted-alpha functional tests](../backend/src/test/java/dev/moonservice/bac
 
 - **Handler/purpose:** `MoonEventController.search` delegates to
   `LunarEclipseEventService` for independent discovery of locally visible lunar
-  eclipses during the next 18 calendar months. Direct API clients can use it;
-  the website, Atom, and iCalendar do not call it yet.
+  eclipses during the next 18 calendar months.
+- **Production invocation:** when the browser-local **Show lunar eclipses**
+  preference is enabled, browser `moonEventView.js` calls the route once after
+  each successful real-location ordinary result. It sends the canonical result
+  location and Version 1 preferences built from `normalizedActiveFilters`.
+  When the preference is disabled, the browser does not show the section or
+  make this request. The browser-only preference is not included in the body.
+  Atom and iCalendar do not call this route yet.
 - **Request:** same-origin `application/json` with required canonical
   `locationId`, required `preferences`, and `preferences.version: 1`. It uses
   the planning parser and rejects query parameters and other top-level fields.
@@ -577,6 +587,10 @@ and [hosted-alpha functional tests](../backend/src/test/java/dev/moonservice/bac
   methods return `405` with `Allow: POST`; variants return `404`. Admission
   refusal uses the existing no-store `429`; no CORS or preflight is added.
 - **References:** [controller](../backend/src/main/java/dev/moonservice/backend/web/MoonEventController.java),
+  [browser event view](../frontend/src/moonEventView.js),
+  [eclipse card](../frontend/src/lunarEclipseCard.js),
+  [eclipse renderer](../frontend/src/lunarEclipseRenderer.js),
+  [ordinary response integration](../frontend/src/responseView.js),
   [service](../backend/src/main/java/dev/moonservice/backend/events/LunarEclipseEventService.java),
   [response model](../backend/src/main/java/dev/moonservice/backend/events/MoonEventResponse.java),
   [API contract](api-shape.md#moon-event-post).

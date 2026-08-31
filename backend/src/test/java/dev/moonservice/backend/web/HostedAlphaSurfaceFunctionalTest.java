@@ -117,7 +117,9 @@ class HostedAlphaSurfaceFunctionalTest {
             "/camera-preview/level-4.webp", "/camera-preview/level-5.webp",
             "/cameraReferenceScene.js", "/cameraSetup.js", "/currentMoonCard.js",
             "/highResolutionMoonRenderer.js", "/moon-textures/lroc_color_2k.jpg",
-            "/planningView.js", "/skyDomeView.js", "/readyz"
+            "/lunarEclipseCard.js", "/lunarEclipseRenderer.js",
+            "/moonEventView.css", "/moonEventView.js", "/planningView.js",
+            "/skyDomeView.js", "/readyz"
     })
     void allowsHeadForApprovedSurface(String path) {
         expectHostedHeaders(webTestClient.head()
@@ -377,6 +379,8 @@ class HostedAlphaSurfaceFunctionalTest {
             "/feeds/atom/", "/feeds/Atom", "/feeds/atom/other",
             "/calendars/opportunities.ics/", "/calendars/other.ics",
             "/o", "/o/result", "/o/result.txt", "/o/result.ics/", "/o/nested/result.ics",
+            "/LunarEclipseCard.js", "/lunarEclipseCard.js/",
+            "/LunarEclipseRenderer.js", "/lunarEclipseRenderer.js/",
             "/error", "/healthz", "/unknown"
     })
     void hidesUnapprovedPaths(String path) {
