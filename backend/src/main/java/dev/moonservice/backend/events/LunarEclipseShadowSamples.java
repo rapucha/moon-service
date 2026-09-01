@@ -3,6 +3,8 @@ package dev.moonservice.backend.events;
 import dev.moonservice.backend.events.MoonEventResponse.EclipseShadow;
 import dev.moonservice.backend.events.MoonEventResponse.EclipseShadowMoon;
 import dev.moonservice.backend.events.MoonEventResponse.EclipseShadowSample;
+import dev.moonservice.backend.events.MoonEventResponse.MoonPath;
+import dev.moonservice.backend.events.MoonEventResponse.MoonPathSample;
 import dev.moonservice.scoringprototype.ephemeris.EphemerisSampler;
 import dev.moonservice.scoringprototype.ephemeris.LunarEclipseShadowSample;
 import dev.moonservice.scoringprototype.ephemeris.MoonSample;
@@ -40,6 +42,15 @@ final class LunarEclipseShadowSamples {
                 .toList();
     }
 
+    MoonPath withPathShadows(Location location, MoonPath path) {
+        List<MoonPathSample> samples = path.samples().stream()
+                .map(sample -> sample.withShadow(responseShadow(
+                        ephemeris.lunarEclipseShadowAt(
+                                location, Instant.parse(sample.at())))))
+                .toList();
+        return new MoonPath(samples);
+    }
+
     private static EclipseShadowSample responseSample(LunarEclipseShadowSample sample) {
         MoonSample moon = sample.moon();
         return new EclipseShadowSample(
@@ -48,10 +59,14 @@ final class LunarEclipseShadowSamples {
                         moon.moonAltitudeDegrees(),
                         moon.moonAzimuthDegrees(),
                         moon.northPoleTiltDegrees()),
-                new EclipseShadow(
-                        sample.centerRightMoonRadii(),
-                        sample.centerUpMoonRadii(),
-                        sample.umbraRadiusMoonRadii(),
-                        sample.penumbraRadiusMoonRadii()));
+                responseShadow(sample));
+    }
+
+    private static EclipseShadow responseShadow(LunarEclipseShadowSample sample) {
+        return new EclipseShadow(
+                sample.centerRightMoonRadii(),
+                sample.centerUpMoonRadii(),
+                sample.umbraRadiusMoonRadii(),
+                sample.penumbraRadiusMoonRadii());
     }
 }

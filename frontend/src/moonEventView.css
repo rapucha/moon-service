@@ -49,12 +49,32 @@
 }
 
 .special-moon-event-summary {
-  padding: 14px 16px;
+  display: grid;
+  grid-template-columns: 8px minmax(0, 1fr);
+  gap: 8px;
+  align-items: start;
+  padding: 10px 14px;
+  list-style: none;
   color: var(--ink);
 }
 
-.special-moon-event-summary::marker {
-  color: var(--accent-strong);
+.special-moon-event-summary::-webkit-details-marker {
+  display: none;
+}
+
+.special-moon-event-summary::before {
+  width: 0;
+  height: 0;
+  margin-top: 0.35em;
+  border-top: 5px solid transparent;
+  border-bottom: 5px solid transparent;
+  border-left: 7px solid var(--accent-strong);
+  content: "";
+  transform-origin: 3px 5px;
+}
+
+.special-moon-event-card[open] > .special-moon-event-summary::before {
+  transform: rotate(90deg);
 }
 
 .special-moon-event-summary:focus-visible {
@@ -63,19 +83,10 @@
 }
 
 .special-moon-event-summary h4 {
-  display: grid;
-  grid-template-columns: 132px minmax(0, 1fr);
-  gap: 14px;
-  align-items: center;
   min-width: 0;
   color: var(--ink);
 }
 
-.special-moon-event-summary.special-moon-event-summary-text h4 {
-  grid-template-columns: 1fr;
-}
-
-.special-moon-summary-canvas,
 .special-moon-stage-canvas {
   display: block;
   max-width: 100%;
@@ -84,25 +95,28 @@
   border-radius: 50%;
 }
 
-.special-moon-summary-canvas {
-  width: 132px;
-}
-
 .special-moon-summary-copy {
-  display: grid;
-  gap: 3px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 12px;
   min-width: 0;
 }
 
-.special-moon-event-kind {
-  color: var(--blue);
-  font-size: 0.74rem;
-  font-weight: 800;
-  text-transform: uppercase;
+.special-moon-summary-copy > span {
+  box-sizing: border-box;
+  min-width: 0;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+}
+
+.special-moon-summary-copy > span + span {
+  padding-left: 12px;
+  border-left: 1px solid var(--line-strong);
 }
 
 .special-moon-event-title {
-  font-size: 1.14rem;
+  font-size: 1rem;
   line-height: 1.25;
 }
 
@@ -115,7 +129,7 @@
 
 .special-moon-event-best {
   color: var(--accent-strong);
-  font-size: 0.92rem;
+  font-size: 0.88rem;
   font-weight: 800;
 }
 
@@ -150,6 +164,40 @@
 
 .special-moon-event-details h5 {
   font-size: 0.96rem;
+}
+
+.special-moon-eclipse-range {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 4px 10px;
+  align-items: center;
+  color: var(--muted);
+  font-size: 0.82rem;
+}
+
+.special-moon-eclipse-range-label {
+  color: var(--ink);
+  font-weight: 750;
+}
+
+.special-moon-eclipse-range-times {
+  justify-self: end;
+}
+
+.special-moon-eclipse-range-track {
+  position: relative;
+  grid-column: 1 / -1;
+  height: 6px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: var(--line);
+}
+
+.special-moon-eclipse-range-segment {
+  position: absolute;
+  inset-block: 0;
+  border-radius: inherit;
+  background: var(--accent);
 }
 
 .special-moon-stages,
@@ -273,13 +321,17 @@
 }
 
 @media (max-width: 680px) {
-  .special-moon-event-summary h4 {
-    grid-template-columns: 88px minmax(0, 1fr);
-    gap: 11px;
+  .special-moon-event-summary {
+    padding: 9px 12px;
   }
 
-  .special-moon-summary-canvas {
-    width: 88px;
+  .special-moon-summary-copy > span + span {
+    padding-left: 0;
+    border-left: 0;
+  }
+
+  .special-moon-summary-copy {
+    column-gap: 8px;
   }
 
   .special-moon-event-details {

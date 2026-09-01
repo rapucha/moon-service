@@ -92,7 +92,7 @@ Open-Meteo URLs are provider dependencies, not Moon Service routes.
   hosted security headers, returns empty `404` for hidden or unknown path variants, empty `405` with a
   path-specific `Allow` value for disallowed methods, and empty `400` for a
   framed `GET` or `HEAD` body. The exact `/moonEventView.css`,
-  `/moonEventView.js`, `/lunarEclipseCard.js`,
+  `/moonEventView.js`, `/moonEventPath.js`, `/lunarEclipseCard.js`,
   `/lunarEclipseRenderer.js`, `/cameraFramingPreview.js`,
   `/cameraReferenceScene.js`, `/highResolutionMoonRenderer.js`, `/planningView.js`,
   `/cameraFramingPreview.css`, and
@@ -580,10 +580,14 @@ and [hosted-alpha functional tests](../backend/src/test/java/dev/moonservice/bac
   A full Moon whose peak is outside the horizon is included when its useful
   local viewing overlaps it. A qualifying peak inside the horizon remains when
   no local viewing overlaps and then omits local facts and weather. Members
-  otherwise include applicable observer-relative visibility, display selection,
-  Version 1 altitude/azimuth assessment, and event-local weather. Preferences
-  and weather never hide or reorder events. Weather uses zero or one existing
-  seven-day provider lookup.
+  otherwise include applicable observer-relative visibility, request-clamped
+  display selection, and a separate bounded Moon path that ordinarily covers
+  the selected full above-horizon pass. The path may extend beyond the request
+  horizon; bounded polar cases need not contain a rise or set. Eclipse path
+  samples embed their own drawable shadow geometry; full-Moon path samples omit
+  that member. Members also include Version 1 altitude/azimuth assessment and
+  event-local weather. Preferences and weather never hide or reorder events.
+  Weather uses zero or one existing seven-day provider lookup.
 - **Authentication/data:** anonymous. It stores no request, result, or profile.
   Preferences remain in the body and outside providers, URLs, analytics,
   shared event caches, application logs, and provider-cache keys. Every
@@ -594,6 +598,7 @@ and [hosted-alpha functional tests](../backend/src/test/java/dev/moonservice/bac
   refusal uses the existing no-store `429`; no CORS or preflight is added.
 - **References:** [controller](../backend/src/main/java/dev/moonservice/backend/web/MoonEventController.java),
   [browser event view](../frontend/src/moonEventView.js),
+  [special-event path adapter](../frontend/src/moonEventPath.js),
   [event cards](../frontend/src/lunarEclipseCard.js),
   [eclipse renderer](../frontend/src/lunarEclipseRenderer.js),
   [ordinary response integration](../frontend/src/responseView.js),

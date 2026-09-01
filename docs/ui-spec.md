@@ -1104,25 +1104,61 @@ The section uses these compact states:
   unchanged.`
 
 Returned eclipses and full Moons remain in API order. Each is a native
-`details` card that is collapsed by default. An eclipse summary uses the
-MoonPass visual language and shows the subtype, local calendar date, best local
-time, Moon altitude and direction, and a model-derived Moon. It says
-`Best · Maximum` when the fixed suggestion is objective maximum and
-`Best visible` otherwise. A full-Moon summary uses the same typography without
-adding an image or icon. When local viewing exists, it says `Best · Full Moon`
-when `suggestedAt` equals `peakAt` and `Best visible` otherwise. Cards show no
-preference pill. When altitude or direction does not match an active preference,
-only that numeric position value uses warning colour and a focusable tooltip:
+`details` card that is collapsed by default. Eclipse and Supermoon summaries
+use the same compact, image-free information row. It contains the event title,
+local calendar date, the applicable `Maximum`, `Full Moon`, or `Best visible`
+time, and Moon altitude and direction when a local position is available. The
+row stays on one line where desktop width permits and wraps compactly on narrow
+screens. An eclipse uses `Maximum` when the fixed suggestion is objective
+maximum and `Best visible` otherwise. A Supermoon with local viewing uses `Full
+Moon` when `suggestedAt` equals `peakAt` and `Best visible` otherwise. There is
+no standalone summary or hero image. Cards show no preference pill. When
+altitude or direction does not match an active preference, only that numeric
+position value uses warning colour and a focusable tooltip:
 `Outside your altitude preference.` or `Outside your direction preference.`
 Matching and unrestricted values retain ordinary styling and no tooltip. The
 same treatment applies to the summary and expanded Moon-position fact.
 
-Expanded eclipse cards show every returned `shadowSamples` member in chronological
-order. Phase contacts use `Penumbral begins`, `Partial begins`, `Total begins`,
-and corresponding end labels. Objective maximum uses `Maximum`; a distinct
-suggestion uses `Best visible`. The best sample carries the same summary label.
-The browser uses returned screen-relative offsets and Moon-radius units
-directly; it does not calculate eclipse geometry or preference matches.
+Expanded cards with local viewing place one `Moon path` panel immediately after
+the description. It reuses the standard MoonPass altitude curve, azimuth rail,
+ambient-light bands, skyline, and responsive desktop/mobile layout across the
+returned `moonPath` extent. The path is independent of the event's
+request-clamped `displayInterval`: it ordinarily shows the selected full
+above-horizon rise-to-set pass and may extend beyond the request horizon. Start
+and End are the first and last samples. The panel features a visible eclipse
+maximum as `Maximum`, a visible exact full-Moon peak as `Full Moon`, and the
+suggestion as `Best visible` when the defining event instant is not on the path.
+It does not show a Sun-pass or sky-dome disclosure and does not add a
+direction-preference mask. A retained full Moon without local viewing has no
+path panel.
+
+An eclipse path has a subtle event-specific cue for the intersection of the
+selected locally visible eclipse interval and the plotted path. The cue must
+make that interval distinguishable without implying that the whole Moon pass is
+part of the eclipse. Its exact visual mechanism is not fixed here.
+
+Supermoon paths use the standard phase-and-orientation Moon images. Eclipse
+paths render each curve marker from that sample's returned shadow geometry, so
+the Moon on the curve shows the eclipse stage at that instant. These marker
+images are generated at runtime through the existing canvas renderer and used
+as data URLs; there is no static eclipse-image asset. Collapsed cards do not
+construct the path or these data URLs. The first expansion constructs and
+retains the path. If that construction fails, the card shows
+`Moon path could not be shown.` in place of the path without replacing its
+other content or other results, and it does not retry or substitute an ordinary
+Moon marker. The featured marker's accessible label uses the same `Maximum`,
+`Full Moon`, or `Best visible` meaning as its visible chart label.
+
+Below the path, expanded eclipse cards retain the existing stage strip with
+every returned `shadowSamples` member in chronological order. Phase contacts
+use `Penumbral begins`, `Partial begins`, `Total begins`, and corresponding end
+labels. Objective maximum uses `Maximum`; a distinct suggestion uses `Best
+visible`. The best sample carries the same summary label. The browser uses
+returned screen-relative offsets and Moon-radius units directly; it does not
+calculate eclipse geometry or preference matches.
+
+The image-free summary treatment does not change the expanded eclipse Moon path
+or stage strip.
 
 `lunarEclipseRenderer.js` reuses the textured full-Moon drawing and applies the
 returned penumbra and umbra circles inside the Moon disk. Shadow placement is
@@ -1163,11 +1199,13 @@ hint, image download, calendar, Atom, share, or solar-warning action.
 
 `lunarEclipseCard.js` owns the eclipse and full-Moon semantic structure and
 copy;
-`lunarEclipseRenderer.js` owns canvas drawing; and `moonEventView.css` owns the
-responsive presentation. Native summaries are keyboard operable, every canvas
-has text alternatives, the section has one polite local status, and desktop
-and narrow layouts do not overflow horizontally. The API field meanings and
-event calculations remain owned by
+`moonEventPath.js` owns the special-event path validation and adapter;
+`lunarEclipseRenderer.js` owns canvas drawing and eclipse marker images;
+`moonPathView.js` owns the shared chart; and `moonEventView.css` owns the
+responsive card presentation. Native summaries are keyboard operable, every
+canvas and chart marker has text alternatives, the section has one polite local
+status, and desktop and narrow layouts do not overflow horizontally. The API
+field meanings and event calculations remain owned by
 [the Moon Event POST contract](api-shape.md#moon-event-post).
 
 ## Calibration Feedback Flow

@@ -325,7 +325,7 @@ public final class WindowGenerator {
         return Optional.of(best.instant());
     }
 
-    static List<MoonSample> pathSamples(
+    public static List<MoonSample> pathSamples(
             SampleProvider samples,
             Instant startsAt,
             List<Instant> extraInstants,

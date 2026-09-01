@@ -112,8 +112,15 @@ The successful response covers the half-open 18 calendar-month horizon in the
 resolved location timezone. It returns a chronological closed union of locally
 visible lunar eclipses and qualifying near-perigee exact full Moons. Eclipse
 members include objective phases, maximum, local visibility, and drawable
-shadow samples. Full-Moon members include the exact peak, versioned qualifier,
-and local viewing within 24 hours on either side. A qualifying full Moon whose
+shadow samples. Each event with local viewing also includes a canonical
+`moonPath` beside `displayInterval`. The display interval keeps its event
+visibility and request-horizon bounds. The independently bounded path ordinarily
+covers the selected full above-horizon rise-to-set pass and may extend beyond
+the request horizon. In bounded polar cases, its extent need not contain a rise
+or set. Every eclipse path sample embeds its matching drawable shadow;
+full-Moon path samples omit it. Full-Moon members include the exact peak,
+versioned qualifier, and local viewing within 24 hours on either side. A
+qualifying full Moon whose
 peak is inside the horizon remains in the response when no local interval
 overlaps; that member omits `localViewing` and `weather`. A valid result can
 have `events: []`.
@@ -126,6 +133,12 @@ warnings. For a retained full Moon without local viewing, active altitude and
 azimuth rows are `not_applicable`. Time/light, named-phase, and bright-limb
 limits produce no special-event assessment rows. The five-minute grid and
 one-second refinement remain in use only to find local visibility intervals.
+The path uses the existing Moon-pass sampling rules. Its first and last samples
+define its own extent. It always includes the visible suggestion and includes
+the eclipse maximum, exact full-Moon peak, and eclipse contacts that lie on the
+path. Clients use the first and last samples as Start and End. They label a
+visible eclipse maximum `Maximum`, a visible full-Moon peak `Full Moon`, and the
+suggestion `Best visible` when the defining event instant is not on the path.
 
 Shadow samples use Astronomy Engine's supported public Sun/Moon vectors and
 rotations. Their center offsets and umbra/penumbra radii are expressed in Moon

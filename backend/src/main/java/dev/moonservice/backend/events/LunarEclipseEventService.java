@@ -19,10 +19,12 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.UUID;
+import java.util.stream.Stream;
 
 @Service
 public final class LunarEclipseEventService {
     private static final Duration ECLIPSE_SEARCH_LOOKBACK = Duration.ofDays(1);
+    private static final Duration PATH_RADIUS = Duration.ofHours(24);
 
     private final EphemerisSampler ephemeris = new EphemerisSampler();
     private final LunarEclipseShadowSamples shadowSamples = new LunarEclipseShadowSamples(ephemeris);
@@ -67,6 +69,12 @@ public final class LunarEclipseEventService {
                 location,
                 objective.startsAt(),
                 objective.endsAt(),
+                maximumAt.minus(PATH_RADIUS),
+                maximumAt.plus(PATH_RADIUS),
+                phaseSpecs.stream()
+                        .flatMap(phase -> Stream.of(
+                                phase.span().startsAt(), phase.span().endsAt()))
+                        .toList(),
                 horizonStart,
                 horizonEnd,
                 maximumAt);
@@ -80,6 +88,7 @@ public final class LunarEclipseEventService {
         MoonSample maximum = ephemeris.sampleAt(location, maximumAt);
         LocalViewing localViewing = viewing.localViewing();
         Instant suggestedAt = Instant.parse(localViewing.displayInterval().suggestedAt());
+        MoonPath moonPath = shadowSamples.withPathShadows(location, localViewing.moonPath());
         List<EclipsePhase> responsePhases = phaseSpecs.stream()
                 .map(phase -> phase(phase, viewing.visibleIntervals()))
                 .toList();
@@ -102,7 +111,8 @@ public final class LunarEclipseEventService {
                         visibilityStatus(objective, viewing.visibleIntervals()),
                         localViewing.intervals(),
                         localViewing.selectedInterval(),
-                        localViewing.displayInterval()),
+                        localViewing.displayInterval(),
+                        moonPath),
                 EventPreferenceEvaluator.evaluate(
                         preferences,
                         viewing.suggestedSample(),

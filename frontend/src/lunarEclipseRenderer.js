@@ -1,3 +1,4 @@
+import { element } from "./dom.js";
 import { drawMoonPhase } from "./moonPhaseView.js";
 
 var MOON_RADIUS_RATIO = 0.34;
@@ -23,6 +24,15 @@ export function drawLunarEclipse(canvas, sample) {
   drawPenumbra(context, shadowX, shadowY, shadow.penumbraRadiusMoonRadii * moonRadius);
   drawUmbra(context, shadowX, shadowY, shadow.umbraRadiusMoonRadii * moonRadius);
   context.restore();
+}
+
+export function lunarEclipseImageDataUrl(sample, size) {
+  var canvas = /** @type {HTMLCanvasElement} */ (element("canvas", {
+    width: size,
+    height: size
+  }));
+  drawLunarEclipse(canvas, sample);
+  return canvas.toDataURL("image/png");
 }
 
 function drawPenumbra(context, centerX, centerY, radius) {

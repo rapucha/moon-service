@@ -1,5 +1,6 @@
 import { element } from "./dom.js";
 import { fullMoonCard, lunarEclipseCard } from "./lunarEclipseCard.js";
+import { validMoonEventPath } from "./moonEventPath.js";
 import { specialMoonEventsEnabled } from "./opportunityPreferences.js";
 
 var EVENT_PATH = "/api/moon-events";
@@ -243,7 +244,8 @@ function validNearPerigee(qualifier) {
 function validFullMoonViewing(viewing, peakAt, responseStartsAt, responseEndsAt) {
   if (!objectValue(viewing) || !Array.isArray(viewing.intervals)
       || viewing.intervals.length === 0 || !validInterval(viewing.selectedInterval)
-      || !validDisplayInterval(viewing.displayInterval, responseEndsAt)) return false;
+      || !validDisplayInterval(viewing.displayInterval, responseEndsAt)
+      || !validMoonEventPath(viewing, "full_moon", [peakAt])) return false;
   var peak = instantValue(peakAt);
   var intervalsValid = viewing.intervals.every(function (interval, index, intervals) {
     return validInterval(interval) && instantValue(interval.startsAt) >= peak - 86_400_000
@@ -276,7 +278,14 @@ function validEventVisibility(visibility, event, responseEndsAt) {
       return sameInterval(interval, visibility.selectedInterval);
     })
     && validDisplayInterval(visibility.displayInterval, responseEndsAt)
+    && validMoonEventPath(visibility, "lunar_eclipse", eclipsePathInstants(event))
     && containsInterval(visibility.selectedInterval, visibility.displayInterval);
+}
+
+function eclipsePathInstants(event) {
+  return [event.maximumAt].concat(event.phases.flatMap(function (phase) {
+    return [phase.startsAt, phase.endsAt];
+  }));
 }
 
 function validVisibility(visibility, objective, allowNotVisible) {

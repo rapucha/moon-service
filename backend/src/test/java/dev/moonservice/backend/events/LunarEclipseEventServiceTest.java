@@ -3,14 +3,19 @@ package dev.moonservice.backend.events;
 import dev.moonservice.backend.events.MoonEventResponse.*;
 import dev.moonservice.backend.location.*;
 import dev.moonservice.backend.location.openmeteo.TestOpenMeteoLocationResolver;
+import dev.moonservice.scoringprototype.ephemeris.EphemerisSampler;
+import dev.moonservice.scoringprototype.ephemeris.MoonSample;
+import dev.moonservice.scoringprototype.fixture.Location;
 import dev.moonservice.scoringprototype.input.OpportunityPreferences;
 import dev.moonservice.scoringprototype.input.OpportunityPreferences.*;
 import dev.moonservice.scoringprototype.window.RefinedTimeGrid;
+import dev.moonservice.scoringprototype.window.WindowGenerator;
 import org.junit.jupiter.api.Test;
 
 import java.time.*;
 import java.util.List;
 import java.util.Set;
+import java.util.stream.Stream;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.within;
@@ -38,6 +43,7 @@ class LunarEclipseEventServiceTest {
                         "2027-02-20T23:12:44.142Z");
         assertThat(events).noneMatch(event ->
                 event.maximumAt().equals("2026-03-03T11:33:40.289Z"));
+        events.forEach(LunarEclipseEventServiceTest::assertEclipsePath);
 
         LunarEclipseEvent total = events.getFirst();
         assertThat(total.kind()).isEqualTo("lunar_eclipse");
@@ -61,6 +67,10 @@ class LunarEclipseEventServiceTest {
                         "2025-09-07T19:56:42.892Z",
                         "2025-09-07T20:55:20.487Z");
         EclipseShadowSample maximumShadow = total.shadowSamples().get(3);
+        MoonPathSample maximumPath = total.localVisibility().moonPath().samples().stream()
+                .filter(sample -> sample.at().equals(total.maximumAt()))
+                .findFirst().orElseThrow();
+        assertThat(maximumPath.shadow()).isEqualTo(maximumShadow.shadow());
         assertThat(maximumShadow.moon().northPoleTiltDegrees()).isNotNull();
         assertThat(maximumShadow.shadow().centerRightMoonRadii())
                 .isCloseTo(-0.1673, within(0.0001));
@@ -124,6 +134,14 @@ class LunarEclipseEventServiceTest {
                 .isEqualTo("2026-08-28T04:13:00Z");
         assertThat(event.localVisibility().displayInterval().endsAt())
                 .isEqualTo(event.localVisibility().selectedInterval().endsAt());
+        List<MoonPathSample> eventPath = event.localVisibility().moonPath().samples();
+        assertThat(Instant.parse(eventPath.getFirst().at()))
+                .isBefore(Instant.parse(event.startsAt()));
+        assertThat(eventPath)
+                .extracting(MoonPathSample::at)
+                .contains(event.maximumAt(), event.localVisibility().displayInterval().suggestedAt());
+        assertThat(Instant.parse(eventPath.getLast().at())).isAfterOrEqualTo(
+                Instant.parse(event.localVisibility().selectedInterval().endsAt()));
         assertThat(event.shadowSamples()).hasSize(6);
         assertThat(event.shadowSamples()).extracting(EclipseShadowSample::at)
                 .contains("2026-08-28T04:13:00Z");
@@ -156,6 +174,10 @@ class LunarEclipseEventServiceTest {
                 .findFirst().orElseThrow();
         assertThat(partial.localVisibility().status()).isEqualTo("not_visible");
         assertThat(partial.localVisibility().intervals()).isEmpty();
+        assertThat(settingEclipse.localVisibility().moonPath().samples())
+                .extracting(MoonPathSample::at)
+                .contains(settingEclipse.localVisibility().displayInterval().suggestedAt())
+                .doesNotContain(settingEclipse.maximumAt());
 
         ResolvedLocation polar = location(
                 "polar-test", 80.5, -165.57924, ZoneOffset.UTC);
@@ -256,10 +278,89 @@ class LunarEclipseEventServiceTest {
                 .orElseThrow();
     }
 
-    private static dev.moonservice.scoringprototype.fixture.Location prototype(
+    private static void assertEclipsePath(LunarEclipseEvent event) {
+        DisplayInterval display = event.localVisibility().displayInterval();
+        List<MoonPathSample> samples = event.localVisibility().moonPath().samples();
+        Instant pathStartsAt = Instant.parse(samples.getFirst().at());
+        Instant pathEndsAt = Instant.parse(samples.getLast().at());
+        Instant maximumAt = Instant.parse(event.maximumAt());
+        Instant pathDomainStartsAt = maximumAt.minus(Duration.ofHours(24));
+        Instant pathDomainEndsAt = maximumAt.plus(Duration.ofHours(24));
+        Instant suggestedAt = Instant.parse(display.suggestedAt());
+        List<Instant> requiredInstants = Stream.concat(
+                        Stream.of(event.startsAt(), event.endsAt(),
+                                event.maximumAt(), display.suggestedAt()),
+                        event.phases().stream().flatMap(phase ->
+                                Stream.of(phase.startsAt(), phase.endsAt())))
+                .map(Instant::parse)
+                .filter(instant -> !instant.isBefore(pathDomainStartsAt)
+                        && !instant.isAfter(pathDomainEndsAt))
+                .distinct()
+                .toList();
+        EphemerisSampler ephemeris = new EphemerisSampler();
+        Location location = prototype(PRAGUE);
+        RefinedTimeGrid.Interval aboveHorizon = RefinedTimeGrid.matchingIntervals(
+                        pathDomainStartsAt,
+                        pathDomainStartsAt,
+                        pathDomainEndsAt,
+                        requiredInstants,
+                        instant -> ephemeris.sampleAt(location, instant).moonAltitudeDegrees() >= 0.0)
+                .stream()
+                .filter(interval -> !suggestedAt.isBefore(interval.startsAt())
+                        && !suggestedAt.isAfter(interval.endsAt()))
+                .findFirst()
+                .orElseThrow();
+        Instant selectedStartsAt = Instant.parse(event.localVisibility().selectedInterval().startsAt());
+        Instant selectedEndsAt = Instant.parse(event.localVisibility().selectedInterval().endsAt());
+        Instant expectedStartsAt = aboveHorizon.startsAt().isBefore(selectedStartsAt)
+                ? aboveHorizon.startsAt() : selectedStartsAt;
+        Instant expectedEndsAt = aboveHorizon.endsAt().isAfter(selectedEndsAt)
+                ? aboveHorizon.endsAt() : selectedEndsAt;
+        List<Instant> specialInstants = requiredInstants.stream()
+                .filter(instant -> !instant.isBefore(expectedStartsAt)
+                        && !instant.isAfter(expectedEndsAt))
+                .toList();
+        List<String> expectedInstants = WindowGenerator.pathSamples(
+                        instant -> ephemeris.sampleAt(location, instant),
+                        expectedStartsAt,
+                        specialInstants,
+                        expectedEndsAt).stream()
+                .map(MoonSample::instant)
+                .map(Instant::toString)
+                .toList();
+
+        assertThat(pathStartsAt).isEqualTo(expectedStartsAt);
+        assertThat(pathEndsAt).isEqualTo(expectedEndsAt);
+        assertThat(samples).extracting(MoonPathSample::at)
+                .containsExactlyElementsOf(expectedInstants)
+                .contains(display.suggestedAt());
+        assertThat(pathStartsAt).isBeforeOrEqualTo(Instant.parse(display.startsAt()));
+        assertThat(pathEndsAt).isAfterOrEqualTo(Instant.parse(display.endsAt()));
+        assertThat(samples).allSatisfy(sample -> {
+            assertThat(sample.altitudeDegrees()).isFinite();
+            assertThat(sample.azimuthDegrees()).isFinite();
+            assertThat(sample.moonPhaseAngleDegrees()).isFinite();
+            assertThat(sample.sunAltitudeDegrees()).isFinite();
+            assertThat(sample.sunAzimuthDegrees()).isFinite();
+            assertThat(sample.lightBucket()).isNotBlank();
+            assertThat(sample.shadow()).isNotNull();
+            var expectedShadow = ephemeris.lunarEclipseShadowAt(
+                    location, Instant.parse(sample.at()));
+            assertThat(sample.shadow().centerRightMoonRadii())
+                    .isEqualTo(expectedShadow.centerRightMoonRadii());
+            assertThat(sample.shadow().centerUpMoonRadii())
+                    .isEqualTo(expectedShadow.centerUpMoonRadii());
+            assertThat(sample.shadow().umbraRadiusMoonRadii())
+                    .isEqualTo(expectedShadow.umbraRadiusMoonRadii());
+            assertThat(sample.shadow().penumbraRadiusMoonRadii())
+                    .isEqualTo(expectedShadow.penumbraRadiusMoonRadii());
+        });
+    }
+
+    private static Location prototype(
             ResolvedLocation location
     ) {
-        return new dev.moonservice.scoringprototype.fixture.Location(
+        return new Location(
                 location.locationId(),
                 "real_location",
                 location.locationId(),

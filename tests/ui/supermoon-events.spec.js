@@ -11,6 +11,17 @@ const FILTERS = {
 
 test("renders visible and retained no-local supermoons in the shared event section", async ({ page }) => {
   await seedPreferences(page, { version: 1, ...FILTERS });
+  await page.addInitScript(() => {
+    const original = HTMLCanvasElement.prototype.toDataURL;
+    Reflect.set(window, "__moonPathImageCalls", 0);
+    HTMLCanvasElement.prototype.toDataURL = function (...args) {
+      if (this.width === 64 && this.height === 64) {
+        Reflect.set(window, "__moonPathImageCalls",
+          Reflect.get(window, "__moonPathImageCalls") + 1);
+      }
+      return original.apply(this, args);
+    };
+  });
   /** @type {any} */
   var eventRequest;
   await routeOrdinary(page);
@@ -36,18 +47,50 @@ test("renders visible and retained no-local supermoons in the shared event secti
   await expect(cards).toHaveCount(2);
   expect(await cards.evaluateAll(nodes => nodes.every(node => !node.hasAttribute("open")))).toBe(true);
   await expect(cards.getByRole("heading", { level: 4 })).toHaveText([
-    /Full Moon.*Supermoon.*Sep 1, 2026.*Best visible/,
-    /Full Moon.*Supermoon.*2027.*Not visible from Prague, Czechia during the searched dates\./
+    /Supermoon.*Sep 1, 2026.*Best visible/,
+    /Supermoon.*2027.*Not visible from Prague, Czechia during the searched dates\./
   ]);
+  await expect(cards.locator(".special-moon-event-kind")).toHaveCount(0);
+  await expect(cards.locator(".special-moon-summary-copy > span")).toHaveCount(7);
+  await expect(cards.locator("summary canvas, summary img, summary svg, summary [role='img']"))
+    .toHaveCount(0);
   await expect(cards.first().locator("summary .special-moon-position-warning"))
     .toHaveText("15.0° altitude");
   await expect(cards.first().locator("summary .special-moon-position-warning"))
     .toHaveAttribute("data-tooltip", "Outside your altitude preference.");
   await expect(cards.first().locator("summary .special-moon-position-warning")).toHaveCount(1);
   await expect(cards.nth(1).locator(".special-moon-position-warning")).toHaveCount(0);
-  await expect(section.locator("a, button, img, svg, canvas")).toHaveCount(0);
+  await expect(section.locator("a, button, img, canvas")).toHaveCount(0);
+  await expect(cards.locator(".moon-path-panel")).toHaveCount(0);
+  expect(await page.evaluate(() => Reflect.get(window, "__moonPathImageCalls"))).toBe(0);
+  const layouts = await summaryLayouts(cards);
+  expect(layouts.every(layout => layout.contained)).toBe(true);
+  if (page.viewportSize()?.width > 680) {
+    expect(layouts.every(layout => layout.oneRow)).toBe(true);
+  } else {
+    expect(layouts[0].oneRow).toBe(false);
+  }
 
   await cards.first().locator("summary").click();
+  await expect(cards.first().locator(".moon-path-summary .moon-path-label"))
+    .toHaveText(["Start", "Full Moon", "End"]);
+  await expect(cards.first().getByRole("img", { name: /Moon altitude and azimuth.*featured marker: Full Moon/ })).toBeVisible();
+  await expect(cards.first().locator(".moon-sample-marker.is-best image").first())
+    .toHaveAttribute("width", "34");
+  await expect(cards.first().locator(".special-moon-eclipse-range")).toHaveCount(0);
+  const pathPanel = cards.first().locator(".moon-path-panel");
+  const markerUrls = await pathPanel.locator(".moon-sample-marker-image")
+    .evaluateAll(images => images.map(image => image.getAttribute("href")));
+  const imageCalls = await page.evaluate(() => Reflect.get(window, "__moonPathImageCalls"));
+  expect(imageCalls).toBeGreaterThan(0);
+  await pathPanel.evaluate(node => node.setAttribute("data-retention-probe", "first-open"));
+  await cards.first().locator("summary").click();
+  await expect(cards.first()).not.toHaveAttribute("open", "");
+  await cards.first().locator("summary").click();
+  await expect(pathPanel).toHaveAttribute("data-retention-probe", "first-open");
+  expect(await pathPanel.locator(".moon-sample-marker-image")
+    .evaluateAll(images => images.map(image => image.getAttribute("href")))).toEqual(markerUrls);
+  expect(await page.evaluate(() => Reflect.get(window, "__moonPathImageCalls"))).toBe(imageCalls);
   await expect(cards.first().locator(".special-moon-event-description")).toHaveText(
     "A full Moon near perigee under Moon Service definition 1. “Supermoon” is an informal term."
   );
@@ -64,6 +107,7 @@ test("renders visible and retained no-local supermoons in the shared event secti
   await expect(cards.first()).toContainText("does not account for terrain, buildings, or trees");
 
   await cards.nth(1).locator("summary").click();
+  await expect(cards.nth(1).locator(".moon-path-panel")).toHaveCount(0);
   await expect(cards.nth(1).locator(".special-moon-event-facts dt")).toHaveText([
     "Exact full Moon", "Distance at peak", "Near-perigee closeness"
   ]);
@@ -71,6 +115,47 @@ test("renders visible and retained no-local supermoons in the shared event secti
     .toHaveCount(0);
   expect(await page.evaluate(() => document.documentElement.scrollWidth
     - document.documentElement.clientWidth)).toBeLessThanOrEqual(1);
+});
+
+test("contains a first-open path failure within one special-event card", async ({ page }) => {
+  await seedPreferences(page, { version: 1, ...FILTERS });
+  /** @type {string[]} */
+  const pageErrors = [];
+  page.on("pageerror", error => pageErrors.push(error.message));
+  await routeOrdinary(page);
+  await page.route("**/api/moon-events", async route => {
+    await fulfill(route, eventResponse("moon-service-3067696", [
+      visibleSupermoon("failed-path"), visibleSupermoon("working-path")
+    ]));
+  });
+
+  await page.goto("/search?locationId=moon-service-3067696");
+  const cards = page.locator(".special-moon-event-card");
+  await expect(cards).toHaveCount(2);
+  await page.evaluate(() => {
+    const original = SVGElement.prototype.setAttribute;
+    SVGElement.prototype.setAttribute = function (_name, _value) {
+      SVGElement.prototype.setAttribute = original;
+      throw new Error("forced Moon-path render failure");
+    };
+  });
+
+  await cards.first().locator("summary").click();
+  const failure = cards.first().locator(".special-moon-path-error");
+  await expect(failure).toHaveText("Moon path could not be shown.");
+  await expect(cards.first().locator(".moon-path-panel")).toHaveCount(0);
+  await expect(cards.first().locator(".special-moon-event-description, "
+    + ".special-moon-event-facts, .special-moon-weather, .special-moon-events-caveat"))
+    .toHaveCount(4);
+  await failure.evaluate(node => node.setAttribute("data-retention-probe", "failed"));
+  await cards.first().locator("summary").click();
+  await cards.first().locator("summary").click();
+  await expect(failure).toHaveAttribute("data-retention-probe", "failed");
+  await expect(cards.first().locator(".moon-path-panel")).toHaveCount(0);
+
+  await cards.nth(1).locator("summary").click();
+  await expect(cards.nth(1).locator(".moon-path-panel")).toHaveCount(1);
+  expect(pageErrors).toEqual([]);
 });
 
 test("rejects malformed full-Moon union members without affecting ordinary results", async ({ page }) => {
@@ -87,12 +172,18 @@ test("rejects malformed full-Moon union members without affecting ordinary resul
     if (id === "ignored-filter-row") {
       event.preferenceAssessment.filters.push({ filter: "time", status: "matches" });
     }
+    if (id === "shadowed-path") event.localViewing.moonPath.samples[0].shadow = {};
+    if (id === "missing-peak") {
+      event.localViewing.moonPath.samples = event.localViewing.moonPath.samples
+        .filter(sample => sample.at !== event.peakAt);
+    }
     if (id === "unknown-kind") event.kind = "solar_eclipse";
     await fulfill(route, eventResponse(id, [event]));
   });
 
   for (const id of [
-    "bad-qualifier", "weather-without-viewing", "ignored-filter-row", "unknown-kind"
+    "bad-qualifier", "weather-without-viewing", "ignored-filter-row", "shadowed-path",
+    "missing-peak", "unknown-kind"
   ]) {
     await page.goto("/search?locationId=" + id);
     await expect(page.locator(".special-moon-events-status")).toHaveText(
@@ -173,7 +264,8 @@ function visibleSupermoon(id) {
         endsAt: "2026-09-01T23:00:00Z",
         moon: { altitudeDegrees: 15, azimuthDegrees: 120 },
         sun: { altitudeDegrees: -18, lightBucket: "night" }
-      }
+      },
+      moonPath: fullMoonPath()
     },
     preferenceAssessment: assessment("does_not_match", [
       row("altitudeDegrees", "does_not_match"), row("azimuthDegrees", "matches")
@@ -199,6 +291,24 @@ function noLocalSupermoon(id) {
       row("azimuthDegrees", "not_applicable")
     ])
   };
+}
+
+function fullMoonPath() {
+  const instants = [
+    "2026-09-01T19:00:00Z", "2026-09-01T20:00:00Z", "2026-09-01T21:00:00Z",
+    "2026-09-01T23:00:00Z", "2026-09-02T01:00:00Z"
+  ];
+  return { samples: instants.map((at, index) => ({
+    at: at,
+    altitudeDegrees: 15 + index * 4,
+    azimuthDegrees: 120 + index * 8,
+    moonPhaseAngleDegrees: 180,
+    brightLimbTiltDegrees: 0,
+    northPoleTiltDegrees: 18,
+    sunAltitudeDegrees: -18,
+    sunAzimuthDegrees: 290,
+    lightBucket: "night"
+  })) };
 }
 
 function nearPerigee(distance, closeness) {
@@ -243,4 +353,17 @@ async function seedPreferences(page, value) {
   await page.addInitScript(({ key, stored }) => {
     localStorage.setItem(key, JSON.stringify(stored));
   }, { key: STORAGE_KEY, stored: value });
+}
+
+async function summaryLayouts(cards) {
+  return cards.locator(".special-moon-summary-copy").evaluateAll(nodes => nodes.map(node => {
+    const bounds = node.getBoundingClientRect();
+    const fields = Array.from(node.children).map(child => child.getBoundingClientRect());
+    return {
+      oneRow: Math.max(...fields.map(field => field.top))
+        < Math.min(...fields.map(field => field.bottom)),
+      contained: fields.every(field => field.left >= bounds.left - 1
+        && field.right <= bounds.right + 1)
+    };
+  }));
 }

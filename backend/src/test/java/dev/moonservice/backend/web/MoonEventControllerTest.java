@@ -85,7 +85,17 @@ class MoonEventControllerTest {
         assertThat(response.at("/events/0/phases/0/localVisibility").propertyNames())
                 .containsExactlyInAnyOrder("status", "intervals");
         assertThat(response.at("/events/0/localVisibility").propertyNames())
-                .containsExactlyInAnyOrder("status", "intervals", "selectedInterval", "displayInterval");
+                .containsExactlyInAnyOrder(
+                        "status", "intervals", "selectedInterval", "displayInterval", "moonPath");
+        JsonNode eclipsePath = response.at(
+                "/events/0/localVisibility/moonPath/samples/0");
+        assertThat(eclipsePath.propertyNames()).containsExactlyInAnyOrder(
+                "at", "altitudeDegrees", "azimuthDegrees", "moonPhaseAngleDegrees",
+                "brightLimbTiltDegrees", "northPoleTiltDegrees", "sunAltitudeDegrees",
+                "sunAzimuthDegrees", "lightBucket", "shadow");
+        assertThat(eclipsePath.path("shadow").propertyNames()).containsExactlyInAnyOrder(
+                "centerRightMoonRadii", "centerUpMoonRadii",
+                "umbraRadiusMoonRadii", "penumbraRadiusMoonRadii");
         assertThat(response.at("/events/0/weather").propertyNames()).containsExactlyInAnyOrder(
                 "status", "forecastHourStartsAt", "summary", "cloudCoverPercent",
                 "precipitationProbabilityPercent");
@@ -102,7 +112,13 @@ class MoonEventControllerTest {
                         "apogeeDistanceKilometers");
         assertThat(fullMoon.path("localViewing").propertyNames())
                 .containsExactlyInAnyOrder(
-                        "intervals", "selectedInterval", "displayInterval");
+                        "intervals", "selectedInterval", "displayInterval", "moonPath");
+        JsonNode fullMoonPath = fullMoon.at("/localViewing/moonPath/samples/0");
+        assertThat(fullMoonPath.propertyNames()).containsExactlyInAnyOrder(
+                "at", "altitudeDegrees", "azimuthDegrees", "moonPhaseAngleDegrees",
+                "brightLimbTiltDegrees", "northPoleTiltDegrees", "sunAltitudeDegrees",
+                "sunAzimuthDegrees", "lightBucket");
+        assertThat(fullMoonPath.has("shadow")).isFalse();
         JsonNode noLocal = response.path("events").get(3);
         assertThat(noLocal.propertyNames()).containsExactlyInAnyOrder(
                 "id", "kind", "peakAt", "qualifiers", "preferenceAssessment");
@@ -254,7 +270,8 @@ class MoonEventControllerTest {
                         "fully_visible",
                         List.of(interval),
                         interval,
-                        display(interval)),
+                        display(interval),
+                        moonPath(interval, new EclipseShadow(-0.3, 0.4, 2.7, 4.7))),
                 new PreferenceAssessment(
                         "matches", List.of(new FilterAssessment("altitudeDegrees", "matches"))),
                 weather);
@@ -263,7 +280,8 @@ class MoonEventControllerTest {
     private static FullMoonEvent fullMoon(String id, boolean local) {
         Interval interval = interval();
         LocalViewing viewing = local
-                ? new LocalViewing(List.of(interval), interval, display(interval))
+                ? new LocalViewing(
+                        List.of(interval), interval, display(interval), moonPath(interval, null))
                 : null;
         return new FullMoonEvent(
                 id,
@@ -296,6 +314,19 @@ class MoonEventControllerTest {
                 interval.endsAt(),
                 new MoonPosition(20.0, 180.0),
                 new SunPosition(-15.0, "night"));
+    }
+
+    private static MoonPath moonPath(Interval interval, EclipseShadow shadow) {
+        return new MoonPath(List.of(
+                        pathSample(interval.startsAt(), shadow),
+                        pathSample("2026-09-01T02:30:00Z", shadow),
+                        pathSample(interval.endsAt(), shadow)));
+    }
+
+    private static MoonPathSample pathSample(String at, EclipseShadow shadow) {
+        return new MoonPathSample(
+                at, 20.0, 180.0, 180.0, 0.0, 12.0,
+                -15.0, 182.0, "night", shadow);
     }
 
     private static Weather outsideForecastHorizon() {
