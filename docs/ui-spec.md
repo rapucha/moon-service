@@ -1142,8 +1142,9 @@ paths render each curve marker from that sample's returned shadow geometry, so
 the Moon on the curve shows the eclipse stage at that instant. These marker
 images are generated at runtime through the existing canvas renderer and used
 as data URLs; there is no static eclipse-image asset. Collapsed cards do not
-construct the path or these data URLs. The first expansion constructs and
-retains the path. If that construction fails, the card shows
+request the event-path adapter module or construct the path or these data URLs.
+The first expansion asynchronously loads the adapter, constructs the path, and
+retains it. If module loading or path construction fails, the card shows
 `Moon path could not be shown.` in place of the path without replacing its
 other content or other results, and it does not retry or substitute an ordinary
 Moon marker. The featured marker's accessible label uses the same `Maximum`,
@@ -1198,8 +1199,8 @@ Cards contain no ordinary score, rank, confidence, exposure balance, photo
 hint, image download, calendar, Atom, share, or solar-warning action.
 
 `lunarEclipseCard.js` owns the eclipse and full-Moon semantic structure and
-copy;
-`moonEventPath.js` owns the special-event path validation and adapter;
+copy, including eager special-event path validation;
+`moonEventPath.js` is the first-expansion-only special-event path adapter;
 `lunarEclipseRenderer.js` owns canvas drawing and eclipse marker images;
 `moonPathView.js` owns the shared chart; and `moonEventView.css` owns the
 responsive card presentation. Native summaries are keyboard operable, every

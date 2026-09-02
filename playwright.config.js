@@ -20,7 +20,7 @@ export default defineConfig({
   webServer: startServer
     ? {
       command: serverCommand,
-      url: baseURL + "/search",
+      url: hostedAlpha ? "http://localhost:8081/readyz" : baseURL + "/search",
       reuseExistingServer: true,
       timeout: 120_000
     }

@@ -1,6 +1,5 @@
 import { element } from "./dom.js";
-import { fullMoonCard, lunarEclipseCard } from "./lunarEclipseCard.js";
-import { validMoonEventPath } from "./moonEventPath.js";
+import { fullMoonCard, lunarEclipseCard, validMoonEventPath } from "./lunarEclipseCard.js";
 import { specialMoonEventsEnabled } from "./opportunityPreferences.js";
 
 var EVENT_PATH = "/api/moon-events";

@@ -11,6 +11,10 @@ const FILTERS = {
 
 test("renders visible and retained no-local supermoons in the shared event section", async ({ page }) => {
   await seedPreferences(page, { version: 1, ...FILTERS });
+  let pathModuleRequests = 0;
+  page.on("request", request => {
+    if (new URL(request.url()).pathname === "/moonEventPath.js") pathModuleRequests += 1;
+  });
   await page.addInitScript(() => {
     const original = HTMLCanvasElement.prototype.toDataURL;
     Reflect.set(window, "__moonPathImageCalls", 0);
@@ -63,6 +67,7 @@ test("renders visible and retained no-local supermoons in the shared event secti
   await expect(section.locator("a, button, img, canvas")).toHaveCount(0);
   await expect(cards.locator(".moon-path-panel")).toHaveCount(0);
   expect(await page.evaluate(() => Reflect.get(window, "__moonPathImageCalls"))).toBe(0);
+  expect(pathModuleRequests).toBe(0);
   const layouts = await summaryLayouts(cards);
   expect(layouts.every(layout => layout.contained)).toBe(true);
   if (page.viewportSize()?.width > 680) {
@@ -79,6 +84,7 @@ test("renders visible and retained no-local supermoons in the shared event secti
     .toHaveAttribute("width", "34");
   await expect(cards.first().locator(".special-moon-eclipse-range")).toHaveCount(0);
   const pathPanel = cards.first().locator(".moon-path-panel");
+  expect(pathModuleRequests).toBe(1);
   const markerUrls = await pathPanel.locator(".moon-sample-marker-image")
     .evaluateAll(images => images.map(image => image.getAttribute("href")));
   const imageCalls = await page.evaluate(() => Reflect.get(window, "__moonPathImageCalls"));
@@ -91,6 +97,7 @@ test("renders visible and retained no-local supermoons in the shared event secti
   expect(await pathPanel.locator(".moon-sample-marker-image")
     .evaluateAll(images => images.map(image => image.getAttribute("href")))).toEqual(markerUrls);
   expect(await page.evaluate(() => Reflect.get(window, "__moonPathImageCalls"))).toBe(imageCalls);
+  expect(pathModuleRequests).toBe(1);
   await expect(cards.first().locator(".special-moon-event-description")).toHaveText(
     "A full Moon near perigee under Moon Service definition 1. “Supermoon” is an informal term."
   );
