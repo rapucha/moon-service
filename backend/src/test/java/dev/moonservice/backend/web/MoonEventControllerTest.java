@@ -8,6 +8,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.boot.test.system.CapturedOutput;
 import org.springframework.boot.test.system.OutputCaptureExtension;
 import org.springframework.http.MediaType;
@@ -38,7 +39,7 @@ class MoonEventControllerTest {
             CapturedOutput output
     ) throws Exception {
         MoonEventService service = mock(MoonEventService.class);
-        when(service.search(anyString(), any(), anyList(), anyInt()))
+        when(service.search(anyString(), any(), anyInt(), anyList(), anyInt()))
                 .thenReturn(successResponse());
 
         MvcResult result = mvc(service).perform(post(PATH)
@@ -127,11 +128,31 @@ class MoonEventControllerTest {
                 eq("prague-cz"),
                 argThat(preferences -> preferences.normalizedFilters().keySet()
                         .equals(Set.of("altitudeDegrees"))),
+                eq(18),
                 eq(List.of("/private-marker")),
                 eq(1));
         assertThat(output.getOut()).contains(
                 "ignored_preference_fields preferenceVersion=1 count=1 truncated=false");
         assertThat(output.getOut()).doesNotContain("secret-value", "private-marker", "prague-cz");
+    }
+
+    @ParameterizedTest
+    @ValueSource(ints = {6, 12, 18, 24, 36})
+    void passesSupportedEventHorizonsToService(int eventHorizonMonths) throws Exception {
+        MoonEventService service = mock(MoonEventService.class);
+        when(service.search(anyString(), any(), anyInt(), anyList(), anyInt()))
+                .thenReturn(successResponse());
+
+        mvc(service).perform(post(PATH)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"locationId":"prague-cz","preferences":{"version":1},
+                                 "eventHorizonMonths":%d}
+                                """.formatted(eventHorizonMonths)))
+                .andExpect(status().isOk());
+
+        verify(service).search(
+                eq("prague-cz"), any(), eq(eventHorizonMonths), eq(List.of()), eq(0));
     }
 
     @ParameterizedTest
@@ -158,6 +179,30 @@ class MoonEventControllerTest {
                 Arguments.of(PATH,
                         "{\"locationId\":\"prague-cz\",\"preferences\":{\"version\":2}}",
                         "preferences.version must be 1."),
+                Arguments.of(PATH,
+                        "{\"locationId\":\"prague-cz\",\"preferences\":{\"version\":1},"
+                                + "\"eventHorizonMonths\":\"12\"}",
+                        "eventHorizonMonths must be an integer."),
+                Arguments.of(PATH,
+                        "{\"locationId\":\"prague-cz\",\"preferences\":{\"version\":1},"
+                                + "\"eventHorizonMonths\":12.0}",
+                        "eventHorizonMonths must be an integer."),
+                Arguments.of(PATH,
+                        "{\"locationId\":\"prague-cz\",\"preferences\":{\"version\":1},"
+                                + "\"eventHorizonMonths\":true}",
+                        "eventHorizonMonths must be an integer."),
+                Arguments.of(PATH,
+                        "{\"locationId\":\"prague-cz\",\"preferences\":{\"version\":1},"
+                                + "\"eventHorizonMonths\":5}",
+                        "eventHorizonMonths must be one of 6, 12, 18, 24, 36."),
+                Arguments.of(PATH,
+                        "{\"locationId\":\"prague-cz\",\"preferences\":{\"version\":1},"
+                                + "\"eventHorizonMonths\":30}",
+                        "eventHorizonMonths must be one of 6, 12, 18, 24, 36."),
+                Arguments.of(PATH,
+                        "{\"locationId\":\"prague-cz\",\"preferences\":{\"version\":1},"
+                                + "\"eventHorizonMonths\":2147483648}",
+                        "eventHorizonMonths must be an integer."),
                 Arguments.of(PATH,
                         "{\"locationId\":\"prague-cz\",\"q\":\"Prague\","
                                 + "\"preferences\":{\"version\":1}}",
@@ -205,7 +250,7 @@ class MoonEventControllerTest {
     @Test
     void mapsOnlyTopLevelTemporaryUnavailabilityToServiceUnavailable() throws Exception {
         MoonEventService service = mock(MoonEventService.class);
-        when(service.search(anyString(), any(), anyList(), anyInt()))
+        when(service.search(anyString(), any(), anyInt(), anyList(), anyInt()))
                 .thenReturn(new Status(
                         "temporarily_unavailable",
                         "2026-08-30T10:00:00Z",

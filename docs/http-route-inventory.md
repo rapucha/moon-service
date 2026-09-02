@@ -561,20 +561,23 @@ and [hosted-alpha functional tests](../backend/src/test/java/dev/moonservice/bac
 
 - **Handler/purpose:** `MoonEventController.search` delegates to
   `MoonEventService`, which resolves one location, discovers lunar eclipses and
-  qualifying near-perigee exact full Moons during the next 18 calendar months,
-  orders the closed event union, and coordinates one weather lookup.
+  qualifying near-perigee exact full Moons during the selected 6, 12, 18, 24,
+  or 36 calendar months, orders the closed event union, and coordinates one
+  weather lookup.
 - **Production invocation:** when the browser-local **Show lunar eclipses and supermoons**
   preference is enabled, browser `moonEventView.js` calls the route once after
   each successful real-location ordinary result. It sends the canonical result
-  location and Version 1 preferences built from `normalizedActiveFilters`.
+  location, selected look-ahead period, and Version 1 preferences built from
+  `normalizedActiveFilters`.
   When the preference is disabled, the browser does not show the section or
   make this request. The browser-only preference is not included in the body.
   Atom and iCalendar do not call this route yet.
 - **Request:** same-origin `application/json` with required canonical
-  `locationId`, required `preferences`, and `preferences.version: 1`. It uses
-  the planning parser and rejects query parameters and other top-level fields.
-  Existing media handling, body limit, normalization, and ignored-field
-  warning apply.
+  `locationId`, required `preferences`, `preferences.version: 1`, and optional
+  top-level `eventHorizonMonths`. Omission means 18 months. The event parser
+  rejects query parameters and other top-level fields while sharing existing
+  media handling, body limit, preference normalization, and ignored-field
+  warnings.
 - **Response:** the result covers the half-open timezone-aware horizon and
   contains objective eclipse facts and qualifying near-perigee full-Moon peaks.
   A full Moon whose peak is outside the horizon is included when its useful

@@ -813,9 +813,11 @@ preference summary:
 The browser keeps one versioned hard-preference state for the editor, storage,
 reset behavior, and result explanations. It derives the active hard-limit count
 and ordinary and planning request state from that stored editor state. It stores
-supported state under `moonService.opportunityPreferences.v1`. Version 1 storage retains only
-the supported `altitudeDegrees`, `time`, `azimuthDegrees`, `namedPhases`, and
-`brightLimbOrientationDegrees` fields. Local-clock state stores one
+supported state under `moonService.opportunityPreferences.v1`. The same state
+can contain the browser-only `showSpecialMoonEvents` and `eventHorizonMonths`
+settings. Its hard-filter portion retains only the supported `altitudeDegrees`,
+`time`, `azimuthDegrees`, `namedPhases`, and `brightLimbOrientationDegrees`
+fields. Local-clock state stores one
 `time.window` object. The former plural `time.windows` shape is unsupported and
 is discarded rather than migrated. The privacy explanation calls this choice
 `selected Moon shapes`; request and storage retain the exact `namedPhases`
@@ -1059,33 +1061,38 @@ separate night.
 ## Special Moon events
 
 The Preferences panel contains one unframed
-`Show lunar eclipses and supermoons` checkbox. It is on by default and belongs
-to the existing browser-local Version 1 preference state. A stored Version 1
-value without this field means enabled, which keeps preferences written by
-older deployed pages compatible. Disabled is stored as
-`showSpecialMoonEvents: false`; Reset all returns to enabled. The field is not
-a hard limit and is absent from preference counts, ordinary and planning API
-bodies, Moon-event API preferences, URLs, history, cookies, analytics, and
-logs. A storage failure keeps the selected value in memory and uses the
-existing storage notice.
+`Show lunar eclipses and supermoons` checkbox followed by a compact native
+`Look ahead` choice with 6, 12, 18, 24, and 36 months. Both belong to the
+existing browser-local Version 1 preference state. The checkbox is on by
+default. A stored Version 1 value without either field means enabled and 18
+months, which keeps preferences written by older deployed pages compatible.
+Disabled is stored as `showSpecialMoonEvents: false`; a non-default period is
+stored as `eventHorizonMonths`. Reset all returns to enabled and 18 months.
+Neither field is a hard limit. They are absent from preference counts,
+ordinary and planning API bodies, Moon-event API preferences, URLs, history,
+cookies, analytics, and logs. A storage failure keeps both selected values in
+memory and uses the existing storage notice.
 
-The control acts immediately without applying draft photography limits or
-rerunning the ordinary lookup. Disabling it cancels any current Moon-event
-request and removes the section. Enabling it requests events for the last
-successful ordinary response and its canonical active filters. An ordinary
-`ok` response for a `real_location` places one section titled `Special Moon
-events` after the result summary and its optional link-privacy notice, and
-before Current Moon, ordinary opportunity or ordinary-empty content, and
-rejected-window diagnostics. No section is shown for another ordinary status
-or location kind.
+Both controls act immediately without applying draft photography limits or
+rerunning the ordinary lookup. Disabling events cancels any current Moon-event
+request and removes the section. Enabling them requests events for the last
+successful ordinary response and its canonical active filters. Changing the
+period while enabled cancels and replaces only that Moon-event request;
+changing it while disabled makes no request. The next enable or real-location
+result uses the saved period. An ordinary `ok` response for a `real_location`
+places one section titled `Special Moon events` after the result summary and
+its optional link-privacy notice, and before Current Moon, ordinary opportunity
+or ordinary-empty content, and rejected-window diagnostics. No section is
+shown for another ordinary status or location kind.
 
 `moonEventView.js` owns the section and starts exactly one same-origin
 `POST /api/moon-events`. It uses the ordinary response's canonical location ID
 and copies only the five Version 1 filter fields from
 `normalizedActiveFilters`; all-off is exactly `{"version": 1}`. Weather
-ranking and the browser-only control are never sent. A newer lookup cancels or
-invalidates the request. A stale, wrong-location, malformed, or non-`ok` event
-response cannot replace or alter ordinary content.
+ranking and the two browser-only settings are never placed inside preferences.
+The selected period is sent only as top-level `eventHorizonMonths`. A newer
+lookup or period replaces the current event request. A stale, wrong-location,
+malformed, or non-`ok` event response cannot replace or alter ordinary content.
 
 The preference-free ordinary GET response predates applied-preference metadata
 and omits both `appliedPreferenceVersion` and `normalizedActiveFilters`. The
@@ -1098,7 +1105,7 @@ The section uses these compact states:
 - loading: `Checking special Moon events…`;
 - successful empty:
   `No lunar eclipse or near-perigee full Moon is available for this location
-  in the next 18 months.`;
+  in the next {selected period} months.`;
 - localized failure:
   `Special Moon events are temporarily unavailable. Moon opportunities are
   unchanged.`

@@ -25,12 +25,13 @@ class MoonEventController {
             throw new InvalidOpportunitySearchRequestException(
                     "Moon event requests must not use URL query parameters.");
         }
-        ProductRequestParser.PlanningRequest eventRequest =
-                ProductRequestParser.parsePlanning(request);
+        MoonEventRequestParser.MoonEventRequest eventRequest =
+                MoonEventRequestParser.parse(request);
         ProductRequestParser.IgnoredFields ignoredFields = eventRequest.ignoredFields();
         MoonEventResponse response = moonEventService.search(
                 eventRequest.locationId(),
                 eventRequest.preferences(),
+                eventRequest.eventHorizonMonths(),
                 ignoredFields.paths(),
                 ignoredFields.count());
         HttpStatus status = "temporarily_unavailable".equals(response.status())

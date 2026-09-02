@@ -43,6 +43,7 @@ test("renders visible and retained no-local supermoons in the shared event secti
   await expect(section.getByRole("status")).toHaveText("2 special Moon events found.");
   expect(eventRequest).toEqual({
     locationId: "moon-service-3067696",
+    eventHorizonMonths: 18,
     preferences: { version: 1, ...FILTERS }
   });
   expect(eventRequest).not.toHaveProperty("showSpecialMoonEvents");

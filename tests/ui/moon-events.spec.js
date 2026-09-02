@@ -28,12 +28,12 @@ test("requests filtered events and renders collapsed model-derived eclipse cards
   await expect(section.getByRole("status")).toHaveText("Checking special Moon events…");
   await expect(section).toHaveAttribute("aria-busy", "true");
   await waitForEventCalls(calls, 1);
-  expect(calls.events[0]).toMatchObject({
-    method: "POST",
-    body: { locationId: "moon-service-3067696", preferences: { version: 1, ...ALL_FILTERS } }
+  expect(calls.events[0].method).toBe("POST");
+  expect(calls.events[0].body).toEqual({
+    locationId: "moon-service-3067696",
+    eventHorizonMonths: 18,
+    preferences: { version: 1, ...ALL_FILTERS }
   });
-  expect(calls.events[0].body).not.toHaveProperty("showSpecialMoonEvents");
-  expect(calls.events[0].body).not.toHaveProperty("weatherRanking");
   expect(new URL(calls.events[0].url).search).toBe("");
 
   releaseEvents();
@@ -130,11 +130,11 @@ test("uses exact all-off preferences and a compact empty state", async ({ page }
   await waitForEventCalls(calls, 1);
   expect(calls.events[0].body).toEqual({
     locationId: "moon-service-3067696",
+    eventHorizonMonths: 18,
     preferences: { version: 1 }
   });
   await expect(page.locator(".special-moon-events-status")).toHaveText(
-    "No lunar eclipse or near-perigee full Moon is available for this location "
-      + "in the next 18 months."
+    "No lunar eclipse or near-perigee full Moon is available for this location in the next 18 months."
   );
   await expect(page.locator(".special-moon-event-card")).toHaveCount(0);
   await expect(page.getByText("No opportunities found in the next 7 days")).toBeVisible();

@@ -75,10 +75,10 @@ class MoonEventServiceTest {
                 clock, resolver, weather, eclipses, fullMoons);
 
         Success response = (Success) service.search(
-                "prague-cz", OpportunityPreferences.none(), List.of("/unknown"), 3);
+                "prague-cz", OpportunityPreferences.none(), 6, List.of("/unknown"), 3);
 
         assertThat(response.generatedAt()).isEqualTo(generatedAt.toString());
-        assertThat(response.endsAt()).isEqualTo("2028-02-29T11:00:00Z");
+        assertThat(response.endsAt()).isEqualTo("2027-02-28T11:00:00Z");
         assertThat(response.location().displayName()).isEqualTo("Prague, Czechia");
         assertThat(response.ignoredPreferenceFields()).containsExactly("/unknown");
         assertThat(response.ignoredPreferenceFieldCount()).isEqualTo(3);
@@ -102,12 +102,12 @@ class MoonEventServiceTest {
         verify(weather, times(1)).forecastFor(any(), any(), any());
         verify(eclipses).discover(
                 eq(generatedAt),
-                eq(Instant.parse("2028-02-29T11:00:00Z")),
+                eq(Instant.parse("2027-02-28T11:00:00Z")),
                 any(),
                 any());
         verify(fullMoons).discover(
                 eq(generatedAt),
-                eq(Instant.parse("2028-02-29T11:00:00Z")),
+                eq(Instant.parse("2027-02-28T11:00:00Z")),
                 any(),
                 any());
     }
@@ -130,7 +130,7 @@ class MoonEventServiceTest {
                 mock(WeatherForecastProvider.class),
                 eclipses,
                 fullMoons).search(
-                "prague-cz", OpportunityPreferences.none(), List.of(), 0);
+                "prague-cz", OpportunityPreferences.none(), 18, List.of(), 0);
 
         assertThat(response.events()).extracting(event -> event.id())
                 .containsExactly("a-id", "z-id");
@@ -149,7 +149,7 @@ class MoonEventServiceTest {
 
         Success response = (Success) service(
                 fixed(generatedAt), resolved(PRAGUE), weather, eclipses, fullMoons)
-                .search("prague-cz", OpportunityPreferences.none(), List.of(), 0);
+                .search("prague-cz", OpportunityPreferences.none(), 18, List.of(), 0);
 
         assertThat(((LunarEclipseEvent) response.events().get(1)).weather().status())
                 .isEqualTo("outside_forecast_horizon");
@@ -171,7 +171,7 @@ class MoonEventServiceTest {
 
         Success response = (Success) service(
                 fixed(generatedAt), resolved(PRAGUE), weather, eclipses, fullMoons)
-                .search("prague-cz", OpportunityPreferences.none(), List.of(), 0);
+                .search("prague-cz", OpportunityPreferences.none(), 18, List.of(), 0);
 
         assertThat(((LunarEclipseEvent) response.events().getFirst()).weather().status())
                 .isEqualTo("temporarily_unavailable");
@@ -206,19 +206,19 @@ class MoonEventServiceTest {
                 fixed(generatedAt), resolver, weather, eclipses, fullMoons);
 
         assertThat(service.search(
-                "missing", OpportunityPreferences.none(), List.of(), 0))
+                "missing", OpportunityPreferences.none(), 18, List.of(), 0))
                 .isEqualTo(new Status(
                         "location_not_found",
                         generatedAt.toString(),
                         "No matching location found."));
         assertThat(service.search(
-                "unavailable", OpportunityPreferences.none(), List.of(), 0))
+                "unavailable", OpportunityPreferences.none(), 18, List.of(), 0))
                 .isEqualTo(new Status(
                         "temporarily_unavailable",
                         generatedAt.toString(),
                         "Location lookup is temporarily unavailable."));
         assertThat(service.search(
-                "ambiguous", OpportunityPreferences.none(), List.of(), 0))
+                "ambiguous", OpportunityPreferences.none(), 18, List.of(), 0))
                 .isInstanceOf(Candidates.class);
         verifyNoInteractions(weather, eclipses, fullMoons);
     }
