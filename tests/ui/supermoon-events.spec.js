@@ -1,6 +1,9 @@
 import { expect, test } from "@playwright/test";
 
 const STORAGE_KEY = "moonService.opportunityPreferences.v1";
+const CALENDAR_WARNING = "This calendar link contains your selected location and any active "
+  + "photography filters. It also reveals that special Moon events are enabled and your selected look-ahead "
+  + "period. Anyone with the link can see that information. Do not share it if those details are private.";
 const FILTERS = {
   altitudeDegrees: { minimum: 20, maximum: 35 },
   azimuthDegrees: { excluded: { start: 280, end: 80 } },
@@ -57,7 +60,7 @@ test("renders visible and retained no-local supermoons in the shared event secti
   ]);
   await expect(cards.locator(".special-moon-event-kind")).toHaveCount(0);
   await expect(cards.locator(".special-moon-summary-copy > span")).toHaveCount(7);
-  await expect(cards.locator("summary canvas, summary img, summary svg, summary [role='img']"))
+  await expect(cards.locator("summary a, summary canvas, summary img, summary svg, summary [role='img']"))
     .toHaveCount(0);
   await expect(cards.first().locator("summary .special-moon-position-warning"))
     .toHaveText("15.0° altitude");
@@ -65,7 +68,10 @@ test("renders visible and retained no-local supermoons in the shared event secti
     .toHaveAttribute("data-tooltip", "Outside your altitude preference.");
   await expect(cards.first().locator("summary .special-moon-position-warning")).toHaveCount(1);
   await expect(cards.nth(1).locator(".special-moon-position-warning")).toHaveCount(0);
-  await expect(section.locator("a, button, img, canvas")).toHaveCount(0);
+  const downloads = cards.locator("a.secondary-action");
+  await expect(downloads).toHaveCount(2);
+  await expect(downloads.first()).toBeHidden();
+  await expect(downloads.nth(1)).toBeHidden();
   await expect(cards.locator(".moon-path-panel")).toHaveCount(0);
   expect(await page.evaluate(() => Reflect.get(window, "__moonPathImageCalls"))).toBe(0);
   expect(pathModuleRequests).toBe(0);
@@ -78,6 +84,12 @@ test("renders visible and retained no-local supermoons in the shared event secti
   }
 
   await cards.first().locator("summary").click();
+  await expect(downloads.first()).toBeVisible();
+  await expect(downloads.first()).toHaveAttribute("href",
+    "/events/visible-supermoon.ics?locationId=moon-service-3067696&eventHorizonMonths=18");
+  await expect(downloads.first()).toHaveAttribute(
+    "aria-describedby", "special-moon-calendar-warning-visible-supermoon");
+  await expect(cards.first().locator(".preference-notice.warning")).toHaveText(CALENDAR_WARNING);
   await expect(cards.first().locator(".moon-path-summary .moon-path-label"))
     .toHaveText(["Start", "Full Moon", "End"]);
   await expect(cards.first().getByRole("img", { name: /Moon altitude and azimuth.*featured marker: Full Moon/ })).toBeVisible();
@@ -115,6 +127,10 @@ test("renders visible and retained no-local supermoons in the shared event secti
   await expect(cards.first()).toContainText("does not account for terrain, buildings, or trees");
 
   await cards.nth(1).locator("summary").click();
+  await expect(downloads.nth(1)).toBeVisible();
+  await expect(downloads.nth(1)).toHaveAttribute("href",
+    "/events/no-local-supermoon.ics?locationId=moon-service-3067696&eventHorizonMonths=18");
+  await expect(cards.nth(1).locator(".preference-notice.warning")).toHaveText(CALENDAR_WARNING);
   await expect(cards.nth(1).locator(".moon-path-panel")).toHaveCount(0);
   await expect(cards.nth(1).locator(".special-moon-event-facts dt")).toHaveText([
     "Exact full Moon", "Distance at peak", "Near-perigee closeness"
@@ -186,6 +202,11 @@ test("rejects malformed full-Moon union members without affecting ordinary resul
         .filter(sample => sample.at !== event.peakAt);
     }
     if (id === "unknown-kind") event.kind = "solar_eclipse";
+    if (id === "missing-link") delete event.links;
+    if (id === "whitespace-link") event.links = { ics: " /events/repaired.ics " };
+    if (id === "absolute-link") event.links = { ics: "https://calendar.invalid/event.ics" };
+    if (id === "backslash-link") event.links = { ics: "/\\calendar.invalid/event.ics" };
+    if (id === "control-link") event.links = { ics: "/events/bad\u0000event.ics" };
     await fulfill(route, eventResponse(id, [event]));
   });
 
@@ -198,6 +219,14 @@ test("rejects malformed full-Moon union members without affecting ordinary resul
       "Special Moon events are temporarily unavailable. Moon opportunities are unchanged."
     );
     await expect(page.getByText("No opportunities found in the next 7 days")).toBeVisible();
+  }
+  for (const id of [
+    "missing-link", "whitespace-link", "absolute-link", "backslash-link", "control-link"
+  ]) {
+    await page.goto("/search?locationId=" + id);
+    await expect(page.locator(".special-moon-events-status")).toHaveText(
+      "1 special Moon event found.");
+    await expect(page.locator(".special-moon-event-card a.secondary-action")).toHaveCount(0);
   }
 });
 
@@ -284,7 +313,9 @@ function visibleSupermoon(id) {
       summary: "clear",
       cloudCoverPercent: 8,
       precipitationProbabilityPercent: 0
-    }
+    },
+    links: { ics: "/events/" + id
+      + ".ics?locationId=moon-service-3067696&eventHorizonMonths=18" }
   };
 }
 
@@ -297,7 +328,9 @@ function noLocalSupermoon(id) {
     preferenceAssessment: assessment("not_applicable", [
       row("altitudeDegrees", "not_applicable"),
       row("azimuthDegrees", "not_applicable")
-    ])
+    ]),
+    links: { ics: "/events/" + id
+      + ".ics?locationId=moon-service-3067696&eventHorizonMonths=18" }
   };
 }
 

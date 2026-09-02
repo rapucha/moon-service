@@ -8,6 +8,7 @@ const ALL_FILTERS = {
   brightLimbOrientationDegrees: [{ start: 337.5, end: 22.5 }]
 };
 const STORAGE_KEY = "moonService.opportunityPreferences.v1";
+const ECLIPSE_ICS_PATH = "/events/total-event.ics?locationId=moon-service-3067696&eventHorizonMonths=18";
 
 test("requests filtered events and renders collapsed model-derived eclipse cards", async ({ page }) => {
   await seedPreferences(page, { version: 1, ...ALL_FILTERS });
@@ -66,10 +67,10 @@ test("requests filtered events and renders collapsed model-derived eclipse cards
   expect(await summaryWarnings.first().evaluate(node =>
     parseFloat(getComputedStyle(node, "::after").width)
       <= node.parentElement.getBoundingClientRect().width)).toBe(true);
-  await expect(cards.locator("summary canvas, summary img, summary svg, summary [role='img']"))
+  await expect(cards.locator("summary a, summary canvas, summary img, summary svg, summary [role='img']"))
     .toHaveCount(0);
   await expect(cards.locator(".moon-path-panel")).toHaveCount(0);
-  await expect(cards.locator(".moon-sample-marker-image[href^='data:image/png']")).toHaveCount(0);
+  await expect(cards.locator("a.secondary-action")).toBeHidden();
 
   await cards.first().locator("summary").click();
   await expect(cards.first()).toHaveAttribute("open", "");
@@ -110,7 +111,7 @@ test("requests filtered events and renders collapsed model-derived eclipse cards
   await expect(cards.first()).toContainText("does not account for terrain, buildings, or trees");
   await expect(cards.nth(1)).toContainText("unusual crescent");
   await expect(cards.nth(2)).toContainText("change can be subtle");
-  await expect(section.locator("a, button, img")).toHaveCount(0);
+  await expect(cards.locator("a.secondary-action")).toHaveAttribute("href", ECLIPSE_ICS_PATH);
   expect(await sectionOrder(page)).toBe(true);
   expect(await horizontalOverflow(page)).toBeLessThanOrEqual(1);
 });
@@ -421,7 +422,8 @@ function populatedEventResponse(id, filters) {
       positions: [4.4, 2.6, 0.6, 0, -0.6, -2.6, -4.4],
       weather: { status: "available", forecastHourStartsAt: "2026-09-01T21:00:00Z",
         summary: "partly cloudy", cloudCoverPercent: 38,
-        precipitationProbabilityPercent: 5 }
+        precipitationProbabilityPercent: 5 },
+      links: { ics: ECLIPSE_ICS_PATH }
     }),
     eclipse({
       id: "partial-event", subtype: "partial", startsAt: "2027-03-01T01:00:00Z",
@@ -486,7 +488,8 @@ function eclipse(value) {
       moonPath: eclipseMoonPath(value)
     },
     preferenceAssessment: value.assessment,
-    weather: value.weather
+    weather: value.weather,
+    links: value.links
   };
 }
 

@@ -16,6 +16,10 @@ accounts, and RSS deliberately out of scope.
   full Moons during a selected 6, 12, 18, 24, or 36 calendar-month period,
   defaulting to 18 months, with request-scoped position preference assessment
   and ordinary short-range weather when available.
+- Stateless individual special-event iCalendar export at
+  `GET /events/<event-id>.ics?locationId=<canonical-id>&eventHorizonMonths=<months>`,
+  with matching bodyless `HEAD` support and backend-owned links on every
+  successful Moon-event member.
 - Browser lookup page at `/search?q=Praha`, using GET without active hard
   preferences and the product POST when at least one is active.
 - Public Atom feed at `GET /feeds/atom?locationId=<canonical-id>`, with optional
@@ -66,7 +70,7 @@ Durable persistence is limited to the disabled-by-default calibration-feedback
 repository described below. Durable/shared caches, accounts, cookies, RSS,
 and deployment configuration remain out of scope.
 Public Atom feed state is bounded, process-local, and rebuildable. Individual
-calendar export and the subscribable calendar feed add no stored state.
+calendar exports and the subscribable calendar feed add no stored state.
 Missing or unknown `moon.location.resolver` or `moon.weather.provider` values
 fail startup; the runtime backend does not include fixture provider modes.
 
@@ -126,6 +130,10 @@ qualifying full Moon whose
 peak is inside the horizon remains in the response when no local interval
 overlaps; that member omits `localViewing` and `weather`. A valid result can
 have `events: []`.
+
+Every successful event member has a backend-generated root-relative `links.ics`
+path for an individual download, including retained full Moons without local
+viewing.
 
 Preferences never move, remove, or reorder either event type. With local
 viewing, the suggestion is the objective event time when that instant lies in
@@ -309,6 +317,37 @@ library's conservative 25-code-unit fold setting so arbitrary Unicode lines
 remain within the RFC 5545 75-octet limit. The redistributed backend includes
 the dependency's BSD 3-Clause notice at `META-INF/LICENSE-iCal4j.txt`.
 
+## Individual Special-Event iCalendar Export
+
+Every successful `POST /api/moon-events` member carries a complete
+root-relative `links.ics` path with this shape:
+
+```text
+GET /events/<event-id>.ics?locationId=<canonical-id>[&preferences=<json>]&eventHorizonMonths=<months>
+```
+
+The location and selected horizon are always present. Active Version 1 hard
+preferences use the ordinary individual export's canonical JSON and encoding.
+The complete query and validation contract is in
+[`docs/api-shape.md`](../docs/api-shape.md#individual-special-event-icalendar-event).
+
+Opening the link reruns the current Moon-event search and selects only the exact
+opaque event ID. An unresolved location gets `404 location_not_found`, a stale
+event gets `404 event_not_found`, and a dependency failure gets
+`503 temporarily_unavailable`.
+
+An eclipse calendar block uses `localVisibility.selectedInterval`. A full Moon
+with local viewing uses a one-hour block centered on
+`displayInterval.suggestedAt`, clipped to `selectedInterval`. A retained full
+Moon without local viewing uses one hour centered on its exact `peakAt`. These
+times do not use the ordinary export's outward whole-minute expansion.
+
+Success is one UTC `VEVENT` downloaded as `moon-event.ics`, with a stable UID,
+`Cache-Control: no-store`, and no `IMAGE`, `ATTACH`, or `VALARM`. Matching
+`HEAD` returns the same success headers without a body. The route adds no
+account, token, saved event, cache, or durable record. A downloaded file is
+static; event-aware subscription remains for the later #328 slice.
+
 ## Subscribable iCalendar Feed
 
 `GET /calendars/opportunities.ics?locationId=<canonical-id>` returns one
@@ -317,6 +356,7 @@ rolling calendar for a resolved location. Optional non-default
 encoding and validation as the Atom and individual-calendar routes. The feed
 rejects `order` and always asks the current opportunity engine for at most ten
 ordinary results in fixed `soonest` order across the current seven-day window.
+It does not include special Moon events.
 
 Success is one UTF-8 `VCALENDAR` containing the resolved location's structural
 `VTIMEZONE` and zero to ten ordinary `VEVENT` components. Each event preserves
@@ -638,7 +678,20 @@ Every displayed ordinary recommendation with a non-blank `links.ics` string
 shows `Download calendar event` with that backend string unchanged. An absent,
 non-string, or blank value produces no action. The browser does not read or
 declare `icsReady`, serialize a calendar, or fetch calendar bytes before normal
-same-tab navigation. Nonordinary results do not receive the action.
+same-tab navigation. Current-Moon, fictional, and planning results do not
+receive this ordinary-opportunity action.
+
+Every special Moon event with a nonempty, whitespace-exact root-relative
+`links.ics` path shows the same `Download calendar event` label inside its
+expanded details. The browser uses the path unchanged in a normal same-tab
+anchor and does not fetch it merely because the user expands the card. An
+absent, non-string, whitespace-padded, absolute, or network-path value hides
+only that action. The collapsed summary remains unchanged.
+
+Each usable special-event action references its own adjacent privacy warning,
+whose exact copy is defined in [`docs/ui-spec.md`](../docs/ui-spec.md). It is
+separate from the ordinary result-link notice and adds no account, token,
+subscription, analytics, cookie, profile, or `localStorage` key.
 
 When applied response metadata contains at least one normalized hard preference
 or a non-default weather ranking, and at least one usable preference-bearing
@@ -836,9 +889,10 @@ query, URL, preference, filter, weather data, request body, user-agent value,
 IP address, or other user data. It uses only the existing bounded
 application-log retention and adds no log destination, metric, or storage.
 
-Preference-aware individual and subscribable calendar URLs can still be
-visible to browsers, copied-link recipients, calendar clients, Funnel, and
-other infrastructure that records the full request target.
+Preference-aware ordinary individual, special-event individual, and
+subscribable calendar URLs can still be visible to browsers, copied-link
+recipients, calendar clients, Funnel, and other infrastructure that records
+the full request target.
 
 ### Hosted-alpha application surface
 
@@ -850,7 +904,8 @@ policy to every request reaching that application instance.
 
 The enabled policy allows `GET` and `HEAD` for `/`, `/search`, `/about`, their
 backing HTML files, the exact static files tracked by the current build,
-`/api/opportunities`, `/feeds/atom`, valid `/o/*.ics`, exact
+`/api/opportunities`, `/feeds/atom`, valid `/o/*.ics`, structurally valid
+single-segment `/events/*.ics`, exact
 `/calendars/opportunities.ics`, `/readyz`, `/admin/status`, and the feedback
 capability route. It also allows
 `POST /api/opportunities`, `POST /api/opportunities/planning`, and
@@ -894,10 +949,11 @@ one provider token and one of two concurrent provider-operation permits before
 controller or provider work. Exact `GET` and `HEAD /feeds/atom` use the same
 admission before the feed-cache lookup, so a cached feed request can receive
 `429`. Valid `GET` and `HEAD /o/*.ics` also use it before their location and
-weather work. Exact `GET` and `HEAD /calendars/opportunities.ics` use it before
-their search; `HEAD` still skips calendar and image serialization. Exact
-`POST /api/moon-events` uses the same provider admission before location and
-event work.
+weather work. Valid `GET` and `HEAD /events/*.ics` use it before their location,
+event, and weather work. Exact `GET` and `HEAD /calendars/opportunities.ics` use
+it before their search; `HEAD` still skips calendar and image serialization.
+Exact `POST /api/moon-events` uses the same provider admission before location
+and event work.
 The fixture POST, static files, admin status, and readiness do not consume those
 two resources. A rejection returns HTTP `429`, canonical `rate_limited` JSON,
 and a numeric `Retry-After` hint. The Docker carve-out is only bodyless

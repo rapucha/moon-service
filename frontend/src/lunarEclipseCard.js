@@ -11,6 +11,9 @@ import { drawLunarEclipse } from "./lunarEclipseRenderer.js";
 import { fact } from "./terms.js";
 
 var INSTANT_PATTERN = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,9})?Z$/;
+var CALENDAR_LINK_WARNING = "This calendar link contains your selected location and any active "
+  + "photography filters. It also reveals that special Moon events are enabled and your selected look-ahead "
+  + "period. Anyone with the link can see that information. Do not share it if those details are private.";
 var SUBTYPES = {
   penumbral: {
     title: "Penumbral lunar eclipse",
@@ -58,7 +61,8 @@ export function lunarEclipseCard(event, location) {
     phaseVisibility(event.phases, location),
     element("p", { className: "special-moon-weather" }, weatherText(event.weather)),
     element("p", { className: "special-moon-events-caveat" },
-      "Visibility uses a level astronomical horizon and does not account for terrain, buildings, or trees."))));
+      "Visibility uses a level astronomical horizon and does not account for terrain, buildings, or trees."),
+    calendarAction(event))));
   renderMoonEventPathOnFirstOpen(card, pathSlot, event, location);
   return card;
 }
@@ -96,7 +100,8 @@ export function fullMoonCard(event, location) {
     fullMoonFacts(event, qualifier, location),
     display ? element("p", { className: "special-moon-weather" }, weatherText(event.weather)) : null,
     display ? element("p", { className: "special-moon-events-caveat" },
-      "Visibility uses a level astronomical horizon and does not account for terrain, buildings, or trees.") : null)));
+      "Visibility uses a level astronomical horizon and does not account for terrain, buildings, or trees.") : null,
+    calendarAction(event))));
   if (pathSlot) renderMoonEventPathOnFirstOpen(card, pathSlot, event, location);
   return card;
 }
@@ -315,6 +320,35 @@ function positionValue(text, filterName, assessment) {
     role: "note",
     ariaLabel: text + ". " + tooltip
   }, text);
+}
+
+function calendarAction(event) {
+  var path = usableCalendarPath(event?.links?.ics);
+  if (!path) return null;
+  var noticeId = "special-moon-calendar-warning-" + safeId(event.id);
+  return [
+    element("div", { className: "opportunity-actions" },
+      element("a", {
+        className: "secondary-action",
+        href: path,
+        "aria-describedby": noticeId
+      }, "Download calendar event")),
+    element("p", { id: noticeId, className: "preference-notice warning" },
+      CALENDAR_LINK_WARNING)
+  ];
+}
+
+function usableCalendarPath(value) {
+  return typeof value === "string" && value && value === value.trim()
+    && value.startsWith("/") && !value.startsWith("//")
+    && !unsafeCalendarPath(value) ? value : null;
+}
+
+function unsafeCalendarPath(value) {
+  return value.includes("\\") || Array.from(value).some(function (character) {
+    var codePoint = character.codePointAt(0);
+    return codePoint < 32 || codePoint === 127;
+  });
 }
 
 function contains(interval, instant) {
