@@ -13,8 +13,9 @@ accounts, and RSS deliberately out of scope.
 - `POST /api/opportunities` for a live lookup with request-scoped hard
   preferences.
 - `POST /api/moon-events` for lunar eclipses and qualifying near-perigee exact
-  full Moons during the next 18 calendar months, with request-scoped position
-  preference assessment and ordinary short-range weather when available.
+  full Moons during a selected 6, 12, 18, 24, or 36 calendar-month period,
+  defaulting to 18 months, with request-scoped position preference assessment
+  and ordinary short-range weather when available.
 - Browser lookup page at `/search?q=Praha`, using GET without active hard
   preferences and the product POST when at least one is active.
 - Public Atom feed at `GET /feeds/atom?locationId=<canonical-id>`, with optional
@@ -105,19 +106,20 @@ preference object:
 ```bash
 curl -sS http://127.0.0.1:8080/api/moon-events \
   -H 'Content-Type: application/json' \
-  --data '{"locationId":"moon-service-3067696","preferences":{"version":1}}'
+  --data '{"locationId":"moon-service-3067696","preferences":{"version":1},"eventHorizonMonths":24}'
 ```
 
-The successful response covers the half-open 18 calendar-month horizon in the
-resolved location timezone. It returns a chronological closed union of locally
-visible lunar eclipses and qualifying near-perigee exact full Moons. Eclipse
-members include objective phases, maximum, local visibility, and drawable
-shadow samples. Each event with local viewing also includes a canonical
-`moonPath` beside `displayInterval`. The display interval keeps its event
-visibility and request-horizon bounds. The independently bounded path ordinarily
-covers the selected full above-horizon rise-to-set pass and may extend beyond
-the request horizon. In bounded polar cases, its extent need not contain a rise
-or set. Every eclipse path sample embeds its matching drawable shadow;
+The successful response covers a half-open horizon of 6, 12, 18, 24, or 36
+calendar months in the resolved location timezone. Omitting
+`eventHorizonMonths` selects 18 months. It returns a chronological closed union
+of locally visible lunar eclipses and qualifying near-perigee exact full Moons.
+Eclipse members include objective phases, maximum, local visibility, and
+drawable shadow samples. Each event with local viewing also includes a
+canonical `moonPath` beside `displayInterval`. The display interval keeps its
+event visibility and request-horizon bounds. The independently bounded path
+ordinarily covers the selected full above-horizon rise-to-set pass and may
+extend beyond the request horizon. In bounded polar cases, its extent need not
+contain a rise or set. Every eclipse path sample embeds its matching drawable shadow;
 full-Moon path samples omit it. Full-Moon members include the exact peak,
 versioned qualifier, and local viewing within 24 hours on either side. A
 qualifying full Moon whose
@@ -152,11 +154,13 @@ report `outside_forecast_horizon`; lookup failure reports event-local
 `temporarily_unavailable` without losing the event. Events without local
 viewing omit weather.
 
-The endpoint accepts no query parameters or `weatherRanking`. It creates no
-permanent location, preference, or result record; existing provider caches keep
-their established inputs and policies. It sends no preference to a provider.
-Every response is `Cache-Control: no-store`. See the complete closed wire
-contract in [`docs/api-shape.md`](../docs/api-shape.md#moon-event-post).
+The endpoint accepts no query parameters or `weatherRanking`. The optional
+top-level `eventHorizonMonths` field accepts only the five documented integer
+values. It creates no permanent location, preference, horizon, or result record;
+existing provider caches keep their established inputs and policies. It sends
+no preference to a provider. Every response is `Cache-Control: no-store`. See
+the complete closed wire contract in
+[`docs/api-shape.md`](../docs/api-shape.md#moon-event-post).
 
 ## Public Atom Feed
 
@@ -657,8 +661,9 @@ no account, token, subscription state, analytics, cookie, profile, or
 
 The page uses two optional browser `localStorage` entries.
 `moonService.recentSearches.v1` keeps up to five display names, location IDs,
-and timezones. `moonService.opportunityPreferences.v1` keeps only the supported
-versioned altitude and availability hard limits. A reset removes this entry
+and timezones. `moonService.opportunityPreferences.v1` keeps the supported
+versioned hard limits plus the browser-only special-event visibility and
+look-ahead settings. A reset removes this entry
 when browser storage accepts the removal. If storage is unavailable, including
 during reset, lookup continues with the current page's preference state in
 memory and the page reports that it cannot save preferences. The browser sends

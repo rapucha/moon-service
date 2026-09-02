@@ -1,6 +1,5 @@
 import { element } from "./dom.js";
 import { fullMoonCard, lunarEclipseCard, validMoonEventPath } from "./lunarEclipseCard.js";
-import { specialMoonEventsEnabled } from "./opportunityPreferences.js";
 
 var EVENT_PATH = "/api/moon-events";
 var INSTANT_PATTERN = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,9})?Z$/;
@@ -17,9 +16,10 @@ export function createMoonEventView(results) {
   var requestNumber = 0;
   var sectionNode = null;
   document.getElementById("preference-form")?.addEventListener("change", function (event) {
-    if (!(event.target instanceof HTMLInputElement)
-        || event.target.id !== "preference-special-events") return;
-    if (event.target.checked && currentResponse && results.querySelector(".result-summary")) {
+    if (!(event.target instanceof Element) || ![
+      "preference-special-events", "preference-event-horizon"
+    ].includes(event.target.id)) return;
+    if (specialMoonEventsEnabled() && currentResponse && results.querySelector(".result-summary")) {
       render(currentResponse);
     } else {
       hide();
@@ -51,9 +51,13 @@ export function createMoonEventView(results) {
     REQUEST_FILTERS.forEach(function (key) {
       if (Object.prototype.hasOwnProperty.call(normalized, key)) preferences[key] = normalized[key];
     });
+    var horizon = /** @type {HTMLSelectElement} */ (
+      document.getElementById("preference-event-horizon"));
+    var eventHorizonMonths = Number(horizon.value);
     var request = {
       controller: new AbortController(),
       id: ++requestNumber,
+      eventHorizonMonths: eventHorizonMonths,
       location: location,
       preferences: preferences,
       section: section
@@ -63,7 +67,8 @@ export function createMoonEventView(results) {
     fetch(EVENT_PATH, {
       method: "POST",
       headers: { "Accept": "application/json", "Content-Type": "application/json" },
-      body: JSON.stringify({ locationId: location.id, preferences: preferences }),
+      body: JSON.stringify({ locationId: location.id, eventHorizonMonths: eventHorizonMonths,
+        preferences: preferences }),
       cache: "no-store",
       signal: request.controller.signal
     }).then(function (response) {
@@ -103,6 +108,10 @@ export function createMoonEventView(results) {
   }
 }
 
+function specialMoonEventsEnabled() {
+  return document.querySelector("#preference-special-events:checked") !== null;
+}
+
 function eventSection() {
   var status = element("p", {
     className: "special-moon-events-status",
@@ -130,7 +139,7 @@ function renderSuccess(request, payload) {
   if (payload.events.length === 0) {
     request.section.status.textContent =
       "No lunar eclipse or near-perigee full Moon is available for this location "
-      + "in the next 18 months.";
+      + "in the next " + request.eventHorizonMonths + " months.";
     request.section.content.replaceChildren();
     return;
   }

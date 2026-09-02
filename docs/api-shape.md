@@ -2151,30 +2151,35 @@ Content-Type: application/json
 ```json
 {
   "locationId": "moon-service-3067696",
-  "preferences": { "version": 1 }
+  "preferences": { "version": 1 },
+  "eventHorizonMonths": 24
 }
 ```
 
-Both fields are required. `{ "version": 1 }` means that every preference is
-off. The route uses the planning request parser, so Version 1 validation,
-normalization, ignored nested-field warnings, media handling, and the 16,384
-byte body limit are identical to the planning API. No other top-level field is
-accepted. In particular, the request cannot set `weatherRanking`, a horizon,
-a result limit, coordinates, or `q`. Query parameters, aliases, GET variants,
-and compatibility paths are not accepted.
+`locationId` and `preferences` are required. `{ "version": 1 }` means that
+every preference is off. `eventHorizonMonths` is optional and accepts only the
+JSON integers `6`, `12`, `18`, `24`, and `36`; omission means `18`. Its value is
+request scope, not a photography preference.
+
+The event request parser shares Version 1 validation, normalization, ignored
+nested-field warnings, media handling, and the 16,384 byte body limit with the
+planning API. No other top-level field is accepted. In particular, the request
+cannot set `weatherRanking`, a result limit, coordinates, or `q`. Query
+parameters, aliases, GET variants, and compatibility paths are not accepted.
 
 ### Successful response
 
 The server captures `generatedAt` once. `startsAt` has the same value. `endsAt`
-is 18 calendar months later at the same local clock time in the resolved
-location timezone. The horizon is half-open: `[startsAt, endsAt)`.
+is the selected number of calendar months later at the same local clock time in
+the resolved location timezone. The horizon is half-open:
+`[startsAt, endsAt)`.
 
 ```json
 {
   "status": "ok",
   "generatedAt": "2025-09-01T00:00:00Z",
   "startsAt": "2025-09-01T00:00:00Z",
-  "endsAt": "2027-03-01T01:00:00Z",
+  "endsAt": "2027-09-01T00:00:00Z",
   "location": {
     "id": "moon-service-3067696",
     "kind": "real_location",

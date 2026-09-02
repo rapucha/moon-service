@@ -79,7 +79,7 @@ final class ProductRequestParser {
                 parsedPreferences.ignoredFields());
     }
 
-    private static JsonNode requestObject(HttpServletRequest request) {
+    static JsonNode requestObject(HttpServletRequest request) {
         if (!isJson(request.getContentType())) {
             throw new UnsupportedOpportunityMediaTypeException();
         }
@@ -117,7 +117,7 @@ final class ProductRequestParser {
         }
     }
 
-    private static void rejectUnknownFields(JsonNode root, Set<String> allowedFields) {
+    static void rejectUnknownFields(JsonNode root, Set<String> allowedFields) {
         if (root.propertyNames().stream().anyMatch(field -> !allowedFields.contains(field))) {
             throw invalid("Request body contains an unknown field.");
         }
@@ -292,7 +292,7 @@ final class ProductRequestParser {
         return requireObject(parent.get(name), "preferences." + name);
     }
 
-    private static JsonNode requiredObject(JsonNode parent, String name) {
+    static JsonNode requiredObject(JsonNode parent, String name) {
         return requireObject(parent.get(name), name);
     }
 
@@ -314,7 +314,7 @@ final class ProductRequestParser {
         return value;
     }
 
-    private static String requiredText(JsonNode parent, String name) {
+    static String requiredText(JsonNode parent, String name) {
         return requireText(parent.get(name), name);
     }
 
@@ -378,7 +378,7 @@ final class ProductRequestParser {
         }
     }
 
-    private static InvalidOpportunitySearchRequestException invalid(String message) {
+    static InvalidOpportunitySearchRequestException invalid(String message) {
         return new InvalidOpportunitySearchRequestException(message);
     }
 

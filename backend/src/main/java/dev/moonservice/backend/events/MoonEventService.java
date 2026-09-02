@@ -30,8 +30,6 @@ import java.util.Objects;
 
 @Service
 public final class MoonEventService {
-    private static final int HORIZON_MONTHS = 18;
-
     private final LocationResolver locationResolver;
     private final WeatherForecastProvider weatherForecastProvider;
     private final OpportunitySearchDefaults opportunitySearchDefaults;
@@ -62,6 +60,7 @@ public final class MoonEventService {
     public MoonEventResponse search(
             String locationId,
             OpportunityPreferences preferences,
+            int eventHorizonMonths,
             List<String> ignoredPreferenceFields,
             int ignoredPreferenceFieldCount
     ) {
@@ -84,6 +83,7 @@ public final class MoonEventService {
                         generatedAt,
                         location,
                         preferences,
+                        eventHorizonMonths,
                         ignoredPreferenceFields,
                         ignoredPreferenceFieldCount))
                 .orElseGet(() -> status(
@@ -96,11 +96,12 @@ public final class MoonEventService {
             Instant generatedAt,
             ResolvedLocation resolvedLocation,
             OpportunityPreferences preferences,
+            int eventHorizonMonths,
             List<String> ignoredPreferenceFields,
             int ignoredPreferenceFieldCount
     ) {
         Instant endsAt = generatedAt.atZone(resolvedLocation.zoneId())
-                .plusMonths(HORIZON_MONTHS)
+                .plusMonths(eventHorizonMonths)
                 .toInstant();
         Location location = prototypeLocation(resolvedLocation);
         List<MoonEvent> events = new ArrayList<>();
