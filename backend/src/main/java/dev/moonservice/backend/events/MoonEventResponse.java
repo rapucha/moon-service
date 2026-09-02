@@ -163,7 +163,8 @@ public sealed interface MoonEventResponse
             String status,
             List<Interval> intervals,
             Interval selectedInterval,
-            DisplayInterval displayInterval
+            DisplayInterval displayInterval,
+            MoonPath moonPath
     ) {
         public EventVisibility {
             intervals = List.copyOf(intervals);
@@ -173,7 +174,8 @@ public sealed interface MoonEventResponse
     record LocalViewing(
             List<Interval> intervals,
             Interval selectedInterval,
-            DisplayInterval displayInterval
+            DisplayInterval displayInterval,
+            MoonPath moonPath
     ) {
         public LocalViewing {
             intervals = List.copyOf(intervals);
@@ -187,6 +189,39 @@ public sealed interface MoonEventResponse
             MoonPosition moon,
             SunPosition sun
     ) {
+    }
+
+    record MoonPath(List<MoonPathSample> samples) {
+        public MoonPath {
+            samples = List.copyOf(samples);
+        }
+    }
+
+    record MoonPathSample(
+            String at,
+            double altitudeDegrees,
+            double azimuthDegrees,
+            double moonPhaseAngleDegrees,
+            Double brightLimbTiltDegrees,
+            Double northPoleTiltDegrees,
+            double sunAltitudeDegrees,
+            double sunAzimuthDegrees,
+            String lightBucket,
+            @JsonInclude(JsonInclude.Include.NON_NULL) EclipseShadow shadow
+    ) {
+        MoonPathSample withShadow(EclipseShadow value) {
+            return new MoonPathSample(
+                    at,
+                    altitudeDegrees,
+                    azimuthDegrees,
+                    moonPhaseAngleDegrees,
+                    brightLimbTiltDegrees,
+                    northPoleTiltDegrees,
+                    sunAltitudeDegrees,
+                    sunAzimuthDegrees,
+                    lightBucket,
+                    value);
+        }
     }
 
     record PreferenceAssessment(String overall, List<FilterAssessment> filters) {

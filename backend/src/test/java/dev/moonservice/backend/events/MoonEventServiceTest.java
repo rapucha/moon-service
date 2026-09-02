@@ -13,6 +13,8 @@ import dev.moonservice.backend.events.MoonEventResponse.Interval;
 import dev.moonservice.backend.events.MoonEventResponse.LocalViewing;
 import dev.moonservice.backend.events.MoonEventResponse.LunarEclipseEvent;
 import dev.moonservice.backend.events.MoonEventResponse.MoonPosition;
+import dev.moonservice.backend.events.MoonEventResponse.MoonPath;
+import dev.moonservice.backend.events.MoonEventResponse.MoonPathSample;
 import dev.moonservice.backend.events.MoonEventResponse.PhaseVisibility;
 import dev.moonservice.backend.events.MoonEventResponse.PreferenceAssessment;
 import dev.moonservice.backend.events.MoonEventResponse.Status;
@@ -88,6 +90,10 @@ class MoonEventServiceTest {
         FullMoonEvent noLocal = (FullMoonEvent) response.events().get(2);
         assertThat(earlier.weather().status()).isEqualTo("available");
         assertThat(later.weather().status()).isEqualTo("available");
+        assertThat(earlier.localViewing().moonPath().samples())
+                .allSatisfy(sample -> assertThat(sample.shadow()).isNull());
+        assertThat(later.localVisibility().moonPath().samples())
+                .allSatisfy(sample -> assertThat(sample.shadow()).isNotNull());
         assertThat(noLocal.localViewing()).isNull();
         assertThat(noLocal.weather()).isNull();
 
@@ -270,7 +276,9 @@ class MoonEventServiceTest {
                         "fully_visible",
                         List.of(interval),
                         interval,
-                        display(interval, maximumAt)),
+                        display(interval, maximumAt),
+                        moonPath(interval, maximumAt,
+                                new EclipseShadow(-0.3, 0.4, 2.7, 4.7))),
                 new PreferenceAssessment("no_active_preferences", List.of()),
                 Weather.outsideForecastHorizon());
     }
@@ -287,7 +295,8 @@ class MoonEventServiceTest {
                     Instant.parse(peakAt).minusSeconds(3_600).toString(),
                     Instant.parse(peakAt).plusSeconds(3_600).toString());
             viewing = new LocalViewing(
-                    List.of(interval), interval, display(interval, peakAt));
+                    List.of(interval), interval, display(interval, peakAt),
+                    moonPath(interval, peakAt, null));
             weather = Weather.outsideForecastHorizon();
         }
         return new FullMoonEvent(
@@ -308,6 +317,23 @@ class MoonEventServiceTest {
                 interval.endsAt(),
                 new MoonPosition(20.0, 180.0),
                 new SunPosition(-15.0, "night"));
+    }
+
+    private static MoonPath moonPath(
+            Interval interval,
+            String suggestedAt,
+            EclipseShadow shadow
+    ) {
+        return new MoonPath(List.of(
+                        pathSample(interval.startsAt(), shadow),
+                        pathSample(suggestedAt, shadow),
+                        pathSample(interval.endsAt(), shadow)));
+    }
+
+    private static MoonPathSample pathSample(String at, EclipseShadow shadow) {
+        return new MoonPathSample(
+                at, 20.0, 180.0, 180.0, 0.0, 12.0,
+                -15.0, 182.0, "night", shadow);
     }
 
     private static HourlyWeather weatherHour(String startsAt) {

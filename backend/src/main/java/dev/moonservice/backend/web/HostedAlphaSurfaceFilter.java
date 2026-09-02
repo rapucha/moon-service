@@ -52,7 +52,7 @@ public final class HostedAlphaSurfaceFilter extends OncePerRequestFilter {
             "/highResolutionMoonRenderer.js",
             "/moonAppearanceControls.js", "/moonAppearancePreview.css",
             "/lunarEclipseCard.js", "/lunarEclipseRenderer.js",
-            "/moonEventView.css", "/moonEventView.js",
+            "/moonEventPath.js", "/moonEventView.css", "/moonEventView.js",
             "/moonPreferenceControls.css", "/terms.js", "/types.js",
             "/favicon.svg", "/styles.css", "/sun-marker-aperture-flare.svg",
             "/moon-textures/lroc_color_2k.jpg",

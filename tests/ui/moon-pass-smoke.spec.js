@@ -32,7 +32,7 @@ test("renders grouped Moon pass cards", async ({ page }) => {
   await expect(page.locator(".pass-choices.is-single .pass-choice-card")).toHaveCount(1);
   await expect(page.locator(".key-facts")).toHaveCount(0);
   await expect(page.locator(".metric-columns")).toHaveCount(0);
-  await expect(page.locator(".moon-path-panel")).toHaveCount(2);
+  await expect(page.locator(".moon-pass-card .moon-path-panel")).toHaveCount(2);
   await expect(page.locator(".moon-pass-card").first().locator(".chart-tick.is-suggested")).toHaveCount(0);
   await expect(page.locator(".moon-pass-card").first().locator(".moon-path-foreground-layer")).toHaveCount(2);
   await expect(page.locator(".moon-pass-card").first().locator(".moon-path-foreground.is-far")).toHaveCount(2);

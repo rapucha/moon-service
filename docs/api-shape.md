@@ -2310,7 +2310,8 @@ the request horizon. The API returns an eclipse only when at least one complete
 event-level visible interval overlaps the half-open horizon.
 
 Event-level `localVisibility` contains every actual interval plus the interval
-used for display:
+used for display. Its required sibling `moonPath` member is described separately
+below and omitted from this selection-focused excerpt:
 
 ```json
 {
@@ -2352,10 +2353,76 @@ request horizon's exclusive end, use the later of the display start and one
 second before the end. `suggestedAt` therefore always lies inside the display
 interval.
 
+### Local-viewing Moon path
+
+Every eclipse `localVisibility` and every present full-Moon `localViewing`
+contains one required `moonPath` object beside `displayInterval`.
+`displayInterval` keeps the event-selection contract above: it is the selected
+locally visible event interval intersected with the half-open request horizon,
+and `suggestedAt` lies inside it. `moonPath` is independently bounded and does
+not change the event visibility intervals, display selection, or suggestion.
+
+The `samples` array is chronological, duplicate-free, and has at least two
+members. Its first and last samples define the path's own extent. Ordinarily,
+the path covers the full above-horizon rise-to-set pass that contains the
+suggestion. It may begin before or end after the request horizon. In a bounded
+polar case without a rise or set in the path domain, the corresponding endpoint
+is the available bounded extent instead.
+
+The path always includes `displayInterval.suggestedAt`. It also includes the
+event's defining instant when that instant lies on the path: `maximumAt` for an
+eclipse or `peakAt` for a full Moon. An eclipse path includes each returned phase
+start and end that lies on the path. Other samples use the established Moon-path
+sampling rules: regular 30-minute instants, quarter points, and refined ambient
+light transitions. Exact duplicate instants appear only once.
+
+Each sample contains:
+
+- `at`;
+- observer-relative Moon `altitudeDegrees` and `azimuthDegrees`;
+- `moonPhaseAngleDegrees`, nullable `brightLimbTiltDegrees`, and nullable
+  `northPoleTiltDegrees`;
+- observer-relative Sun `sunAltitudeDegrees` and `sunAzimuthDegrees`; and
+- `lightBucket`.
+
+An eclipse sample also contains `shadow` with the same screen-relative
+`centerRightMoonRadii`, `centerUpMoonRadii`, `umbraRadiusMoonRadii`, and
+`penumbraRadiusMoonRadii` meanings as the top-level drawable shadow samples:
+
+```json
+{
+  "at": "2025-09-07T18:11:41.502Z",
+  "altitudeDegrees": 5.730577,
+  "azimuthDegrees": 107.552074,
+  "moonPhaseAngleDegrees": 180.0,
+  "brightLimbTiltDegrees": 90.4,
+  "northPoleTiltDegrees": 343.280190,
+  "sunAltitudeDegrees": -6.230685,
+  "sunAzimuthDegrees": 287.2,
+  "lightBucket": "nautical_twilight",
+  "shadow": {
+    "centerRightMoonRadii": -0.1673,
+    "centerUpMoonRadii": 0.9953,
+    "umbraRadiusMoonRadii": 2.74475,
+    "penumbraRadiusMoonRadii": 4.70873
+  }
+}
+```
+
+Every eclipse path member has model-derived shadow geometry for its exact `at`
+instant. A full-Moon path member omits `shadow`; it does not serialize the key
+as `null`. The API does not serialize chart roles. Clients use the first and
+last samples as Start and End. When eclipse maximum lies on the path, clients
+feature it as `Maximum`. When the exact full-Moon peak lies on the path, clients
+feature it as `Full Moon`. Otherwise, clients feature the visible suggestion as
+`Best visible`. Path generation does not apply photography preferences. A
+retained full Moon without `localViewing` has no path.
+
 ### Near-perigee full-Moon event
 
 The second union member represents one exact full Moon with the single
-Version 1 near-perigee qualifier:
+Version 1 near-perigee qualifier. The required `localViewing.moonPath` sibling
+is described above and omitted from this qualifier-focused excerpt:
 
 ```json
 {

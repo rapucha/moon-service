@@ -118,7 +118,7 @@ class HostedAlphaSurfaceFunctionalTest {
             "/cameraReferenceScene.js", "/cameraSetup.js", "/currentMoonCard.js",
             "/highResolutionMoonRenderer.js", "/moon-textures/lroc_color_2k.jpg",
             "/lunarEclipseCard.js", "/lunarEclipseRenderer.js",
-            "/moonEventView.css", "/moonEventView.js", "/planningView.js",
+            "/moonEventPath.js", "/moonEventView.css", "/moonEventView.js", "/planningView.js",
             "/skyDomeView.js", "/readyz"
     })
     void allowsHeadForApprovedSurface(String path) {

@@ -30,6 +30,8 @@ final class NearPerigeeFullMoonService {
     private static final double FULL_MOON_PHASE_DEGREES = 180.0;
     private static final double PHASE_SEARCH_LIMIT_DAYS = 40.0;
     private static final Duration VIEWING_RADIUS = Duration.ofHours(24);
+    // A pass may meet the viewing edge just after moonrise; another lunar day finds moonset.
+    private static final Duration PATH_RADIUS = Duration.ofHours(50);
     private static final double APSIS_SEARCH_LOOKBACK_DAYS = 60.0;
 
     private final EphemerisSampler ephemeris = new EphemerisSampler();
@@ -79,6 +81,9 @@ final class NearPerigeeFullMoonService {
                 location,
                 peakAt.minus(VIEWING_RADIUS),
                 peakAt.plus(VIEWING_RADIUS),
+                peakAt.minus(PATH_RADIUS),
+                peakAt.plus(PATH_RADIUS),
+                List.of(),
                 horizonStartsAt,
                 horizonEndsAt,
                 peakAt);

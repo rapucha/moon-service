@@ -10,6 +10,7 @@ import {
 import { drawLunarEclipse } from "./lunarEclipseRenderer.js";
 import { fact } from "./terms.js";
 
+var INSTANT_PATTERN = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,9})?Z$/;
 var SUBTYPES = {
   penumbral: {
     title: "Penumbral lunar eclipse",
@@ -28,22 +29,18 @@ export function lunarEclipseCard(event, location) {
   var subtype = SUBTYPES[event.subtype];
   var display = event.localVisibility.displayInterval;
   var bestAt = display.suggestedAt;
-  var bestSample = event.shadowSamples.find(function (sample) { return sample.at === bestAt; });
   var maximumIsBest = bestAt === event.maximumAt;
   var headingId = "special-moon-event-" + safeId(event.id);
-  var bestLabel = maximumIsBest ? "Best · Maximum" : "Best visible";
-  var summaryCanvas = eclipseCanvas(bestSample, subtype.title + " at " + bestLabel, 156,
-    "special-moon-summary-canvas");
+  var bestLabel = maximumIsBest ? "Maximum" : "Best visible";
+  var pathSlot = element("div", { className: "special-moon-path-slot" });
 
-  return element("details", {
+  var card = /** @type {HTMLDetailsElement} */ (element("details", {
     className: "special-moon-event-card",
     ariaLabelledby: headingId
   },
   element("summary", { className: "special-moon-event-summary" },
     element("h4", { id: headingId },
-      summaryCanvas,
       element("span", { className: "special-moon-summary-copy" },
-        element("span", { className: "special-moon-event-kind" }, "Lunar eclipse"),
         element("span", { className: "special-moon-event-title" }, subtype.title),
         element("span", { className: "special-moon-event-date" },
           localDate(bestAt, location)),
@@ -53,6 +50,7 @@ export function lunarEclipseCard(event, location) {
           moonPosition(display.moon, event.preferenceAssessment))))),
   element("div", { className: "special-moon-event-details" },
     element("p", { className: "special-moon-event-description" }, subtype.description),
+    pathSlot,
     stageStrip(event, location),
     eventFacts(event, location),
     maximumVisible(event) ? null : element("p", { className: "special-moon-horizon-note" },
@@ -60,7 +58,9 @@ export function lunarEclipseCard(event, location) {
     phaseVisibility(event.phases, location),
     element("p", { className: "special-moon-weather" }, weatherText(event.weather)),
     element("p", { className: "special-moon-events-caveat" },
-      "Visibility uses a level astronomical horizon and does not account for terrain, buildings, or trees.")));
+      "Visibility uses a level astronomical horizon and does not account for terrain, buildings, or trees."))));
+  renderMoonEventPathOnFirstOpen(card, pathSlot, event, location);
+  return card;
 }
 
 export function fullMoonCard(event, location) {
@@ -69,19 +69,17 @@ export function fullMoonCard(event, location) {
   var bestAt = display?.suggestedAt;
   var qualifier = event.qualifiers[0];
   var headingId = "special-moon-event-" + safeId(event.id);
-  var bestLabel = bestAt === event.peakAt ? "Best · Full Moon" : "Best visible";
+  var bestLabel = bestAt === event.peakAt ? "Full Moon" : "Best visible";
   var unavailable = "Not visible from " + location.displayName + " during the searched dates.";
+  var pathSlot = display ? element("div", { className: "special-moon-path-slot" }) : null;
 
-  return element("details", {
+  var card = /** @type {HTMLDetailsElement} */ (element("details", {
     className: "special-moon-event-card",
     ariaLabelledby: headingId
   },
-  element("summary", {
-    className: "special-moon-event-summary special-moon-event-summary-text"
-  },
+  element("summary", { className: "special-moon-event-summary" },
   element("h4", { id: headingId },
     element("span", { className: "special-moon-summary-copy" },
-      element("span", { className: "special-moon-event-kind" }, "Full Moon"),
       element("span", { className: "special-moon-event-title" }, "Supermoon"),
       element("span", { className: "special-moon-event-date" },
         localDate(bestAt || event.peakAt, location)),
@@ -94,10 +92,70 @@ export function fullMoonCard(event, location) {
   element("div", { className: "special-moon-event-details" },
     element("p", { className: "special-moon-event-description" },
       "A full Moon near perigee under Moon Service definition 1. “Supermoon” is an informal term."),
+    pathSlot,
     fullMoonFacts(event, qualifier, location),
     display ? element("p", { className: "special-moon-weather" }, weatherText(event.weather)) : null,
     display ? element("p", { className: "special-moon-events-caveat" },
-      "Visibility uses a level astronomical horizon and does not account for terrain, buildings, or trees.") : null));
+      "Visibility uses a level astronomical horizon and does not account for terrain, buildings, or trees.") : null)));
+  if (pathSlot) renderMoonEventPathOnFirstOpen(card, pathSlot, event, location);
+  return card;
+}
+
+function renderMoonEventPathOnFirstOpen(card, pathSlot, event, location) {
+  function renderPath() {
+    if (!card.open) return;
+    card.removeEventListener("toggle", renderPath);
+    import("./moonEventPath.js").then(function (pathModule) {
+      pathSlot.replaceWith(pathModule.moonEventPathPanel(event, location));
+    }).catch(function () {
+      pathSlot.replaceChildren(element("p", { className: "special-moon-path-error" },
+        "Moon path could not be shown."));
+    });
+  }
+  card.addEventListener("toggle", renderPath);
+}
+
+export function validMoonEventPath(viewing, eventKind, requiredInstants) {
+  if (!objectValue(viewing) || !objectValue(viewing.displayInterval)
+      || !objectValue(viewing.moonPath) || !Array.isArray(viewing.moonPath.samples)
+      || viewing.moonPath.samples.length < 2
+      || (eventKind !== "lunar_eclipse" && eventKind !== "full_moon")
+      || !Array.isArray(requiredInstants) || requiredInstants.length === 0
+      || !requiredInstants.every(validInstant)) return false;
+  var display = viewing.displayInterval;
+  var samples = viewing.moonPath.samples;
+  var instantKeys = samples.map(function (sample) {
+    return validPathSample(sample, eventKind) ? instantOrderKey(sample.at) : null;
+  });
+  var requiredKeys = requiredInstants.map(instantOrderKey);
+  return instantKeys.every(function (key) { return key !== null; })
+    && validInstant(display.startsAt) && validInstant(display.suggestedAt)
+    && validInstant(display.endsAt)
+    && samples.some(function (sample) { return sample.at === display.suggestedAt; })
+    && instantKeys[0] <= instantOrderKey(display.startsAt)
+    && instantKeys[instantKeys.length - 1] >= instantOrderKey(display.endsAt)
+    && requiredInstants.every(function (requiredAt, index) {
+      return samples.some(function (sample) { return sample.at === requiredAt; })
+        === (instantKeys[0] <= requiredKeys[index]
+          && requiredKeys[index] <= instantKeys[instantKeys.length - 1]);
+    })
+    && instantKeys.every(function (key, index) {
+      return index === 0 || key > instantKeys[index - 1];
+    });
+}
+
+function validPathSample(sample, eventKind) {
+  if (!objectValue(sample) || !validInstant(sample.at)
+      || !finiteBetween(sample.altitudeDegrees, -90, 90)
+      || !finiteBetween(sample.azimuthDegrees, 0, 360, false)
+      || !finiteBetween(sample.moonPhaseAngleDegrees, 0, 360)
+      || !nullableDegrees(sample.brightLimbTiltDegrees)
+      || !nullableDegrees(sample.northPoleTiltDegrees)
+      || !finiteBetween(sample.sunAltitudeDegrees, -90, 90)
+      || !finiteBetween(sample.sunAzimuthDegrees, 0, 360, false)
+      || typeof sample.lightBucket !== "string" || sample.lightBucket.length === 0) return false;
+  return eventKind === "lunar_eclipse"
+    ? validShadow(sample.shadow) : sample.shadow === undefined;
 }
 
 function stageStrip(event, location) {
@@ -109,10 +167,8 @@ function stageStrip(event, location) {
   element("div", { className: "special-moon-stage-list" },
     event.shadowSamples.map(function (sample) {
       var best = sample.at === event.localVisibility.displayInterval.suggestedAt;
-      var bestText = best
-        ? (sample.at === event.maximumAt ? "Best · Maximum" : "Best visible")
-        : "";
-      var label = stageLabel(event, sample.at);
+      var bestText = best && sample.at !== event.maximumAt ? "Best visible" : "";
+      var label = stageLabel(event, sample.at) || bestText;
       return element("figure", {
         className: "special-moon-stage" + (best ? " is-best" : "")
       },
@@ -120,7 +176,8 @@ function stageStrip(event, location) {
       element("figcaption", {},
         element("strong", {}, label),
         element("span", {}, formatTime(sample.at, location.timezone, location.countryCode)),
-        bestText ? element("span", { className: "special-moon-stage-best" }, bestText) : null));
+        bestText && label !== bestText
+          ? element("span", { className: "special-moon-stage-best" }, bestText) : null));
     })));
 }
 
@@ -191,8 +248,6 @@ function stageLabel(event, instant) {
     if (phase.endsAt === instant) labels.push(readableToken(phase.kind) + " ends");
   });
   if (event.maximumAt === instant) labels.push("Maximum");
-  if (event.localVisibility.displayInterval.suggestedAt === instant
-      && event.maximumAt !== instant) labels.push("Best visible");
   return labels.join(" · ");
 }
 
@@ -265,6 +320,41 @@ function positionValue(text, filterName, assessment) {
 function contains(interval, instant) {
   return new Date(interval.startsAt).getTime() <= new Date(instant).getTime()
     && new Date(instant).getTime() <= new Date(interval.endsAt).getTime();
+}
+
+function validShadow(shadow) {
+  return objectValue(shadow)
+    && Number.isFinite(shadow.centerRightMoonRadii)
+    && Number.isFinite(shadow.centerUpMoonRadii)
+    && Number.isFinite(shadow.umbraRadiusMoonRadii) && shadow.umbraRadiusMoonRadii > 0
+    && Number.isFinite(shadow.penumbraRadiusMoonRadii)
+    && shadow.penumbraRadiusMoonRadii > shadow.umbraRadiusMoonRadii;
+}
+
+function nullableDegrees(value) {
+  return value === null || finiteBetween(value, 0, 360, false);
+}
+
+function validInstant(value) {
+  var parsed = typeof value === "string" && INSTANT_PATTERN.test(value)
+    ? new Date(value) : null;
+  return parsed !== null && Number.isFinite(parsed.getTime())
+    && parsed.toISOString().slice(0, 19) === value.slice(0, 19);
+}
+
+function instantOrderKey(value) {
+  var dot = value.indexOf(".");
+  var fraction = dot < 0 ? "" : value.slice(dot + 1, -1);
+  return value.slice(0, 19) + fraction.padEnd(9, "0");
+}
+
+function finiteBetween(value, minimum, maximum, inclusiveMaximum) {
+  return typeof value === "number" && Number.isFinite(value) && value >= minimum
+    && (inclusiveMaximum === false ? value < maximum : value <= maximum);
+}
+
+function objectValue(value) {
+  return value !== null && typeof value === "object" && !Array.isArray(value);
 }
 
 function safeId(value) {

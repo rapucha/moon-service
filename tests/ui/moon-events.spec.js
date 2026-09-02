@@ -43,8 +43,8 @@ test("requests filtered events and renders collapsed model-derived eclipse cards
   expect(await cards.evaluateAll(nodes => nodes.every(node => !node.hasAttribute("open")))).toBe(true);
   await expect(cards.getByRole("heading", { level: 4 })).toHaveText([
     /Total lunar eclipse.*Sep 1, 2026.*Best visible/,
-    /Partial lunar eclipse.*2027.*Best · Maximum/,
-    /Penumbral lunar eclipse.*2027.*Best · Maximum/
+    /Partial lunar eclipse.*2027.*Maximum/,
+    /Penumbral lunar eclipse.*2027.*Maximum/
   ]);
   await expect(cards.locator(".special-moon-preference")).toHaveCount(0);
   const summaryWarnings = cards.locator("summary .special-moon-position-warning");
@@ -59,21 +59,40 @@ test("requests filtered events and renders collapsed model-derived eclipse cards
   await expect(cards.nth(1).locator("summary .special-moon-position-warning").nth(1))
     .toHaveAttribute("data-tooltip", "Outside your direction preference.");
   await expect(cards.nth(2).locator(".special-moon-position-warning")).toHaveCount(0);
+  await expect(cards.locator(".special-moon-event-kind")).toHaveCount(0);
+  await expect(cards.locator(".special-moon-summary-copy > span")).toHaveCount(12);
   await summaryWarnings.first().focus();
   await expect(summaryWarnings.first()).toBeFocused();
   expect(await summaryWarnings.first().evaluate(node =>
     parseFloat(getComputedStyle(node, "::after").width)
       <= node.parentElement.getBoundingClientRect().width)).toBe(true);
-  await expect(cards.locator(".special-moon-summary-canvas")).toHaveCount(3);
-  await expect(cards.locator("canvas[role='img']")).toHaveCount(18);
-  await expect(cards.first().locator(".special-moon-event-details")).not.toBeVisible();
+  await expect(cards.locator("summary canvas, summary img, summary svg, summary [role='img']"))
+    .toHaveCount(0);
+  await expect(cards.locator(".moon-path-panel")).toHaveCount(0);
+  await expect(cards.locator(".moon-sample-marker-image[href^='data:image/png']")).toHaveCount(0);
 
   await cards.first().locator("summary").click();
   await expect(cards.first()).toHaveAttribute("open", "");
+  await expect(cards.first().locator(".moon-path-summary .moon-path-label"))
+    .toHaveText(["Start", "Best visible", "End"]);
+  await expect(cards.first().locator(".moon-path-panel")).toHaveCount(1);
+  await expect(cards.nth(1).locator(".moon-path-panel")).toHaveCount(0);
+  const eclipseMarkers = cards.first().locator(".moon-path-panel .moon-sample-marker-image");
+  expect(await eclipseMarkers.count()).toBeGreaterThanOrEqual(6);
+  expect(new Set(await eclipseMarkers.evaluateAll(images =>
+    images.map(image => image.getAttribute("href")))).size).toBeGreaterThanOrEqual(3);
+  await expect(cards.first().locator(".moon-path-panel .moon-sample-dot")).toHaveCount(0);
+  await cards.nth(1).locator("summary").click();
+  await expect(cards.first().getByRole("img", { name: /Moon altitude and azimuth.*featured marker: Best visible/ })).toBeVisible();
+  await expect(cards.nth(1).getByRole("img", { name: /Moon altitude and azimuth.*featured marker: Maximum/ })).toBeVisible();
+  const range = cards.first().locator(".special-moon-eclipse-range");
+  await expect(range).toHaveAttribute("aria-label", /covering 88% of the selected local Moon pass/);
+  await expect(range.locator(".special-moon-eclipse-range-segment"))
+    .toHaveAttribute("style", "left:0.00%;width:88.46%;");
   const stages = cards.first().locator(".special-moon-stage");
   await expect(stages).toHaveCount(7);
   await expect(stages.locator("figcaption strong")).toHaveText([
-    "Penumbral begins", "Partial begins", "Total begins · Best visible", "Maximum",
+    "Penumbral begins", "Partial begins", "Total begins", "Maximum",
     "Total ends", "Partial ends", "Penumbral ends"
   ]);
   await expect(stages.locator(".special-moon-stage-best")).toHaveText("Best visible");
@@ -91,7 +110,7 @@ test("requests filtered events and renders collapsed model-derived eclipse cards
   await expect(cards.first()).toContainText("does not account for terrain, buildings, or trees");
   await expect(cards.nth(1)).toContainText("unusual crescent");
   await expect(cards.nth(2)).toContainText("change can be subtle");
-  await expect(section.locator("a, button, img, svg")).toHaveCount(0);
+  await expect(section.locator("a, button, img")).toHaveCount(0);
   expect(await sectionOrder(page)).toBe(true);
   expect(await horizontalOverflow(page)).toBeLessThanOrEqual(1);
 });
@@ -239,7 +258,8 @@ test("localizes malformed, wrong-location, and failed event responses", async ({
   });
 
   for (const id of [
-    "wrong-location", "wrong-timezone", "wrong-filters", "malformed-shadow", "unavailable"
+    "wrong-location", "wrong-timezone", "wrong-filters", "malformed-shadow",
+    "malformed-path", "missing-path-shadow", "missing-contact", "missing-maximum", "unavailable"
   ]) {
     await page.goto("/search?locationId=" + id);
     await expect(page.locator(".special-moon-events-status")).toHaveText(
@@ -249,7 +269,7 @@ test("localizes malformed, wrong-location, and failed event responses", async ({
       "0 ranked Moon passes · 0 candidate windows"
     );
   }
-  expect(calls.events).toHaveLength(5);
+  expect(calls.events).toHaveLength(9);
 });
 
 test("ignores stale responses and keeps the collapsed cards keyboard-usable on narrow screens", async ({ page }) => {
@@ -368,7 +388,7 @@ function responseBase(id, normalizedActiveFilters, events) {
   return {
     status: "ok",
     generatedAt: "2026-08-31T10:00:00Z",
-    startsAt: "2026-08-31T10:00:00Z",
+    startsAt: "2026-09-01T20:15:00Z",
     endsAt: "2028-02-29T11:00:00Z",
     location: location(id),
     appliedPreferenceVersion: 1,
@@ -386,7 +406,9 @@ function populatedEventResponse(id, filters) {
     eclipse({
       id: "total-event", subtype: "total", startsAt: "2026-09-01T20:00:00Z",
       maximumAt: "2026-09-01T22:30:00Z", endsAt: "2026-09-02T01:00:00Z",
-      visible: interval("2026-09-01T20:30:00Z", "2026-09-01T22:00:00Z"),
+      visible: interval("2026-09-01T20:00:00Z", "2026-09-01T22:00:00Z"),
+      display: interval("2026-09-01T20:15:00Z", "2026-09-01T22:00:00Z"),
+      pathStartsAt: "2026-09-01T20:05:00Z", pathEndsAt: "2026-09-01T22:15:00Z",
       suggestedAt: "2026-09-01T21:30:00Z", altitude: 1.4, azimuth: 184,
       maximumAltitude: -2, obscuration: 100, assessment: assessment("does_not_match", [
         row("altitudeDegrees", "does_not_match"), row("azimuthDegrees", "matches")
@@ -432,6 +454,7 @@ function populatedEventResponse(id, filters) {
 }
 
 function eclipse(value) {
+  const display = value.display || value.visible;
   const instants = Array.from(new Set([
     ...value.phases.flatMap(item => [item.startsAt, item.endsAt]),
     value.maximumAt,
@@ -454,12 +477,13 @@ function eclipse(value) {
       intervals: [value.visible],
       selectedInterval: value.visible,
       displayInterval: {
-        startsAt: value.visible.startsAt,
+        startsAt: display.startsAt,
         suggestedAt: value.suggestedAt,
-        endsAt: value.visible.endsAt,
+        endsAt: display.endsAt,
         moon: { altitudeDegrees: value.altitude, azimuthDegrees: value.azimuth },
         sun: { altitudeDegrees: -12, lightBucket: "night" }
-      }
+      },
+      moonPath: eclipseMoonPath(value)
     },
     preferenceAssessment: value.assessment,
     weather: value.weather
@@ -477,6 +501,39 @@ function shadowSample(at, right, pole) {
       penumbraRadiusMoonRadii: 3.4
     }
   };
+}
+
+function eclipseMoonPath(value) {
+  const display = value.display || value.visible;
+  const startsAt = value.pathStartsAt || shiftedInstant(value.visible.startsAt, -30);
+  const endsAt = value.pathEndsAt
+    || shiftedInstant(value.visible.endsAt, value.maximumAltitude < 0 ? 15 : 30);
+  const instants = Array.from(new Set([
+    startsAt, display.startsAt, value.suggestedAt, display.endsAt, endsAt, value.maximumAt,
+    ...value.phases.flatMap(item => [item.startsAt, item.endsAt])
+  ])).filter(at => Date.parse(startsAt) <= Date.parse(at)
+    && Date.parse(at) <= Date.parse(endsAt)).sort();
+  return { samples: instants.map((at, index) => ({
+    at: at,
+    altitudeDegrees: 1 + index * 3,
+    azimuthDegrees: 180 + index * 2,
+    moonPhaseAngleDegrees: 180,
+    brightLimbTiltDegrees: 0,
+    northPoleTiltDegrees: index === 0 ? null : 18,
+    sunAltitudeDegrees: -12,
+    sunAzimuthDegrees: 205,
+    lightBucket: "night",
+    shadow: {
+      centerRightMoonRadii: 2.2 - index * 1.4,
+      centerUpMoonRadii: 0.18,
+      umbraRadiusMoonRadii: 1.6,
+      penumbraRadiusMoonRadii: 3.4
+    }
+  })) };
+}
+
+function shiftedInstant(at, minutes) {
+  return new Date(Date.parse(at) + minutes * 60_000).toISOString().replace(".000Z", "Z");
 }
 
 function phase(kind, startsAt, endsAt, status) {
@@ -523,11 +580,25 @@ function failureScenario(id) {
     return json({ status: "temporarily_unavailable", generatedAt: "2026-08-31T10:00:00Z",
       message: "Location lookup is temporarily unavailable." }, 503);
   }
-  const response = singleEventResponse(id, "total");
+  const response = singleEventResponse(id, id === "missing-maximum" ? "partial" : "total");
   if (id === "wrong-location") response.location.id = "another-location";
   if (id === "wrong-timezone") response.location.timezone = "Europe/London";
   if (id === "wrong-filters") response.normalizedActiveFilters = { time: ALL_FILTERS.time };
   if (id === "malformed-shadow") response.events[0].shadowSamples.pop();
+  if (id === "malformed-path") {
+    response.events[0].localVisibility.moonPath.samples[1].at =
+      response.events[0].localVisibility.moonPath.samples[0].at;
+  }
+  if (id === "missing-path-shadow") {
+    delete response.events[0].localVisibility.moonPath.samples[0].shadow;
+  }
+  const missingAt = id === "missing-contact" ? response.events[0].phases[1].startsAt
+    : id === "missing-maximum" ? response.events[0].maximumAt : null;
+  if (missingAt) {
+    response.events[0].localVisibility.moonPath.samples =
+      response.events[0].localVisibility.moonPath.samples
+        .filter(sample => sample.at !== missingAt);
+  }
   return json(response);
 }
 

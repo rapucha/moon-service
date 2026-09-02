@@ -3,6 +3,10 @@ package dev.moonservice.backend.events;
 import dev.moonservice.backend.events.MoonEventResponse.FilterAssessment;
 import dev.moonservice.backend.events.MoonEventResponse.FullMoonEvent;
 import dev.moonservice.backend.events.MoonEventResponse.FullMoonQualifier;
+import dev.moonservice.backend.events.MoonEventResponse.DisplayInterval;
+import dev.moonservice.backend.events.MoonEventResponse.MoonPathSample;
+import dev.moonservice.scoringprototype.ephemeris.EphemerisSampler;
+import dev.moonservice.scoringprototype.ephemeris.MoonSample;
 import dev.moonservice.scoringprototype.fixture.Location;
 import dev.moonservice.scoringprototype.input.OpportunityPreferences;
 import dev.moonservice.scoringprototype.input.OpportunityPreferences.AltitudeRange;
@@ -12,15 +16,19 @@ import dev.moonservice.scoringprototype.input.OpportunityPreferences.DegreeRange
 import dev.moonservice.scoringprototype.input.OpportunityPreferences.NamedPhase;
 import dev.moonservice.scoringprototype.input.OpportunityPreferences.TimeMode;
 import dev.moonservice.scoringprototype.input.OpportunityPreferences.TimePreference;
+import dev.moonservice.scoringprototype.window.RefinedTimeGrid;
+import dev.moonservice.scoringprototype.window.WindowGenerator;
 import io.github.cosinekitty.astronomy.ApsisInfo;
 import io.github.cosinekitty.astronomy.ApsisKind;
 import io.github.cosinekitty.astronomy.Astronomy;
 import io.github.cosinekitty.astronomy.Time;
 import org.junit.jupiter.api.Test;
 
+import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
 import java.util.Set;
+import java.util.stream.Stream;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.within;
@@ -52,6 +60,7 @@ class NearPerigeeFullMoonServiceTest {
         assertThat(event.id())
                 .isEqualTo("full-moon-07e5fe49-ab54-3187-a249-76ca1dbd9130");
         assertThat(event.kind()).isEqualTo("full_moon");
+        assertMoonPath(event, PRAGUE);
         assertThat(event.qualifiers()).hasSize(1);
         FullMoonQualifier qualifier = event.qualifiers().getFirst();
         assertThat(qualifier.kind()).isEqualTo("near_perigee");
@@ -83,6 +92,22 @@ class NearPerigeeFullMoonServiceTest {
                 .isCloseTo(
                         (apogee - fullDistance) / (apogee - perigee),
                         within(0.000000000001));
+    }
+
+    @Test
+    void includesTheExactPeakWhenItIsVisibleOnTheSelectedMoonPath() {
+        FullMoonEvent event = eventAt(service.discover(
+                        Instant.parse("2026-11-01T00:00:00Z"),
+                        Instant.parse("2026-12-01T00:00:00Z"),
+                        PRAGUE,
+                        OpportunityPreferences.none()),
+                "2026-11-24T14:54:04.191Z");
+
+        assertThat(event.localViewing().displayInterval().suggestedAt())
+                .isEqualTo(event.peakAt());
+        assertThat(event.localViewing().moonPath().samples())
+                .extracting(MoonPathSample::at)
+                .contains(event.peakAt());
     }
 
     @Test
@@ -178,6 +203,7 @@ class NearPerigeeFullMoonServiceTest {
                         OpportunityPreferences.none()),
                 event.peakAt());
         assertThat(withLaterHorizon.localViewing()).isNotNull();
+        assertMoonPath(withLaterHorizon, antarctic);
         assertThat(withLaterHorizon.localViewing().intervals()).isNotEmpty();
         assertThat(withLaterHorizon.localViewing().intervals()).allSatisfy(interval ->
                 assertThat(Instant.parse(interval.startsAt()))
@@ -235,11 +261,94 @@ class NearPerigeeFullMoonServiceTest {
                 new FilterAssessment("altitudeDegrees", "does_not_match"));
     }
 
+    @Test
+    void completesOrdinaryMoonsetBeyondEventSearchBoundary() {
+        Location equatorDateline = location("equator-dateline", 0.0, -180.0, "UTC");
+        FullMoonEvent event = service.discover(
+                Instant.parse("2027-01-23T07:00:00Z"),
+                Instant.parse("2027-01-24T00:00:00Z"),
+                equatorDateline,
+                OpportunityPreferences.none()).getFirst();
+        Instant peakAt = Instant.parse(event.peakAt());
+        Instant pathEndsAt = Instant.parse(
+                event.localViewing().moonPath().samples().getLast().at());
+
+        assertThat(pathEndsAt).isAfter(peakAt.plus(Duration.ofHours(24)));
+        assertMoonPath(event, equatorDateline);
+    }
+
     private static FullMoonEvent eventAt(List<FullMoonEvent> events, String peakAt) {
         return events.stream()
                 .filter(event -> event.peakAt().equals(peakAt))
                 .findFirst()
                 .orElseThrow();
+    }
+
+    private static void assertMoonPath(FullMoonEvent event, Location location) {
+        DisplayInterval display = event.localViewing().displayInterval();
+        List<MoonPathSample> samples = event.localViewing().moonPath().samples();
+        Instant pathStartsAt = Instant.parse(samples.getFirst().at());
+        Instant pathEndsAt = Instant.parse(samples.getLast().at());
+        Instant peakAt = Instant.parse(event.peakAt());
+        Instant pathDomainStartsAt = peakAt.minus(Duration.ofHours(50));
+        Instant pathDomainEndsAt = peakAt.plus(Duration.ofHours(50));
+        Instant suggestedAt = Instant.parse(display.suggestedAt());
+        List<Instant> requiredInstants = Stream.of(
+                        peakAt.minus(Duration.ofHours(24)),
+                        peakAt.plus(Duration.ofHours(24)),
+                        peakAt,
+                        suggestedAt)
+                .filter(instant -> !instant.isBefore(pathDomainStartsAt)
+                        && !instant.isAfter(pathDomainEndsAt))
+                .distinct()
+                .toList();
+        EphemerisSampler ephemeris = new EphemerisSampler();
+        RefinedTimeGrid.Interval aboveHorizon = RefinedTimeGrid.matchingIntervals(
+                        pathDomainStartsAt,
+                        pathDomainStartsAt,
+                        pathDomainEndsAt,
+                        requiredInstants,
+                        instant -> ephemeris.sampleAt(location, instant).moonAltitudeDegrees() >= 0.0)
+                .stream()
+                .filter(interval -> !suggestedAt.isBefore(interval.startsAt())
+                        && !suggestedAt.isAfter(interval.endsAt()))
+                .findFirst()
+                .orElseThrow();
+        Instant selectedStartsAt = Instant.parse(event.localViewing().selectedInterval().startsAt());
+        Instant selectedEndsAt = Instant.parse(event.localViewing().selectedInterval().endsAt());
+        Instant expectedStartsAt = aboveHorizon.startsAt().isBefore(selectedStartsAt)
+                ? aboveHorizon.startsAt() : selectedStartsAt;
+        Instant expectedEndsAt = aboveHorizon.endsAt().isAfter(selectedEndsAt)
+                ? aboveHorizon.endsAt() : selectedEndsAt;
+        List<Instant> specialInstants = requiredInstants.stream()
+                .filter(instant -> !instant.isBefore(expectedStartsAt)
+                        && !instant.isAfter(expectedEndsAt))
+                .toList();
+        List<String> expectedInstants = WindowGenerator.pathSamples(
+                        instant -> ephemeris.sampleAt(location, instant),
+                        expectedStartsAt,
+                        specialInstants,
+                        expectedEndsAt).stream()
+                .map(MoonSample::instant)
+                .map(Instant::toString)
+                .toList();
+
+        assertThat(pathStartsAt).isEqualTo(expectedStartsAt);
+        assertThat(pathEndsAt).isEqualTo(expectedEndsAt);
+        assertThat(samples).extracting(MoonPathSample::at)
+                .containsExactlyElementsOf(expectedInstants)
+                .contains(display.suggestedAt());
+        assertThat(pathStartsAt).isBeforeOrEqualTo(Instant.parse(display.startsAt()));
+        assertThat(pathEndsAt).isAfterOrEqualTo(Instant.parse(display.endsAt()));
+        assertThat(samples).allSatisfy(sample -> {
+            assertThat(sample.altitudeDegrees()).isFinite();
+            assertThat(sample.azimuthDegrees()).isFinite();
+            assertThat(sample.moonPhaseAngleDegrees()).isFinite();
+            assertThat(sample.sunAltitudeDegrees()).isFinite();
+            assertThat(sample.sunAzimuthDegrees()).isFinite();
+            assertThat(sample.lightBucket()).isNotBlank();
+            assertThat(sample.shadow()).isNull();
+        });
     }
 
     private static double closeness(Time fullMoon) {
