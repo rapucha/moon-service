@@ -3,6 +3,7 @@ package dev.moonservice.backend.web;
 import dev.moonservice.backend.events.MoonEventService;
 import dev.moonservice.backend.events.MoonEventResponse;
 import dev.moonservice.backend.opportunity.InvalidOpportunitySearchRequestException;
+import dev.moonservice.scoringprototype.input.OpportunityPreferences;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
@@ -34,11 +35,33 @@ class MoonEventController {
                 eventRequest.eventHorizonMonths(),
                 ignoredFields.paths(),
                 ignoredFields.count());
+        if (response instanceof MoonEventResponse.Success success) {
+            response = withCalendarLinks(
+                    success, eventRequest.preferences(), eventRequest.eventHorizonMonths());
+        }
         HttpStatus status = "temporarily_unavailable".equals(response.status())
                 ? HttpStatus.SERVICE_UNAVAILABLE
                 : HttpStatus.OK;
         return ResponseEntity.status(status)
                 .header(HttpHeaders.CACHE_CONTROL, "no-store")
                 .body(response);
+    }
+
+    private static MoonEventResponse.Success withCalendarLinks(
+            MoonEventResponse.Success response,
+            OpportunityPreferences preferences,
+            int eventHorizonMonths
+    ) {
+        return new MoonEventResponse.Success(
+                response.status(), response.generatedAt(), response.startsAt(), response.endsAt(),
+                response.location(), response.appliedPreferenceVersion(),
+                response.normalizedActiveFilters(), response.ignoredPreferenceFields(),
+                response.ignoredPreferenceFieldCount(),
+                response.additionalIgnoredPreferenceFieldCount(),
+                response.events().stream().map(event -> {
+                    String link = PublicPreferenceQuery.moonEventCalendarLink(
+                            event.id(), response.location().id(), preferences, eventHorizonMonths);
+                    return event.withLinks(new MoonEventResponse.Links(link));
+                }).toList());
     }
 }

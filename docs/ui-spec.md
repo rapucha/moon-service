@@ -24,9 +24,12 @@ individual calendar download and preference-filtered Atom discovery tracked by
 subscription copy discovery tracked by
 [#305](https://github.com/rapucha/moon-service/issues/305). The `Special Moon
 events` lunar-eclipse section is tracked by
-[#318](https://github.com/rapucha/moon-service/issues/318). Broader visual
-design, RSS, standalone calendar export pages, account flows, and native apps
-are out of scope for this document until they become active product work.
+[#318](https://github.com/rapucha/moon-service/issues/318). Individual
+special-event calendar downloads are tracked by
+[#328](https://github.com/rapucha/moon-service/issues/328); event-aware
+subscription remains for its later slice. Broader visual design, RSS,
+standalone calendar export pages, account flows, and native apps are out of
+scope until they become active product work.
 
 If implementation and this document disagree, treat the disagreement as a
 product decision to resolve. Do not silently encode new UI behavior only in
@@ -1012,7 +1015,8 @@ Treat the backend URL as opaque and use it unchanged. Do not read or declare
 `links.icsReady`, build a calendar in JavaScript, fetch a blob, or replace the
 anchor with a POST action, token, or saved snapshot. An absent, non-string, or
 blank value produces no action. Current-Moon cards, fictional reports, planning
-results, recurring-event matches, and eclipses do not receive this action.
+results, and recurring-event matches do not receive this ordinary action.
+Special-event actions follow their separate rules below.
 
 Cards should avoid hiding the main decision behind decoration. The primary
 information is time, Moon position, light, weather, and reasoning. Each
@@ -1126,6 +1130,26 @@ position value uses warning colour and a focusable tooltip:
 Matching and unrestricted values retain ordinary styling and no tooltip. The
 same treatment applies to the summary and expanded Moon-position fact.
 
+Each expanded special-event card with a nonempty, whitespace-exact
+root-relative `links.ics` value has one normal same-tab anchor labelled
+`Download calendar event`. It uses the backend value unchanged and does not
+fetch the calendar while rendering or expanding the card. An absent,
+non-string, empty, whitespace-padded, absolute, or network-path value omits
+only the action. The action is inside the details; the collapsed summary and
+its compact layout remain unchanged.
+
+Each displayed action has an adjacent visible warning that it references with
+`aria-describedby`:
+
+> This calendar link contains your selected location and any active photography
+> filters. It also reveals that special Moon events are enabled and your
+> selected look-ahead period. Anyone with the link can see that information. Do
+> not share it if those details are private.
+
+This is link-specific and separate from the ordinary result-level warning. It
+adds no copy flow, account, token, saved event, subscription, analytics, cookie,
+profile, or browser storage.
+
 Expanded cards with local viewing place one `Moon path` panel immediately after
 the description. It reuses the standard MoonPass altitude curve, azimuth rail,
 ambient-light bands, skyline, and responsive desktop/mobile layout across the
@@ -1203,7 +1227,9 @@ produce assessment rows. A retained full Moon without a local viewing interval
 has no position warning because there is no local instant to assess.
 
 Cards contain no ordinary score, rank, confidence, exposure balance, photo
-hint, image download, calendar, Atom, share, or solar-warning action.
+hint, image download, Atom, share, subscription, calendar-feed, or
+solar-warning action. The individual download above is their only calendar
+action.
 
 `lunarEclipseCard.js` owns the eclipse and full-Moon semantic structure and
 copy, including eager special-event path validation;

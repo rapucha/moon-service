@@ -174,12 +174,16 @@ public final class HostedAlphaSurfaceFilter extends OncePerRequestFilter {
         if (!isCalendarRequestPath(path) || !path.endsWith(".ics")) {
             return false;
         }
-        String opportunityId = path.substring("/o/".length(), path.length() - ".ics".length());
-        return opportunityId.indexOf('/') < 0;
+        int prefixLength = path.startsWith("/events/")
+                ? "/events/".length()
+                : "/o/".length();
+        String id = path.substring(prefixLength, path.length() - ".ics".length());
+        return id.indexOf('/') < 0;
     }
 
     private static boolean isCalendarRequestPath(String path) {
-        return path.equals("/o") || path.startsWith("/o/");
+        return path.equals("/o") || path.startsWith("/o/")
+                || path.equals("/events") || path.startsWith("/events/");
     }
 
     static String applicationPath(HttpServletRequest request) {

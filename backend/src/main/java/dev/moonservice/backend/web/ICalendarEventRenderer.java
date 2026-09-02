@@ -1,5 +1,13 @@
 package dev.moonservice.backend.web;
 
+import dev.moonservice.backend.events.MoonEventResponse;
+import dev.moonservice.backend.events.MoonEventResponse.DisplayInterval;
+import dev.moonservice.backend.events.MoonEventResponse.FilterAssessment;
+import dev.moonservice.backend.events.MoonEventResponse.FullMoonEvent;
+import dev.moonservice.backend.events.MoonEventResponse.Interval;
+import dev.moonservice.backend.events.MoonEventResponse.LunarEclipseEvent;
+import dev.moonservice.backend.events.MoonEventResponse.MoonEvent;
+import dev.moonservice.backend.events.MoonEventResponse.Weather;
 import dev.moonservice.backend.opportunity.search.OpportunitySearchResponse;
 import net.fortuna.ical4j.data.CalendarOutputter;
 import net.fortuna.ical4j.model.Calendar;
@@ -91,6 +99,37 @@ final class ICalendarEventRenderer {
                 .map(opportunity -> event(location, opportunity, generatedAt))
                 .forEach(components::add);
         return serialize(new Calendar(calendarProperties(), new ComponentList<>(components)));
+    }
+
+    static byte[] renderMoonEvent(
+            MoonEventResponse.Location location,
+            MoonEvent moonEvent,
+            Instant generatedAt
+    ) {
+        Objects.requireNonNull(location, "location");
+        Objects.requireNonNull(moonEvent, "moonEvent");
+        Objects.requireNonNull(generatedAt, "generatedAt");
+        return serialize(new Calendar(
+                calendarProperties(),
+                new ComponentList<>(List.of(moonEvent(location, moonEvent, generatedAt)))
+        ));
+    }
+
+    static VEvent moonEvent(
+            MoonEventResponse.Location location,
+            MoonEvent moonEvent,
+            Instant generatedAt
+    ) {
+        EventTimes times = eventTimes(moonEvent);
+        return new VEvent(new PropertyList(List.of(
+                new Uid(uid(location.id(), moonEvent.id())),
+                new DtStamp(generatedAt.truncatedTo(ChronoUnit.SECONDS)),
+                new DtStart<>(times.startsAt()),
+                new DtEnd<>(times.endsAt()),
+                new Summary(normalizeLineBreaks(eventSummary(location, moonEvent))),
+                new Location(normalizeLineBreaks(location.displayName())),
+                new Description(normalizeLineBreaks(moonEventDescription(location, moonEvent)))
+        )));
     }
 
     private static VEvent event(
@@ -201,6 +240,135 @@ final class ICalendarEventRenderer {
         return String.join("\n", lines);
     }
 
+    private static EventTimes eventTimes(MoonEvent event) {
+        EventTimes times = switch (event) {
+            case LunarEclipseEvent eclipse -> from(eclipse.localVisibility().selectedInterval());
+            case FullMoonEvent fullMoon -> fullMoonTimes(fullMoon);
+        };
+        if (!times.startsAt().isBefore(times.endsAt())) {
+            throw new IllegalStateException("Moon event calendar interval must be non-empty.");
+        }
+        return times;
+    }
+
+    private static EventTimes fullMoonTimes(FullMoonEvent fullMoon) {
+        Instant center;
+        Interval selected = null;
+        if (fullMoon.localViewing() == null) {
+            center = Instant.parse(fullMoon.peakAt());
+        } else {
+            center = Instant.parse(fullMoon.localViewing().displayInterval().suggestedAt());
+            selected = fullMoon.localViewing().selectedInterval();
+        }
+        Instant startsAt = center.minus(30, ChronoUnit.MINUTES);
+        Instant endsAt = center.plus(30, ChronoUnit.MINUTES);
+        if (selected != null) {
+            startsAt = later(startsAt, Instant.parse(selected.startsAt()));
+            endsAt = earlier(endsAt, Instant.parse(selected.endsAt()));
+        }
+        return new EventTimes(startsAt, endsAt);
+    }
+
+    private static EventTimes from(Interval interval) {
+        Objects.requireNonNull(interval, "selectedInterval");
+        return new EventTimes(Instant.parse(interval.startsAt()), Instant.parse(interval.endsAt()));
+    }
+
+    private static Instant later(Instant first, Instant second) {
+        return first.isAfter(second) ? first : second;
+    }
+
+    private static Instant earlier(Instant first, Instant second) {
+        return first.isBefore(second) ? first : second;
+    }
+
+    private static String eventSummary(MoonEventResponse.Location location, MoonEvent event) {
+        return switch (event) {
+            case LunarEclipseEvent eclipse -> plainLabel(eclipse.subtype())
+                    + " lunar eclipse near " + location.displayName();
+            case FullMoonEvent ignored -> "Near-perigee full Moon near " + location.displayName();
+        };
+    }
+
+    private static String moonEventDescription(
+            MoonEventResponse.Location location,
+            MoonEvent event
+    ) {
+        EventTimes times = eventTimes(event);
+        List<String> lines = new ArrayList<>();
+        lines.add("Location: " + location.displayName() + ".");
+        switch (event) {
+            case LunarEclipseEvent eclipse -> {
+                lines.add("Event: " + plainLabel(eclipse.subtype()) + " lunar eclipse.");
+                lines.add("Eclipse maximum: " + localTime(location, eclipse.maximumAt()) + ".");
+                addSuggestedDetails(lines, location, eclipse.localVisibility().displayInterval());
+            }
+            case FullMoonEvent fullMoon -> {
+                lines.add("Event: near-perigee full Moon.");
+                lines.add("Exact full Moon: " + localTime(location, fullMoon.peakAt()) + ".");
+                if (fullMoon.localViewing() == null) {
+                    lines.add("Not visible from " + location.displayName() + ".");
+                } else {
+                    addSuggestedDetails(lines, location, fullMoon.localViewing().displayInterval());
+                }
+            }
+        }
+        lines.add("Calendar block: " + localTime(location, times.startsAt())
+                + " to " + localTime(location, times.endsAt()) + ".");
+        addPreferenceAssessment(lines, event);
+        lines.add(weatherDescription(event));
+        lines.add("Visibility uses a level horizon; terrain, buildings, and local obstructions are not included.");
+        return String.join("\n", lines);
+    }
+
+    private static void addSuggestedDetails(
+            List<String> lines,
+            MoonEventResponse.Location location,
+            DisplayInterval display
+    ) {
+        lines.add("Suggested local time: " + localTime(location, display.suggestedAt())
+                + "; Moon altitude: " + oneDecimal(display.moon().altitudeDegrees())
+                + " degrees; azimuth: " + oneDecimal(display.moon().azimuthDegrees())
+                + " degrees.");
+    }
+
+    private static void addPreferenceAssessment(List<String> lines, MoonEvent event) {
+        for (FilterAssessment filter : event instanceof LunarEclipseEvent eclipse
+                ? eclipse.preferenceAssessment().filters()
+                : ((FullMoonEvent) event).preferenceAssessment().filters()) {
+            String label = switch (filter.filter()) {
+                case "altitudeDegrees" -> "Altitude";
+                case "azimuthDegrees" -> "Direction";
+                default -> null;
+            };
+            if (label != null && !"not_applicable".equals(filter.status())) {
+                lines.add(label + " preference: " + plainLabel(filter.status()) + ".");
+            }
+        }
+    }
+
+    private static String weatherDescription(MoonEvent event) {
+        Weather weather = event instanceof LunarEclipseEvent eclipse
+                ? eclipse.weather() : ((FullMoonEvent) event).weather();
+        if (weather == null) {
+            return "Weather: not assessed.";
+        }
+        return switch (weather.status()) {
+            case "available" -> "Weather: " + weather.summary().strip() + ".";
+            case "outside_forecast_horizon" -> "Weather: outside the forecast horizon.";
+            case "temporarily_unavailable" -> "Weather: temporarily unavailable.";
+            default -> "Weather: unavailable.";
+        };
+    }
+
+    private static String localTime(MoonEventResponse.Location location, String instant) {
+        return localTime(location, Instant.parse(instant));
+    }
+
+    private static String localTime(MoonEventResponse.Location location, Instant instant) {
+        return LOCAL_TIME.format(instant.atZone(ZoneId.of(location.timezone())));
+    }
+
     private static String plainLabel(String value) {
         return Objects.requireNonNull(value, "value").replace('_', ' ').toLowerCase(Locale.ENGLISH);
     }
@@ -213,5 +381,8 @@ final class ICalendarEventRenderer {
         return Objects.requireNonNull(value, "value")
                 .replace("\r\n", "\n")
                 .replace('\r', '\n');
+    }
+
+    private record EventTimes(Instant startsAt, Instant endsAt) {
     }
 }

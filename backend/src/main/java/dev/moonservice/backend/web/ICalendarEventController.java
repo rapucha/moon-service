@@ -1,10 +1,13 @@
 package dev.moonservice.backend.web;
 
+import dev.moonservice.backend.events.MoonEventResponse;
+import dev.moonservice.backend.events.MoonEventService;
 import dev.moonservice.backend.opportunity.InvalidOpportunitySearchRequestException;
 import dev.moonservice.backend.opportunity.OpportunitySearchService;
 import dev.moonservice.backend.opportunity.search.OpportunityResponse;
 import dev.moonservice.backend.opportunity.search.OpportunitySearchResponse;
 import jakarta.servlet.http.HttpServletRequest;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
@@ -20,17 +23,23 @@ import java.util.Objects;
 
 @RestController
 final class ICalendarEventController {
-    private static final int OPPORTUNITY_ID_LIMIT = 200;
+    private static final int ID_LIMIT = 200;
     private static final MediaType ICALENDAR_MEDIA_TYPE =
             new MediaType("text", "calendar", StandardCharsets.UTF_8);
 
     private final OpportunitySearchService opportunitySearchService;
     private final Clock clock;
+    private MoonEventService moonEventService;
 
     ICalendarEventController(OpportunitySearchService opportunitySearchService, Clock clock) {
         this.opportunitySearchService = Objects.requireNonNull(
                 opportunitySearchService, "opportunitySearchService");
         this.clock = Objects.requireNonNull(clock, "clock");
+    }
+
+    @Autowired
+    void setMoonEventService(MoonEventService moonEventService) {
+        this.moonEventService = Objects.requireNonNull(moonEventService, "moonEventService");
     }
 
     @GetMapping(
@@ -64,20 +73,69 @@ final class ICalendarEventController {
             }
             byte[] calendar = ICalendarEventRenderer.render(
                     success.location(), opportunity, Instant.parse(success.generatedAt()));
-            HttpHeaders headers = new HttpHeaders();
-            headers.setContentType(ICALENDAR_MEDIA_TYPE);
-            headers.set(HttpHeaders.CONTENT_DISPOSITION,
-                    "attachment; filename=\"moon-opportunity.ics\"");
-            headers.setCacheControl("no-store");
-            headers.setContentLength(calendar.length);
-            return head
-                    ? ResponseEntity.ok().headers(headers).build()
-                    : ResponseEntity.ok().headers(headers).body(calendar);
+            return calendar(calendar, "moon-opportunity.ics", head);
         } catch (InvalidOpportunitySearchRequestException exception) {
             return error(HttpStatus.BAD_REQUEST, "invalid_request", exception.getMessage(), head);
         } catch (RuntimeException exception) {
             return temporarilyUnavailable(head);
         }
+    }
+
+    @GetMapping(
+            value = {"/events/{eventId}.ics", "/events/.ics"},
+            produces = "text/calendar;charset=UTF-8"
+    )
+    ResponseEntity<?> moonEvent(
+            @PathVariable(name = "eventId", required = false) String eventId,
+            HttpServletRequest request
+    ) {
+        boolean head = "HEAD".equals(request.getMethod());
+        try {
+            validateId(eventId, "eventId");
+            PublicPreferenceQuery.MoonEventCalendarRequest calendarRequest =
+                    PublicPreferenceQuery.parseMoonEventCalendar(request);
+            ProductRequestParser.IgnoredFields ignored = calendarRequest.ignoredFields();
+            MoonEventResponse response = moonEventService.search(
+                    calendarRequest.locationId(),
+                    calendarRequest.preferences(),
+                    calendarRequest.eventHorizonMonths(),
+                    ignored.paths(),
+                    ignored.count());
+            if (!(response instanceof MoonEventResponse.Success success)
+                    || !"ok".equals(success.status())) {
+                return moonEventStatusError(response, head);
+            }
+            MoonEventResponse.MoonEvent selected = success.events().stream()
+                    .filter(candidate -> eventId.equals(candidate.id()))
+                    .findFirst()
+                    .orElse(null);
+            if (selected == null) {
+                return error(
+                        HttpStatus.NOT_FOUND,
+                        "event_not_found",
+                        "This Moon event is no longer available. Refresh the Moon Service search.",
+                        head);
+            }
+            byte[] content = ICalendarEventRenderer.renderMoonEvent(
+                    success.location(), selected, Instant.parse(success.generatedAt()));
+            return calendar(content, "moon-event.ics", head);
+        } catch (InvalidOpportunitySearchRequestException exception) {
+            return error(HttpStatus.BAD_REQUEST, "invalid_request", exception.getMessage(), head);
+        } catch (RuntimeException exception) {
+            return moonEventsTemporarilyUnavailable(head);
+        }
+    }
+
+    private ResponseEntity<?> calendar(byte[] content, String filename, boolean head) {
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(ICALENDAR_MEDIA_TYPE);
+        headers.set(HttpHeaders.CONTENT_DISPOSITION,
+                "attachment; filename=\"" + filename + "\"");
+        headers.setCacheControl("no-store");
+        headers.setContentLength(content.length);
+        return head
+                ? ResponseEntity.ok().headers(headers).build()
+                : ResponseEntity.ok().headers(headers).body(content);
     }
 
     private OpportunityResponse search(PublicPreferenceQuery.CalendarRequest request) {
@@ -120,11 +178,30 @@ final class ICalendarEventController {
         return temporarilyUnavailable(head);
     }
 
+    private ResponseEntity<?> moonEventStatusError(MoonEventResponse response, boolean head) {
+        if (response != null && "location_not_found".equals(response.status())) {
+            return error(
+                    HttpStatus.NOT_FOUND,
+                    "location_not_found",
+                    "No matching location found.",
+                    head);
+        }
+        return moonEventsTemporarilyUnavailable(head);
+    }
+
     private ResponseEntity<?> temporarilyUnavailable(boolean head) {
         return error(
                 HttpStatus.SERVICE_UNAVAILABLE,
                 "temporarily_unavailable",
                 "Moon opportunities are temporarily unavailable.",
+                head);
+    }
+
+    private ResponseEntity<?> moonEventsTemporarilyUnavailable(boolean head) {
+        return error(
+                HttpStatus.SERVICE_UNAVAILABLE,
+                "temporarily_unavailable",
+                "Moon events are temporarily unavailable.",
                 head);
     }
 
@@ -143,14 +220,18 @@ final class ICalendarEventController {
     }
 
     private static void validateOpportunityId(String opportunityId) {
-        if (opportunityId == null || opportunityId.isBlank()) {
-            throw invalid("opportunityId must be non-empty.");
+        validateId(opportunityId, "opportunityId");
+    }
+
+    private static void validateId(String value, String field) {
+        if (value == null || value.isBlank()) {
+            throw invalid(field + " must be non-empty.");
         }
-        if (containsUnsupportedControlCharacter(opportunityId)) {
-            throw invalid("opportunityId contains unsupported control characters.");
+        if (containsUnsupportedControlCharacter(value)) {
+            throw invalid(field + " contains unsupported control characters.");
         }
-        if (opportunityId.codePointCount(0, opportunityId.length()) > OPPORTUNITY_ID_LIMIT) {
-            throw invalid("opportunityId must be 200 characters or fewer.");
+        if (value.codePointCount(0, value.length()) > ID_LIMIT) {
+            throw invalid(field + " must be 200 characters or fewer.");
         }
     }
 

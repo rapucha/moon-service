@@ -66,8 +66,11 @@ public sealed interface MoonEventResponse
         String id();
 
         String kind();
+
+        MoonEvent withLinks(Links links);
     }
 
+    @JsonInclude(JsonInclude.Include.NON_NULL)
     record LunarEclipseEvent(
             String id,
             String kind,
@@ -81,11 +84,41 @@ public sealed interface MoonEventResponse
             MoonPosition moonAtMaximum,
             EventVisibility localVisibility,
             PreferenceAssessment preferenceAssessment,
-            Weather weather
+            Weather weather,
+            Links links
     ) implements MoonEvent {
+        public LunarEclipseEvent(
+                String id,
+                String kind,
+                String subtype,
+                String startsAt,
+                String maximumAt,
+                String endsAt,
+                double umbralObscurationPercent,
+                List<EclipsePhase> phases,
+                List<EclipseShadowSample> shadowSamples,
+                MoonPosition moonAtMaximum,
+                EventVisibility localVisibility,
+                PreferenceAssessment preferenceAssessment,
+                Weather weather
+        ) {
+            this(id, kind, subtype, startsAt, maximumAt, endsAt, umbralObscurationPercent,
+                    phases, shadowSamples, moonAtMaximum, localVisibility,
+                    preferenceAssessment, weather, null);
+        }
+
         public LunarEclipseEvent {
             phases = List.copyOf(phases);
             shadowSamples = List.copyOf(shadowSamples);
+        }
+
+        @Override
+        public LunarEclipseEvent withLinks(Links value) {
+            return new LunarEclipseEvent(
+                    id, kind, subtype, startsAt, maximumAt, endsAt,
+                    umbralObscurationPercent, phases, shadowSamples, moonAtMaximum,
+                    localVisibility, preferenceAssessment, weather,
+                    java.util.Objects.requireNonNull(value, "links"));
         }
     }
 
@@ -97,11 +130,34 @@ public sealed interface MoonEventResponse
             List<FullMoonQualifier> qualifiers,
             LocalViewing localViewing,
             PreferenceAssessment preferenceAssessment,
-            Weather weather
+            Weather weather,
+            Links links
     ) implements MoonEvent {
+        public FullMoonEvent(
+                String id,
+                String kind,
+                String peakAt,
+                List<FullMoonQualifier> qualifiers,
+                LocalViewing localViewing,
+                PreferenceAssessment preferenceAssessment,
+                Weather weather
+        ) {
+            this(id, kind, peakAt, qualifiers, localViewing, preferenceAssessment, weather, null);
+        }
+
         public FullMoonEvent {
             qualifiers = List.copyOf(qualifiers);
         }
+
+        @Override
+        public FullMoonEvent withLinks(Links value) {
+            return new FullMoonEvent(
+                    id, kind, peakAt, qualifiers, localViewing, preferenceAssessment, weather,
+                    java.util.Objects.requireNonNull(value, "links"));
+        }
+    }
+
+    record Links(String ics) {
     }
 
     record FullMoonQualifier(

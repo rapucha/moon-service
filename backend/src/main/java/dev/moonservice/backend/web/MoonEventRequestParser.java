@@ -49,7 +49,26 @@ final class MoonEventRequestParser {
         if (!value.isIntegralNumber() || !value.canConvertToInt()) {
             throw ProductRequestParser.invalid("eventHorizonMonths must be an integer.");
         }
-        int months = value.intValue();
+        return supportedEventHorizonMonths(value.intValue());
+    }
+
+    static int eventHorizonMonths(String value) {
+        if (value == null) {
+            throw ProductRequestParser.invalid("eventHorizonMonths is required.");
+        }
+        int months;
+        try {
+            if (!value.matches("[0-9]+")) {
+                throw new NumberFormatException();
+            }
+            months = Integer.parseInt(value);
+        } catch (NumberFormatException exception) {
+            throw ProductRequestParser.invalid("eventHorizonMonths must be an integer.");
+        }
+        return supportedEventHorizonMonths(months);
+    }
+
+    private static int supportedEventHorizonMonths(int months) {
         if (!SUPPORTED_HORIZON_MONTHS.contains(months)) {
             throw ProductRequestParser.invalid(
                     "eventHorizonMonths must be one of " + SUPPORTED_HORIZON_MONTHS_TEXT + ".");

@@ -73,7 +73,7 @@ class MoonEventControllerTest {
         assertThat(response.path("events").get(0).propertyNames()).containsExactlyInAnyOrder(
                 "id", "kind", "subtype", "startsAt", "maximumAt", "endsAt",
                 "umbralObscurationPercent", "phases", "shadowSamples", "moonAtMaximum",
-                "localVisibility", "preferenceAssessment", "weather");
+                "localVisibility", "preferenceAssessment", "weather", "links");
         assertThat(response.at("/events/0/shadowSamples/0").propertyNames())
                 .containsExactlyInAnyOrder("at", "moon", "shadow");
         assertThat(response.at("/events/0/shadowSamples/0/moon").propertyNames())
@@ -101,11 +101,16 @@ class MoonEventControllerTest {
                 "status", "forecastHourStartsAt", "summary", "cloudCoverPercent",
                 "precipitationProbabilityPercent");
         assertThat(response.at("/events/1/weather").propertyNames()).containsExactly("status");
+        assertThat(response.at("/events/0/links/ics").asString()).isEqualTo(
+                "/events/event-1.ics?locationId=prague-cz"
+                        + "&preferences=%7B%22version%22%3A1%2C%22altitudeDegrees%22%3A%7B"
+                        + "%22minimum%22%3A5%2C%22maximum%22%3A10%7D%7D"
+                        + "&eventHorizonMonths=18");
 
         JsonNode fullMoon = response.path("events").get(2);
         assertThat(fullMoon.propertyNames()).containsExactlyInAnyOrder(
                 "id", "kind", "peakAt", "qualifiers", "localViewing",
-                "preferenceAssessment", "weather");
+                "preferenceAssessment", "weather", "links");
         assertThat(fullMoon.path("qualifiers").get(0).propertyNames())
                 .containsExactlyInAnyOrder(
                         "kind", "definitionVersion", "closeness",
@@ -122,7 +127,7 @@ class MoonEventControllerTest {
         assertThat(fullMoonPath.has("shadow")).isFalse();
         JsonNode noLocal = response.path("events").get(3);
         assertThat(noLocal.propertyNames()).containsExactlyInAnyOrder(
-                "id", "kind", "peakAt", "qualifiers", "preferenceAssessment");
+                "id", "kind", "peakAt", "qualifiers", "preferenceAssessment", "links");
 
         verify(service).search(
                 eq("prague-cz"),
@@ -149,7 +154,10 @@ class MoonEventControllerTest {
                                 {"locationId":"prague-cz","preferences":{"version":1},
                                  "eventHorizonMonths":%d}
                                 """.formatted(eventHorizonMonths)))
-                .andExpect(status().isOk());
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.events[0].links.ics").value(
+                        "/events/event-1.ics?locationId=prague-cz"
+                                + "&eventHorizonMonths=" + eventHorizonMonths));
 
         verify(service).search(
                 eq("prague-cz"), any(), eq(eventHorizonMonths), eq(List.of()), eq(0));
@@ -194,6 +202,10 @@ class MoonEventControllerTest {
                 Arguments.of(PATH,
                         "{\"locationId\":\"prague-cz\",\"preferences\":{\"version\":1},"
                                 + "\"eventHorizonMonths\":5}",
+                        "eventHorizonMonths must be one of 6, 12, 18, 24, 36."),
+                Arguments.of(PATH,
+                        "{\"locationId\":\"prague-cz\",\"preferences\":{\"version\":1},"
+                                + "\"eventHorizonMonths\":-6}",
                         "eventHorizonMonths must be one of 6, 12, 18, 24, 36."),
                 Arguments.of(PATH,
                         "{\"locationId\":\"prague-cz\",\"preferences\":{\"version\":1},"

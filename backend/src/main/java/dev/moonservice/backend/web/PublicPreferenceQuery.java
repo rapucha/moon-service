@@ -28,6 +28,8 @@ final class PublicPreferenceQuery {
     private static final ObjectMapper MAPPER = new ObjectMapper();
     private static final Set<String> CALENDAR_PARAMETERS =
             Set.of("locationId", "order", "weatherRanking", "preferences");
+    private static final Set<String> MOON_EVENT_PARAMETERS =
+            Set.of("locationId", "preferences", "eventHorizonMonths");
     private static final char[] HEX = "0123456789ABCDEF".toCharArray();
     private static final DateTimeFormatter CLOCK_FORMAT = DateTimeFormatter.ofPattern("HH:mm");
 
@@ -36,14 +38,7 @@ final class PublicPreferenceQuery {
 
     static CalendarRequest parseCalendar(HttpServletRequest request) {
         Map<String, String[]> parameters = request.getParameterMap();
-        if (parameters.keySet().stream().anyMatch(name -> !CALENDAR_PARAMETERS.contains(name))) {
-            throw invalid("Request contains an unknown query parameter.");
-        }
-        for (String[] values : parameters.values()) {
-            if (values == null || values.length != 1) {
-                throw invalid("Query parameters must not be repeated.");
-            }
-        }
+        validateParameters(parameters, CALENDAR_PARAMETERS);
 
         String locationId = parameter(parameters, "locationId");
         if (locationId == null) {
@@ -66,6 +61,29 @@ final class PublicPreferenceQuery {
                         : parsedPreferences.ignoredFields());
     }
 
+    static MoonEventCalendarRequest parseMoonEventCalendar(HttpServletRequest request) {
+        Map<String, String[]> parameters = request.getParameterMap();
+        validateParameters(parameters, MOON_EVENT_PARAMETERS);
+        String locationId = parameter(parameters, "locationId");
+        if (locationId == null) {
+            throw invalid("locationId is required.");
+        }
+        String rawPreferences = parameter(parameters, "preferences");
+        ProductRequestParser.ParsedPreferences parsedPreferences = rawPreferences == null
+                ? null
+                : ProductRequestParser.parsePreferences(preferenceObject(rawPreferences));
+        return new MoonEventCalendarRequest(
+                calendarLocationId(locationId),
+                parsedPreferences == null
+                        ? OpportunityPreferences.none()
+                        : parsedPreferences.preferences(),
+                parsedPreferences == null
+                        ? new ProductRequestParser.IgnoredFields(List.of(), 0)
+                        : parsedPreferences.ignoredFields(),
+                MoonEventRequestParser.eventHorizonMonths(
+                        parameter(parameters, "eventHorizonMonths")));
+    }
+
     static String calendarQuery(
             String canonicalLocationId,
             Order order,
@@ -84,6 +102,38 @@ final class PublicPreferenceQuery {
             query.append("&preferences=").append(encode(canonicalPreferences(preferences)));
         }
         return query.toString();
+    }
+
+    static String moonEventCalendarLink(
+            String eventId,
+            String canonicalLocationId,
+            OpportunityPreferences preferences,
+            int eventHorizonMonths
+    ) {
+        StringBuilder link = new StringBuilder("/events/")
+                .append(encode(Objects.requireNonNull(eventId, "eventId")))
+                .append(".ics?locationId=")
+                .append(encode(Objects.requireNonNull(canonicalLocationId, "canonicalLocationId")));
+        if (Objects.requireNonNull(preferences, "preferences").active()) {
+            link.append("&preferences=").append(encode(canonicalPreferences(preferences)));
+        }
+        return link.append("&eventHorizonMonths=")
+                .append(eventHorizonMonths)
+                .toString();
+    }
+
+    private static void validateParameters(
+            Map<String, String[]> parameters,
+            Set<String> accepted
+    ) {
+        if (parameters.keySet().stream().anyMatch(name -> !accepted.contains(name))) {
+            throw invalid("Request contains an unknown query parameter.");
+        }
+        for (String[] values : parameters.values()) {
+            if (values == null || values.length != 1) {
+                throw invalid("Query parameters must not be repeated.");
+            }
+        }
     }
 
     private static String parameter(Map<String, String[]> parameters, String name) {
@@ -270,6 +320,14 @@ final class PublicPreferenceQuery {
             ProductWeatherRanking weatherRanking,
             OpportunityPreferences preferences,
             ProductRequestParser.IgnoredFields ignoredFields
+    ) {
+    }
+
+    record MoonEventCalendarRequest(
+            String locationId,
+            OpportunityPreferences preferences,
+            ProductRequestParser.IgnoredFields ignoredFields,
+            int eventHorizonMonths
     ) {
     }
 
